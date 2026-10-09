@@ -79,7 +79,7 @@ public class StudioTrackService {
         }
 
         return tracks.stream().map(track -> {
-            Genre genre = genreRepository.findById(track.getGenreId()).orElse(null);
+            Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
             Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
             TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
             return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
@@ -92,7 +92,7 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        Genre genre = genreRepository.findById(track.getGenreId()).orElse(null);
+        Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
 
