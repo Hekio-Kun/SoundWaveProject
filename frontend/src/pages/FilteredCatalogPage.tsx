@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { genres as staticGenres, tracks as staticTracks } from "../data";
 import { catalogApi } from "../api/catalog";
 import { TrackCard } from "../components/MusicCards";
 import { SortDropdown } from "../components/SortDropdown";
@@ -25,8 +24,13 @@ export function FilteredCatalogPage({
 }: Props) {
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre ?? "all");
   const [sortBy, setSortBy] = useState<"newest" | "trending" | "title">(initialSort ?? "newest");
-  const [genresList, setGenresList] = useState<Genre[]>(staticGenres);
-  const [serverTracks, setServerTracks] = useState<LandingTrack[] | null>(null);
+  const [genresList, setGenresList] = useState<Genre[]>([]);
+  const [genresLoading, setGenresLoading] = useState(true);
+  const [genresError, setGenresError] = useState(false);
+
+  const [tracks, setTracks] = useState<LandingTrack[]>([]);
+  const [tracksLoading, setTracksLoading] = useState(true);
+  const [tracksError, setTracksError] = useState<string | null>(null);
 
   // Keep state in sync with URL query params
   useEffect(() => {
@@ -37,76 +41,100 @@ export function FilteredCatalogPage({
     setSortBy(initialSort ?? "newest");
   }, [initialSort]);
 
-  // Load genres from backend
+  // Phase 1: Load available genres from backend
   useEffect(() => {
-    catalogApi.getGenres()
-      .then((data) => {
-        if (data && data.length > 0) setGenresList(data);
-      })
-      .catch(() => {});
-  }, []);
+    let active = true;
+    setGenresLoading(true);
+    setGenresError(false);
 
-  // Load filtered tracks from backend
-  useEffect(() => {
-    catalogApi.getTracks({
-      genre: selectedGenre !== "all" ? selectedGenre : undefined,
-      sort: sortBy,
-    })
-      .then((res) => {
-        if (res && res.content) {
-          setServerTracks(res.content);
+    catalogApi
+      .getGenres()
+      .then((data) => {
+        if (!active) return;
+        if (data && data.length > 0) {
+          setGenresList(data);
+          setGenresError(false);
+        } else {
+          setGenresList([]);
+          setGenresError(true);
         }
       })
       .catch(() => {
-        setServerTracks(null);
+        if (!active) return;
+        setGenresList([]);
+        setGenresError(true);
+      })
+      .finally(() => {
+        if (active) setGenresLoading(false);
       });
-  }, [selectedGenre, sortBy]);
 
-  const approvedTracks = useMemo(
-    () => staticTracks.filter((track) => track.publicationStatus === "APPROVED"),
-    []
-  );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Phase 2 & 3: Query matching published tracks whenever genre or sort changes
+  useEffect(() => {
+    let active = true;
+    setTracksLoading(true);
+    setTracksError(null);
+
+    catalogApi
+      .getTracks({
+        genre: selectedGenre !== "all" ? selectedGenre : undefined,
+        sort: sortBy,
+        page: 0,
+        size: 20,
+      })
+      .then((res) => {
+        if (!active) return;
+        setTracks(res?.content ?? []);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setTracks([]);
+        setTracksError(err instanceof Error ? err.message : "Failed to load public catalog.");
+      })
+      .finally(() => {
+        if (active) setTracksLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedGenre, sortBy]);
 
   const activeGenreObj = useMemo(
     () => genresList.find((g) => g.slug.toLowerCase() === selectedGenre.toLowerCase()),
     [genresList, selectedGenre]
   );
 
+  // Phase 2: Select genre filter & trigger query with unselect reset to 'all'
   const updateFilters = (newGenre: string, newSort: "newest" | "trending" | "title") => {
     setSelectedGenre(newGenre);
     setSortBy(newSort);
+
     const params = new URLSearchParams();
     if (newGenre && newGenre !== "all") params.set("genre", newGenre);
     if (newSort && newSort !== "newest") params.set("sort", newSort);
     const qs = params.toString();
-    const nextHash = qs ? `#/browse?${qs}` : "#/browse";
-    window.history.replaceState(null, "", nextHash);
+
+    // Update browser URL hash without full page reload
+    onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+  };
+
+  const handleGenreTagClick = (slug: string) => {
+    // Sequence diagram Phase 2: If user clicks "All" or unselects the currently active genre -> resets to "all"
+    if (slug === "all" || selectedGenre.toLowerCase() === slug.toLowerCase()) {
+      updateFilters("all", sortBy);
+    } else {
+      updateFilters(slug, sortBy);
+    }
   };
 
   const handleClearFilters = () => {
     updateFilters("all", "newest");
   };
-
-  const filteredTracks = useMemo(() => {
-    const list: LandingTrack[] =
-      serverTracks !== null
-        ? serverTracks
-        : (selectedGenre === "all"
-            ? approvedTracks
-            : approvedTracks.filter(
-                (track) => track.genreSlug?.toLowerCase() === selectedGenre.toLowerCase()
-              ));
-
-    return [...list].sort((a, b) => {
-      if (sortBy === "trending") {
-        if (b.playCount !== a.playCount) return b.playCount - a.playCount;
-        return b.id - a.id;
-      }
-      if (sortBy === "newest") return b.id - a.id;
-      if (sortBy === "title") return a.title.localeCompare(b.title);
-      return 0;
-    });
-  }, [approvedTracks, serverTracks, selectedGenre, sortBy]);
 
   return (
     <div className="catalog-browse-page" style={{ padding: "0 0 60px 0" }}>
@@ -138,15 +166,10 @@ export function FilteredCatalogPage({
           alignItems: "center",
           justifyContent: "space-between",
           gap: "14px",
-          padding: "14px 18px",
-          background: "#fff",
-          border: "1px solid var(--sw-border)",
-          borderRadius: "16px",
-          marginBottom: "16px",
-          boxShadow: "0 4px 18px rgba(16, 24, 40, 0.03)",
+          marginBottom: "18px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           {/* Custom Modern Sort Dropdown */}
           <SortDropdown
             value={sortBy}
@@ -190,7 +213,7 @@ export function FilteredCatalogPage({
               fontWeight: 700,
             }}
           >
-            Result count: <b>{filteredTracks.length}</b> tracks
+            Result count: <b>{tracks.length}</b> tracks
           </span>
           {activeGenreObj && (
             <span
@@ -210,7 +233,7 @@ export function FilteredCatalogPage({
         </div>
       </div>
 
-      {/* Quick genre pills scrollbar */}
+      {/* Phase 1: Quick genre filter pills scrollbar (Default: All, Ballad, Pop, Rock, ...) */}
       <div
         className="sw-filter-scroll"
         style={{
@@ -219,54 +242,104 @@ export function FilteredCatalogPage({
           overflowX: "auto",
           marginBottom: "22px",
           paddingBottom: "4px",
+          alignItems: "center",
         }}
       >
-        <button
-          className={selectedGenre === "all" ? "is-active" : ""}
-          onClick={() => updateFilters("all", sortBy)}
-          style={{
-            padding: "8px 16px",
-            borderRadius: "10px",
-            fontSize: "12px",
-            fontWeight: 700,
-            border: selectedGenre === "all" ? "none" : "1px solid var(--sw-border)",
-            background: selectedGenre === "all" ? "var(--sw-primary)" : "#fff",
-            color: selectedGenre === "all" ? "#fff" : "var(--sw-muted)",
-            cursor: "pointer",
-          }}
-        >
-          All Genres
-        </button>
-        {genresList.map((g) => {
-          const isSelected = selectedGenre.toLowerCase() === g.slug.toLowerCase();
-          return (
+        {genresLoading ? (
+          <span style={{ fontSize: "12px", color: "var(--sw-muted)", padding: "8px 0" }}>
+            Loading genre filters...
+          </span>
+        ) : genresError && genresList.length === 0 ? (
+          /* Step 12: Display message "No genres are available right now" */
+          <span style={{ fontSize: "12px", color: "#DC2626", background: "#FEF2F2", padding: "6px 14px", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
+            No genres are available right now
+          </span>
+        ) : (
+          /* Step 13: Render all genre filter tags (Default: All, Ballad, Pop, ...) */
+          <>
             <button
-              key={g.id}
-              className={isSelected ? "is-active" : ""}
-              onClick={() => updateFilters(g.slug, sortBy)}
+              className={selectedGenre === "all" ? "is-active" : ""}
+              onClick={() => handleGenreTagClick("all")}
               style={{
                 padding: "8px 16px",
                 borderRadius: "10px",
                 fontSize: "12px",
                 fontWeight: 700,
-                border: isSelected ? "none" : "1px solid var(--sw-border)",
-                background: isSelected ? "var(--sw-primary)" : "#fff",
-                color: isSelected ? "#fff" : "var(--sw-muted)",
+                border: selectedGenre === "all" ? "none" : "1px solid var(--sw-border)",
+                background: selectedGenre === "all" ? "var(--sw-primary)" : "#fff",
+                color: selectedGenre === "all" ? "#fff" : "var(--sw-muted)",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
-                boxShadow: isSelected ? "0 4px 12px rgba(8, 145, 178, 0.25)" : "none",
+                boxShadow: selectedGenre === "all" ? "0 4px 12px rgba(8, 145, 178, 0.25)" : "none",
               }}
             >
-              {g.name}
+              All Genres
             </button>
-          );
-        })}
+            {genresList.map((g) => {
+              const isSelected = selectedGenre.toLowerCase() === g.slug.toLowerCase();
+              return (
+                <button
+                  key={g.id}
+                  className={isSelected ? "is-active" : ""}
+                  onClick={() => handleGenreTagClick(g.slug)}
+                  title={isSelected ? `Unselect ${g.name} (reset to all)` : `Filter by ${g.name}`}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "10px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    border: isSelected ? "none" : "1px solid var(--sw-border)",
+                    background: isSelected ? "var(--sw-primary)" : "#fff",
+                    color: isSelected ? "#fff" : "var(--sw-muted)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    boxShadow: isSelected ? "0 4px 12px rgba(8, 145, 178, 0.25)" : "none",
+                  }}
+                >
+                  {g.name}
+                </button>
+              );
+            })}
+          </>
+        )}
       </div>
 
-      {/* Track Cards Results or Empty State */}
-      {filteredTracks.length > 0 ? (
+      {/* Phase 4: Track Cards Results or Empty State */}
+      {tracksLoading ? (
+        <div
+          style={{
+            minHeight: "240px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--sw-muted)",
+            fontSize: "14px",
+          }}
+        >
+          Loading songs for selected filters...
+        </div>
+      ) : tracksError ? (
+        <div
+          style={{
+            padding: "24px",
+            background: "#FEF2F2",
+            border: "1px solid #FCA5A5",
+            borderRadius: "14px",
+            color: "#991B1B",
+            textAlign: "center",
+          }}
+        >
+          <strong>{tracksError}</strong>
+          <div style={{ marginTop: "12px" }}>
+            <button className="button button-secondary" onClick={() => updateFilters(selectedGenre, sortBy)}>
+              Retry query
+            </button>
+          </div>
+        </div>
+      ) : tracks.length > 0 ? (
+        /* Step 31 & 32: Render matching Track Cards */
         <div className="sw-track-grid sw-track-grid--catalog">
-          {filteredTracks.map((track) => (
+          {tracks.map((track) => (
             <TrackCard
               key={track.id}
               track={track}
@@ -275,7 +348,7 @@ export function FilteredCatalogPage({
               onPlay={(t) =>
                 onPlayTrack(
                   t,
-                  filteredTracks,
+                  tracks,
                   selectedGenre !== "all" ? `Genre • ${selectedGenre}` : "Catalog"
                 )
               }
@@ -284,6 +357,7 @@ export function FilteredCatalogPage({
           ))}
         </div>
       ) : (
+        /* Step 30: Empty State as per Sequence Diagram */
         <div
           className="sw-empty"
           style={{
@@ -297,6 +371,7 @@ export function FilteredCatalogPage({
             alignItems: "center",
             justifyContent: "center",
             gap: "12px",
+            textAlign: "center",
           }}
         >
           <div
@@ -312,19 +387,29 @@ export function FilteredCatalogPage({
           >
             <HeadphonesIcon width={28} height={28} />
           </div>
+
+          {/* Sequence diagram Step 30 exact message: "No published songs found for this genre. Please select another genre." */}
           <strong style={{ fontSize: "16px", color: "var(--sw-text)" }}>
-            No tracks found in {activeGenreObj ? `"${activeGenreObj.name}"` : "this genre"}
+            {selectedGenre !== "all"
+              ? "No published songs found for this genre. Please select another genre."
+              : "No published songs found in catalog. Please check back later."}
           </strong>
-          <span style={{ fontSize: "13px", color: "var(--sw-muted)" }}>
-            There are currently no approved published tracks in this category.
+
+          <span style={{ fontSize: "13px", color: "var(--sw-muted)", maxWidth: "420px" }}>
+            {selectedGenre !== "all"
+              ? `There are currently no active public tracks assigned to ${activeGenreObj ? `"${activeGenreObj.name}"` : "this genre"}. Try exploring other musical genres.`
+              : "There are currently no published tracks available in the public catalog."}
           </span>
-          <button
-            className="button button-primary"
-            onClick={handleClearFilters}
-            style={{ marginTop: "10px" }}
-          >
-            Clear filters and view all tracks
-          </button>
+
+          {selectedGenre !== "all" && (
+            <button
+              className="button button-primary"
+              onClick={handleClearFilters}
+              style={{ marginTop: "10px" }}
+            >
+              Clear filters and view all tracks
+            </button>
+          )}
         </div>
       )}
     </div>

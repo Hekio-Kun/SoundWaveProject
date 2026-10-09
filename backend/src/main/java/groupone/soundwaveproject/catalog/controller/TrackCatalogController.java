@@ -39,7 +39,7 @@ public class TrackCatalogController {
     ) {
         log.info("Fetching public track catalog: genre={}, search={}, sort={}, page={}",
                 genre, search, sort, pageable.getPageNumber());
-        return ResponseEntity.ok(trackCatalogService.getPublishedTracks(genre, search, sort, pageable));
+        return ResponseEntity.ok(trackCatalogService.getFilteredTracks(genre, search, sort, pageable));
     }
 
     /**

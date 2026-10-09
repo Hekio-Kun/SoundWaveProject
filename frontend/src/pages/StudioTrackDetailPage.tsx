@@ -7,6 +7,7 @@ import {
   type GenreOption,
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { MediaUploadField } from "../components/MediaUploadField";
 import {
   AlertIcon,
   CheckIcon,
@@ -800,9 +801,12 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <div>
-                <h3 id="edit-track-modal-title">Edit Track: {track.title}</h3>
-                <p className="modal-subtitle">Update metadata, audio file, and cover artwork</p>
+              <div className="studio-modal-heading">
+                <span className="studio-modal-heading__icon"><UploadIcon width={20} height={20} /></span>
+                <div>
+                  <span className="eyebrow">CONTENT STUDIO</span>
+                  <h3 id="edit-track-modal-title">Edit track</h3>
+                </div>
               </div>
               <button
                 className="icon-button"
@@ -814,132 +818,236 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="studio-track-form">
-              <div className="modal-body" style={{ maxHeight: "calc(80vh - 120px)", overflowY: "auto" }}>
+            {Object.keys(formErrors).length > 0 && (
+              <div className="auth-v2-error" role="alert">
+                <span><AlertIcon width={16} height={16} /></span>
+                <div>
+                  <b>Please review errors below</b>
+                  <small>Make sure all mandatory fields are correctly filled.</small>
+                </div>
+              </div>
+            )}
+
+            {actionError && (
+              <div className="auth-v2-error studio-inline-api-error" role="alert">
+                <span><AlertIcon width={16} height={16} /></span>
+                <div>
+                  <b>Unable to save this track</b>
+                  <small>{actionError}</small>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleEditSubmit} className="modal-form" noValidate>
+              <div className="form-group">
+                <label htmlFor="edit-track-title">
+                  Title <span style={{ color: "var(--sw-danger, #ef4444)" }}>*</span>
+                </label>
+                <input
+                  id="edit-track-title"
+                  type="text"
+                  placeholder="For example: Sunset Memories"
+                  value={editTitle}
+                  aria-invalid={Boolean(formErrors.title)}
+                  style={formErrors.title ? { borderColor: "#b42318", background: "#fef3f2" } : {}}
+                  onChange={(e) => {
+                    setEditTitle(e.target.value);
+                    if (formErrors.title) {
+                      setFormErrors((prev) => ({ ...prev, title: "" }));
+                    }
+                  }}
+                  disabled={isProcessing}
+                />
+                {formErrors.title && (
+                  <small className="auth-v2-field-error">
+                    <AlertIcon width={12} height={12} />
+                    {formErrors.title}
+                  </small>
+                )}
+              </div>
+
+              <div className="studio-form-grid studio-form-grid--equal">
                 <div className="form-group">
-                  <label htmlFor="edit-track-title">
-                    Track Title <span className="text-danger">*</span>
+                  <label htmlFor="edit-track-genre">
+                    Genre <span style={{ color: "var(--sw-danger, #ef4444)" }}>*</span>
                   </label>
-                  <input
-                    id="edit-track-title"
-                    type="text"
-                    value={editTitle}
+                  <select
+                    id="edit-track-genre"
+                    value={editGenreId}
                     onChange={(e) => {
-                      setEditTitle(e.target.value);
-                      if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: "" }));
+                      setEditGenreId(Number(e.target.value));
+                      if (formErrors.genre) setFormErrors((prev) => ({ ...prev, genre: "" }));
                     }}
-                    placeholder="Enter track title"
-                    className={formErrors.title ? "input-error" : ""}
+                    style={formErrors.genre ? { borderColor: "#b42318", background: "#fef3f2" } : {}}
                     disabled={isProcessing}
-                  />
-                  {formErrors.title && <span className="field-error">{formErrors.title}</span>}
+                  >
+                    <option value={0}>Select genre...</option>
+                    {genres.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.genre && (
+                    <small className="auth-v2-field-error">
+                      <AlertIcon width={12} height={12} />
+                      {formErrors.genre}
+                    </small>
+                  )}
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="edit-track-genre">
-                      Genre <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="edit-track-genre"
-                      value={editGenreId}
-                      onChange={(e) => {
-                        setEditGenreId(Number(e.target.value));
-                        if (formErrors.genre) setFormErrors((prev) => ({ ...prev, genre: "" }));
-                      }}
-                      className={formErrors.genre ? "input-error" : ""}
-                      disabled={isProcessing}
-                    >
-                      <option value={0}>Select genre...</option>
-                      {genres.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.genre && <span className="field-error">{formErrors.genre}</span>}
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="edit-track-album">Album / Collection (Optional)</label>
-                    <select
-                      id="edit-track-album"
-                      value={editAlbumId}
-                      onChange={(e) => setEditAlbumId(e.target.value ? Number(e.target.value) : "")}
-                      disabled={isProcessing}
-                    >
-                      <option value="">Single release (no album)</option>
-                      {albums.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Audio File */}
                 <div className="form-group">
-                  <label>Replace Audio File (Optional - MP3, WAV, FLAC max 30MB)</label>
-                  <input
-                    type="file"
-                    accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setEditAudioFile(file);
-                      setEditAudioFileName(file ? file.name : "");
-                    }}
+                  <label htmlFor="edit-track-album">Album (optional)</label>
+                  <select
+                    id="edit-track-album"
+                    value={editAlbumId}
+                    onChange={(e) => setEditAlbumId(e.target.value ? Number(e.target.value) : "")}
                     disabled={isProcessing}
-                  />
-                  {editAudioFileName && <small className="text-muted">Selected: {editAudioFileName}</small>}
-                  {formErrors.audio && <span className="field-error">{formErrors.audio}</span>}
-                </div>
-
-                {/* Cover File */}
-                <div className="form-group">
-                  <label>Replace Cover Artwork (Optional - JPG, PNG max 5MB)</label>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setEditCoverFile(file);
-                      setEditCoverFileName(file ? file.name : "");
-                    }}
-                    disabled={isProcessing}
-                  />
-                  {editCoverFileName && <small className="text-muted">Selected: {editCoverFileName}</small>}
-                  {formErrors.cover && <span className="field-error">{formErrors.cover}</span>}
-                </div>
-
-                {/* Description */}
-                <div className="form-group">
-                  <label htmlFor="edit-track-desc">Description</label>
-                  <textarea
-                    id="edit-track-desc"
-                    rows={3}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Story behind the track or notes..."
-                    disabled={isProcessing}
-                  />
-                </div>
-
-                {/* Lyrics */}
-                <div className="form-group">
-                  <label htmlFor="edit-track-lyrics">Lyrics (Optional)</label>
-                  <textarea
-                    id="edit-track-lyrics"
-                    rows={4}
-                    value={editLyricsContent}
-                    onChange={(e) => setEditLyricsContent(e.target.value)}
-                    placeholder="Enter song lyrics here..."
-                    disabled={isProcessing}
-                  />
+                  >
+                    <option value="">None (Single track)</option>
+                    {albums.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="modal-actions">
+              <div className="form-group" style={{ marginTop: "16px" }}>
+                <label htmlFor="edit-track-desc">Description (optional)</label>
+                <textarea
+                  id="edit-track-desc"
+                  placeholder="Brief description or mood of the track"
+                  value={editDescription}
+                  rows={3}
+                  maxLength={2000}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  disabled={isProcessing}
+                />
+              </div>
+
+              <div className="studio-media-grid">
+                <MediaUploadField
+                  id="edit-audio-file-input"
+                  label="Audio file"
+                  helperText="MP3, WAV or FLAC · Max 30MB"
+                  accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
+                  file={editAudioFile}
+                  existingFileLabel={editAudioFileName}
+                  error={formErrors.audio}
+                  disabled={isProcessing}
+                  onFileChange={(file) => {
+                    setEditAudioFile(file);
+                    if (file) {
+                      setEditAudioFileName(file.name);
+                      if (formErrors.audio) setFormErrors((prev) => ({ ...prev, audio: "" }));
+                    } else {
+                      setEditAudioFileName(track.audioUrl ? "Current audio file attached" : "");
+                    }
+                  }}
+                />
+
+                <MediaUploadField
+                  id="edit-cover-file-input"
+                  label="Cover artwork"
+                  helperText="JPG or PNG · Max 5MB"
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  file={editCoverFile}
+                  existingFileLabel={editCoverFileName}
+                  error={formErrors.cover}
+                  disabled={isProcessing}
+                  onFileChange={(file) => {
+                    setEditCoverFile(file);
+                    if (file) {
+                      setEditCoverFileName(file.name);
+                      if (formErrors.cover) setFormErrors((prev) => ({ ...prev, cover: "" }));
+                    } else {
+                      setEditCoverFileName(track.coverUrl ? "Current cover image attached" : "");
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginTop: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label htmlFor="edit-lyrics-file-input" style={{ margin: 0 }}>
+                    Lyrics file (.lrc, .txt - Optional)
+                  </label>
+                  {editLyricsContent && (
+                    <button
+                      type="button"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--sw-danger, #ef4444)",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        padding: 0,
+                      }}
+                      onClick={() => {
+                        setEditLyricsContent("");
+                        setEditLyricsFileName("");
+                      }}
+                    >
+                      Remove lyrics
+                    </button>
+                  )}
+                </div>
+
+                <div className="file-drop-zone">
+                  <input
+                    type="file"
+                    accept=".lrc,.txt,text/plain"
+                    id="edit-lyrics-file-input"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const lyricsError = validateLyricsFile(file);
+                      if (lyricsError) {
+                        setEditLyricsFileName("");
+                        setFormErrors((prev) => ({ ...prev, lyrics: lyricsError }));
+                        e.target.value = "";
+                        return;
+                      }
+                      void readLyricsFile(file)
+                        .then((content) => {
+                          setEditLyricsFileName(file.name);
+                          setEditLyricsContent(content);
+                          setFormErrors((prev) => ({ ...prev, lyrics: "" }));
+                        })
+                        .catch((error: unknown) => {
+                          setEditLyricsFileName("");
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            lyrics: error instanceof Error ? error.message : "Lyrics file could not be read.",
+                          }));
+                        });
+                      e.target.value = "";
+                    }}
+                    style={{ display: "none" }}
+                  />
+                  <label htmlFor="edit-lyrics-file-input" className="file-drop-label">
+                    <FileTextIcon width={24} height={24} />
+                    <span>
+                      {editLyricsFileName
+                        ? `Selected lyrics: ${editLyricsFileName}`
+                        : editLyricsContent
+                        ? "Lyrics attached (click to choose a different file)"
+                        : "Upload lyrics file (.lrc, .txt - optional)"}
+                    </span>
+                  </label>
+                </div>
+                {formErrors.lyrics && (
+                  <small className="auth-v2-field-error">
+                    <AlertIcon width={12} height={12} />
+                    {formErrors.lyrics}
+                  </small>
+                )}
+              </div>
+
+              <div className="modal-actions studio-track-modal__actions">
                 <button
                   type="button"
                   className="button button-secondary"
