@@ -1,22 +1,19 @@
 package groupone.soundwaveproject.catalog.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
+@Getter
 @Entity
 @Table(name = "albums")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Album {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -34,7 +31,6 @@ public class Album {
     private String description;
 
     @Column(nullable = false, length = 30)
-    @Builder.Default
     private String status = "DRAFT";
 
     @Column(name = "cover_public_id", length = 255)
@@ -47,13 +43,33 @@ public class Album {
     private LocalDate releaseDate;
 
     @Column(name = "published_at")
-    private Instant publishedAt;
+    private LocalDateTime publishedAt;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
+
+    public Album(Long createdByUserId, String title, String slug, String description, String coverUrl) {
+        this.createdByUserId = createdByUserId;
+        this.title = title;
+        this.slug = slug;
+        this.description = description;
+        this.coverUrl = coverUrl;
+        this.status = "DRAFT";
+    }
+
+    @PrePersist
+    void initializeTimestamps() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+        if (status == null) status = "DRAFT";
+    }
+
+    @PreUpdate
+    void updateTimestamp() {
+        updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
 }

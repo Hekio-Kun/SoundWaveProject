@@ -45,4 +45,15 @@ export const catalogApi = {
   getRecommendations: async (idOrSlug: string | number, limit = 5): Promise<LandingTrack[]> => {
     return apiFetch<LandingTrack[]>(`/tracks/${idOrSlug}/recommendations?limit=${limit}`);
   },
+
+  recordPlay: async (
+    trackId: number,
+    listenedDurationMs: number,
+    completed: boolean
+  ): Promise<RecordPlayResponse> => {
+    return apiFetch<RecordPlayResponse>(`/tracks/${trackId}/play`, {
+      method: "POST",
+      body: { listenedDurationMs, completed },
+    });
+  },
 };

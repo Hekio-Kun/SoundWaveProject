@@ -1,21 +1,19 @@
 package groupone.soundwaveproject.catalog.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
+@Getter
 @Entity
 @Table(name = "tracks")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Track {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -23,18 +21,12 @@ public class Track {
     @Column(name = "uploader_user_id", nullable = false)
     private Long uploaderUserId;
 
-    @Column(name = "album_id")
-    private Long albumId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "album_id", insertable = false, updatable = false)
+    @JoinColumn(name = "album_id")
     private Album album;
 
-    @Column(name = "genre_id", nullable = false)
-    private Long genreId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "genre_id", insertable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "genre_id", nullable = false)
     private Genre genre;
 
     @Column(nullable = false, length = 200)
@@ -51,11 +43,10 @@ public class Track {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "publication_status", nullable = false, length = 30)
-    @Builder.Default
-    private PublicationStatus publicationStatus = PublicationStatus.DRAFT;
+    private TrackPublicationStatus publicationStatus = TrackPublicationStatus.DRAFT;
 
     @Column(name = "approved_at")
-    private Instant approvedAt;
+    private LocalDateTime approvedAt;
 
     @Column(name = "latest_rejection_reason", length = 1000)
     private String latestRejectionReason;
@@ -78,15 +69,64 @@ public class Track {
     @Column(name = "cover_url", length = 2048)
     private String coverUrl;
 
+    @Setter
     @Column(name = "play_count_cache", nullable = false)
-    @Builder.Default
     private Long playCountCache = 0L;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
+
+    public Track(Long uploaderUserId,
+                 Genre genre,
+                 Album album,
+                 String title,
+                 String slug,
+                 String description,
+                 String audioPublicId,
+                 String audioUrl,
+                 String audioFormat,
+                 Integer durationMs,
+                 String coverPublicId,
+                 String coverUrl,
+                 TrackPublicationStatus publicationStatus) {
+        this.uploaderUserId = uploaderUserId;
+        this.genre = genre;
+        this.album = album;
+        this.title = title;
+        this.slug = slug;
+        this.description = description;
+        this.audioPublicId = audioPublicId;
+        this.audioUrl = audioUrl;
+        this.audioFormat = audioFormat;
+        this.durationMs = durationMs;
+        this.coverPublicId = coverPublicId;
+        this.coverUrl = coverUrl;
+        this.publicationStatus = publicationStatus != null ? publicationStatus : TrackPublicationStatus.DRAFT;
+        this.playCountCache = 0L;
+    }
+
+    public void incrementPlayCount() {
+        if (this.playCountCache == null) {
+            this.playCountCache = 1L;
+        } else {
+            this.playCountCache++;
+        }
+    }
+
+    @PrePersist
+    void initializeTimestamps() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+        if (playCountCache == null) playCountCache = 0L;
+        if (publicationStatus == null) publicationStatus = TrackPublicationStatus.DRAFT;
+    }
+
+    @PreUpdate
+    void updateTimestamp() {
+        updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
 }

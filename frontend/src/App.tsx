@@ -192,6 +192,18 @@ export default function App() {
     setPendingTrack(null);
   };
 
+  const handleRecordPlay = useCallback(async (trackId: number, listenedDurationMs: number, completed: boolean) => {
+    try {
+      const res = await catalogApi.recordPlay(trackId, listenedDurationMs, completed);
+      setCurrentTrack((prev) => (prev && prev.id === trackId ? { ...prev, playCount: res.playCount } : prev));
+      setQueue((prevQueue) =>
+        prevQueue.map((item) => (item.id === trackId ? { ...item, playCount: res.playCount } : item))
+      );
+    } catch (err) {
+      console.warn("Failed to record play count:", err);
+    }
+  }, []);
+
   // Queue manipulation
   const handleRemoveFromQueue = (trackId: number) => {
     setQueue((prev) => prev.filter((t) => t.id !== trackId));
@@ -812,6 +824,7 @@ export default function App() {
           isAuthenticated={isAuthenticated}
           onToggleQueue={() => setQueueOpen((prev) => !prev)}
           isQueueOpen={queueOpen}
+          onRecordPlay={handleRecordPlay}
         />
       )}
 
