@@ -33,9 +33,19 @@ const creators = {
   lam: { userId: 102, displayName: "Lâm Mộc", avatarUrl: avatar("#fdf3e5", "#b4691e", "LM") },
   yen: { userId: 103, displayName: "Yên Chi", avatarUrl: avatar("#ffe4e6", "#e11d48", "YC") },
   kai: { userId: 104, displayName: "Kai Vũ", avatarUrl: avatar("#d1fae5", "#059669", "KV") },
+  mck: { userId: 6, displayName: "MCK", avatarUrl: avatar("#fef08a", "#854d0e", "MCK") },
+  hieuthuhai: { userId: 7, displayName: "HIEUTHUHAI ft. Marzuz", avatarUrl: avatar("#fed7aa", "#c2410c", "H22") },
+  uyenlinh: { userId: 8, displayName: "Uyên Linh", avatarUrl: avatar("#fce7f3", "#be185d", "UL") },
+  hngle: { userId: 9, displayName: "Hngle ft. Bảo Anh", avatarUrl: avatar("#e0e7ff", "#4338ca", "HB") },
+  sontung: { userId: 10, displayName: "Sơn Tùng M-TP", avatarUrl: avatar("#dbeafe", "#1d4ed8", "ST") },
+  yorushika: { userId: 11, displayName: "Yorushika", avatarUrl: avatar("#ccfbf1", "#0f766e", "YS") },
+  yoko: { userId: 12, displayName: "Yoko Takahashi", avatarUrl: avatar("#ede9fe", "#6d28d9", "YT") },
+  yoasobi: { userId: 13, displayName: "YOASOBI", avatarUrl: avatar("#fbcfe8", "#db2777", "YA") },
 };
 
 export const tracks: LandingTrack[] = [];
+
+export const tracks: LandingTrack[] = [...projectTracks, ...demoTracks];
 
 export const genres: Genre[] = [
   { id: 1, name: "Pop", slug: "pop", color: "#ecfeff", accent: "#0891b2", description: "Bright, catchy, and popular melodies." },
