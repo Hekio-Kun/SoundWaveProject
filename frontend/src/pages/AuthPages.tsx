@@ -122,6 +122,7 @@ function TextField({
   autoComplete,
   icon,
   minLength,
+  action,
   error,
 }: {
   id: string;
@@ -133,11 +134,19 @@ function TextField({
   autoComplete?: string;
   icon: ReactNode;
   minLength?: number;
+  action?: ReactNode;
   error?: string;
 }) {
   return (
     <div className={`auth-v2-field ${error ? "has-error" : ""}`}>
-      <label htmlFor={id}>{label}</label>
+      {action ? (
+        <div className="auth-v2-label-row">
+          <label htmlFor={id}>{label}</label>
+          {action}
+        </div>
+      ) : (
+        <label htmlFor={id}>{label}</label>
+      )}
       <div className={`auth-v2-input ${error ? "is-invalid" : ""}`}>
         <span>{icon}</span>
         <input id={id} type={type} required minLength={minLength} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} />
@@ -278,37 +287,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
         </div>
 
         <button type="submit" className="button button-primary button-large auth-v2-submit" disabled={submitting}>{submitting ? "Logging in…" : "Login"}</button>
-
-        <div style={{ marginTop: "12px", display: "flex", gap: "8px", justifyContent: "center" }}>
-          <button
-            type="button"
-            className="button button-ghost button-small"
-            style={{ fontSize: "11px", padding: "4px 10px" }}
-            onClick={() => {
-              setEmail("staff@soundwave.com");
-              setPassword("Admin@123456");
-            }}
-          >
-            Fill Staff Account
-          </button>
-          <button
-            type="button"
-            className="button button-ghost button-small"
-            style={{ fontSize: "11px", padding: "4px 10px" }}
-            onClick={() => {
-              setEmail("admin@soundwave.com");
-              setPassword("Admin@123456");
-            }}
-          >
-            Fill Admin Account
-          </button>
-        </div>
       </form>
-
-      <div className="auth-v2-access-note">
-        <ShieldIcon width={17} height={17} />
-        <span><b>Access is assigned automatically</b><small>The system checks the account role after login.</small></span>
-      </div>
 
       <p className="auth-v2-switch">Do not have an account? <button onClick={() => onNavigate("/register")}>Register</button></p>
     </AuthExperience>
@@ -446,6 +425,8 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
   const [errors, setErrors] = useState<FieldErrors>({});
   const [apiError, setApiError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -475,6 +456,24 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
     }
   };
 
+  const handleResendOtp = async () => {
+    if (!email) {
+      setApiError("Email address is missing. Please return to Forgot Password.");
+      return;
+    }
+    setApiError("");
+    setResendMessage("");
+    setResending(true);
+    try {
+      const response = await authApi.forgotPassword(email);
+      setResendMessage(response.message || "A new 6-digit OTP has been sent to your email.");
+    } catch (error) {
+      setApiError(getAuthErrorMessage(error, "Unable to send another OTP right now. Please wait before retrying."));
+    } finally {
+      setResending(false);
+    }
+  };
+
   const updateField = (id: string, setter: (value: string) => void) => (value: string) => {
     setter(value);
     setApiError("");
@@ -489,10 +488,46 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
         <form className="auth-v2-form" onSubmit={handleSubmit} noValidate>
           {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Review the New Password and Confirm Password fields." /> : null}
           {apiError ? <AuthErrorNotice title="Unable to reset password" message={apiError} /> : null}
-          <TextField id="reset-otp" label="6-digit OTP" value={otp} onChange={updateField("reset-otp", setOtp)} placeholder="000000" autoComplete="one-time-code" icon={<ShieldIcon width={17} height={17} />} error={errors["reset-otp"]} />
+          {resendMessage ? (
+            <div className="auth-v2-verification-resend" role="status">
+              <CheckIcon width={17} height={17} />
+              <span><b>OTP sent</b><small>{resendMessage}</small></span>
+            </div>
+          ) : null}
+          <TextField
+            id="reset-otp"
+            label="6-digit OTP"
+            value={otp}
+            onChange={updateField("reset-otp", setOtp)}
+            placeholder="000000"
+            autoComplete="one-time-code"
+            icon={<ShieldIcon width={17} height={17} />}
+            action={
+              <button
+                type="button"
+                className="auth-v2-text-button"
+                disabled={resending || submitting}
+                onClick={handleResendOtp}
+              >
+                {resending ? "Sending OTP…" : "Resend OTP"}
+              </button>
+            }
+            error={errors["reset-otp"]}
+          />
           <PasswordField id="new-password" label="New Password" value={newPassword} onChange={updateField("new-password", setNewPassword)} autoComplete="new-password" error={errors["new-password"]} />
           <PasswordField id="confirm-password" label="Confirm Password" value={confirmPassword} onChange={updateField("confirm-password", setConfirmPassword)} autoComplete="new-password" error={errors["confirm-password"]} />
           <button className="button button-primary button-large auth-v2-submit" disabled={submitting}>{submitting ? "Saving…" : "Save Password"}</button>
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={resending || submitting}
+            onClick={handleResendOtp}
+          >
+            {resending ? "Sending OTP…" : "Resend OTP"}
+          </button>
+          <button type="button" className="auth-v2-back" onClick={() => onNavigate("/forgot-password")}>
+            ← Back to Forgot Password
+          </button>
         </form>
       )}
     </AuthExperience>
