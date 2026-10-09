@@ -50,6 +50,7 @@ export default function App() {
     sessionStorage.removeItem("soundwave_user");
     sessionStorage.removeItem("soundwave_access_token");
 
+
     void authApi.refresh()
       .then((session) => {
         if (active) setUser(session.user);
