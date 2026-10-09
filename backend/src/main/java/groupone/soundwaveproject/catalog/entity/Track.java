@@ -2,6 +2,8 @@ package groupone.soundwaveproject.catalog.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,9 +12,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Getter
+@Setter
+@Builder
 @Entity
 @Table(name = "tracks")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Track {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +46,7 @@ public class Track {
     @Column(name = "track_number")
     private Integer trackNumber;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "publication_status", nullable = false, length = 30)
     private TrackPublicationStatus publicationStatus = TrackPublicationStatus.DRAFT;
@@ -69,7 +75,7 @@ public class Track {
     @Column(name = "cover_url", length = 2048)
     private String coverUrl;
 
-    @Setter
+    @Builder.Default
     @Column(name = "play_count_cache", nullable = false)
     private Long playCountCache = 0L;
 
@@ -114,6 +120,14 @@ public class Track {
         } else {
             this.playCountCache++;
         }
+    }
+
+    public Long getGenreId() {
+        return genre != null ? genre.getId() : null;
+    }
+
+    public Long getAlbumId() {
+        return album != null ? album.getId() : null;
     }
 
     @PrePersist

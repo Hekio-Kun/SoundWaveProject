@@ -82,6 +82,39 @@ public class TrackCatalogService {
         return new RecordPlayResponse(trackId, updatedPlayCount, recordedHistory);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<TrackResponse> getRecommendations(String idOrSlug, int limit) {
+        Track currentTrack = null;
+        try {
+            if (idOrSlug != null && !idOrSlug.isBlank()) {
+                if (idOrSlug.matches("\\d+")) {
+                    currentTrack = trackRepository.findByIdAndPublicationStatus(Long.valueOf(idOrSlug), TrackPublicationStatus.PUBLISHED).orElse(null);
+                } else {
+                    currentTrack = trackRepository.findBySlugAndPublicationStatus(idOrSlug, TrackPublicationStatus.PUBLISHED).orElse(null);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Long genreId = (currentTrack != null && currentTrack.getGenre() != null) ? currentTrack.getGenre().getId() : null;
+        Long excludeId = currentTrack != null ? currentTrack.getId() : -1L;
+
+        java.util.List<Track> allPublished = trackRepository.findAll().stream()
+                .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
+                .filter(t -> !t.getId().equals(excludeId))
+                .toList();
+
+        java.util.List<Track> filtered = allPublished.stream()
+                .filter(t -> genreId != null && t.getGenre() != null && genreId.equals(t.getGenre().getId()))
+                .limit(limit)
+                .toList();
+
+        if (filtered.isEmpty()) {
+            filtered = allPublished.stream().limit(limit).toList();
+        }
+
+        return filtered.stream().map(this::mapToTrackResponse).toList();
+    }
+
     private TrackResponse mapToTrackResponse(Track track) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
