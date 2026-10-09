@@ -200,6 +200,15 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   const [submitting, setSubmitting] = useState(false);
   const [verificationCooldown, setVerificationCooldown] = useState(0);
 
+  // Self-Service Emergency Unlock via OTP
+  const [unlockMode, setUnlockMode] = useState(false);
+  const [unlockOtp, setUnlockOtp] = useState("");
+  const [unlockOtpError, setUnlockOtpError] = useState("");
+  const [unlockSuccess, setUnlockSuccess] = useState("");
+  const [unlockCooldown, setUnlockCooldown] = useState(0);
+  const [requestingUnlock, setRequestingUnlock] = useState(false);
+  const [submittingUnlock, setSubmittingUnlock] = useState(false);
+
   useEffect(() => {
     if (verificationCooldown <= 0) return;
     const timer = window.setInterval(() => {
@@ -207,6 +216,14 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [verificationCooldown]);
+
+  useEffect(() => {
+    if (unlockCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setUnlockCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [unlockCooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -225,6 +242,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     setApiError("");
     setApiErrorCode("");
     setResendMessage("");
+    setUnlockSuccess("");
     setSubmitting(true);
     try {
       const session = await authApi.login(email.trim(), password, rememberMe);
@@ -255,6 +273,50 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     }
   };
 
+  const handleRequestUnlock = async () => {
+    if (!email.trim()) {
+      setErrors({ "login-email": "Please enter your email to request an unlock code." });
+      focusFirstInvalid({ "login-email": "required" });
+      return;
+    }
+    if (unlockCooldown > 0 || requestingUnlock) return;
+    setRequestingUnlock(true);
+    setUnlockOtpError("");
+    try {
+      const result = await authApi.requestUnlock(email.trim());
+      setUnlockMode(true);
+      setUnlockCooldown(60);
+      setUnlockSuccess("");
+      setResendMessage(result.message);
+    } catch (error) {
+      setApiError(getAuthErrorMessage(error, "Unable to send unlock OTP."));
+    } finally {
+      setRequestingUnlock(false);
+    }
+  };
+
+  const handleConfirmUnlock = async () => {
+    if (unlockOtp.length !== 6) {
+      setUnlockOtpError("Please enter the 6-digit OTP code.");
+      return;
+    }
+    setSubmittingUnlock(true);
+    setUnlockOtpError("");
+    try {
+      const result = await authApi.unlockAccount(email.trim(), unlockOtp);
+      setUnlockMode(false);
+      setUnlockOtp("");
+      setApiError("");
+      setApiErrorCode("");
+      setPassword("");
+      setUnlockSuccess(result.message);
+    } catch (error) {
+      setUnlockOtpError(getAuthErrorMessage(error, "Invalid or expired unlock code."));
+    } finally {
+      setSubmittingUnlock(false);
+    }
+  };
+
   const updateField = (id: string, setter: (value: string) => void) => (value: string) => {
     setter(value);
     setApiError("");
@@ -263,26 +325,150 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     setErrors((current) => ({ ...current, [id]: "" }));
   };
 
+  const isWarningRemainingAttempts = apiError.includes("remaining before");
+
   return (
     <AuthExperience mode="login" eyebrow="WELCOME BACK" title="Continue with SoundWave" description="Log in to open your personal library and continue listening where you left off." onNavigate={onNavigate}>
       <form onSubmit={handleSubmit} className="auth-v2-form" noValidate>
         {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Please review the fields marked below." /> : null}
         {apiError ? (
           <AuthErrorNotice
-            title={apiErrorCode === "ACCOUNT_BANNED" ? "Account banned" : "Unable to log in"}
+            title={
+              apiErrorCode === "ACCOUNT_BANNED"
+                ? "Account banned"
+                : apiErrorCode === "LOGIN_LOCKED"
+                ? "Account temporarily locked"
+                : isWarningRemainingAttempts
+                ? "Incorrect password warning"
+                : "Unable to log in"
+            }
             message={apiError}
-            action={apiErrorCode === "EMAIL_NOT_VERIFIED" ? (
-              <button
-                type="button"
-                className="auth-v2-error-action"
-                onClick={resendVerificationOtp}
-                disabled={verificationCooldown > 0 || resendingVerification}
-              >
-                {resendingVerification ? "Sending…" : verificationCooldown > 0 ? `Resend OTP (${verificationCooldown}s)` : "Resend verification OTP"}
-              </button>
-            ) : undefined}
+            action={
+              apiErrorCode === "EMAIL_NOT_VERIFIED" ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={resendVerificationOtp}
+                  disabled={verificationCooldown > 0 || resendingVerification}
+                >
+                  {resendingVerification ? "Sending…" : verificationCooldown > 0 ? `Resend OTP (${verificationCooldown}s)` : "Resend verification OTP"}
+                </button>
+              ) : apiErrorCode === "LOGIN_LOCKED" && !unlockMode ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={handleRequestUnlock}
+                  disabled={requestingUnlock || unlockCooldown > 0}
+                >
+                  {requestingUnlock ? "Sending code…" : unlockCooldown > 0 ? `Resend Unlock OTP (${unlockCooldown}s)` : "Unlock via Email"}
+                </button>
+              ) : isWarningRemainingAttempts ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={() => onNavigate(`/forgot-password?email=${encodeURIComponent(email.trim())}`)}
+                >
+                  Reset password now
+                </button>
+              ) : undefined
+            }
           />
         ) : null}
+
+        {unlockSuccess ? (
+          <div className="auth-v2-verification-resend" role="status" style={{ marginBottom: "0.5rem" }}>
+            <CheckIcon width={17} height={17} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <span><b>Account unlocked</b><small>{unlockSuccess}</small></span>
+              <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
+                <button
+                  type="button"
+                  className="auth-v2-text-button"
+                  onClick={() => {
+                    setUnlockSuccess("");
+                    document.getElementById("login-password")?.focus();
+                  }}
+                >
+                  Log in now
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  className="auth-v2-text-button"
+                  onClick={() => onNavigate(`/forgot-password?email=${encodeURIComponent(email.trim())}`)}
+                >
+                  Reset password
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {unlockMode ? (
+          <div style={{
+            padding: "1rem",
+            borderRadius: "0.75rem",
+            backgroundColor: "rgba(2, 132, 199, 0.05)",
+            border: "1px solid rgba(2, 132, 199, 0.25)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <ShieldIcon width={18} height={18} />
+              <b style={{ fontSize: "0.95rem" }}>Emergency Account Unlock</b>
+            </div>
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--color-text-muted, #64748b)" }}>
+              We sent a 6-digit unlock code to <b>{email}</b>. Enter it below to restore your account immediately.
+            </p>
+            <div className={`auth-v2-field ${unlockOtpError ? "has-error" : ""}`}>
+              <label htmlFor="unlock-otp">6-digit Unlock OTP</label>
+              <div className={`auth-v2-input ${unlockOtpError ? "is-invalid" : ""}`}>
+                <span><MailIcon width={17} height={17} /></span>
+                <input
+                  id="unlock-otp"
+                  type="text"
+                  value={unlockOtp}
+                  onChange={(e) => {
+                    setUnlockOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setUnlockOtpError("");
+                  }}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                />
+              </div>
+              {unlockOtpError ? <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{unlockOtpError}</small> : null}
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleConfirmUnlock}
+                disabled={submittingUnlock || unlockOtp.length !== 6}
+              >
+                {submittingUnlock ? "Unlocking…" : "Confirm Unlock"}
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={handleRequestUnlock}
+                disabled={requestingUnlock || unlockCooldown > 0}
+              >
+                {requestingUnlock ? "Sending…" : unlockCooldown > 0 ? `Resend (${unlockCooldown}s)` : "Resend OTP"}
+              </button>
+              <button
+                type="button"
+                className="auth-v2-text-button"
+                onClick={() => setUnlockMode(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {resendMessage ? (
           <div className="auth-v2-verification-resend" role="status">
             <CheckIcon width={17} height={17} />

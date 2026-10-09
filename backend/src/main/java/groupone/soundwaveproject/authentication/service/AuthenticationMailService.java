@@ -41,6 +41,15 @@ public class AuthenticationMailService {
                         .formatted(recipient));
     }
 
+    /**
+     * Gửi mã OTP dùng một lần để mở khóa tài khoản bị khóa tạm thời.
+     */
+    public void sendAccountUnlockOtp(String recipient, String otp, long expirationMinutes) {
+        send(recipient, "Unlock your SoundWave account",
+                "Hello,%n%nYour SoundWave emergency account unlock code is: %s%n%nThis code expires in %d minutes. Enter this code to immediately unlock your account. If you did not request this, please ignore this email."
+                        .formatted(otp, expirationMinutes));
+    }
+
     private void send(String recipient, String subject, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);

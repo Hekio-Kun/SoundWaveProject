@@ -1,8 +1,11 @@
 package groupone.soundwaveproject.authentication.service;
 
+import groupone.soundwaveproject.authentication.dto.request.EmailOtpRequest;
+import groupone.soundwaveproject.authentication.dto.request.EmailRequest;
 import groupone.soundwaveproject.authentication.dto.request.RegisterRequest;
 import groupone.soundwaveproject.authentication.dto.request.LoginRequest;
 import groupone.soundwaveproject.authentication.dto.request.ResetPasswordRequest;
+import groupone.soundwaveproject.authentication.entity.AccountUnlockToken;
 import groupone.soundwaveproject.authentication.entity.AppUser;
 import groupone.soundwaveproject.authentication.entity.PasswordResetToken;
 import groupone.soundwaveproject.authentication.entity.RefreshToken;
@@ -38,6 +41,7 @@ class AuthenticationServiceTest {
     @Mock private EmailVerificationTokenRepository verificationTokenRepository;
     @Mock private PasswordResetTokenRepository resetTokenRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private AccountUnlockTokenRepository unlockTokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private OtpGenerator otpGenerator;
     @Mock private TokenHashService tokenHashService;
@@ -52,8 +56,8 @@ class AuthenticationServiceTest {
     void setUp() {
         service = new AuthenticationService(userRepository, roleRepository, profileRepository,
                 verificationTokenRepository, resetTokenRepository, refreshTokenRepository,
-                passwordEncoder, otpGenerator, tokenHashService, mailService, jwtService, mapper,
-                authRateLimiterService);
+                unlockTokenRepository, passwordEncoder, otpGenerator, tokenHashService,
+                mailService, jwtService, mapper, authRateLimiterService);
         ReflectionTestUtils.setField(service, "otpExpirationMinutes", 10L);
         ReflectionTestUtils.setField(service, "otpResendSeconds", 60L);
         ReflectionTestUtils.setField(service, "refreshTokenDays", 7L);
@@ -201,14 +205,16 @@ class AuthenticationServiceTest {
 
     @Test
     void loginRejectsWhenAccountIsLockedOut() {
-        when(authRateLimiterService.isLoginBlocked("user@example.com")).thenReturn(true);
+        AppUser user = mock(AppUser.class);
+        when(user.isTemporarilyLocked(any())).thenReturn(true);
+        when(user.getLockedUntil()).thenReturn(java.time.LocalDateTime.now().plusMinutes(5));
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
 
         groupone.soundwaveproject.authentication.exception.AccountUnavailableException ex =
                 assertThrows(groupone.soundwaveproject.authentication.exception.AccountUnavailableException.class,
                         () -> service.login(new LoginRequest("user@example.com", "Password1", false)));
 
         assertEquals("LOGIN_LOCKED", ex.getCode());
-        verify(userRepository, never()).findByEmailIgnoreCase(any());
     }
 
     @Test
@@ -250,5 +256,86 @@ class AuthenticationServiceTest {
 
         assertEquals("new-jwt-token", result.response().accessToken());
         verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(), any());
+    }
+
+    @Test
+    void loginRejectsWithWarningMessageWhenFewAttemptsRemaining() {
+        AppUser user = mock(AppUser.class);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(user.isTemporarilyLocked(any())).thenReturn(false);
+        when(user.getPasswordHash()).thenReturn("hash");
+        when(passwordEncoder.matches("WrongPass", "hash")).thenReturn(false);
+        when(authRateLimiterService.recordFailedLogin("user@example.com")).thenReturn(3);
+        when(authRateLimiterService.getRemainingLoginAttempts("user@example.com")).thenReturn(2);
+
+        groupone.soundwaveproject.authentication.exception.InvalidCredentialsException ex =
+                assertThrows(groupone.soundwaveproject.authentication.exception.InvalidCredentialsException.class,
+                        () -> service.login(new LoginRequest("user@example.com", "WrongPass", false)));
+
+        assertEquals(true, ex.getMessage().contains("2 attempt(s) remaining"));
+        verify(user, never()).lockTemporarily(any());
+    }
+
+    @Test
+    void loginLocksAccountInDbWhenReachingMaxFailedAttempts() {
+        AppUser user = mock(AppUser.class);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(user.isTemporarilyLocked(any())).thenReturn(false);
+        when(user.getPasswordHash()).thenReturn("hash");
+        when(passwordEncoder.matches("WrongPass", "hash")).thenReturn(false);
+        when(authRateLimiterService.recordFailedLogin("user@example.com")).thenReturn(5);
+        when(authRateLimiterService.getRemainingLoginAttempts("user@example.com")).thenReturn(0);
+
+        groupone.soundwaveproject.authentication.exception.AccountUnavailableException ex =
+                assertThrows(groupone.soundwaveproject.authentication.exception.AccountUnavailableException.class,
+                        () -> service.login(new LoginRequest("user@example.com", "WrongPass", false)));
+
+        assertEquals("LOGIN_LOCKED", ex.getCode());
+        verify(user).lockTemporarily(any());
+    }
+
+    @Test
+    void requestUnlockSendsOtpWhenAccountIsLocked() {
+        AppUser user = mock(AppUser.class);
+        when(user.getId()).thenReturn(10L);
+        when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getStatus()).thenReturn(UserStatus.TEMPORARILY_LOCKED);
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.isTemporarilyLocked(any())).thenReturn(true);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(unlockTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(10L))
+                .thenReturn(Optional.empty());
+        when(otpGenerator.generate()).thenReturn("112233");
+        when(passwordEncoder.encode("112233")).thenReturn("unlock-hash");
+
+        var response = service.requestUnlock(new EmailRequest("user@example.com"));
+
+        assertEquals(true, response.message().contains("an unlock OTP has been sent"));
+        verify(unlockTokenRepository).save(any());
+        verify(mailService).sendAccountUnlockOtp("user@example.com", "112233", 10L);
+    }
+
+    @Test
+    void unlockAccountRestoresActiveStatusAndResetsLockout() {
+        AppUser user = mock(AppUser.class);
+        AccountUnlockToken token = mock(AccountUnlockToken.class);
+        when(user.getId()).thenReturn(10L);
+        when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getStatus()).thenReturn(UserStatus.TEMPORARILY_LOCKED);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(authRateLimiterService.isOtpBlocked("user@example.com")).thenReturn(false);
+        when(unlockTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(10L))
+                .thenReturn(Optional.of(token));
+        when(token.getTokenHash()).thenReturn("token-hash");
+        when(token.isExpired(any())).thenReturn(false);
+        when(token.isUsed()).thenReturn(false);
+        when(passwordEncoder.matches("112233", "token-hash")).thenReturn(true);
+
+        var response = service.unlockAccount(new EmailOtpRequest("user@example.com", "112233"));
+
+        assertEquals(true, response.message().contains("successfully unlocked"));
+        verify(token).markUsed(any());
+        verify(user).unlock();
+        verify(authRateLimiterService).resetLoginAttempts("user@example.com");
     }
 }

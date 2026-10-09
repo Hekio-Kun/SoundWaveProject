@@ -304,6 +304,7 @@ body.modal-open .app-scroll-region {
 .ops-sidebar-user-avatar {
   width: 34px;
   height: 34px;
+  aspect-ratio: 1 / 1;
   border-radius: 10px;
   overflow: hidden;
   background: var(--ops-brand-light);
@@ -316,7 +317,10 @@ body.modal-open .app-scroll-region {
 .ops-sidebar-user-avatar img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .ops-sidebar-user-meta {
@@ -560,18 +564,23 @@ body.modal-open .app-scroll-region {
 .ops-topbar-avatar {
   width: 28px;
   height: 28px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   background: var(--ops-brand-light);
   color: var(--ops-brand);
   display: grid;
   place-items: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .ops-topbar-avatar img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .ops-topbar-user-text {

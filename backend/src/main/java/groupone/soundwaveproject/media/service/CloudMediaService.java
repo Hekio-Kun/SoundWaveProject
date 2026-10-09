@@ -1,6 +1,7 @@
 package groupone.soundwaveproject.media.service;
 
 import com.cloudinary.Cloudinary;
+import com.cloudinary.Transformation;
 import com.cloudinary.utils.ObjectUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,10 +34,18 @@ public class CloudMediaService {
 
     /**
      * Kiểm tra và tải ảnh đại diện của người dùng lên Cloudinary.
+     * Tự động căn chỉnh khuôn mặt (gravity: face), cắt vuông (fill) và thu về kích thước chuẩn 500x500.
      */
     public StoredMediaResponse uploadAvatar(MultipartFile file, Long userId) {
         byte[] content = readValidAvatar(file);
-        Map<?, ?> result = upload(content, "soundwave/avatars", "user-" + userId, "image");
+        Transformation<?> transformation = new Transformation<>()
+                .width(500)
+                .height(500)
+                .crop("fill")
+                .gravity("face");
+        Map<?, ?> result = upload(content, "soundwave/avatars", "user-" + userId, "image", ObjectUtils.asMap(
+                "transformation", transformation
+        ));
         return toStoredMedia(result);
     }
 
@@ -170,14 +180,21 @@ public class CloudMediaService {
     }
 
     private Map<?, ?> upload(byte[] content, String folder, String publicIdPrefix, String resourceType) {
+        return upload(content, folder, publicIdPrefix, resourceType, Map.of());
+    }
+
+    private Map<?, ?> upload(byte[] content, String folder, String publicIdPrefix, String resourceType, Map<String, ?> extraOptions) {
         ensureConfigured();
         try {
-            return cloudinary.uploader().upload(content, ObjectUtils.asMap(
-                    "folder", folder,
-                    "public_id", publicIdPrefix + "-" + UUID.randomUUID(),
-                    "resource_type", resourceType,
-                    "overwrite", false
-            ));
+            Map<String, Object> params = new HashMap<>();
+            params.put("folder", folder);
+            params.put("public_id", publicIdPrefix + "-" + UUID.randomUUID());
+            params.put("resource_type", resourceType);
+            params.put("overwrite", false);
+            if (extraOptions != null && !extraOptions.isEmpty()) {
+                params.putAll(extraOptions);
+            }
+            return cloudinary.uploader().upload(content, params);
         } catch (IOException | RuntimeException exception) {
             log.warn("Không thể tải media lên Cloudinary, folder={}, cause={}: {}",
                     folder, exception.getClass().getSimpleName(), exception.getMessage());
