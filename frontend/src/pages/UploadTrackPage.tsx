@@ -41,7 +41,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
   const [title, setTitle] = useState("");
   const [genreId, setGenreId] = useState<number>(0);
   const [albumId, setAlbumId] = useState<number | "">("");
-  const [trackNumber, setTrackNumber] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -182,9 +181,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     if (description.trim().length > 2000) {
       errors.description = "Description cannot exceed 2000 characters.";
     }
-    if (trackNumber !== "" && (!Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > 32767)) {
-      errors.trackNumber = "Track number must be a whole number from 1 to 32767.";
-    }
     return errors;
   };
 
@@ -211,7 +207,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
         title: title.trim(),
         genreId,
         albumId: albumId === "" ? undefined : Number(albumId),
-        trackNumber: trackNumber === "" ? undefined : Number(trackNumber),
         description: description.trim() || undefined,
         durationMs,
         lyrics: lyrics.trim() || undefined,
@@ -263,7 +258,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     setTitle("");
     setGenreId(genres[0]?.id ?? 0);
     setAlbumId("");
-    setTrackNumber("");
     setDescription("");
     setAudioFile(null);
     setCoverFile(null);
@@ -399,37 +393,19 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
             </div>
           </div>
 
-          <div className="studio-form-grid studio-form-grid--details">
-            <div className="form-group">
-              <label htmlFor="upload-track-trackNumber">Track number <span>(optional)</span></label>
-              <input
-                id="upload-track-trackNumber"
-                type="number"
-                min={1}
-                max={32767}
-                step={1}
-                value={trackNumber}
-                disabled={submitting}
-                aria-invalid={Boolean(formErrors.trackNumber)}
-                placeholder="1"
-                onChange={(event) => { setTrackNumber(event.target.value ? Number(event.target.value) : ""); clearError("trackNumber"); }}
-              />
-              {formErrors.trackNumber && <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{formErrors.trackNumber}</small>}
-            </div>
-            <div className="form-group">
-              <label htmlFor="upload-track-description">Description <span>(optional)</span></label>
-              <textarea
-                id="upload-track-description"
-                rows={3}
-                maxLength={2001}
-                value={description}
-                disabled={submitting}
-                aria-invalid={Boolean(formErrors.description)}
-                placeholder="Describe the mood or story behind this track"
-                onChange={(event) => { setDescription(event.target.value); clearError("description"); }}
-              />
-              <div className="upload-track-character-count"><span>{formErrors.description || ""}</span><small>{description.length}/2000</small></div>
-            </div>
+          <div className="form-group" style={{ marginTop: "16px" }}>
+            <label htmlFor="upload-track-description">Description <span>(optional)</span></label>
+            <textarea
+              id="upload-track-description"
+              rows={3}
+              maxLength={2001}
+              value={description}
+              disabled={submitting}
+              aria-invalid={Boolean(formErrors.description)}
+              placeholder="Describe the mood or story behind this track"
+              onChange={(event) => { setDescription(event.target.value); clearError("description"); }}
+            />
+            <div className="upload-track-character-count"><span>{formErrors.description || ""}</span><small>{description.length}/2000</small></div>
           </div>
 
           <div className="upload-track-card-heading upload-track-card-heading--section">
