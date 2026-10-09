@@ -37,6 +37,18 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
     boolean existsByAlbum_Id(Long albumId);
 
+    List<Track> findByAlbum_IdOrderByTrackNumberAsc(Long albumId);
+
+    long countByAlbum_Id(Long albumId);
+
+    boolean existsByAlbum_IdAndPublicationStatus(Long albumId, TrackPublicationStatus publicationStatus);
+
+    List<Track> findByUploaderUserIdAndAlbumIsNullOrderByCreatedAtDesc(Long uploaderUserId);
+
+    @Modifying
+    @Query("UPDATE Track t SET t.album = null, t.trackNumber = null, t.updatedAt = CURRENT_TIMESTAMP WHERE t.album.id = :albumId AND t.uploaderUserId = :userId")
+    void unlinkAlbumFromTracks(@Param("albumId") Long albumId, @Param("userId") Long userId);
+
     @Modifying
     @Query("UPDATE Track t SET t.playCountCache = t.playCountCache + 1 WHERE t.id = :id")
     void incrementPlayCount(@Param("id") Long id);
