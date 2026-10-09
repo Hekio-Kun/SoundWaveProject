@@ -10,6 +10,7 @@ import groupone.soundwaveproject.authentication.dto.request.ResetPasswordRequest
 import groupone.soundwaveproject.authentication.dto.response.AuthResponse;
 import groupone.soundwaveproject.authentication.dto.response.LoginResult;
 import groupone.soundwaveproject.authentication.dto.response.MessageResponse;
+import groupone.soundwaveproject.authentication.entity.AccountUnlockToken;
 import groupone.soundwaveproject.authentication.entity.AppUser;
 import groupone.soundwaveproject.authentication.entity.EmailVerificationToken;
 import groupone.soundwaveproject.authentication.entity.PasswordResetToken;
@@ -25,6 +26,7 @@ import groupone.soundwaveproject.authentication.exception.InvalidCredentialsExce
 import groupone.soundwaveproject.authentication.exception.InvalidOtpException;
 import groupone.soundwaveproject.authentication.exception.InvalidRefreshTokenException;
 import groupone.soundwaveproject.authentication.mapper.AuthenticationMapper;
+import groupone.soundwaveproject.authentication.repository.AccountUnlockTokenRepository;
 import groupone.soundwaveproject.authentication.repository.AppUserRepository;
 import groupone.soundwaveproject.authentication.repository.EmailVerificationTokenRepository;
 import groupone.soundwaveproject.authentication.repository.PasswordResetTokenRepository;
@@ -43,6 +45,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -58,6 +61,7 @@ public class AuthenticationService {
     private final EmailVerificationTokenRepository verificationTokenRepository;
     private final PasswordResetTokenRepository resetTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AccountUnlockTokenRepository unlockTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpGenerator otpGenerator;
     private final TokenHashService tokenHashService;
@@ -89,8 +93,32 @@ public class AuthenticationService {
         if (!request.password().equals(request.confirmPassword())) {
             throw new AccountUnavailableException("PASSWORD_MISMATCH", "Password confirmation does not match.");
         }
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new EmailAlreadyExistsException();
+        // SEC-03: Chống Account Enumeration theo chuẩn OWASP.
+        // Luôn trả về phản hồi đồng nhất để kẻ tấn công không thể dò quét danh sách email tồn tại trong hệ thống.
+        Optional<AppUser> existingUserOpt = userRepository.findByEmailIgnoreCase(email);
+        if (existingUserOpt.isPresent()) {
+            AppUser existing = existingUserOpt.get();
+            if (existing.getEmailVerifiedAt() != null) {
+                // Tài khoản đã kích hoạt: gửi email cảnh báo bảo mật tới chủ tài khoản
+                mailService.sendAccountAlreadyExistsNotice(existing.getEmail());
+                log.info("Registration attempted for already verified email: {}. Sent security notification email.", email);
+            } else {
+                // Tài khoản đã đăng ký nhưng chưa xác thực email: gửi lại mã OTP nếu thỏa mãn cooldown
+                EmailVerificationToken current = verificationTokenRepository
+                        .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(existing.getId()).orElse(null);
+                if (isResendAllowed(current == null ? null : current.getCreatedAt())) {
+                    if (current != null) current.markUsed(nowUtc());
+                    authRateLimiterService.resetOtpAttempts(existing.getEmail());
+                    String displayName = profileRepository.findByUserId(existing.getId())
+                            .map(UserProfile::getDisplayName)
+                            .orElse(request.displayName().trim());
+                    createAndSendVerificationOtp(existing, displayName);
+                    log.info("Registration attempted for unverified email: {}. Resent verification OTP.", email);
+                } else {
+                    log.info("Registration attempted for unverified email: {} within cooldown period. Skipped sending duplicate OTP.", email);
+                }
+            }
+            return new MessageResponse("Registration successful. Enter the OTP sent to your email.");
         }
 
         Role role = roleRepository.findByCode(DEFAULT_ROLE)
@@ -161,17 +189,54 @@ public class AuthenticationService {
     @Transactional
     public LoginResult login(LoginRequest request) {
         String email = normalizeEmail(request.email());
-        if (authRateLimiterService.isLoginBlocked(email)) {
-            log.warn("Blocked login attempt: email {} is temporarily locked out due to multiple failed attempts", email);
-            throw new AccountUnavailableException("LOGIN_LOCKED", "Too many failed login attempts. Please wait 10 minutes before trying again.");
-        }
         AppUser user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+
+        // 1. Kiểm tra trạng thái khóa trong DB
+        if (user != null) {
+            if (user.isTemporarilyLocked(nowUtc())) {
+                long remainingSeconds = ChronoUnit.SECONDS.between(nowUtc(), user.getLockedUntil());
+                long minutes = Math.max(1, (remainingSeconds + 59) / 60);
+                log.warn("Blocked login attempt: email {} is TEMPORARILY_LOCKED in DB until {}", email, user.getLockedUntil());
+                throw new AccountUnavailableException("LOGIN_LOCKED",
+                        "Your account is temporarily locked for " + minutes + " more minute(s) due to multiple failed login attempts. You can wait or unlock immediately via email.");
+            } else if (user.getStatus() == UserStatus.TEMPORARILY_LOCKED) {
+                user.unlock();
+                authRateLimiterService.resetLoginAttempts(email);
+                log.info("Temporary lock expired for user {}. Account auto-unlocked.", email);
+            }
+        }
+
+        // 2. Kiểm tra nếu Rate Limiter đang chặn
+        if (authRateLimiterService.isLoginBlocked(email)) {
+            log.warn("Blocked login attempt: email {} is temporarily locked out in RateLimiter", email);
+            throw new AccountUnavailableException("LOGIN_LOCKED",
+                    "Too many failed login attempts. Your account is temporarily locked for 10 minutes. You can wait or unlock immediately via email.");
+        }
+
+        // 3. Kiểm tra thông tin đăng nhập
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             int failed = authRateLimiterService.recordFailedLogin(email);
             int remaining = authRateLimiterService.getRemainingLoginAttempts(email);
             log.warn("Failed login attempt #{} for email: {}. Remaining attempts before lockout: {}", failed, email, remaining);
+
+            if (remaining == 0) {
+                if (user != null) {
+                    LocalDateTime lockedUntil = nowUtc().plusSeconds(AuthRateLimiterService.LOGIN_LOCKOUT_SECONDS);
+                    user.lockTemporarily(lockedUntil);
+                    log.warn("Account {} is now TEMPORARILY_LOCKED in DB until {}", email, lockedUntil);
+                }
+                throw new AccountUnavailableException("LOGIN_LOCKED",
+                        "Too many failed login attempts. Your account is temporarily locked for 10 minutes. You can wait or unlock immediately via email.");
+            }
+
+            if (remaining <= 2) {
+                throw new InvalidCredentialsException(
+                        "Incorrect password. You have " + remaining + " attempt(s) remaining before your account is temporarily locked for 10 minutes.");
+            }
+
             throw new InvalidCredentialsException();
         }
+
         ensureAccountCanLogin(user);
         authRateLimiterService.resetLoginAttempts(email);
         user.recordLogin(nowUtc());
@@ -180,15 +245,72 @@ public class AuthenticationService {
     }
 
     /**
+     * Gửi mã OTP mở khóa khẩn cấp về email nếu tài khoản đang bị khóa tạm thời.
+     */
+    @Transactional
+    public MessageResponse requestUnlock(EmailRequest request) {
+        String email = normalizeEmail(request.email());
+        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+            if (user.getStatus() != UserStatus.BANNED && user.getDeletedAt() == null) {
+                if (user.isTemporarilyLocked(nowUtc()) || authRateLimiterService.isLoginBlocked(email)) {
+                    AccountUnlockToken current = unlockTokenRepository
+                            .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId()).orElse(null);
+                    ensureResendAllowed(current == null ? null : current.getCreatedAt());
+                    if (current != null) current.markUsed(nowUtc());
+
+                    String otp = otpGenerator.generate();
+                    unlockTokenRepository.save(new AccountUnlockToken(
+                            user, passwordEncoder.encode(otp), nowUtc().plusMinutes(otpExpirationMinutes)));
+                    authRateLimiterService.resetOtpAttempts(user.getEmail());
+                    mailService.sendAccountUnlockOtp(user.getEmail(), otp, otpExpirationMinutes);
+                    log.info("Sent emergency unlock OTP for user ID: {} ({})", user.getId(), user.getEmail());
+                }
+            }
+        });
+        return new MessageResponse("If your account is locked, an unlock OTP has been sent to your email.");
+    }
+
+    /**
+     * Xác minh OTP và mở khóa tài khoản ngay lập tức.
+     */
+    @Transactional
+    public MessageResponse unlockAccount(EmailOtpRequest request) {
+        AppUser user = findUser(request.email());
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new AccountBannedException();
+        }
+        if (authRateLimiterService.isOtpBlocked(user.getEmail())) {
+            log.warn("Blocked unlock OTP attempt for email {}: maximum failed attempts reached", user.getEmail());
+            throw new InvalidOtpException("Too many failed attempts. This OTP code has been deactivated. Please request a new code.");
+        }
+
+        AccountUnlockToken token = unlockTokenRepository
+                .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId())
+                .orElseThrow(() -> new InvalidOtpException("No active unlock code was found."));
+
+        validateOtpWithAttempts(request.otp(), token.getTokenHash(), token.isUsed(), token.isExpired(nowUtc()),
+                user.getEmail(), () -> token.markUsed(nowUtc()));
+
+        LocalDateTime now = nowUtc();
+        token.markUsed(now);
+        user.unlock();
+        authRateLimiterService.resetLoginAttempts(user.getEmail());
+        authRateLimiterService.resetOtpAttempts(user.getEmail());
+        log.info("Account successfully unlocked via OTP for user ID: {} ({})", user.getId(), user.getEmail());
+        return new MessageResponse("Your account has been successfully unlocked. You can now log in.");
+    }
+
+    /**
      * Gửi OTP đặt lại mật khẩu mà không tiết lộ email có tồn tại hay không.
      */
     @Transactional
     public MessageResponse forgotPassword(EmailRequest request) {
         userRepository.findByEmailIgnoreCase(normalizeEmail(request.email())).ifPresent(user -> {
-            if (user.getStatus() == UserStatus.ACTIVE && user.getDeletedAt() == null) {
+            if ((user.getStatus() == UserStatus.ACTIVE || user.getStatus() == UserStatus.TEMPORARILY_LOCKED)
+                    && user.getDeletedAt() == null) {
                 PasswordResetToken current = resetTokenRepository
                         .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId()).orElse(null);
-                if (current != null && !isResendAllowed(current.getCreatedAt())) return;
+                ensureResendAllowed(current == null ? null : current.getCreatedAt());
                 if (current != null) current.markUsed(nowUtc());
                 String otp = otpGenerator.generate();
                 resetTokenRepository.save(new PasswordResetToken(
@@ -222,7 +344,9 @@ public class AuthenticationService {
         LocalDateTime now = nowUtc();
         token.markUsed(now);
         user.changePassword(passwordEncoder.encode(request.newPassword()), now);
+        user.unlock();
         refreshTokenRepository.revokeAllActiveByUserId(user.getId(), now);
+        authRateLimiterService.resetLoginAttempts(user.getEmail());
         authRateLimiterService.resetOtpAttempts(user.getEmail());
         log.info("Password reset successfully for user ID: {} ({}). All active sessions revoked.", user.getId(), user.getEmail());
         return new MessageResponse("Password updated successfully. Please log in again.");
@@ -335,7 +459,9 @@ public class AuthenticationService {
 
     private void ensureResendAllowed(LocalDateTime createdAt) {
         if (!isResendAllowed(createdAt)) {
-            throw new AccountUnavailableException("OTP_RATE_LIMITED", "Please wait before requesting another OTP.");
+            long remaining = createdAt == null ? otpResendSeconds : Math.max(1, otpResendSeconds - ChronoUnit.SECONDS.between(createdAt, nowUtc()));
+            throw new AccountUnavailableException("OTP_RATE_LIMITED",
+                    "Please wait " + remaining + " seconds before requesting another OTP.");
         }
     }
 
@@ -349,6 +475,12 @@ public class AuthenticationService {
         }
         if (user.getDeletedAt() != null) {
             throw new AccountUnavailableException("ACCOUNT_UNAVAILABLE", "This account is unavailable.");
+        }
+        if (user.isTemporarilyLocked(nowUtc())) {
+            long remainingSeconds = ChronoUnit.SECONDS.between(nowUtc(), user.getLockedUntil());
+            long minutes = Math.max(1, (remainingSeconds + 59) / 60);
+            throw new AccountUnavailableException("LOGIN_LOCKED",
+                    "Your account is temporarily locked for " + minutes + " more minute(s) due to multiple failed login attempts. You can wait or unlock immediately via email.");
         }
         if (user.getStatus() != UserStatus.ACTIVE || user.getEmailVerifiedAt() == null) {
             throw new EmailNotVerifiedException();

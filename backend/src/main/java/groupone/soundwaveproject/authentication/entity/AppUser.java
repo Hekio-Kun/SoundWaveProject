@@ -40,6 +40,9 @@ public class AppUser {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -67,6 +70,27 @@ public class AppUser {
     public void changePassword(String encodedPassword, LocalDateTime changedAt) {
         passwordHash = encodedPassword;
         updatedAt = changedAt;
+    }
+
+    public void lockTemporarily(LocalDateTime until) {
+        this.status = UserStatus.TEMPORARILY_LOCKED;
+        this.lockedUntil = until;
+        this.updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    public void unlock() {
+        if (this.status == UserStatus.TEMPORARILY_LOCKED) {
+            this.status = UserStatus.ACTIVE;
+        }
+        this.lockedUntil = null;
+        this.updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    public boolean isTemporarilyLocked(LocalDateTime now) {
+        if (this.status == UserStatus.TEMPORARILY_LOCKED) {
+            return lockedUntil != null && lockedUntil.isAfter(now);
+        }
+        return false;
     }
 
     @PrePersist

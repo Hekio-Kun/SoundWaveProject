@@ -93,6 +93,22 @@ public class AuthenticationController {
     }
 
     /**
+     * Yêu cầu gửi mã OTP mở khóa tài khoản bị khóa tạm thời về email.
+     */
+    @PostMapping("/request-unlock")
+    public MessageResponse requestUnlock(@Valid @RequestBody EmailRequest request) {
+        return authenticationService.requestUnlock(request);
+    }
+
+    /**
+     * Xác thực mã OTP và mở khóa tài khoản ngay lập tức.
+     */
+    @PostMapping("/unlock-account")
+    public MessageResponse unlockAccount(@Valid @RequestBody EmailOtpRequest request) {
+        return authenticationService.unlockAccount(request);
+    }
+
+    /**
      * Làm mới access token và xoay refresh token hiện tại.
      */
     @PostMapping("/refresh")

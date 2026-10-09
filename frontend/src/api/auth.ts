@@ -55,6 +55,10 @@ export const authApi = {
     request<MessageResponse>("/auth/forgot-password", { email }),
   resetPassword: (email: string, otp: string, newPassword: string, confirmPassword: string) =>
     request<MessageResponse>("/auth/reset-password", { email, otp, newPassword, confirmPassword }),
+  requestUnlock: (email: string) =>
+    request<MessageResponse>("/auth/request-unlock", { email }),
+  unlockAccount: (email: string, otp: string) =>
+    request<MessageResponse>("/auth/unlock-account", { email, otp }),
   refresh: async () => {
     const session = await silentRefresh<AuthSession>();
     if (!session) {

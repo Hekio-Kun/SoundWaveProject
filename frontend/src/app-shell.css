@@ -403,8 +403,11 @@
 .user-avatar {
   width: 28px;
   height: 28px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
 }
 
 .user-display-name {
@@ -1494,10 +1497,13 @@
 .creator-card-avatar {
   width: 72px;
   height: 72px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   border: 3px solid #e0f2fe;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .creator-card-name {
@@ -1877,8 +1883,11 @@
 .track-creator-avatar {
   width: 28px;
   height: 28px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
 }
 
 .track-creator-name {
@@ -1994,8 +2003,10 @@
 .creator-large-avatar {
   width: 150px;
   height: 150px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   border: 4px solid #e0f2fe;
   box-shadow: 0 8px 24px rgba(2, 132, 199, 0.15);
   flex-shrink: 0;
@@ -3109,6 +3120,7 @@ body.modal-open .ops-shell-main {
   width: 88px;
   height: 88px;
   flex: 0 0 88px;
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -3122,7 +3134,10 @@ body.modal-open .ops-shell-main {
 .profile-settings-avatar img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .profile-settings-hero .eyebrow {
@@ -3297,7 +3312,8 @@ body.modal-open .ops-shell-main {
 .profile-settings-avatar--compact {
   width: 68px;
   height: 68px;
-  flex-basis: 68px;
+  flex: 0 0 68px;
+  aspect-ratio: 1 / 1;
   border-width: 3px;
   border-radius: 18px;
 }

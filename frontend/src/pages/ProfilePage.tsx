@@ -183,7 +183,7 @@ export function ProfilePage({ onProfileUpdated }: Props) {
 function ProfileDashboard({ profile, onEdit }: { profile: ProfileDetails; onEdit: () => void }) {
   return <section className="profile-dashboard">
     <div className="profile-about-card"><span className="profile-section-kicker">ABOUT</span><h2>Biography</h2><p>{profile.bio || "You have not added a biography yet. Tell listeners a little about yourself."}</p>{!profile.bio ? <button onClick={onEdit}>Add biography</button> : null}</div>
-    <div className="profile-details-card"><div className="profile-card-heading"><div><span className="profile-section-kicker">ACCOUNT DETAILS</span><h2>Personal information</h2></div><button onClick={onEdit}>Edit</button></div><dl>
+    <div className="profile-details-card"><div className="profile-card-heading"><div><span className="profile-section-kicker">ACCOUNT DETAILS</span><h2>Personal information</h2></div></div><dl>
       <div><dt><UserIcon width={17} height={17} />Username</dt><dd>@{profile.username}</dd></div>
       <div><dt><MailIcon width={17} height={17} />Email</dt><dd>{profile.email}</dd></div>
       <div><dt><ClockIcon width={17} height={17} />Date of birth</dt><dd>{formatDate(profile.dateOfBirth)}</dd></div>

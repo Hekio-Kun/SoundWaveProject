@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, useEffect, type FormEvent, type ReactNode } from "react";
 import { AuthApiError, authApi, getAuthErrorMessage, type AuthSession } from "../api/auth";
 import {
   AlertIcon,
@@ -122,6 +122,7 @@ function TextField({
   autoComplete,
   icon,
   minLength,
+  action,
   error,
 }: {
   id: string;
@@ -133,11 +134,19 @@ function TextField({
   autoComplete?: string;
   icon: ReactNode;
   minLength?: number;
+  action?: ReactNode;
   error?: string;
 }) {
   return (
     <div className={`auth-v2-field ${error ? "has-error" : ""}`}>
-      <label htmlFor={id}>{label}</label>
+      {action ? (
+        <div className="auth-v2-label-row">
+          <label htmlFor={id}>{label}</label>
+          {action}
+        </div>
+      ) : (
+        <label htmlFor={id}>{label}</label>
+      )}
       <div className={`auth-v2-input ${error ? "is-invalid" : ""}`}>
         <span>{icon}</span>
         <input id={id} type={type} required minLength={minLength} autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} />
@@ -189,6 +198,32 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   const [resendMessage, setResendMessage] = useState("");
   const [resendingVerification, setResendingVerification] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
+
+  // Self-Service Emergency Unlock via OTP
+  const [unlockMode, setUnlockMode] = useState(false);
+  const [unlockOtp, setUnlockOtp] = useState("");
+  const [unlockOtpError, setUnlockOtpError] = useState("");
+  const [unlockSuccess, setUnlockSuccess] = useState("");
+  const [unlockCooldown, setUnlockCooldown] = useState(0);
+  const [requestingUnlock, setRequestingUnlock] = useState(false);
+  const [submittingUnlock, setSubmittingUnlock] = useState(false);
+
+  useEffect(() => {
+    if (verificationCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setVerificationCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationCooldown]);
+
+  useEffect(() => {
+    if (unlockCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setUnlockCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [unlockCooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -207,6 +242,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     setApiError("");
     setApiErrorCode("");
     setResendMessage("");
+    setUnlockSuccess("");
     setSubmitting(true);
     try {
       const session = await authApi.login(email.trim(), password, rememberMe);
@@ -220,6 +256,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   };
 
   const resendVerificationOtp = async () => {
+    if (verificationCooldown > 0 || resendingVerification) return;
     setResendingVerification(true);
     setResendMessage("");
     try {
@@ -227,11 +264,56 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
       setApiError("");
       setApiErrorCode("");
       setResendMessage(result.message);
+      setVerificationCooldown(60);
     } catch (error) {
       setApiError(getAuthErrorMessage(error, "Unable to resend the verification OTP."));
       setApiErrorCode(error instanceof AuthApiError ? error.code ?? "" : "");
     } finally {
       setResendingVerification(false);
+    }
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!email.trim()) {
+      setErrors({ "login-email": "Please enter your email to request an unlock code." });
+      focusFirstInvalid({ "login-email": "required" });
+      return;
+    }
+    if (unlockCooldown > 0 || requestingUnlock) return;
+    setRequestingUnlock(true);
+    setUnlockOtpError("");
+    try {
+      const result = await authApi.requestUnlock(email.trim());
+      setUnlockMode(true);
+      setUnlockCooldown(60);
+      setUnlockSuccess("");
+      setResendMessage(result.message);
+    } catch (error) {
+      setApiError(getAuthErrorMessage(error, "Unable to send unlock OTP."));
+    } finally {
+      setRequestingUnlock(false);
+    }
+  };
+
+  const handleConfirmUnlock = async () => {
+    if (unlockOtp.length !== 6) {
+      setUnlockOtpError("Please enter the 6-digit OTP code.");
+      return;
+    }
+    setSubmittingUnlock(true);
+    setUnlockOtpError("");
+    try {
+      const result = await authApi.unlockAccount(email.trim(), unlockOtp);
+      setUnlockMode(false);
+      setUnlockOtp("");
+      setApiError("");
+      setApiErrorCode("");
+      setPassword("");
+      setUnlockSuccess(result.message);
+    } catch (error) {
+      setUnlockOtpError(getAuthErrorMessage(error, "Invalid or expired unlock code."));
+    } finally {
+      setSubmittingUnlock(false);
     }
   };
 
@@ -243,26 +325,150 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     setErrors((current) => ({ ...current, [id]: "" }));
   };
 
+  const isWarningRemainingAttempts = apiError.includes("remaining before");
+
   return (
     <AuthExperience mode="login" eyebrow="WELCOME BACK" title="Continue with SoundWave" description="Log in to open your personal library and continue listening where you left off." onNavigate={onNavigate}>
       <form onSubmit={handleSubmit} className="auth-v2-form" noValidate>
         {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Please review the fields marked below." /> : null}
         {apiError ? (
           <AuthErrorNotice
-            title={apiErrorCode === "ACCOUNT_BANNED" ? "Account banned" : "Unable to log in"}
+            title={
+              apiErrorCode === "ACCOUNT_BANNED"
+                ? "Account banned"
+                : apiErrorCode === "LOGIN_LOCKED"
+                ? "Account temporarily locked"
+                : isWarningRemainingAttempts
+                ? "Incorrect password warning"
+                : "Unable to log in"
+            }
             message={apiError}
-            action={apiErrorCode === "EMAIL_NOT_VERIFIED" ? (
-              <button
-                type="button"
-                className="auth-v2-error-action"
-                onClick={resendVerificationOtp}
-                disabled={resendingVerification}
-              >
-                {resendingVerification ? "Sending…" : "Resend verification OTP"}
-              </button>
-            ) : undefined}
+            action={
+              apiErrorCode === "EMAIL_NOT_VERIFIED" ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={resendVerificationOtp}
+                  disabled={verificationCooldown > 0 || resendingVerification}
+                >
+                  {resendingVerification ? "Sending…" : verificationCooldown > 0 ? `Resend OTP (${verificationCooldown}s)` : "Resend verification OTP"}
+                </button>
+              ) : apiErrorCode === "LOGIN_LOCKED" && !unlockMode ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={handleRequestUnlock}
+                  disabled={requestingUnlock || unlockCooldown > 0}
+                >
+                  {requestingUnlock ? "Sending code…" : unlockCooldown > 0 ? `Resend Unlock OTP (${unlockCooldown}s)` : "Unlock via Email"}
+                </button>
+              ) : isWarningRemainingAttempts ? (
+                <button
+                  type="button"
+                  className="auth-v2-error-action"
+                  onClick={() => onNavigate(`/forgot-password?email=${encodeURIComponent(email.trim())}`)}
+                >
+                  Reset password now
+                </button>
+              ) : undefined
+            }
           />
         ) : null}
+
+        {unlockSuccess ? (
+          <div className="auth-v2-verification-resend" role="status" style={{ marginBottom: "0.5rem" }}>
+            <CheckIcon width={17} height={17} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <span><b>Account unlocked</b><small>{unlockSuccess}</small></span>
+              <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
+                <button
+                  type="button"
+                  className="auth-v2-text-button"
+                  onClick={() => {
+                    setUnlockSuccess("");
+                    document.getElementById("login-password")?.focus();
+                  }}
+                >
+                  Log in now
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  className="auth-v2-text-button"
+                  onClick={() => onNavigate(`/forgot-password?email=${encodeURIComponent(email.trim())}`)}
+                >
+                  Reset password
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {unlockMode ? (
+          <div style={{
+            padding: "1rem",
+            borderRadius: "0.75rem",
+            backgroundColor: "rgba(2, 132, 199, 0.05)",
+            border: "1px solid rgba(2, 132, 199, 0.25)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <ShieldIcon width={18} height={18} />
+              <b style={{ fontSize: "0.95rem" }}>Emergency Account Unlock</b>
+            </div>
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--color-text-muted, #64748b)" }}>
+              We sent a 6-digit unlock code to <b>{email}</b>. Enter it below to restore your account immediately.
+            </p>
+            <div className={`auth-v2-field ${unlockOtpError ? "has-error" : ""}`}>
+              <label htmlFor="unlock-otp">6-digit Unlock OTP</label>
+              <div className={`auth-v2-input ${unlockOtpError ? "is-invalid" : ""}`}>
+                <span><MailIcon width={17} height={17} /></span>
+                <input
+                  id="unlock-otp"
+                  type="text"
+                  value={unlockOtp}
+                  onChange={(e) => {
+                    setUnlockOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setUnlockOtpError("");
+                  }}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                />
+              </div>
+              {unlockOtpError ? <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{unlockOtpError}</small> : null}
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleConfirmUnlock}
+                disabled={submittingUnlock || unlockOtp.length !== 6}
+              >
+                {submittingUnlock ? "Unlocking…" : "Confirm Unlock"}
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={handleRequestUnlock}
+                disabled={requestingUnlock || unlockCooldown > 0}
+              >
+                {requestingUnlock ? "Sending…" : unlockCooldown > 0 ? `Resend (${unlockCooldown}s)` : "Resend OTP"}
+              </button>
+              <button
+                type="button"
+                className="auth-v2-text-button"
+                onClick={() => setUnlockMode(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {resendMessage ? (
           <div className="auth-v2-verification-resend" role="status">
             <CheckIcon width={17} height={17} />
@@ -278,37 +484,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
         </div>
 
         <button type="submit" className="button button-primary button-large auth-v2-submit" disabled={submitting}>{submitting ? "Logging in…" : "Login"}</button>
-
-        <div style={{ marginTop: "12px", display: "flex", gap: "8px", justifyContent: "center" }}>
-          <button
-            type="button"
-            className="button button-ghost button-small"
-            style={{ fontSize: "11px", padding: "4px 10px" }}
-            onClick={() => {
-              setEmail("staff@soundwave.com");
-              setPassword("Admin@123456");
-            }}
-          >
-            Fill Staff Account
-          </button>
-          <button
-            type="button"
-            className="button button-ghost button-small"
-            style={{ fontSize: "11px", padding: "4px 10px" }}
-            onClick={() => {
-              setEmail("admin@soundwave.com");
-              setPassword("Admin@123456");
-            }}
-          >
-            Fill Admin Account
-          </button>
-        </div>
       </form>
-
-      <div className="auth-v2-access-note">
-        <ShieldIcon width={17} height={17} />
-        <span><b>Access is assigned automatically</b><small>The system checks the account role after login.</small></span>
-      </div>
 
       <p className="auth-v2-switch">Do not have an account? <button onClick={() => onNavigate("/register")}>Register</button></p>
     </AuthExperience>
@@ -446,6 +622,17 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
   const [errors, setErrors] = useState<FieldErrors>({});
   const [apiError, setApiError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [cooldown, setCooldown] = useState(60);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -475,6 +662,26 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
     }
   };
 
+  const handleResendOtp = async () => {
+    if (cooldown > 0 || resending) return;
+    if (!email) {
+      setApiError("Email address is missing. Please return to Forgot Password.");
+      return;
+    }
+    setApiError("");
+    setResendMessage("");
+    setResending(true);
+    try {
+      const response = await authApi.forgotPassword(email);
+      setResendMessage(response.message || "A new 6-digit OTP has been sent to your email.");
+      setCooldown(60);
+    } catch (error) {
+      setApiError(getAuthErrorMessage(error, "Unable to send another OTP right now. Please wait before retrying."));
+    } finally {
+      setResending(false);
+    }
+  };
+
   const updateField = (id: string, setter: (value: string) => void) => (value: string) => {
     setter(value);
     setApiError("");
@@ -489,10 +696,46 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
         <form className="auth-v2-form" onSubmit={handleSubmit} noValidate>
           {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Review the New Password and Confirm Password fields." /> : null}
           {apiError ? <AuthErrorNotice title="Unable to reset password" message={apiError} /> : null}
-          <TextField id="reset-otp" label="6-digit OTP" value={otp} onChange={updateField("reset-otp", setOtp)} placeholder="000000" autoComplete="one-time-code" icon={<ShieldIcon width={17} height={17} />} error={errors["reset-otp"]} />
+          {resendMessage ? (
+            <div className="auth-v2-verification-resend" role="status">
+              <CheckIcon width={17} height={17} />
+              <span><b>OTP sent</b><small>{resendMessage}</small></span>
+            </div>
+          ) : null}
+          <TextField
+            id="reset-otp"
+            label="6-digit OTP"
+            value={otp}
+            onChange={updateField("reset-otp", setOtp)}
+            placeholder="000000"
+            autoComplete="one-time-code"
+            icon={<ShieldIcon width={17} height={17} />}
+            action={
+              <button
+                type="button"
+                className="auth-v2-text-button"
+                disabled={cooldown > 0 || resending || submitting}
+                onClick={handleResendOtp}
+              >
+                {resending ? "Sending…" : cooldown > 0 ? `Resend (${cooldown}s)` : "Resend OTP"}
+              </button>
+            }
+            error={errors["reset-otp"]}
+          />
           <PasswordField id="new-password" label="New Password" value={newPassword} onChange={updateField("new-password", setNewPassword)} autoComplete="new-password" error={errors["new-password"]} />
           <PasswordField id="confirm-password" label="Confirm Password" value={confirmPassword} onChange={updateField("confirm-password", setConfirmPassword)} autoComplete="new-password" error={errors["confirm-password"]} />
           <button className="button button-primary button-large auth-v2-submit" disabled={submitting}>{submitting ? "Saving…" : "Save Password"}</button>
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={cooldown > 0 || resending || submitting}
+            onClick={handleResendOtp}
+          >
+            {resending ? "Sending OTP…" : cooldown > 0 ? `Resend OTP (${cooldown}s)` : "Resend OTP"}
+          </button>
+          <button type="button" className="auth-v2-back" onClick={() => onNavigate("/forgot-password")}>
+            ← Back to Forgot Password
+          </button>
         </form>
       )}
     </AuthExperience>

@@ -20,7 +20,7 @@ public class AuthRateLimiterService {
     public static final int MAX_FAILED_OTP_ATTEMPTS = 5;
     public static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     public static final int MAX_REGISTRATION_ATTEMPTS = 5;
-    private static final long LOGIN_LOCKOUT_SECONDS = 600; // 10 phút khóa tạm thời
+    public static final long LOGIN_LOCKOUT_SECONDS = 600; // 10 phút khóa tạm thời
     private static final long REGISTRATION_WINDOW_MINUTES = 10;
 
     private final ConcurrentHashMap<String, OtpAttemptTracker> otpAttempts = new ConcurrentHashMap<>();

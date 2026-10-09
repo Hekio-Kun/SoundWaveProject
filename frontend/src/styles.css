@@ -88,7 +88,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .hero-actions { display: flex; align-items: center; gap: 12px; }
 .hero-proof { display: flex; align-items: center; gap: 12px; margin-top: 35px; color: #344054; }
 .avatar-stack { display: flex; padding-left: 9px; }
-.avatar-stack img { width: 34px; height: 34px; border: 3px solid #f6efe3; border-radius: 50%; margin-left: -9px; }
+.avatar-stack img { width: 34px; height: 34px; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; flex-shrink: 0; border: 3px solid #f6efe3; border-radius: 50%; margin-left: -9px; }
 .hero-proof > span { display: flex; flex-direction: column; gap: 2px; }
 .hero-proof b { font-size: 12px; }.hero-proof small { color: #98a2b3; font-size: 10px; }
 .hero-visual { position: relative; min-height: 510px; isolation: isolate; }
