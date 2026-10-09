@@ -19,7 +19,9 @@ export type ApiTrack = {
   playCount: number;
   latestRejectionReason?: string;
   reviewerNote?: string;
+  submitterNote?: string;
   submittedAt?: string;
+  reviewedAt?: string;
   createdAt: string;
   updatedAt: string;
   lyrics?: string;

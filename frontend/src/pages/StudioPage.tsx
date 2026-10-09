@@ -13,7 +13,10 @@ import { MediaUploadField } from "../components/MediaUploadField";
 import {
   AlertIcon,
   CheckIcon,
+  ClockIcon,
   CloseIcon,
+  EditIcon,
+  EyeIcon,
   FileTextIcon,
   PauseIcon,
   PlayIcon,
@@ -29,6 +32,14 @@ import {
   validateCoverFile,
   validateLyricsFile,
 } from "../utils/trackUpload";
+
+function formatDuration(ms?: number): string {
+  if (!ms || ms <= 0) return "0:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
 
 type Props = {
   tracks: StudioTrack[];
@@ -69,11 +80,18 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
   const [previewAudioPlaying, setPreviewAudioPlaying] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // View Detail state (Manage My Tracks - View Detail Sequence)
+  const [detailTrack, setDetailTrack] = useState<StudioTrack | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
+  const [detailAudioPlaying, setDetailAudioPlaying] = useState(false);
+  const [detailAudioCurrentTime, setDetailAudioCurrentTime] = useState(0);
+  const [detailAudioDuration, setDetailAudioDuration] = useState(0);
+  const detailAudioRef = useRef<HTMLAudioElement | null>(null);
+
   // Form inputs
   const [title, setTitle] = useState("");
   const [selectedGenreId, setSelectedGenreId] = useState<number>(0);
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | "">("");
-  const [trackNumber, setTrackNumber] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -149,7 +167,14 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
 
   // Rule 4.7: Modal background scroll lock
   useModalScrollLock(
-    Boolean(trackModalOpen || deleteConfirmTrack || rejectionModalTrack || submittingNoteTrack || withdrawConfirmTrack)
+    Boolean(
+      trackModalOpen ||
+      deleteConfirmTrack ||
+      rejectionModalTrack ||
+      submittingNoteTrack ||
+      withdrawConfirmTrack ||
+      detailTrack
+    )
   );
 
   useEffect(() => {
@@ -163,6 +188,86 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
     };
   }, [trackModalOpen, isSaving]);
 
+  useEffect(() => {
+    if (!detailTrack) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeDetailModal();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [detailTrack]);
+
+  // View Detail (Manage My Tracks - View Detail Sequence Diagram)
+  const handleOpenDetail = async (track: StudioTrack) => {
+    try {
+      setLoadingDetailId(track.id);
+      setActionError(null);
+      const data = await studioApi.getTrackById(track.id);
+      const mapped: StudioTrack = {
+        id: data.id,
+        title: data.title,
+        slug: data.slug,
+        description: data.description,
+        coverUrl: data.coverUrl ?? "/pics/album.png",
+        audioUrl: data.audioUrl,
+        audioFormat: data.audioFormat,
+        durationMs: data.durationMs,
+        genreId: data.genreId,
+        genreSlug: data.genreSlug,
+        genreName: data.genreName,
+        albumId: data.albumId,
+        albumTitle: data.albumTitle,
+        trackNumber: data.trackNumber,
+        status: data.status === "PUBLISHED" || data.status === "APPROVED"
+          ? "APPROVED"
+          : data.status === "TAKEN_DOWN"
+          ? "REJECTED"
+          : data.status,
+        playCount: data.playCount,
+        latestRejectionReason: data.latestRejectionReason,
+        reviewerNote: data.reviewerNote,
+        submitterNote: data.submitterNote,
+        submittedAt: data.submittedAt,
+        reviewedAt: data.reviewedAt,
+        createdAt: new Date(data.createdAt).toLocaleDateString(),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt).toLocaleDateString() : undefined,
+        lyrics: data.lyrics,
+      };
+      setDetailTrack(mapped);
+      setDetailAudioPlaying(false);
+      setDetailAudioCurrentTime(0);
+    } catch {
+      // Fallback local if offline/mock
+      setDetailTrack(track);
+      setDetailAudioPlaying(false);
+      setDetailAudioCurrentTime(0);
+    } finally {
+      setLoadingDetailId(null);
+    }
+  };
+
+  const closeDetailModal = () => {
+    if (detailAudioRef.current) {
+      detailAudioRef.current.pause();
+    }
+    setDetailAudioPlaying(false);
+    setDetailTrack(null);
+  };
+
+  const handleToggleDetailAudio = () => {
+    if (!detailAudioRef.current) return;
+    if (detailAudioPlaying) {
+      detailAudioRef.current.pause();
+      setDetailAudioPlaying(false);
+    } else {
+      detailAudioRef.current.play()
+        .then(() => setDetailAudioPlaying(true))
+        .catch(() => setDetailAudioPlaying(false));
+    }
+  };
+
   // Open Edit Modal (UC-19.3)
   const openEditModal = (track: StudioTrack) => {
     setActionError(null);
@@ -170,7 +275,6 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
     setTitle(track.title);
     setDescription(track.description ?? "");
     setSelectedAlbumId(track.albumId ?? "");
-    setTrackNumber(track.trackNumber ?? "");
     setAudioFile(null);
     setCoverFile(null);
     setAudioDurationMs(undefined);
@@ -256,17 +360,11 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
       errors.description = "Description cannot exceed 2000 characters.";
     }
 
-    if (trackNumber !== "" && (!Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > 32767)) {
-      errors.trackNumber = "Track number must be a whole number from 1 to 32767.";
-    }
-
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const firstError = Object.keys(errors)[0];
       const targetId = firstError === "audio" || firstError === "cover"
         ? `${firstError}-file-input-button`
-        : firstError === "trackNumber"
-        ? "track-number"
         : firstError === "description"
         ? "track-desc"
         : `track-${firstError}`;
@@ -284,7 +382,6 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
           title: title.trim(),
           genreId: selectedGenreId,
           albumId: selectedAlbumId ? Number(selectedAlbumId) : undefined,
-          trackNumber: trackNumber ? Number(trackNumber) : undefined,
           description: description.trim() || undefined,
           durationMs: audioDurationMs,
           lyrics: lyricsContent.trim() || undefined,
@@ -670,7 +767,23 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                         </div>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <b>{t.title}</b>
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenDetail(t)}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                font: "inherit",
+                                fontWeight: "bold",
+                                color: "var(--sw-text, #1e293b)",
+                                cursor: "pointer",
+                                textAlign: "left",
+                              }}
+                              title="Click to view details"
+                            >
+                              {t.title}
+                            </button>
                             {t.lyrics && (
                               <span
                                 title="Official lyrics attached"
@@ -727,6 +840,17 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                     <td>{t.createdAt}</td>
                     <td style={{ textAlign: "right" }}>
                       <div className="table-action-btns" style={{ justifyContent: "flex-end" }}>
+                        <button
+                          type="button"
+                          className="button button-ghost button-small"
+                          onClick={() => void handleOpenDetail(t)}
+                          disabled={loadingDetailId === t.id}
+                          title="View track details & moderation status"
+                        >
+                          <EyeIcon width={14} height={14} />
+                          <span>Details</span>
+                        </button>
+
                         {t.status === "DRAFT" && (
                           <>
                             <button
@@ -763,7 +887,7 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                               className="button button-secondary button-small"
                               onClick={() => handleViewRejection(t)}
                             >
-                              Rejection feedback
+                              Feedback
                             </button>
                             <button
                               className="button button-ghost button-small"
@@ -816,12 +940,12 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                           <>
                             <span className="text-muted small" style={{ marginRight: "4px" }}>Under review...</span>
                             <button
-                              className="button button-ghost button-small text-danger"
-                              onClick={() => setDeleteConfirmTrack(t)}
-                              title="Delete track"
-                              aria-label="Delete pending track"
+                              type="button"
+                              className="button button-ghost button-small text-warning"
+                              onClick={() => setWithdrawConfirmTrack(t)}
+                              title="Withdraw submission from moderation review"
                             >
-                              <TrashIcon width={15} height={15} />
+                              Withdraw
                             </button>
                           </>
                         )}
@@ -970,42 +1094,21 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                 </div>
               </div>
 
-              <div className="studio-form-grid studio-form-grid--details">
-                <div className="form-group">
-                  <label htmlFor="track-number">Track #</label>
-                  <input
-                    id="track-number"
-                    type="number"
-                    min="1"
-                    max="32767"
-                    step="1"
-                    placeholder="1"
-                    value={trackNumber}
-                    aria-invalid={Boolean(formErrors.trackNumber)}
-                    onChange={(e) => {
-                      setTrackNumber(e.target.value ? Number(e.target.value) : "");
-                      if (formErrors.trackNumber) setFormErrors((previous) => ({ ...previous, trackNumber: "" }));
-                    }}
-                  />
-                  {formErrors.trackNumber && <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{formErrors.trackNumber}</small>}
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="track-desc">Description (optional)</label>
-                  <textarea
-                    id="track-desc"
-                    placeholder="Brief description or mood of the track"
-                    value={description}
-                    rows={3}
-                    maxLength={2001}
-                    aria-invalid={Boolean(formErrors.description)}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                      if (formErrors.description) setFormErrors((previous) => ({ ...previous, description: "" }));
-                    }}
-                  />
-                  {formErrors.description && <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{formErrors.description}</small>}
-                </div>
+              <div className="form-group" style={{ marginTop: "16px" }}>
+                <label htmlFor="track-desc">Description (optional)</label>
+                <textarea
+                  id="track-desc"
+                  placeholder="Brief description or mood of the track"
+                  value={description}
+                  rows={3}
+                  maxLength={2001}
+                  aria-invalid={Boolean(formErrors.description)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (formErrors.description) setFormErrors((previous) => ({ ...previous, description: "" }));
+                  }}
+                />
+                {formErrors.description && <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{formErrors.description}</small>}
               </div>
 
               <div className="studio-media-grid">
@@ -1422,6 +1525,511 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
               >
                 {isSaving ? "Withdrawing..." : "Confirm withdraw"}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Track Detail Modal (Manage My Tracks - View Detail Sequence Diagram) */}
+      {detailTrack && createPortal(
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={closeDetailModal}
+        >
+          <div
+            className="modal-card modal-card--wide studio-track-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studio-detail-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "780px" }}
+          >
+            {/* Header */}
+            <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid #e4e7ec" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0 }}>
+                <img
+                  src={detailTrack.coverUrl || "/pics/album.png"}
+                  alt={detailTrack.title}
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "8px",
+                    objectFit: "cover",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <h3 id="studio-detail-modal-title" style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--sw-text, #1e293b)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {detailTrack.title}
+                    </h3>
+                    <span className={`status-badge status-badge--${detailTrack.status.toLowerCase()}`}>
+                      {detailTrack.status === "APPROVED" && "Published"}
+                      {detailTrack.status === "PENDING" && "Pending Review"}
+                      {detailTrack.status === "REJECTED" && "Rejected"}
+                      {detailTrack.status === "DRAFT" && "Draft"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", fontSize: "12px", color: "var(--sw-text-muted, #64748b)" }}>
+                    <span>Slug: <code>{detailTrack.slug}</code></span>
+                    <span>•</span>
+                    <span>ID: #{detailTrack.id}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                className="icon-button"
+                onClick={closeDetailModal}
+                title="Close modal"
+                aria-label="Close modal"
+              >
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(85vh - 160px)", display: "flex", flexDirection: "column", gap: "18px" }}>
+              {/* Audio Preview Player (Step 5) */}
+              {detailTrack.audioUrl && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                    border: "1px solid #bae6fd",
+                    borderRadius: "12px",
+                    padding: "14px 18px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <audio
+                    ref={detailAudioRef}
+                    src={detailTrack.audioUrl}
+                    preload="metadata"
+                    onTimeUpdate={() => setDetailAudioCurrentTime(detailAudioRef.current?.currentTime || 0)}
+                    onLoadedMetadata={() => setDetailAudioDuration(detailAudioRef.current?.duration || 0)}
+                    onEnded={() => {
+                      setDetailAudioPlaying(false);
+                      setDetailAudioCurrentTime(0);
+                    }}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <button
+                        type="button"
+                        onClick={handleToggleDetailAudio}
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          borderRadius: "50%",
+                          background: "var(--sw-primary, #0284c7)",
+                          color: "#ffffff",
+                          border: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)",
+                          flexShrink: 0,
+                        }}
+                        title={detailAudioPlaying ? "Pause preview" : "Play preview"}
+                        aria-label={detailAudioPlaying ? "Pause preview" : "Play preview"}
+                      >
+                        {detailAudioPlaying ? <PauseIcon width={18} height={18} /> : <PlayIcon width={18} height={18} />}
+                      </button>
+                      <div>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#0369a1" }}>Audio Preview</span>
+                        <div style={{ fontSize: "11px", color: "#0284c7" }}>
+                          {detailTrack.audioFormat?.toUpperCase() || "AUDIO"} • {formatDuration((detailAudioDuration || ((detailTrack.durationMs || 0) / 1000)) * 1000)}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "12px", fontWeight: 500, color: "#0369a1", fontVariantNumeric: "tabular-nums" }}>
+                      {formatDuration(detailAudioCurrentTime * 1000)} / {formatDuration((detailAudioDuration || ((detailTrack.durationMs || 0) / 1000)) * 1000)}
+                    </span>
+                  </div>
+                  {/* Progress scrubber */}
+                  <input
+                    type="range"
+                    min={0}
+                    max={detailAudioDuration || (detailTrack.durationMs ? detailTrack.durationMs / 1000 : 100)}
+                    step={0.1}
+                    value={detailAudioCurrentTime}
+                    onChange={(e) => {
+                      const newTime = Number(e.target.value);
+                      if (detailAudioRef.current) {
+                        detailAudioRef.current.currentTime = newTime;
+                      }
+                      setDetailAudioCurrentTime(newTime);
+                    }}
+                    style={{
+                      width: "100%",
+                      accentColor: "var(--sw-primary, #0284c7)",
+                      cursor: "pointer",
+                      height: "5px",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Moderation State Evaluation Banner (Step 4) */}
+              {detailTrack.status === "PENDING" && (
+                <div
+                  style={{
+                    background: "#fefce8",
+                    border: "1px solid #fef08a",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ color: "#ca8a04", flexShrink: 0, marginTop: "2px" }}>
+                    <ClockIcon width={20} height={20} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#854d0e", lineHeight: 1.5 }}>
+                    <strong style={{ display: "block", color: "#713f12", marginBottom: "3px" }}>
+                      Pending Moderation Review
+                    </strong>
+                    This track is currently queued for review by SoundWave moderators. Direct editing and deletion are locked to preserve submission integrity.
+                    {detailTrack.submittedAt && (
+                      <div style={{ marginTop: "6px", fontSize: "12px" }}>
+                        Submitted on: <b>{new Date(detailTrack.submittedAt).toLocaleString()}</b>
+                      </div>
+                    )}
+                    {detailTrack.submitterNote && (
+                      <div style={{ marginTop: "6px", padding: "8px 12px", background: "#fef9c3", borderRadius: "6px", fontStyle: "italic" }}>
+                        &ldquo;{detailTrack.submitterNote}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {detailTrack.status === "REJECTED" && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ color: "#dc2626", flexShrink: 0, marginTop: "2px" }}>
+                    <AlertIcon width={20} height={20} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#991b1b", lineHeight: 1.5, flex: 1 }}>
+                    <strong style={{ display: "block", color: "#7f1d1d", marginBottom: "4px" }}>
+                      Submission Rejected
+                    </strong>
+                    <div style={{ marginBottom: "6px" }}>
+                      Reason: <b>{detailTrack.latestRejectionReason || "Content or metadata does not meet community guidelines."}</b>
+                    </div>
+                    {detailTrack.reviewerNote && (
+                      <div style={{ padding: "8px 12px", background: "#fee2e2", borderRadius: "6px", marginBottom: "6px", fontSize: "12px" }}>
+                        <strong>Reviewer note:</strong> {detailTrack.reviewerNote}
+                      </div>
+                    )}
+                    {detailTrack.reviewedAt && (
+                      <div style={{ fontSize: "12px", color: "#b91c1c" }}>
+                        Reviewed on: {new Date(detailTrack.reviewedAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {detailTrack.status === "DRAFT" && (
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    fontSize: "13px",
+                    color: "var(--sw-text-secondary, #475569)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong style={{ display: "block", color: "var(--sw-text, #1e293b)", marginBottom: "3px" }}>
+                    Draft Track
+                  </strong>
+                  This track is in draft mode and not visible to public listeners. You can edit the audio file and metadata at any time before submitting for review.
+                </div>
+              )}
+
+              {detailTrack.status === "APPROVED" && (
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ color: "#16a34a", flexShrink: 0, marginTop: "2px" }}>
+                    <CheckIcon width={20} height={20} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#166534", lineHeight: 1.5 }}>
+                    <strong style={{ display: "block", color: "#14532d", marginBottom: "3px" }}>
+                      Live in Public Catalog
+                    </strong>
+                    This track is approved and streaming on SoundWave.
+                    <div style={{ marginTop: "4px", fontSize: "12px" }}>
+                      Total Plays: <b>{detailTrack.playCount ?? 0}</b>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata Details Grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "12px",
+                  background: "#f8fafc",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Genre
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {detailTrack.genreName || "Unassigned"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Album
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {detailTrack.albumTitle ? `${detailTrack.albumTitle}${detailTrack.trackNumber ? ` (#${detailTrack.trackNumber})` : ""}` : "Single Release"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Duration
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {formatDuration(detailTrack.durationMs)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Format
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {detailTrack.audioFormat?.toUpperCase() || "MP3 / AAC"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Created Date
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {detailTrack.createdAt}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Plays
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {detailTrack.playCount ?? 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {detailTrack.description && (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--sw-text-secondary, #475569)", marginBottom: "4px" }}>
+                    Description
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap" }}>
+                    {detailTrack.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Lyrics */}
+              {detailTrack.lyrics && (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--sw-text-secondary, #475569)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FileTextIcon width={14} height={14} /> Lyrics
+                  </div>
+                  <div style={{ maxHeight: "140px", overflowY: "auto", fontSize: "12px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+                    {detailTrack.lyrics}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions (Step 4 & 22) */}
+            <div className="modal-actions" style={{ padding: "16px 24px", borderTop: "1px solid #e4e7ec", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closeDetailModal}
+              >
+                Close
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {/* Status: PENDING (lock dangerous edit, provide Withdraw) */}
+                {detailTrack.status === "PENDING" && (
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={() => {
+                      const t = detailTrack;
+                      closeDetailModal();
+                      setWithdrawConfirmTrack(t);
+                    }}
+                  >
+                    Withdraw submission
+                  </button>
+                )}
+
+                {/* Status: REJECTED (provide Edit, Delete & Resubmit) */}
+                {detailTrack.status === "REJECTED" && (
+                  <>
+                    <button
+                      type="button"
+                      className="button button-ghost text-danger"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        setDeleteConfirmTrack(t);
+                      }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        openEditModal(t);
+                      }}
+                    >
+                      Edit track
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        setSubmittingNoteTrack(t);
+                        setSubmitterNote("");
+                        setSubmitCopyrightAgreed(false);
+                      }}
+                    >
+                      Resubmit for review
+                    </button>
+                  </>
+                )}
+
+                {/* Status: DRAFT (provide Edit, Delete & Submit for Review) */}
+                {detailTrack.status === "DRAFT" && (
+                  <>
+                    <button
+                      type="button"
+                      className="button button-ghost text-danger"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        setDeleteConfirmTrack(t);
+                      }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        openEditModal(t);
+                      }}
+                    >
+                      Edit track
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        setSubmittingNoteTrack(t);
+                        setSubmitterNote("");
+                        setSubmitCopyrightAgreed(false);
+                      }}
+                    >
+                      Submit for review
+                    </button>
+                  </>
+                )}
+
+                {/* Status: APPROVED (provide View on Public Catalog, Edit & Delete) */}
+                {detailTrack.status === "APPROVED" && (
+                  <>
+                    <button
+                      type="button"
+                      className="button button-ghost text-danger"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        setDeleteConfirmTrack(t);
+                      }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => {
+                        const t = detailTrack;
+                        closeDetailModal();
+                        openEditModal(t);
+                      }}
+                    >
+                      Edit track
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => {
+                        closeDetailModal();
+                        onNavigate(`/track/${detailTrack.id}`);
+                      }}
+                    >
+                      View on Public Catalog
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>,
