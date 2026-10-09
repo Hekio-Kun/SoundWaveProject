@@ -134,7 +134,7 @@ public class CloudMediaService {
             throw new InvalidTrackCoverException();
         }
         byte[] content = readBytes(file, new InvalidTrackCoverException());
-        if (!isJpeg(content) && !isPng(content)) {
+        if (!isJpeg(content) && !isPng(content) && !isWebp(content)) {
             throw new InvalidTrackCoverException();
         }
         return content;
@@ -161,6 +161,12 @@ public class CloudMediaService {
             if (content[index] != PNG_SIGNATURE[index]) return false;
         }
         return true;
+    }
+
+    private boolean isWebp(byte[] content) {
+        return content.length >= 12
+                && content[0] == 'R' && content[1] == 'I' && content[2] == 'F' && content[3] == 'F'
+                && content[8] == 'W' && content[9] == 'E' && content[10] == 'B' && content[11] == 'P';
     }
 
     private boolean isMp3(byte[] content) {
