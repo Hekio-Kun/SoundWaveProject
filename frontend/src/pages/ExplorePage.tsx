@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { albums, featuredCreators, genres as initialGenres, projectTracks } from "../data";
+import { albums, featuredCreators, genres as initialGenres } from "../data";
 import { catalogApi } from "../api/catalog";
 import { AlbumCard, CreatorCard, SectionHeader, TrackCard } from "../components/MusicCards";
 import { ArrowIcon, PauseIcon, PlayIcon } from "../icons";
@@ -20,10 +20,10 @@ const formatDuration = (ms: number) => {
 
 export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: Props) {
   const [genresList, setGenresList] = useState<Genre[]>(initialGenres);
-  const [trendingTracks, setTrendingTracks] = useState<LandingTrack[]>(() => projectTracks.slice(0, 5));
-  const [newReleaseTracks, setNewReleaseTracks] = useState<LandingTrack[]>(() => projectTracks.slice(2, 8));
-  const [catalogTrackCount, setCatalogTrackCount] = useState(projectTracks.length);
-  const [tracksLoading, setTracksLoading] = useState(false);
+  const [trendingTracks, setTrendingTracks] = useState<LandingTrack[]>([]);
+  const [newReleaseTracks, setNewReleaseTracks] = useState<LandingTrack[]>([]);
+  const [catalogTrackCount, setCatalogTrackCount] = useState(0);
+  const [tracksLoading, setTracksLoading] = useState(true);
   const [tracksError, setTracksError] = useState("");
   const heroTrack = trendingTracks[0] ?? newReleaseTracks[0] ?? null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);

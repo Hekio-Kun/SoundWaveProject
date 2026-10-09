@@ -45,8 +45,6 @@ const creators = {
 
 export const tracks: LandingTrack[] = [];
 
-export const tracks: LandingTrack[] = [...projectTracks, ...demoTracks];
-
 export const genres: Genre[] = [
   { id: 1, name: "Pop", slug: "pop", color: "#ecfeff", accent: "#0891b2", description: "Bright, catchy, and popular melodies." },
   { id: 2, name: "Ballad", slug: "ballad", color: "#fdf6ed", accent: "#b4691e", description: "Gentle, heartfelt songs rich in emotion." },
