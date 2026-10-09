@@ -119,13 +119,15 @@ export function MusicPlayer({
       const cur = audio.currentTime;
       setCurrentTime(cur);
 
-      // BR-08: Listening event is counted when valid-play condition is met (>= 30s or >= 50% duration)
+      // BR.13: Listening event is counted when valid listening threshold is reached
+      // Duration <= 30s: Threshold = 90% duration; Duration > 30s: Threshold = 30 seconds
       if (!recordedRef.current && playing && cur > 0) {
         const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000;
-        const threshold = Math.min(30, dur * 0.5);
+        const threshold = dur <= 30 ? dur * 0.9 : 30;
         if (cur >= threshold) {
           recordedRef.current = true;
-          onRecordPlay?.(track.id, Math.round(cur * 1000), false);
+          const completed = cur >= dur * 0.9;
+          onRecordPlay?.(track.id, Math.round(cur * 1000), completed);
         }
       }
     };
