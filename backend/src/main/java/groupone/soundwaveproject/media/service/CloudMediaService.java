@@ -83,6 +83,15 @@ public class CloudMediaService {
     }
 
     /**
+     * Kiểm tra và tải ảnh bìa album (Album Cover) lên Cloudinary.
+     */
+    public StoredMediaResponse uploadAlbumCover(MultipartFile file, Long userId) {
+        byte[] content = readValidTrackCover(file);
+        Map<?, ?> result = upload(content, "soundwave/albums/covers", "user-" + userId + "-album-cover", "image");
+        return toStoredMedia(result);
+    }
+
+    /**
      * Xóa ảnh cũ khỏi Cloudinary sau khi hồ sơ đã dùng ảnh mới.
      */
     public void deleteImageQuietly(String publicId) {
