@@ -83,3 +83,18 @@ Khi thực hiện các nhiệm vụ chuyên sâu, AI sẽ đóng vai các chuyê
 - **Code Reviewer ([agent/code-reviewer.md](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/code-reviewer.md))**: Đánh giá chất lượng code, phát hiện code smell.
 - **Security Reviewer ([agent/security-reviewer.md](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/security-reviewer.md))**: Rà soát bảo mật SQL Injection, CORS, JWT và lỗ hổng xác thực.
 - Cùng toàn bộ danh mục 68 chuyên viên AI chuyên sâu nằm trong thư mục [agent/](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/).
+
+---
+
+## 5. Quy tắc quản lý Git (Git Safety Rules) — BẮT BUỘC
+
+1. **TUYỆT ĐỐI KHÔNG TỰ Ý COMMIT HOẶC PUSH CODE**:
+   - AI **nghiêm cấm** tự ý chạy các lệnh `git commit` hoặc `git push` trong bất kỳ tình huống nào nếu lập trình viên chưa yêu cầu rõ ràng.
+   - Khi hoàn thành việc viết code, kiểm thử hoặc sửa đổi:
+     - AI chỉ chạy kiểm tra build/test (`mvn test`, `npm run build`), kiểm tra `git status`.
+     - Báo cáo rõ ràng danh sách các file đã thay đổi cho người dùng và chờ chỉ thị tiếp theo.
+   - Chỉ thực hiện `git commit` hoặc `git push` khi và chỉ khi có yêu cầu bằng lời nói rõ ràng từ người dùng (ví dụ: *"hãy commit code cho tui"*, *"commit và push lên github"*).
+2. **Quy chuẩn khi được lệnh commit**:
+   - Sử dụng định dạng Conventional Commits chuẩn mực (`feat:`, `fix:`, `style:`, `refactor:`, `test:`, `chore:`).
+   - Chỉ stage (`git add`) đúng các file thuộc phạm vi tính năng/yêu cầu đó.
+
