@@ -1,17 +1,8 @@
 HELP.md
-**/target/
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-
-### Node / Frontend ###
-**/node_modules/
-**/dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 ### STS ###
 .apt_generated
@@ -42,9 +33,10 @@ build/
 .vscode/
 
 ### Application Configuration & Secrets ###
-**/src/main/resources/application-local.properties
+src/main/resources/application-local.properties
 *.properties.local
 *.env
 .env
 .env.*
 !.env.example
+
