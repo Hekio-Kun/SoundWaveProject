@@ -64,7 +64,7 @@ class AuthenticationServiceTest {
     void registerCreatesPendingAccountAndSendsOtp() {
         RegisterRequest request = new RegisterRequest("Le Hai", "User@Example.com", "Password1", "Password1");
         Role role = mock(Role.class);
-        when(userRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(false);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(authRateLimiterService.tryAcquireRegistrationAttempt("user@example.com", "127.0.0.1")).thenReturn(true);
         when(roleRepository.findByCode("LISTENER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode("Password1")).thenReturn("password-hash");
@@ -81,14 +81,41 @@ class AuthenticationServiceTest {
     }
 
     @Test
-    void registerRejectsAnExistingEmailBeforeSendingOtp() {
+    void registerWithExistingVerifiedEmailSendsNoticeWithoutRevealingAccount() {
         RegisterRequest request = new RegisterRequest("Le Hai", "user@example.com", "Password1", "Password1");
+        AppUser existingUser = mock(AppUser.class);
+        when(existingUser.getEmail()).thenReturn("user@example.com");
+        when(existingUser.getEmailVerifiedAt()).thenReturn(java.time.LocalDateTime.now());
         when(authRateLimiterService.tryAcquireRegistrationAttempt("user@example.com", "127.0.0.1")).thenReturn(true);
-        when(userRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(true);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(existingUser));
 
-        assertThrows(EmailAlreadyExistsException.class, () -> service.register(request, "127.0.0.1"));
+        var response = service.register(request, "127.0.0.1");
 
-        verifyNoInteractions(mailService);
+        assertEquals("Registration successful. Enter the OTP sent to your email.", response.message());
+        verify(mailService).sendAccountAlreadyExistsNotice("user@example.com");
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void registerWithExistingUnverifiedEmailResendsOtpWithoutRevealingAccount() {
+        RegisterRequest request = new RegisterRequest("Le Hai", "user@example.com", "Password1", "Password1");
+        AppUser existingUser = mock(AppUser.class);
+        when(existingUser.getId()).thenReturn(10L);
+        when(existingUser.getEmail()).thenReturn("user@example.com");
+        when(existingUser.getEmailVerifiedAt()).thenReturn(null);
+        when(authRateLimiterService.tryAcquireRegistrationAttempt("user@example.com", "127.0.0.1")).thenReturn(true);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(existingUser));
+        when(verificationTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(10L))
+                .thenReturn(Optional.empty());
+        when(profileRepository.findByUserId(10L)).thenReturn(Optional.empty());
+        when(otpGenerator.generate()).thenReturn("654321");
+        when(passwordEncoder.encode("654321")).thenReturn("otp-hash");
+
+        var response = service.register(request, "127.0.0.1");
+
+        assertEquals("Registration successful. Enter the OTP sent to your email.", response.message());
+        verify(verificationTokenRepository).save(any());
+        verify(mailService).sendVerificationOtp("user@example.com", "Le Hai", "654321", 10L);
         verify(userRepository, never()).save(any());
     }
 

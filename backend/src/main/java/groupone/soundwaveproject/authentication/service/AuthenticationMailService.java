@@ -32,6 +32,15 @@ public class AuthenticationMailService {
                         .formatted(otp, expirationMinutes));
     }
 
+    /**
+     * Gửi thông báo khi có yêu cầu đăng ký bằng email đã tồn tại để chống Account Enumeration và bảo vệ tài khoản.
+     */
+    public void sendAccountAlreadyExistsNotice(String recipient) {
+        send(recipient, "SoundWave account registration attempt",
+                "Hello,%n%nSomeone recently attempted to create a new SoundWave account using your email address (%s).%n%nBecause you already have an active SoundWave account, no new account was created.%n%nIf this was you, you can log in directly or reset your password if you forgot it.%n%nIf you did not make this request, you can safely ignore this email. Your account is secure."
+                        .formatted(recipient));
+    }
+
     private void send(String recipient, String subject, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);

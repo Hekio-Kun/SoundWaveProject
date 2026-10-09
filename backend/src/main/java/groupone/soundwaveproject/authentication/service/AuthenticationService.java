@@ -43,6 +43,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -89,8 +90,32 @@ public class AuthenticationService {
         if (!request.password().equals(request.confirmPassword())) {
             throw new AccountUnavailableException("PASSWORD_MISMATCH", "Password confirmation does not match.");
         }
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new EmailAlreadyExistsException();
+        // SEC-03: Chống Account Enumeration theo chuẩn OWASP.
+        // Luôn trả về phản hồi đồng nhất để kẻ tấn công không thể dò quét danh sách email tồn tại trong hệ thống.
+        Optional<AppUser> existingUserOpt = userRepository.findByEmailIgnoreCase(email);
+        if (existingUserOpt.isPresent()) {
+            AppUser existing = existingUserOpt.get();
+            if (existing.getEmailVerifiedAt() != null) {
+                // Tài khoản đã kích hoạt: gửi email cảnh báo bảo mật tới chủ tài khoản
+                mailService.sendAccountAlreadyExistsNotice(existing.getEmail());
+                log.info("Registration attempted for already verified email: {}. Sent security notification email.", email);
+            } else {
+                // Tài khoản đã đăng ký nhưng chưa xác thực email: gửi lại mã OTP nếu thỏa mãn cooldown
+                EmailVerificationToken current = verificationTokenRepository
+                        .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(existing.getId()).orElse(null);
+                if (isResendAllowed(current == null ? null : current.getCreatedAt())) {
+                    if (current != null) current.markUsed(nowUtc());
+                    authRateLimiterService.resetOtpAttempts(existing.getEmail());
+                    String displayName = profileRepository.findByUserId(existing.getId())
+                            .map(UserProfile::getDisplayName)
+                            .orElse(request.displayName().trim());
+                    createAndSendVerificationOtp(existing, displayName);
+                    log.info("Registration attempted for unverified email: {}. Resent verification OTP.", email);
+                } else {
+                    log.info("Registration attempted for unverified email: {} within cooldown period. Skipped sending duplicate OTP.", email);
+                }
+            }
+            return new MessageResponse("Registration successful. Enter the OTP sent to your email.");
         }
 
         Role role = roleRepository.findByCode(DEFAULT_ROLE)
