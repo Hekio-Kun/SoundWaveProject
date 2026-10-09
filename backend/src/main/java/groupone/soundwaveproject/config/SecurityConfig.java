@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/genres/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/tracks/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tracks", "/api/v1/tracks/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/tracks/*/play").permitAll()
                         .requestMatchers("/api/v1/playlists/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/playlists", "/api/v1/playlists/*").permitAll()

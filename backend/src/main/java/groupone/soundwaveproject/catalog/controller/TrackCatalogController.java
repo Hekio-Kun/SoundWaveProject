@@ -7,6 +7,9 @@ import groupone.soundwaveproject.catalog.dto.request.RecordPlayRequest;
 import groupone.soundwaveproject.catalog.dto.response.RecordPlayResponse;
 import groupone.soundwaveproject.catalog.dto.response.TrackResponse;
 import groupone.soundwaveproject.catalog.service.TrackCatalogService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -22,6 +26,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TrackCatalogController {
     private final TrackCatalogService trackCatalogService;
+
+    /**
+     * Lấy danh sách bài hát đã phát hành phục vụ catalog, tìm kiếm và thêm vào playlist.
+     */
+    @GetMapping
+    public ResponseEntity<Page<TrackResponse>> getTracks(
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        log.info("Fetching public track catalog: genre={}, search={}, sort={}, page={}",
+                genre, search, sort, pageable.getPageNumber());
+        return ResponseEntity.ok(trackCatalogService.getPublishedTracks(genre, search, sort, pageable));
+    }
 
     /**
      * Lấy metadata bài hát và URL streaming phục vụ phát nhạc trực tuyến (Phase 1).

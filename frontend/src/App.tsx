@@ -134,8 +134,8 @@ export default function App() {
   };
 
   // 2. Audio & Player State
-  const audio = useMemo(() => new Audio(tracks[0].audioUrl), []);
-  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(tracks[0]);
+  const audio = useMemo(() => new Audio(tracks[0]?.audioUrl || ""), []);
+  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(tracks[0] || null);
   const [playing, setPlaying] = useState(false);
   const [queue, setQueue] = useState<LandingTrack[]>(tracks);
   const [queueOpen, setQueueOpen] = useState(false);

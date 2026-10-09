@@ -12,9 +12,14 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.library.service.ListeningHistoryPublicService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -46,6 +51,60 @@ public class TrackCatalogService {
         }
 
         return mapToTrackResponse(track);
+    }
+
+    /**
+     * Lấy danh sách các bài hát đã xuất bản (PUBLISHED) phục vụ hiển thị catalog công khai, tìm kiếm và thêm vào playlist.
+     */
+    @Transactional(readOnly = true)
+    public Page<TrackResponse> getPublishedTracks(String genre, String search, String sort, Pageable pageable) {
+        List<Track> allPublished = trackRepository.findAll().stream()
+                .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
+                .toList();
+
+        if (genre != null && !genre.isBlank() && !"all".equalsIgnoreCase(genre)) {
+            allPublished = allPublished.stream()
+                    .filter(t -> t.getGenre() != null && genre.equalsIgnoreCase(t.getGenre().getSlug()))
+                    .toList();
+        }
+
+        if (search != null && !search.isBlank()) {
+            String lowerSearch = search.trim().toLowerCase();
+            allPublished = allPublished.stream()
+                    .filter(t -> (t.getTitle() != null && t.getTitle().toLowerCase().contains(lowerSearch))
+                            || (t.getSlug() != null && t.getSlug().toLowerCase().contains(lowerSearch))
+                            || (t.getDescription() != null && t.getDescription().toLowerCase().contains(lowerSearch))
+                            || (t.getAlbum() != null && t.getAlbum().getTitle() != null && t.getAlbum().getTitle().toLowerCase().contains(lowerSearch)))
+                    .toList();
+        }
+
+        Comparator<Track> comparator;
+        if ("trending".equalsIgnoreCase(sort)) {
+            comparator = Comparator.comparing(
+                    (Track t) -> t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L
+            ).reversed();
+        } else if ("title".equalsIgnoreCase(sort)) {
+            comparator = Comparator.comparing(
+                    Track::getTitle, String.CASE_INSENSITIVE_ORDER
+            );
+        } else {
+            comparator = Comparator.comparing(
+                    Track::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())
+            );
+        }
+
+        List<Track> sortedList = allPublished.stream().sorted(comparator).toList();
+
+        int pageNumber = pageable.getPageNumber();
+        int pageSize = pageable.getPageSize() > 0 ? pageable.getPageSize() : 20;
+        int fromIndex = Math.min(pageNumber * pageSize, sortedList.size());
+        int toIndex = Math.min(fromIndex + pageSize, sortedList.size());
+
+        List<TrackResponse> pagedResponses = sortedList.subList(fromIndex, toIndex).stream()
+                .map(this::mapToTrackResponse)
+                .toList();
+
+        return new PageImpl<>(pagedResponses, pageable, sortedList.size());
     }
 
     /**
