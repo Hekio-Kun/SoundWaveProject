@@ -1,18 +1,37 @@
-import { useEffect, useRef, useState } from "react";
-import { studioApi, type ApiTrack } from "../api/track";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  studioApi,
+  type AlbumOption,
+  type ApiTrack,
+  type GenreOption,
+} from "../api/track";
+import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   AlertIcon,
   CheckIcon,
   ClockIcon,
+  CloseIcon,
   DiscIcon,
+  EditIcon,
+  EyeIcon,
   FileTextIcon,
   PauseIcon,
   PlayIcon,
   ShieldIcon,
+  TrashIcon,
+  UploadIcon,
   UserIcon,
   VolumeIcon,
 } from "../icons";
 import type { CurrentUser } from "../types";
+import {
+  readAudioDuration,
+  readLyricsFile,
+  validateAudioFile,
+  validateCoverFile,
+  validateLyricsFile,
+} from "../utils/trackUpload";
 
 function formatDuration(ms?: number | null): string {
   if (!ms || ms <= 0) return "0:00";
@@ -54,6 +73,9 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [track, setTrack] = useState<ApiTrack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Audio player state
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -63,25 +85,62 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.85);
 
+  // Modals
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+
+  // Edit form state
+  const [genres, setGenres] = useState<GenreOption[]>([]);
+  const [albums, setAlbums] = useState<AlbumOption[]>([]);
+  const [editTitle, setEditTitle] = useState("");
+  const [editGenreId, setEditGenreId] = useState<number>(0);
+  const [editAlbumId, setEditAlbumId] = useState<number | "">("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editAudioFile, setEditAudioFile] = useState<File | null>(null);
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [editLyricsContent, setEditLyricsContent] = useState("");
+  const [editAudioFileName, setEditAudioFileName] = useState("");
+  const [editCoverFileName, setEditCoverFileName] = useState("");
+  const [editLyricsFileName, setEditLyricsFileName] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Submit for review state
+  const [submitterNote, setSubmitterNote] = useState("");
+  const [submitCopyrightAgreed, setSubmitCopyrightAgreed] = useState(false);
+
+  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen);
+
+  const fetchTrackData = async (active = true) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await studioApi.getTrackById(trackId);
+      if (active) {
+        setTrack(data);
+        setLoading(false);
+      }
+    } catch (err: unknown) {
+      if (active) {
+        setError(err instanceof Error ? err.message : "Failed to load track details.");
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
+    void fetchTrackData(active);
 
-    studioApi
-      .getTrackById(trackId)
-      .then((data) => {
-        if (active) {
-          setTrack(data);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load track details.");
-          setLoading(false);
-        }
-      });
+    // Also load genres & albums for editing
+    studioApi.getGenres().then((g) => {
+      if (active && g.length > 0) setGenres(g);
+    }).catch(() => {});
+
+    studioApi.getMyAlbums().then((a) => {
+      if (active && a.length > 0) setAlbums(a);
+    }).catch(() => {});
 
     return () => {
       active = false;
@@ -97,6 +156,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
     };
   }, [trackId]);
 
+  // Player controls
   const togglePlay = () => {
     if (!audioRef.current) return;
 
@@ -107,9 +167,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
             audioRef.current?.pause();
             setIsPlaying(false);
           })
-          .catch(() => {
-            setIsPlaying(false);
-          });
+          .catch(() => setIsPlaying(false));
       } else {
         audioRef.current.pause();
         setIsPlaying(false);
@@ -121,9 +179,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
         promise
           .then(() => setIsPlaying(true))
           .catch((err: Error) => {
-            if (err.name !== "AbortError") {
-              console.error("Audio playback error:", err);
-            }
+            if (err.name !== "AbortError") console.error("Audio playback error:", err);
             setIsPlaying(false);
           });
       }
@@ -191,6 +247,135 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const submitterEmail = currentUser?.email || "artist@soundwave.io";
   const submitterUsername = currentUser?.username || currentUser?.email?.split("@")[0] || "artist";
 
+  // Actions
+  const openEditModal = () => {
+    if (!track) return;
+    setEditTitle(track.title);
+    setEditGenreId(track.genreId);
+    setEditAlbumId(track.albumId ?? "");
+    setEditDescription(track.description ?? "");
+    setEditLyricsContent(track.lyrics ?? "");
+    setEditAudioFile(null);
+    setEditCoverFile(null);
+    setEditAudioFileName(track.audioUrl ? "Current audio file attached" : "");
+    setEditCoverFileName(track.coverUrl ? "Current cover image attached" : "");
+    setEditLyricsFileName(track.lyrics ? "Existing lyrics attached" : "");
+    setFormErrors({});
+    setActionError(null);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!track) return;
+
+    const errors: Record<string, string> = {};
+    if (!editTitle.trim()) {
+      errors.title = "Please enter the track title.";
+    } else if (editTitle.trim().length > 200) {
+      errors.title = "Track title cannot exceed 200 characters.";
+    }
+
+    if (!editGenreId) {
+      errors.genre = "Please select a music genre.";
+    }
+
+    if (editAudioFile) {
+      const audioErr = validateAudioFile(editAudioFile);
+      if (audioErr) errors.audio = audioErr;
+    }
+
+    if (editCoverFile) {
+      const coverErr = validateCoverFile(editCoverFile);
+      if (coverErr) errors.cover = coverErr;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setActionError(null);
+      const updated = await studioApi.updateTrack(
+        track.id,
+        {
+          title: editTitle.trim(),
+          genreId: editGenreId,
+          albumId: editAlbumId ? Number(editAlbumId) : undefined,
+          description: editDescription.trim() || undefined,
+          lyrics: editLyricsContent.trim() || undefined,
+        },
+        editAudioFile ?? undefined,
+        editCoverFile ?? undefined
+      );
+
+      setTrack(updated);
+      setEditModalOpen(false);
+      setActionSuccess("Track updated successfully.");
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to update track.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!track) return;
+    try {
+      setIsProcessing(true);
+      setActionError(null);
+      await studioApi.deleteTrack(track.id);
+      setDeleteConfirmOpen(false);
+      onNavigate("/studio");
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete track.");
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubmitForReview = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!track) return;
+    if (!submitCopyrightAgreed) {
+      setActionError("You must acknowledge that you own or have permission to distribute this audio.");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setActionError(null);
+      const updated = await studioApi.submitForReview(track.id, submitterNote.trim() || undefined);
+      setTrack(updated);
+      setSubmitModalOpen(false);
+      setActionSuccess("Track submitted for moderation review successfully.");
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to submit track.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWithdrawSubmission = async () => {
+    if (!track) return;
+    try {
+      setIsProcessing(true);
+      setActionError(null);
+      const updated = await studioApi.withdrawSubmission(track.id);
+      setTrack(updated);
+      setWithdrawModalOpen(false);
+      setActionSuccess("Submission withdrawn back to draft successfully.");
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to withdraw submission.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="studio-track-detail-page" style={{ padding: "28px clamp(16px, 3vw, 40px) 60px", maxWidth: "1120px", margin: "0 auto" }}>
       {/* Top Banner */}
@@ -211,31 +396,110 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
         </div>
       </header>
 
+      {/* Action Alerts */}
+      {actionSuccess ? (
+        <div className="app-toast" role="status" style={{ marginBottom: "16px", position: "static" }}>
+          {actionSuccess}
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <div className="form-error-banner" role="alert" style={{ marginBottom: "16px" }}>
+          {actionError}
+        </div>
+      ) : null}
+
       {/* Main Container */}
       <div className="staff-detail-view-container" style={{ background: "#ffffff", border: "1px solid var(--ops-border, #e2e8f0)", borderRadius: "20px", padding: "24px 28px", boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04)" }}>
-        {/* Top Breadcrumbs & Back Navigation */}
-        <div className="staff-detail-top-nav" style={{ marginBottom: "20px" }}>
-          <button
-            type="button"
-            onClick={() => onNavigate("/studio")}
-            className="staff-detail-back-btn"
-            title="Back to track list"
-          >
-            <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
-            <span>Back to Queue</span>
-          </button>
+        {/* Top Breadcrumbs & Action Navigation */}
+        <div className="staff-detail-top-nav" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => onNavigate("/studio")}
+              className="staff-detail-back-btn"
+              title="Back to Content Studio"
+            >
+              <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
+              <span>Back to Queue</span>
+            </button>
 
-          <div className="staff-detail-breadcrumbs">
-            <span className="staff-crumb-muted">Moderation Queue</span>
-            <span className="staff-crumb-sep">/</span>
-            <span className="staff-crumb-active">Submission Details #{trackId}</span>
+            <div className="staff-detail-breadcrumbs">
+              <span className="staff-crumb-muted">Moderation Queue</span>
+              <span className="staff-crumb-sep">/</span>
+              <span className="staff-crumb-active">Submission Details #{trackId}</span>
+            </div>
+
+            {track ? (
+              <span className={`staff-status-chip ${statusClass}`}>
+                <i />
+                <span>{statusLabel}</span>
+              </span>
+            ) : null}
           </div>
 
+          {/* Action Toolbar on Top Right (Edit, Delete, Submit, etc.) */}
           {track ? (
-            <span className={`staff-status-chip ${statusClass}`}>
-              <i />
-              <span>{statusLabel}</span>
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {/* Edit button */}
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                onClick={openEditModal}
+                title="Edit track information & media"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                <EditIcon width={14} height={14} />
+                <span>Edit track</span>
+              </button>
+
+              {/* Delete button */}
+              <button
+                type="button"
+                className="button button-ghost button-small text-danger"
+                onClick={() => setDeleteConfirmOpen(true)}
+                title="Delete this track"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                <TrashIcon width={14} height={14} />
+                <span>Delete</span>
+              </button>
+
+              {/* Status specific actions */}
+              {(isDraft || isRejected) && (
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  onClick={() => {
+                    setSubmitterNote("");
+                    setSubmitCopyrightAgreed(false);
+                    setSubmitModalOpen(true);
+                  }}
+                >
+                  Submit for review
+                </button>
+              )}
+
+              {isPending && (
+                <button
+                  type="button"
+                  className="button button-ghost button-small text-warning"
+                  onClick={() => setWithdrawModalOpen(true)}
+                >
+                  Withdraw submission
+                </button>
+              )}
+
+              {isApproved && (
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  onClick={() => onNavigate(`/track/${track.id}`)}
+                >
+                  View on Public Catalog
+                </button>
+              )}
+            </div>
           ) : null}
         </div>
 
@@ -524,6 +788,297 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
           </div>
         )}
       </div>
+
+      {/* Edit Track Modal */}
+      {editModalOpen && track && createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setEditModalOpen(false)}>
+          <div
+            className="modal-card modal-card--wide studio-track-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-track-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 id="edit-track-modal-title">Edit Track: {track.title}</h3>
+                <p className="modal-subtitle">Update metadata, audio file, and cover artwork</p>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setEditModalOpen(false)}
+                aria-label="Close edit modal"
+                disabled={isProcessing}
+              >
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="studio-track-form">
+              <div className="modal-body" style={{ maxHeight: "calc(80vh - 120px)", overflowY: "auto" }}>
+                <div className="form-group">
+                  <label htmlFor="edit-track-title">
+                    Track Title <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    id="edit-track-title"
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => {
+                      setEditTitle(e.target.value);
+                      if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: "" }));
+                    }}
+                    placeholder="Enter track title"
+                    className={formErrors.title ? "input-error" : ""}
+                    disabled={isProcessing}
+                  />
+                  {formErrors.title && <span className="field-error">{formErrors.title}</span>}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="edit-track-genre">
+                      Genre <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="edit-track-genre"
+                      value={editGenreId}
+                      onChange={(e) => {
+                        setEditGenreId(Number(e.target.value));
+                        if (formErrors.genre) setFormErrors((prev) => ({ ...prev, genre: "" }));
+                      }}
+                      className={formErrors.genre ? "input-error" : ""}
+                      disabled={isProcessing}
+                    >
+                      <option value={0}>Select genre...</option>
+                      {genres.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.genre && <span className="field-error">{formErrors.genre}</span>}
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="edit-track-album">Album / Collection (Optional)</label>
+                    <select
+                      id="edit-track-album"
+                      value={editAlbumId}
+                      onChange={(e) => setEditAlbumId(e.target.value ? Number(e.target.value) : "")}
+                      disabled={isProcessing}
+                    >
+                      <option value="">Single release (no album)</option>
+                      {albums.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Audio File */}
+                <div className="form-group">
+                  <label>Replace Audio File (Optional - MP3, WAV, FLAC max 30MB)</label>
+                  <input
+                    type="file"
+                    accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setEditAudioFile(file);
+                      setEditAudioFileName(file ? file.name : "");
+                    }}
+                    disabled={isProcessing}
+                  />
+                  {editAudioFileName && <small className="text-muted">Selected: {editAudioFileName}</small>}
+                  {formErrors.audio && <span className="field-error">{formErrors.audio}</span>}
+                </div>
+
+                {/* Cover File */}
+                <div className="form-group">
+                  <label>Replace Cover Artwork (Optional - JPG, PNG max 5MB)</label>
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setEditCoverFile(file);
+                      setEditCoverFileName(file ? file.name : "");
+                    }}
+                    disabled={isProcessing}
+                  />
+                  {editCoverFileName && <small className="text-muted">Selected: {editCoverFileName}</small>}
+                  {formErrors.cover && <span className="field-error">{formErrors.cover}</span>}
+                </div>
+
+                {/* Description */}
+                <div className="form-group">
+                  <label htmlFor="edit-track-desc">Description</label>
+                  <textarea
+                    id="edit-track-desc"
+                    rows={3}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Story behind the track or notes..."
+                    disabled={isProcessing}
+                  />
+                </div>
+
+                {/* Lyrics */}
+                <div className="form-group">
+                  <label htmlFor="edit-track-lyrics">Lyrics (Optional)</label>
+                  <textarea
+                    id="edit-track-lyrics"
+                    rows={4}
+                    value={editLyricsContent}
+                    onChange={(e) => setEditLyricsContent(e.target.value)}
+                    placeholder="Enter song lyrics here..."
+                    disabled={isProcessing}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setEditModalOpen(false)}
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? "Saving changes..." : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmOpen && track && createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setDeleteConfirmOpen(false)}>
+          <div className="modal-card modal-card--narrow" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="text-danger">Delete Track</h3>
+              <button className="icon-button" onClick={() => setDeleteConfirmOpen(false)} disabled={isProcessing}>
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <p style={{ margin: "16px 0", color: "var(--sw-text-secondary)" }}>
+              Are you sure you want to permanently delete &quot;<b>{track.title}</b>&quot;? All uploaded audio files, covers, and play stats will be removed and cannot be recovered.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                style={{ background: "#dc2626", borderColor: "#dc2626" }}
+                onClick={handleDeleteConfirm}
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Deleting..." : "Confirm delete"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Submit for Review Modal */}
+      {submitModalOpen && track && createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setSubmitModalOpen(false)}>
+          <div className="modal-card modal-card--medium" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Submit Track for Moderation Review</h3>
+                <p className="modal-subtitle">Track: <b>{track.title}</b></p>
+              </div>
+              <button className="icon-button" onClick={() => setSubmitModalOpen(false)} disabled={isProcessing}>
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitForReview}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="submitter-note-input">Creator Note to Moderator (Optional)</label>
+                  <textarea
+                    id="submitter-note-input"
+                    rows={3}
+                    placeholder="Notes on mastering, genre clarification, or credits..."
+                    value={submitterNote}
+                    onChange={(e) => setSubmitterNote(e.target.value)}
+                    disabled={isProcessing}
+                  />
+                </div>
+                <div className="form-group" style={{ marginTop: "12px" }}>
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                    <input
+                      type="checkbox"
+                      checked={submitCopyrightAgreed}
+                      onChange={(e) => setSubmitCopyrightAgreed(e.target.checked)}
+                      disabled={isProcessing}
+                      style={{ marginTop: "3px" }}
+                    />
+                    <span>
+                      I certify that I hold the copyright or necessary licenses for this audio recording and artwork, and agree to SoundWave community terms.
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="button button-secondary" onClick={() => setSubmitModalOpen(false)} disabled={isProcessing}>
+                  Cancel
+                </button>
+                <button type="submit" className="button button-primary" disabled={isProcessing || !submitCopyrightAgreed}>
+                  {isProcessing ? "Submitting..." : "Submit track"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Withdraw Modal */}
+      {withdrawModalOpen && track && createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setWithdrawModalOpen(false)}>
+          <div className="modal-card modal-card--narrow" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Withdraw Submission</h3>
+              <button className="icon-button" onClick={() => setWithdrawModalOpen(false)} disabled={isProcessing}>
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <p style={{ margin: "16px 0", color: "var(--sw-text-secondary)" }}>
+              Are you sure you want to withdraw &quot;<b>{track.title}</b>&quot; from moderation review? The track will return to <b>Draft</b> status so you can continue editing.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setWithdrawModalOpen(false)} disabled={isProcessing}>
+                Keep in review
+              </button>
+              <button type="button" className="button button-primary" onClick={handleWithdrawSubmission} disabled={isProcessing}>
+                {isProcessing ? "Withdrawing..." : "Confirm withdraw"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ export function AddTrackToPlaylistModal({
   allTracks,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [availableTracks, setAvailableTracks] = useState<LandingTrack[]>(staticTracks);
+  const [availableTracks, setAvailableTracks] = useState<LandingTrack[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +152,15 @@ export function AddTrackToPlaylistModal({
             minHeight: "240px",
           }}
         >
-          {filteredTracks.map((t: LandingTrack) => {
+          {filteredTracks.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--sw-muted, #64748b)" }}>
+              <p style={{ margin: 0, fontSize: "14px", fontWeight: 500 }}>No tracks found</p>
+              <small style={{ fontSize: "12px", color: "var(--sw-subtext, #94a3b8)" }}>
+                {search ? "No published tracks match your search." : "No published tracks available to add yet."}
+              </small>
+            </div>
+          ) : (
+            filteredTracks.map((t: LandingTrack) => {
             const isAdded = currentTrackIds.includes(t.id);
             return (
               <div
@@ -227,7 +235,8 @@ export function AddTrackToPlaylistModal({
                 )}
               </div>
             );
-          })}
+          })
+        )}
         </div>
 
         {/* Modal Footer */}
