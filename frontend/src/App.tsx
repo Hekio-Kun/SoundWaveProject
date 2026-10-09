@@ -28,6 +28,7 @@ import { AdminGenreManagementPage } from "./pages/AdminGenreManagementPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SearchPage } from "./pages/SearchPage";
 import { StudioPage } from "./pages/StudioPage";
+import { StudioTrackDetailPage } from "./pages/StudioTrackDetailPage";
 import { TrackDetailsPage } from "./pages/TrackDetailsPage";
 import { UploadTrackPage } from "./pages/UploadTrackPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
@@ -716,6 +717,23 @@ export default function App() {
         <UploadTrackPage
           isAuthenticated={isAuthenticated}
           canUpload={user?.role === "LISTENER"}
+          onNavigate={navigate}
+        />
+      );
+    }
+
+    if (pathname.startsWith("/studio/tracks/") || pathname.startsWith("/studio/track/")) {
+      if (!authReady || !isAuthenticated) return null;
+      const parts = pathname.split("/");
+      const trackId = Number(parts[3]) || Number(parts[2]) || null;
+      if (!trackId) {
+        navigate("/studio");
+        return null;
+      }
+      return (
+        <StudioTrackDetailPage
+          trackId={trackId}
+          currentUser={user}
           onNavigate={navigate}
         />
       );
