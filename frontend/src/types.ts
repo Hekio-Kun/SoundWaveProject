@@ -106,3 +106,18 @@ export type CurrentUser = {
   countryCode?: string;
 };
 
+export type StudioAlbum = {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string | null;
+  status: "DRAFT" | "PUBLISHED";
+  coverUrl?: string | null;
+  releaseDate?: string | null;
+  trackCount: number;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tracks?: StudioTrack[];
+};
+

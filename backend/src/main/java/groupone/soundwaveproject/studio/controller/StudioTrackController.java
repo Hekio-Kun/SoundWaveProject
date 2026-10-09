@@ -111,9 +111,4 @@ public class StudioTrackController {
     public List<GenreOptionResponse> getGenres() {
         return studioTrackService.getActiveGenres();
     }
-
-    @GetMapping("/albums")
-    public List<AlbumOptionResponse> getMyAlbums(Authentication authentication) {
-        return studioTrackService.getMyAlbums(authentication.getName());
-    }
 }
