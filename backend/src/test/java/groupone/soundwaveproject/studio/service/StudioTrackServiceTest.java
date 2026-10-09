@@ -5,8 +5,8 @@ import groupone.soundwaveproject.authentication.entity.Role;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.repository.AppUserRepository;
 import groupone.soundwaveproject.catalog.entity.Genre;
-import groupone.soundwaveproject.catalog.entity.PublicationStatus;
 import groupone.soundwaveproject.catalog.entity.Track;
+import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
@@ -88,10 +88,10 @@ class StudioTrackServiceTest {
         Track track = Track.builder()
                 .id(100L)
                 .uploaderUserId(10L)
-                .genreId(1L)
+                .genre(activeGenre)
                 .title("Sunny Morning")
                 .slug("sunny-morning-123")
-                .publicationStatus(PublicationStatus.DRAFT)
+                .publicationStatus(TrackPublicationStatus.DRAFT)
                 .audioPublicId("audio-123")
                 .audioUrl("https://cloudinary.com/audio.mp3")
                 .audioFormat("mp3")
@@ -151,9 +151,9 @@ class StudioTrackServiceTest {
         Track publishedTrack = Track.builder()
                 .id(200L)
                 .uploaderUserId(10L)
-                .genreId(1L)
+                .genre(activeGenre)
                 .title("Published Song")
-                .publicationStatus(PublicationStatus.PUBLISHED)
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
                 .audioPublicId("audio-pub")
                 .build();
         when(trackRepository.findByIdAndUploaderUserId(200L, 10L))
@@ -176,9 +176,9 @@ class StudioTrackServiceTest {
         Track draftTrack = Track.builder()
                 .id(300L)
                 .uploaderUserId(10L)
-                .genreId(1L)
+                .genre(activeGenre)
                 .title("Draft Song")
-                .publicationStatus(PublicationStatus.DRAFT)
+                .publicationStatus(TrackPublicationStatus.DRAFT)
                 .audioPublicId("audio-draft-public-id")
                 .coverPublicId("cover-draft-public-id")
                 .build();
@@ -202,9 +202,9 @@ class StudioTrackServiceTest {
         Track publishedTrack = Track.builder()
                 .id(301L)
                 .uploaderUserId(10L)
-                .genreId(1L)
+                .genre(activeGenre)
                 .title("Published Song")
-                .publicationStatus(PublicationStatus.PUBLISHED)
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
                 .build();
         when(trackRepository.findByIdAndUploaderUserId(301L, 10L))
                 .thenReturn(Optional.of(publishedTrack));
@@ -223,9 +223,9 @@ class StudioTrackServiceTest {
         Track draftTrack = Track.builder()
                 .id(400L)
                 .uploaderUserId(10L)
-                .genreId(1L)
+                .genre(activeGenre)
                 .title("Song For Review")
-                .publicationStatus(PublicationStatus.DRAFT)
+                .publicationStatus(TrackPublicationStatus.DRAFT)
                 .audioPublicId("aud-400")
                 .audioUrl("url")
                 .audioFormat("mp3")
@@ -240,7 +240,7 @@ class StudioTrackServiceTest {
         StudioTrackResponse response = studioTrackService.submitForReview(400L, "Please review my song", "creator@soundwave.com");
 
         assertThat(response.status()).isEqualTo("PENDING");
-        assertThat(draftTrack.getPublicationStatus()).isEqualTo(PublicationStatus.PENDING);
+        assertThat(draftTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
         verify(trackSubmissionRepository).save(any(TrackSubmission.class));
     }
 
@@ -251,10 +251,10 @@ class StudioTrackServiceTest {
                 .thenReturn(Optional.of(activeUser));
 
         when(trackRepository.countByUploaderUserId(10L)).thenReturn(5L);
-        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, PublicationStatus.DRAFT)).thenReturn(2L);
-        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, PublicationStatus.PENDING)).thenReturn(1L);
-        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, PublicationStatus.PUBLISHED)).thenReturn(1L);
-        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, PublicationStatus.REJECTED)).thenReturn(1L);
+        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.DRAFT)).thenReturn(2L);
+        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.PENDING)).thenReturn(1L);
+        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.PUBLISHED)).thenReturn(1L);
+        when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.REJECTED)).thenReturn(1L);
 
         StudioStatsResponse stats = studioTrackService.getStats("creator@soundwave.com");
 

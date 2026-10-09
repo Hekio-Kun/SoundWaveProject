@@ -2,17 +2,23 @@ package groupone.soundwaveproject.catalog.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Getter
+@Setter
+@Builder
 @Entity
 @Table(name = "albums")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Album {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,6 +36,7 @@ public class Album {
     @Column(length = 2000)
     private String description;
 
+    @Builder.Default
     @Column(nullable = false, length = 30)
     private String status = "DRAFT";
 

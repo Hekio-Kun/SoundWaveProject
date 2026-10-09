@@ -34,6 +34,15 @@ public class TrackCatalogController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{idOrSlug}/recommendations")
+    public ResponseEntity<java.util.List<TrackResponse>> getRecommendations(
+            @PathVariable String idOrSlug,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "5") int limit
+    ) {
+        log.info("Fetching recommendations for track identifier: {}, limit: {}", idOrSlug, limit);
+        return ResponseEntity.ok(trackCatalogService.getRecommendations(idOrSlug, limit));
+    }
+
     /**
      * Ghi nhận lượt nghe khi client đạt ngưỡng phát hợp lệ (Phase 3 - BR.13).
      * Cho phép cả Guest lẫn Authenticated User gọi.

@@ -56,8 +56,8 @@ public class StudioTrackMapper {
                 submitterNote,
                 submittedAt,
                 reviewedAt,
-                track.getCreatedAt(),
-                track.getUpdatedAt(),
+                track.getCreatedAt() != null ? track.getCreatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
+                track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
                 null
         );
     }

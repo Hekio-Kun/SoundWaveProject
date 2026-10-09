@@ -8,8 +8,8 @@ import groupone.soundwaveproject.authentication.exception.AuthenticationExceptio
 import groupone.soundwaveproject.authentication.repository.AppUserRepository;
 import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
-import groupone.soundwaveproject.catalog.entity.PublicationStatus;
 import groupone.soundwaveproject.catalog.entity.Track;
+import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
@@ -71,7 +71,7 @@ public class StudioTrackService {
                 if ("APPROVED".equals(normalizedFilter)) {
                     normalizedFilter = "PUBLISHED";
                 }
-                PublicationStatus status = PublicationStatus.valueOf(normalizedFilter);
+                TrackPublicationStatus status = TrackPublicationStatus.valueOf(normalizedFilter);
                 tracks = trackRepository.findByUploaderUserIdAndPublicationStatusOrderByCreatedAtDesc(user.getId(), status);
             } catch (IllegalArgumentException ex) {
                 tracks = trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(user.getId());
@@ -133,13 +133,13 @@ public class StudioTrackService {
 
         Track track = Track.builder()
                 .uploaderUserId(user.getId())
-                .genreId(genre.getId())
-                .albumId(album != null ? album.getId() : null)
+                .genre(genre)
+                .album(album)
                 .title(request.title().trim())
                 .slug(slug)
                 .description(request.description() != null ? request.description().trim() : null)
                 .trackNumber(request.trackNumber())
-                .publicationStatus(PublicationStatus.DRAFT)
+                .publicationStatus(TrackPublicationStatus.DRAFT)
                 .audioPublicId(audioResponse.publicId())
                 .audioUrl(audioResponse.secureUrl())
                 .audioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3")
@@ -159,7 +159,7 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() != PublicationStatus.DRAFT && track.getPublicationStatus() != PublicationStatus.REJECTED) {
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT && track.getPublicationStatus() != TrackPublicationStatus.REJECTED) {
             throw new ForbiddenOperationException("Only DRAFT or REJECTED tracks can be modified.");
         }
 
@@ -202,8 +202,8 @@ public class StudioTrackService {
             track.setSlug(generateUniqueSlug(request.title()));
         }
 
-        track.setGenreId(genre.getId());
-        track.setAlbumId(album != null ? album.getId() : null);
+        track.setGenre(genre);
+        track.setAlbum(album);
         track.setTrackNumber(request.trackNumber());
         track.setDescription(request.description() != null ? request.description().trim() : null);
 
@@ -219,7 +219,7 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() == PublicationStatus.PUBLISHED || track.getPublicationStatus() == PublicationStatus.PENDING) {
+        if (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED || track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
             throw new ConflictOperationException("Cannot delete a published or pending track directly.");
         }
 
@@ -236,11 +236,11 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() != PublicationStatus.DRAFT && track.getPublicationStatus() != PublicationStatus.REJECTED) {
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT && track.getPublicationStatus() != TrackPublicationStatus.REJECTED) {
             throw new ConflictOperationException("Only DRAFT or REJECTED tracks can be submitted for review.");
         }
 
-        track.setPublicationStatus(PublicationStatus.PENDING);
+        track.setPublicationStatus(TrackPublicationStatus.PENDING);
         trackRepository.save(track);
 
         TrackSubmission submission = TrackSubmission.builder()
@@ -263,11 +263,11 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() != PublicationStatus.PENDING) {
+        if (track.getPublicationStatus() != TrackPublicationStatus.PENDING) {
             throw new ConflictOperationException("Only PENDING tracks can be withdrawn from review.");
         }
 
-        track.setPublicationStatus(PublicationStatus.DRAFT);
+        track.setPublicationStatus(TrackPublicationStatus.DRAFT);
         trackRepository.save(track);
 
         trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId())
@@ -297,10 +297,10 @@ public class StudioTrackService {
     public StudioStatsResponse getStats(String currentUserEmail) {
         AppUser user = getAuthenticatedUser(currentUserEmail);
         long total = trackRepository.countByUploaderUserId(user.getId());
-        long draft = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), PublicationStatus.DRAFT);
-        long pending = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), PublicationStatus.PENDING);
-        long approved = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), PublicationStatus.PUBLISHED);
-        long rejected = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), PublicationStatus.REJECTED);
+        long draft = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.DRAFT);
+        long pending = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.PENDING);
+        long approved = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.PUBLISHED);
+        long rejected = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.REJECTED);
 
         return new StudioStatsResponse(total, draft, pending, approved, rejected);
     }

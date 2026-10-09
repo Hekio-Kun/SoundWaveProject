@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface TrackRepository extends JpaRepository<Track, Long> {
@@ -17,6 +18,24 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
     Optional<Track> findBySlugAndPublicationStatus(String slug, TrackPublicationStatus publicationStatus);
 
     Page<Track> findByPublicationStatus(TrackPublicationStatus publicationStatus, Pageable pageable);
+
+    Optional<Track> findBySlug(String slug);
+
+    List<Track> findByUploaderUserIdOrderByCreatedAtDesc(Long uploaderUserId);
+
+    List<Track> findByUploaderUserIdAndPublicationStatusOrderByCreatedAtDesc(Long uploaderUserId, TrackPublicationStatus publicationStatus);
+
+    Optional<Track> findByIdAndUploaderUserId(Long id, Long uploaderUserId);
+
+    long countByUploaderUserId(Long uploaderUserId);
+
+    long countByUploaderUserIdAndPublicationStatus(Long uploaderUserId, TrackPublicationStatus publicationStatus);
+
+    boolean existsBySlug(String slug);
+
+    boolean existsByGenre_Id(Long genreId);
+
+    boolean existsByAlbum_Id(Long albumId);
 
     @Modifying
     @Query("UPDATE Track t SET t.playCountCache = t.playCountCache + 1 WHERE t.id = :id")
