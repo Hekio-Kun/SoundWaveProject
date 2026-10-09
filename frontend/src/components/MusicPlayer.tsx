@@ -158,7 +158,7 @@ export function MusicPlayer({
                 display: "block",
                 fontSize: "11px",
                 fontWeight: 600,
-                color: "var(--brand, #0891b2)",
+                color: "var(--brand, #0284c7)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",

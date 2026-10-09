@@ -41,15 +41,15 @@ Chỉ sử dụng màu trực tiếp khi đang bổ sung token mới có lý do 
 | **Brand Blue (Xanh dương sáng)** | `#0284C7` | CTA chính, nút Play, tiến trình bài hát, trạng thái active, link quan trọng |
 | **Brand Blue Hover** | `#0369A1` | Hover state cho CTA xanh dương, text nhấn mạnh trên nền sáng |
 | **Light Ocean Tint** | `#E0F2FE` | Nền badge xanh, vùng active nhẹ, background thanh progress |
-| **Sand Primary (Màu cát chính)** | `#D4B996` | Màu cát ấm tự nhiên: Điểm nhấn thương hiệu thứ hai, icon phụ, badge nổi bật |
-| **Sand Light / Warm Surface** | `#F5EFE6` | Nền chip thể loại, tag phân loại, banner phụ, card highlight phong cách cát ấm |
-| **Sand Deep** | `#A88B68` | Chữ màu cát đậm, viền nhấn ấm, divider nghệ thuật |
-| **Page background** | `#FAF8F5` | Nền chính của trang: Trắng ánh cát ấm dịu mắt, tránh xám lạnh vô hồn |
+| **Sand Primary (Màu vàng cát chính)** | `#D4A373` | Màu cát ấm tự nhiên: Điểm nhấn thương hiệu thứ hai, icon phụ, badge nổi bật |
+| **Sand Warm / Chip Background** | `#F5EAD8` | Nền chip thể loại, tag phân loại, banner phụ, card highlight phong cách cát ấm |
+| **Sand Deep (Chữ / Điểm nhấn cát đậm)** | `#8C5828` | Chữ màu cát đậm, viền nhấn ấm, divider nghệ thuật đạt chuẩn WCAG AA |
+| **Page background (Nền vàng cát biển)** | `#F6EFE3` | Nền chính của toàn trang: Màu vàng cát tự nhiên, ấm áp, thoáng đãng |
 | **Surface** | `#FFFFFF` | Nền card, header, modal, player nổi bật trên nền cát |
 | **Primary text** | `#1C1917` | Stone đen ấm cho tiêu đề, nội dung quan trọng |
 | **Secondary text** | `#57534E` | Mô tả phụ, tên nghệ sĩ/creator, metadata |
 | **Muted text** | `#8D877F` | Thông tin phụ, timestamp |
-| **Border** | `#EAE4DC` | Viền card và divider tông cát ấm hài hòa |
+| **Border (Viền cát ấm)** | `#E8DCCB` | Viền card và divider tông cát ấm hài hòa, viền hover `#D4A373` |
 | **Error text** | `#B42318` | Lỗi validation hoặc tải dữ liệu |
 | **Error background** | `#FEF3F2` | Nền thông báo lỗi |
 | **Success text** | `#059669` | Trạng thái thành công |
@@ -59,7 +59,7 @@ Quy tắc:
 
 - **Hai màu chủ đạo là Xanh dương sáng và Màu cát**. Tuyệt đối không tự ý chuyển sang Dark Theme hoặc màu tím/xanh lá làm màu thương hiệu.
 - CTA chính (Play, Primary Button, Active Tab/Nav) ưu tiên dùng **Xanh dương sáng** (`#0284C7`) để tạo điểm nhấn thị giác rõ ràng và thu hút tương tác.
-- **Màu cát ấm** (`#D4B996`, `#F5EFE6`) đóng vai trò cân bằng, làm dịu mắt, sử dụng cho category chips, badges, card accents, và background tone của toàn trang (`#FAF8F5`).
+- **Màu cát ấm** (`#D4A373`, `#F5EAD8`, `#F6EFE3`) đóng vai trò tạo không khí bãi biển ven biển tự nhiên, làm dịu mắt, sử dụng cho category chips, badges, card accents, borders, và background tone của toàn trang (`#F6EFE3`).
 - Không dùng chữ xám nhạt trên nền trắng/cát nếu tương phản không đạt chuẩn WCAG.
 - Trạng thái destructive dùng đỏ; không dùng đỏ cho hành động thông thường.
 - Trạng thái thành công nên dùng xanh lá dịu và phải có icon hoặc text, không chỉ thể hiện bằng màu.

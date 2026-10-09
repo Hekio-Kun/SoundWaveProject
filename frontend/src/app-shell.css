@@ -1,6 +1,6 @@
 /* ==========================================================================
    SoundWave Music Streaming App Shell & Modules
-   Design System: Light-first, #0284c7 primary, #7C3AED accent, #faf8f5 bg
+   Design System: Light-first, #0284c7 primary, #d4a373 sand accent, #f6efe3 bg
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -9,7 +9,7 @@
 .music-app-shell {
   display: flex;
   min-height: 100vh;
-  background-color: #faf8f5;
+  background-color: var(--sw-bg, #f6efe3);
   color: #101828;
   position: relative;
   overflow-x: hidden;
@@ -21,7 +21,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #faf8f5;
+  background-color: var(--sw-bg, #f6efe3);
 }
 
 .music-app-shell--with-player .app-main-viewport {
@@ -45,8 +45,8 @@
   position: sticky;
   top: 0;
   flex-shrink: 0;
-  background: #ffffff;
-  border-right: 1px solid #e4e7ec;
+  background: #fdfaf4;
+  border-right: 1px solid #e8dcba;
   display: flex;
   flex-direction: column;
   z-index: 40;
@@ -139,12 +139,12 @@
 }
 
 .nav-item:hover {
-  background: #f2f4f7;
+  background: #f5ead8;
   color: #101828;
 }
 
 .nav-item--active {
-  background: #e0f2fe !important;
+  background: linear-gradient(90deg, #e0f2fe, #fbf3e5) !important;
   color: #0284c7 !important;
   font-weight: 700;
 }
@@ -164,8 +164,9 @@
   font-size: 10px;
   font-weight: 700;
   border-radius: 6px;
-  background: #f3e8ff;
-  color: #7c3aed;
+  background: #fdf3e3;
+  color: #8c5828;
+  border: 1px solid #ebd7bf;
   letter-spacing: 0.02em;
 }
 
@@ -268,8 +269,8 @@
   align-items: center;
   gap: 10px;
   height: 40px;
-  background: #f8fafc;
-  border: 1px solid #e4e7ec !important;
+  background: #fbf5ea;
+  border: 1px solid #e6d5b8 !important;
   border-radius: 20px;
   padding: 0 14px;
   transition: all 0.16s ease;
@@ -327,9 +328,9 @@
   height: 38px;
   padding: 0 16px;
   border-radius: 10px;
-  border: 1px solid #7c3aed !important;
-  background: #fbf8ff;
-  color: #7c3aed;
+  border: 1px solid #d4a373 !important;
+  background: #fdf5e8;
+  color: #8c5828;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -337,9 +338,9 @@
 }
 
 .topbar-upload-btn:hover {
-  background: #7c3aed;
+  background: #d4a373;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.22);
+  box-shadow: 0 4px 14px rgba(212, 163, 115, 0.3);
 }
 
 .topbar-bell-btn {
@@ -348,16 +349,16 @@
   height: 38px;
   display: grid;
   place-items: center;
-  border: 1px solid #e4e7ec !important;
+  border: 1px solid #e8dccb !important;
   border-radius: 10px;
-  background: #ffffff;
+  background: #fdfbf7;
   color: #475467;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .topbar-bell-btn:hover {
-  background: #f2f4f7;
+  background: #f5ead8;
   color: #101828;
 }
 
@@ -1559,9 +1560,9 @@
 .filter-pill {
   padding: 6px 14px;
   border-radius: 20px;
-  border: 1px solid #e4e7ec !important;
-  background: #f8fafc;
-  color: #475467;
+  border: 1px solid #e6d5b8 !important;
+  background: #fbf4ea;
+  color: #785028;
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1570,8 +1571,9 @@
 }
 
 .filter-pill:hover {
-  background: #f2f4f7;
-  color: #101828;
+  background: #f5ead8;
+  border-color: #d4a373 !important;
+  color: #5c3a15;
 }
 
 .filter-pill--active {
@@ -2122,18 +2124,20 @@
 .playlist-card {
   position: relative;
   background: #ffffff;
-  border: 1px solid #e4e7ec;
+  border: 1px solid #e8dccb;
   border-radius: 16px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  box-shadow: 0 2px 8px rgba(180, 140, 90, 0.05);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 .playlist-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  border-color: #d4a373;
+  box-shadow: 0 10px 24px rgba(180, 140, 90, 0.14);
 }
 
 .playlist-cover-wrap {
@@ -3097,8 +3101,8 @@ body.modal-open .ops-shell-main {
   gap: 20px;
   padding: 28px;
   background:
-    radial-gradient(circle at 92% 10%, rgba(124, 58, 237, 0.1), transparent 34%),
-    linear-gradient(135deg, #e0f2fe 0%, #ffffff 58%);
+    radial-gradient(circle at 92% 10%, rgba(212, 163, 115, 0.22), transparent 34%),
+    linear-gradient(135deg, #e0f2fe 0%, #ffffff 58%, #fbf3e5 100%);
 }
 
 .profile-settings-avatar {
@@ -3627,7 +3631,7 @@ body.modal-open .ops-shell-main {
   height: 50px;
   border-radius: 15px;
   color: #fff;
-  background: linear-gradient(135deg, var(--sw-primary), #7c3aed);
+  background: linear-gradient(135deg, var(--sw-primary), #d4a373);
   box-shadow: 0 10px 24px rgba(2, 132, 199, 0.2);
 }
 

@@ -183,8 +183,9 @@ export function FilteredCatalogPage({
             style={{
               padding: "6px 12px",
               borderRadius: "999px",
-              background: "#F1F5F9",
-              color: "#475467",
+              background: "var(--sw-sand-chip, #f5ead8)",
+              color: "var(--sw-sand-deep, #8c5828)",
+              border: "1px solid var(--sw-sand-border, #e6d5b8)",
               fontSize: "11.5px",
               fontWeight: 700,
             }}

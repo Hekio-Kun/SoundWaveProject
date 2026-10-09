@@ -18,7 +18,7 @@ const avatar = (background: string, foreground: string, initials: string) =>
   svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" rx="100" fill="${background}"/><circle cx="100" cy="75" r="38" fill="${foreground}" opacity=".92"/><path d="M36 190c4-46 27-72 64-72s60 26 64 72" fill="${foreground}" opacity=".92"/><text x="100" y="108" text-anchor="middle" fill="white" font-family="Arial" font-weight="800" font-size="24">${initials}</text></svg>`);
 
 export const covers = {
-  dawn: cover("#0e7490", "#7c3aed", "#67e8f9", "SỚM MAI", 1),
+  dawn: cover("#0e7490", "#d4a373", "#67e8f9", "SỚM MAI", 1),
   city: cover("#111827", "#be185d", "#f9a8d4", "THÀNH PHỐ", 2),
   blue: cover("#0369a1", "#312e81", "#bae6fd", "BIỂN XANH", 3),
   warm: cover("#c2410c", "#7c2d12", "#fed7aa", "MÙA HẠ", 1),
@@ -30,7 +30,7 @@ export const covers = {
 
 const creators = {
   minh: { userId: 101, displayName: "Minh An", avatarUrl: avatar("#cffafe", "#0891b2", "MA") },
-  lam: { userId: 102, displayName: "Lâm Mộc", avatarUrl: avatar("#ede9fe", "#7c3aed", "LM") },
+  lam: { userId: 102, displayName: "Lâm Mộc", avatarUrl: avatar("#fdf3e5", "#b4691e", "LM") },
   yen: { userId: 103, displayName: "Yên Chi", avatarUrl: avatar("#ffe4e6", "#e11d48", "YC") },
   kai: { userId: 104, displayName: "Kai Vũ", avatarUrl: avatar("#d1fae5", "#059669", "KV") },
 };
@@ -176,13 +176,13 @@ Gọi nắng về thắp sáng ngày mai.`,
 
 export const genres: Genre[] = [
   { id: 1, name: "Pop", slug: "pop", color: "#ecfeff", accent: "#0891b2", description: "Bright, catchy, and popular melodies." },
-  { id: 2, name: "Ballad", slug: "ballad", color: "#f5f3ff", accent: "#7c3aed", description: "Gentle, heartfelt songs rich in emotion." },
+  { id: 2, name: "Ballad", slug: "ballad", color: "#fdf6ed", accent: "#b4691e", description: "Gentle, heartfelt songs rich in emotion." },
   { id: 3, name: "Rap / Hip-hop", slug: "rap-hip-hop", color: "#fff7ed", accent: "#ea580c", description: "Energetic beats with honest, expressive lyrics." },
   { id: 4, name: "R&B", slug: "rnb", color: "#fdf2f8", accent: "#db2777", description: "Smooth, warm, and soulful melodies." },
   { id: 5, name: "Acoustic", slug: "acoustic", color: "#f0fdf4", accent: "#16a34a", description: "Natural sounds from acoustic guitar and piano." },
   { id: 6, name: "EDM", slug: "edm", color: "#eff6ff", accent: "#2563eb", description: "High-energy modern electronic music." },
   { id: 7, name: "Indie", slug: "indie", color: "#fefce8", accent: "#ca8a04", description: "Independent music with a free and distinctive spirit." },
-  { id: 8, name: "Lofi", slug: "lofi", color: "#f8fafc", accent: "#475569", description: "Relaxing sounds for studying and working." },
+  { id: 8, name: "Lofi", slug: "lofi", color: "#fbf5ea", accent: "#8c5828", description: "Relaxing sounds for studying and working." },
 ];
 
 export const albums: FeaturedAlbum[] = [

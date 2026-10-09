@@ -32,7 +32,7 @@ Mỗi khi nhận yêu cầu từ lập trình viên, AI **bắt buộc** phải 
 
 2. **Nếu task chỉ liên quan Frontend (Giao diện, Component, Page, Player, State)**:
    - Phải đọc và tuân thủ tuyệt đối [agent/AGENTS_FRONTEND.md](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/AGENTS_FRONTEND.md).
-   - Chuẩn thiết kế: Light-first, tối giản, vibe biển & bờ cát tự nhiên, màu chủ đạo là **Xanh dương sáng** (`#0284C7` / `#0EA5E9`) kết hợp **Màu cát** (`#E6D5B8` / `#D4B996`), không dùng gradient quá mức, không duplicate Header/Footer/Player.
+   - Chuẩn thiết kế: Light-first, tối giản, vibe biển & bờ cát tự nhiên, màu chủ đạo là **Xanh dương sáng** (`#0284C7` / `#0EA5E9`) kết hợp **Màu vàng cát** (`#D4A373` / `#F6EFE3` / `#E6D5B8`), không dùng gradient quá mức, không duplicate Header/Footer/Player.
    - Tuân thủ quy chuẩn React & TypeScript trong `.ecc/rules/react/`.
 
 3. **Nếu task Full-Stack (Tính năng mới đi từ Database -> API -> UI)**:
@@ -67,7 +67,7 @@ Khi được yêu cầu tạo tính năng mới (ví dụ: Tạo Playlist, Uploa
 ### Bước 3: Triển khai Frontend (`frontend/`)
 - Khai báo kiểu dữ liệu trong `src/types.ts` khớp với Response DTO của Backend.
 - Viết service/fetch API.
-- Tạo component/page tuân thủ Design Tokens trong `AGENTS_FRONTEND.md` (Xanh dương sáng `#0284C7` & Màu cát `#E6D5B8`, không duplicate Player/Header).
+- Tạo component/page tuân thủ Design Tokens trong `AGENTS_FRONTEND.md` (Xanh dương sáng `#0284C7` & Màu vàng cát `#D4A373` / `#F6EFE3`, không duplicate Player/Header).
 - Xử lý các trạng thái: Loading, Success, Error, Empty state.
 
 ### Bước 4: Kiểm tra & Review (Quality Gate)
