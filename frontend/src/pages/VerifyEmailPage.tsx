@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { authApi, getAuthErrorMessage } from "../api/auth";
 import { AlertIcon, CheckIcon, MailIcon, ShieldIcon } from "../icons";
 import { AuthExperience } from "./AuthPages";
@@ -16,6 +16,15 @@ export function VerifyEmailPage({ email, onNavigate }: VerifyEmailPageProps) {
   const [verified, setVerified] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(60);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -38,12 +47,14 @@ export function VerifyEmailPage({ email, onNavigate }: VerifyEmailPageProps) {
   };
 
   const handleResend = async () => {
+    if (cooldown > 0 || resending) return;
     setApiError("");
     setMessage("");
     setResending(true);
     try {
       const result = await authApi.resendVerificationOtp(email);
       setMessage(result.message);
+      setCooldown(60);
     } catch (error) {
       setApiError(getAuthErrorMessage(error, "Unable to send another OTP right now."));
     } finally {
@@ -74,7 +85,14 @@ export function VerifyEmailPage({ email, onNavigate }: VerifyEmailPageProps) {
             {fieldError ? <small className="auth-v2-field-error" id="verify-otp-error"><AlertIcon width={12} height={12} />{fieldError}</small> : null}
           </div>
           <button className="button button-primary button-large auth-v2-submit" disabled={submitting}>{submitting ? "Verifying…" : "Verify Email"}</button>
-          <button type="button" className="button button-secondary" disabled={resending} onClick={handleResend}>{resending ? "Sending…" : "Resend OTP"}</button>
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={cooldown > 0 || resending}
+            onClick={handleResend}
+          >
+            {resending ? "Sending…" : cooldown > 0 ? `Resend OTP (${cooldown}s)` : "Resend OTP"}
+          </button>
           <div className="auth-v2-verification-security"><ShieldIcon width={17} height={17} /><span><b>Keep this code private</b><small>SoundWave staff will never ask for your OTP.</small></span></div>
         </form>
       )}

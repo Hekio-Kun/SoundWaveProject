@@ -188,7 +188,7 @@ public class AuthenticationService {
             if (user.getStatus() == UserStatus.ACTIVE && user.getDeletedAt() == null) {
                 PasswordResetToken current = resetTokenRepository
                         .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId()).orElse(null);
-                if (current != null && !isResendAllowed(current.getCreatedAt())) return;
+                ensureResendAllowed(current == null ? null : current.getCreatedAt());
                 if (current != null) current.markUsed(nowUtc());
                 String otp = otpGenerator.generate();
                 resetTokenRepository.save(new PasswordResetToken(
@@ -335,7 +335,9 @@ public class AuthenticationService {
 
     private void ensureResendAllowed(LocalDateTime createdAt) {
         if (!isResendAllowed(createdAt)) {
-            throw new AccountUnavailableException("OTP_RATE_LIMITED", "Please wait before requesting another OTP.");
+            long remaining = createdAt == null ? otpResendSeconds : Math.max(1, otpResendSeconds - ChronoUnit.SECONDS.between(createdAt, nowUtc()));
+            throw new AccountUnavailableException("OTP_RATE_LIMITED",
+                    "Please wait " + remaining + " seconds before requesting another OTP.");
         }
     }
 

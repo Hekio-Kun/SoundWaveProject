@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, useEffect, type FormEvent, type ReactNode } from "react";
 import { AuthApiError, authApi, getAuthErrorMessage, type AuthSession } from "../api/auth";
 import {
   AlertIcon,
@@ -198,6 +198,15 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   const [resendMessage, setResendMessage] = useState("");
   const [resendingVerification, setResendingVerification] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
+
+  useEffect(() => {
+    if (verificationCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setVerificationCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationCooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -229,6 +238,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   };
 
   const resendVerificationOtp = async () => {
+    if (verificationCooldown > 0 || resendingVerification) return;
     setResendingVerification(true);
     setResendMessage("");
     try {
@@ -236,6 +246,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
       setApiError("");
       setApiErrorCode("");
       setResendMessage(result.message);
+      setVerificationCooldown(60);
     } catch (error) {
       setApiError(getAuthErrorMessage(error, "Unable to resend the verification OTP."));
       setApiErrorCode(error instanceof AuthApiError ? error.code ?? "" : "");
@@ -265,9 +276,9 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
                 type="button"
                 className="auth-v2-error-action"
                 onClick={resendVerificationOtp}
-                disabled={resendingVerification}
+                disabled={verificationCooldown > 0 || resendingVerification}
               >
-                {resendingVerification ? "Sending…" : "Resend verification OTP"}
+                {resendingVerification ? "Sending…" : verificationCooldown > 0 ? `Resend OTP (${verificationCooldown}s)` : "Resend verification OTP"}
               </button>
             ) : undefined}
           />
@@ -427,6 +438,15 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
+  const [cooldown, setCooldown] = useState(60);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -457,6 +477,7 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
   };
 
   const handleResendOtp = async () => {
+    if (cooldown > 0 || resending) return;
     if (!email) {
       setApiError("Email address is missing. Please return to Forgot Password.");
       return;
@@ -467,6 +488,7 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
     try {
       const response = await authApi.forgotPassword(email);
       setResendMessage(response.message || "A new 6-digit OTP has been sent to your email.");
+      setCooldown(60);
     } catch (error) {
       setApiError(getAuthErrorMessage(error, "Unable to send another OTP right now. Please wait before retrying."));
     } finally {
@@ -506,10 +528,10 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
               <button
                 type="button"
                 className="auth-v2-text-button"
-                disabled={resending || submitting}
+                disabled={cooldown > 0 || resending || submitting}
                 onClick={handleResendOtp}
               >
-                {resending ? "Sending OTP…" : "Resend OTP"}
+                {resending ? "Sending…" : cooldown > 0 ? `Resend (${cooldown}s)` : "Resend OTP"}
               </button>
             }
             error={errors["reset-otp"]}
@@ -520,10 +542,10 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
           <button
             type="button"
             className="button button-secondary"
-            disabled={resending || submitting}
+            disabled={cooldown > 0 || resending || submitting}
             onClick={handleResendOtp}
           >
-            {resending ? "Sending OTP…" : "Resend OTP"}
+            {resending ? "Sending OTP…" : cooldown > 0 ? `Resend OTP (${cooldown}s)` : "Resend OTP"}
           </button>
           <button type="button" className="auth-v2-back" onClick={() => onNavigate("/forgot-password")}>
             ← Back to Forgot Password
