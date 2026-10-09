@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { covers, tracks } from "../data";
 import { playlistApi } from "../api/playlists";
+import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  CheckIcon,
   ClockIcon,
+  CloseIcon,
   EditIcon,
+  EyeIcon,
+  FileTextIcon,
   HeadphonesIcon,
   LockIcon,
   PauseIcon,
@@ -61,6 +67,42 @@ export function PlaylistDetailsPage({
     return playlists.find((p) => p.id === playlistId) ?? null;
   });
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
+  const [selectedDetailTrack, setSelectedDetailTrack] = useState<LandingTrack | null>(null);
+  const [detailAudioPlaying, setDetailAudioPlaying] = useState(false);
+  const [detailAudioCurrentTime, setDetailAudioCurrentTime] = useState(0);
+  const [detailAudioDuration, setDetailAudioDuration] = useState(0);
+  const detailAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useModalScrollLock(Boolean(selectedDetailTrack || manageTracksModalOpen));
+
+  const closeDetailModal = () => {
+    if (detailAudioRef.current) {
+      detailAudioRef.current.pause();
+    }
+    setDetailAudioPlaying(false);
+    setSelectedDetailTrack(null);
+  };
+
+  const handleToggleDetailAudio = () => {
+    if (!detailAudioRef.current) return;
+    if (detailAudioPlaying) {
+      detailAudioRef.current.pause();
+      setDetailAudioPlaying(false);
+    } else {
+      detailAudioRef.current.play()
+        .then(() => setDetailAudioPlaying(true))
+        .catch(() => setDetailAudioPlaying(false));
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedDetailTrack) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDetailModal();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [selectedDetailTrack]);
 
   const fetchPlaylist = useCallback(async () => {
     try {
@@ -525,7 +567,9 @@ export function PlaylistDetailsPage({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 100px",
+                gridTemplateColumns: isOwner
+                  ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
+                  : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
                 alignItems: "center",
                 gap: "14px",
                 padding: "10px 16px",
@@ -545,7 +589,7 @@ export function PlaylistDetailsPage({
               <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <ClockIcon width={12} height={12} /> Time
               </span>
-              <span style={{ textAlign: "right" }}>{isOwner ? "Manage Tracks" : ""}</span>
+              <span style={{ textAlign: "right" }}>Actions</span>
             </div>
             {playlistTracks.map((track, idx) => {
               const isCurrent = currentTrack?.id === track.id;
@@ -559,7 +603,9 @@ export function PlaylistDetailsPage({
                   className={`table-track-row ${isCurrent ? "table-track-row--active" : ""}`}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 100px",
+                    gridTemplateColumns: isOwner
+                      ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
+                      : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
                     alignItems: "center",
                     gap: "14px",
                     padding: "10px 16px",
@@ -610,7 +656,11 @@ export function PlaylistDetailsPage({
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <button
                         type="button"
-                        onClick={() => onPlayTrack(track)}
+                        onClick={() => {
+                          setSelectedDetailTrack(track);
+                          setDetailAudioPlaying(false);
+                          setDetailAudioCurrentTime(0);
+                        }}
                         style={{
                           display: "inline-block",
                           background: "none",
@@ -633,7 +683,7 @@ export function PlaylistDetailsPage({
                         onMouseLeave={(e) => {
                           if (!isCurrent) e.currentTarget.style.color = "var(--sw-text)";
                         }}
-                        title={`Play ${track.title}`}
+                        title={`View details for ${track.title}`}
                       >
                         {track.title}
                       </button>
@@ -675,8 +725,31 @@ export function PlaylistDetailsPage({
                     {formatDuration(track.durationMs)}
                   </span>
 
-                  {/* Owner Controls: Reorder Up/Down + Remove */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                  {/* Actions column: Detail button + Owner Controls */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
+                    <button
+                      type="button"
+                      className="button button-ghost button-small"
+                      onClick={() => {
+                        setSelectedDetailTrack(track);
+                        setDetailAudioPlaying(false);
+                        setDetailAudioCurrentTime(0);
+                      }}
+                      title={`View details for ${track.title}`}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: "12px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        color: "var(--sw-primary, #0284c7)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <EyeIcon width={13} height={13} />
+                      <span>Detail</span>
+                    </button>
+
                     {isOwner ? (
                       <>
                         <button
@@ -761,6 +834,304 @@ export function PlaylistDetailsPage({
           onOpenAddTrackModal();
         }}
       />
+
+      {/* Public Track Detail Modal */}
+      {selectedDetailTrack && createPortal(
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={closeDetailModal}
+        >
+          <div
+            className="modal-card modal-card--wide studio-track-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="public-detail-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "760px" }}
+          >
+            {/* Header */}
+            <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid #e4e7ec" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0 }}>
+                <img
+                  src={selectedDetailTrack.coverUrl || "/pics/album.png"}
+                  alt={selectedDetailTrack.title}
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "8px",
+                    objectFit: "cover",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <h3 id="public-detail-modal-title" style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--sw-text, #1e293b)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {selectedDetailTrack.title}
+                    </h3>
+                    <span className="status-badge status-badge--approved">
+                      Public / Live
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", fontSize: "12px", color: "var(--sw-text-muted, #64748b)" }}>
+                    <span>By: <strong style={{ color: "var(--sw-primary, #0284c7)" }}>{selectedDetailTrack.creator.displayName}</strong></span>
+                    <span>•</span>
+                    <span>Track #{selectedDetailTrack.id}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                className="icon-button"
+                onClick={closeDetailModal}
+                title="Close modal"
+                aria-label="Close modal"
+              >
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(85vh - 160px)", display: "flex", flexDirection: "column", gap: "18px" }}>
+              {/* Audio Preview Player */}
+              {selectedDetailTrack.audioUrl && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                    border: "1px solid #bae6fd",
+                    borderRadius: "12px",
+                    padding: "14px 18px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <audio
+                    ref={detailAudioRef}
+                    src={selectedDetailTrack.audioUrl}
+                    preload="metadata"
+                    onTimeUpdate={() => setDetailAudioCurrentTime(detailAudioRef.current?.currentTime || 0)}
+                    onLoadedMetadata={() => setDetailAudioDuration(detailAudioRef.current?.duration || 0)}
+                    onEnded={() => {
+                      setDetailAudioPlaying(false);
+                      setDetailAudioCurrentTime(0);
+                    }}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <button
+                        type="button"
+                        onClick={handleToggleDetailAudio}
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          borderRadius: "50%",
+                          background: "var(--sw-primary, #0284c7)",
+                          color: "#ffffff",
+                          border: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)",
+                          flexShrink: 0,
+                        }}
+                        title={detailAudioPlaying ? "Pause preview" : "Play preview"}
+                        aria-label={detailAudioPlaying ? "Pause preview" : "Play preview"}
+                      >
+                        {detailAudioPlaying ? <PauseIcon width={18} height={18} /> : <PlayIcon width={18} height={18} />}
+                      </button>
+                      <div>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#0369a1" }}>Audio Stream</span>
+                        <div style={{ fontSize: "11px", color: "#0284c7" }}>
+                          Preview Player • {formatDuration((detailAudioDuration || (selectedDetailTrack.durationMs / 1000)) * 1000)}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "12px", fontWeight: 500, color: "#0369a1", fontVariantNumeric: "tabular-nums" }}>
+                      {formatDuration(detailAudioCurrentTime * 1000)} / {formatDuration((detailAudioDuration || (selectedDetailTrack.durationMs / 1000)) * 1000)}
+                    </span>
+                  </div>
+                  {/* Scrubber */}
+                  <input
+                    type="range"
+                    min={0}
+                    max={detailAudioDuration || (selectedDetailTrack.durationMs / 1000)}
+                    step={0.1}
+                    value={detailAudioCurrentTime}
+                    onChange={(e) => {
+                      const newTime = Number(e.target.value);
+                      if (detailAudioRef.current) {
+                        detailAudioRef.current.currentTime = newTime;
+                      }
+                      setDetailAudioCurrentTime(newTime);
+                    }}
+                    style={{
+                      width: "100%",
+                      accentColor: "var(--sw-primary, #0284c7)",
+                      cursor: "pointer",
+                      height: "5px",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Status Banner */}
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "10px",
+                  padding: "14px 16px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ color: "#16a34a", flexShrink: 0, marginTop: "2px" }}>
+                  <CheckIcon width={20} height={20} />
+                </div>
+                <div style={{ fontSize: "13px", color: "#166534", lineHeight: 1.5 }}>
+                  <strong style={{ display: "block", color: "#14532d", marginBottom: "3px" }}>
+                    Public Catalog Release
+                  </strong>
+                  This track is live and streaming on SoundWave. Total Plays: <b>{selectedDetailTrack.playCount.toLocaleString()}</b>.
+                </div>
+              </div>
+
+              {/* Metadata Details Grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "12px",
+                  background: "#f8fafc",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Artist
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {selectedDetailTrack.creator.displayName}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Genre
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {selectedDetailTrack.genreName || selectedDetailTrack.genreSlug || "Pop"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Album
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {selectedDetailTrack.album?.title || "Single Release"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Duration
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {formatDuration(selectedDetailTrack.durationMs)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Plays
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    {selectedDetailTrack.playCount.toLocaleString()}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Format
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
+                    Stereo (HQ Audio)
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedDetailTrack.description && (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--sw-text-secondary, #475569)", marginBottom: "4px" }}>
+                    Description
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap" }}>
+                    {selectedDetailTrack.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Lyrics */}
+              {selectedDetailTrack.lyrics && (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--sw-text-secondary, #475569)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FileTextIcon width={14} height={14} /> Lyrics
+                  </div>
+                  <div style={{ maxHeight: "140px", overflowY: "auto", fontSize: "12px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+                    {selectedDetailTrack.lyrics}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="modal-actions" style={{ padding: "16px 24px", borderTop: "1px solid #e4e7ec", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closeDetailModal}
+              >
+                Close
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    const t = selectedDetailTrack;
+                    closeDetailModal();
+                    onPlayTrack(t, playlistTracks, `Playlist • ${playlist.title}`, `playlist-${playlist.id}`);
+                  }}
+                >
+                  <PlayIcon width={14} height={14} />
+                  <span>Play in player</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => {
+                    const id = selectedDetailTrack.id;
+                    closeDetailModal();
+                    onNavigate(`/track/${id}`);
+                  }}
+                >
+                  View full track page
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
