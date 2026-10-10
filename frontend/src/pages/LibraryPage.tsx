@@ -173,8 +173,8 @@ export function LibraryPage({
       ) : playlists.length === 0 ? (
         <div className="state-empty-box">
           <HeadphonesIcon width={48} height={48} />
-          <p className="empty-title">No playlists created yet</p>
-          <p className="empty-desc">Create custom playlists to group and listen to your favorite tracks.</p>
+          <p className="empty-title">No playlists yet</p>
+          <p className="empty-desc">Create a playlist to get started.</p>
           <button className="button button-primary button-small" onClick={onCreatePlaylist}>
             <PlusIcon width={16} height={16} /> Create playlist
           </button>
