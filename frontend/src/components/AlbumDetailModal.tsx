@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { albumApi } from "../api/album";
-import { CloseIcon, EditIcon, HeadphonesIcon } from "../icons";
+import { CloseIcon, EditIcon, HeadphonesIcon, TrashIcon } from "../icons";
 import type { StudioAlbum } from "../types";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   onClose: () => void;
   album: StudioAlbum | null;
   onEdit: (album: StudioAlbum) => void;
+  onDelete?: (album: StudioAlbum) => void;
 };
 
 function formatDuration(ms?: number): string {
@@ -20,7 +21,7 @@ function formatDuration(ms?: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
+export function AlbumDetailModal({ open, onClose, album, onEdit, onDelete }: Props) {
   useModalScrollLock(open);
 
   const [fullAlbum, setFullAlbum] = useState<StudioAlbum | null>(null);
@@ -51,13 +52,13 @@ export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
   return createPortal(
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-container album-detail-modal"
+        className="modal-card modal-card--wide album-detail-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: "720px", width: "95%" }}
+        style={{ maxWidth: "720px", width: "95%", padding: "26px", gap: "16px" }}
       >
         <div className="modal-header">
           <div>
-            <span className="eyebrow">ALBUM DETAILS (UC-21.2)</span>
+            <span className="eyebrow">ALBUM DETAILS</span>
             <h2 className="modal-title">{current.title}</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close dialog">
@@ -65,7 +66,7 @@ export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
           </button>
         </div>
 
-        <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ padding: 0 }}>
           {/* Header Banner */}
           <div style={{ display: "flex", gap: "20px", alignItems: "flex-start", marginBottom: "24px" }}>
             <div
@@ -132,7 +133,7 @@ export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
                 </p>
               )}
 
-              <div style={{ display: "flex", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
                 <button
                   type="button"
                   className="button button-primary button-small"
@@ -140,10 +141,26 @@ export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
                     onClose();
                     onEdit(current);
                   }}
+                  id="btn-modal-edit-album"
                 >
                   <EditIcon width={14} height={14} />
                   <span>Edit Album</span>
                 </button>
+
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="button button-danger button-small"
+                    onClick={() => {
+                      onClose();
+                      onDelete(current);
+                    }}
+                    id="btn-modal-delete-album"
+                  >
+                    <TrashIcon width={14} height={14} />
+                    <span>Delete Album</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -226,16 +243,16 @@ export function AlbumDetailModal({ open, onClose, album, onEdit }: Props) {
                           padding: "2px 8px",
                           borderRadius: "12px",
                           backgroundColor:
-                            track.status === "APPROVED"
-                              ? "#ECFDF5"
+                            track.status === "APPROVED" || track.status === "PUBLISHED"
+                              ? "#D1FADF"
                               : "#FEF3F2",
                           color:
-                            track.status === "APPROVED"
-                              ? "#059669"
+                            track.status === "APPROVED" || track.status === "PUBLISHED"
+                              ? "#027A48"
                               : "#B42318",
                         }}
                       >
-                        {track.status}
+                        {track.status === "APPROVED" || track.status === "PUBLISHED" ? "PUBLISHED" : track.status}
                       </span>
                     </span>
                   </div>

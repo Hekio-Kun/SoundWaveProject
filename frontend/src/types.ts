@@ -80,7 +80,7 @@ export type StudioTrack = {
   albumId?: number;
   albumTitle?: string;
   trackNumber?: number;
-  status: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "TAKEN_DOWN";
+  status: "DRAFT" | "PENDING" | "APPROVED" | "PUBLISHED" | "REJECTED" | "TAKEN_DOWN" | string;
   audioFormat?: string;
   playCount?: number;
   latestRejectionReason?: string;
