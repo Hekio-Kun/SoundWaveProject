@@ -147,6 +147,7 @@ public class StudioTrackService {
                 .coverPublicId(coverResponse != null ? coverResponse.publicId() : null)
                 .coverUrl(coverResponse != null ? coverResponse.secureUrl() : null)
                 .playCountCache(0L)
+                .lyrics(request.lyrics() != null && !request.lyrics().isBlank() ? request.lyrics().trim() : null)
                 .build();
 
         Track savedTrack = trackRepository.save(track);
@@ -206,6 +207,9 @@ public class StudioTrackService {
         track.setAlbum(album);
         track.setTrackNumber(request.trackNumber());
         track.setDescription(request.description() != null ? request.description().trim() : null);
+        if (request.lyrics() != null) {
+            track.setLyrics(request.lyrics().isBlank() ? null : request.lyrics().trim());
+        }
 
         Track updatedTrack = trackRepository.save(track);
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
@@ -353,3 +357,4 @@ public class StudioTrackService {
         return slug.toLowerCase(Locale.ENGLISH);
     }
 }
+

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+﻿import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   studioApi,
@@ -708,7 +708,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
               </div>
             ) : null}
 
-            {/* Lyrics Section (Placeholder maintained as specifically requested) */}
+            {/* Lyrics Section */}
             <div className="staff-lyrics-card">
               <div className="staff-lyrics-header">
                 <div className="staff-lyrics-title-group">
@@ -717,15 +717,40 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                   </span>
                   <h4 className="staff-lyrics-heading">Lyrics</h4>
                 </div>
+
+                {track.lyrics ? (
+                  <div className="staff-lyrics-header-actions">
+                    <div className="staff-lyrics-stats-badge">
+                      <span><b>{track.lyrics.split(/\r?\n/).filter((l) => l.trim().length > 0).length}</b> lines</span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="staff-lyrics-empty-state">
-                <FileTextIcon width={28} height={28} />
-                <div className="staff-lyrics-empty-text">
-                  <strong>No lyrics provided</strong>
-                  <span>The uploader did not attach lyrics for this release.</span>
+              {track.lyrics ? (
+                <div className="staff-lyrics-viewer-wrapper">
+                  <div className="staff-lyrics-lines-container">
+                    {track.lyrics.split(/\r?\n/).map((line, idx) => (
+                      <div key={idx} className="staff-lyrics-line-row">
+                        <span className="staff-lyrics-line-number" aria-hidden="true">
+                          {idx + 1}
+                        </span>
+                        <span className="staff-lyrics-line-content">
+                          {line || "\u00A0"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="staff-lyrics-empty-state">
+                  <FileTextIcon width={28} height={28} />
+                  <div className="staff-lyrics-empty-text">
+                    <strong>No lyrics provided</strong>
+                    <span>The uploader did not attach lyrics for this release.</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Moderation Review Decision Footer Banner */}
@@ -1045,6 +1070,35 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                     {formErrors.lyrics}
                   </small>
                 )}
+
+                <div style={{ marginTop: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "11px", color: "var(--sw-text-secondary)", fontWeight: 600 }}>
+                      Lyrics content & preview:
+                    </span>
+                    <span style={{ fontSize: "11px", color: "var(--sw-primary)", fontWeight: 600 }}>
+                      {editLyricsContent ? `${editLyricsContent.split("\n").filter((l) => l.trim().length > 0).length} lines` : "Optional"}
+                    </span>
+                  </div>
+                  <textarea
+                    id="edit-track-lyrics-editor"
+                    rows={4}
+                    value={editLyricsContent}
+                    onChange={(e) => setEditLyricsContent(e.target.value)}
+                    placeholder="Upload a lyrics file above, or paste / type lyrics directly here..."
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--sw-border)",
+                      fontFamily: "monospace",
+                      fontSize: "12px",
+                      lineHeight: "1.5",
+                      resize: "vertical",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="modal-actions studio-track-modal__actions">
