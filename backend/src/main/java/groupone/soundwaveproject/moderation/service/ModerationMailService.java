@@ -8,6 +8,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service gửi email thông báo kết quả kiểm duyệt bài hát tới nghệ sĩ/tác giả (UC-24: Manage Track Moderation).
+ */
 @Service
 @RequiredArgsConstructor
 public class ModerationMailService {
@@ -18,6 +21,13 @@ public class ModerationMailService {
     @Value("${app.mail.from}")
     private String fromAddress;
 
+    /**
+     * Gửi email thông báo bài hát đã được phê duyệt và xuất bản công khai lên hệ thống (UC-24.2 Approve Track).
+     *
+     * @param recipient   Địa chỉ email người nhận (nghệ sĩ/tác giả)
+     * @param displayName Tên hiển thị của nghệ sĩ
+     * @param trackTitle  Tiêu đề bài hát được phê duyệt
+     */
     public void sendTrackApprovedEmail(String recipient, String displayName, String trackTitle) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -34,6 +44,14 @@ public class ModerationMailService {
         }
     }
 
+    /**
+     * Gửi email thông báo bài hát bị từ chối phê duyệt kèm lý do cụ thể (UC-24.2 Reject Track).
+     *
+     * @param recipient       Địa chỉ email người nhận (nghệ sĩ/tác giả)
+     * @param displayName     Tên hiển thị của nghệ sĩ
+     * @param trackTitle      Tiêu đề bài hát bị từ chối
+     * @param rejectionReason Lý do từ chối cụ thể từ kiểm duyệt viên
+     */
     public void sendTrackRejectedEmail(String recipient, String displayName, String trackTitle, String rejectionReason) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -52,6 +70,14 @@ public class ModerationMailService {
         }
     }
 
+    /**
+     * Gửi email thông báo bài hát đã bị gỡ bỏ khỏi hệ thống do vi phạm chính sách hoặc bản quyền (UC-24.2 Take Down Track).
+     *
+     * @param recipient      Địa chỉ email người nhận (nghệ sĩ/tác giả)
+     * @param displayName    Tên hiển thị của nghệ sĩ
+     * @param trackTitle     Tiêu đề bài hát bị gỡ bỏ
+     * @param takedownReason Lý do gỡ bỏ cụ thể
+     */
     public void sendTrackTakenDownEmail(String recipient, String displayName, String trackTitle, String takedownReason) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
