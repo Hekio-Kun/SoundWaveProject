@@ -378,9 +378,20 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   };
 
   return (
-    <div className="studio-track-detail-page" style={{ padding: "28px clamp(16px, 3vw, 40px) 60px", maxWidth: "1120px", margin: "0 auto" }}>
-      {/* Top Banner */}
-      <header className="staff-hero-banner" style={{ marginBottom: "20px" }}>
+    <div className="studio-track-detail-page" style={{ padding: "0 0 48px", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+      {/* Top Banner - sát lên trên và trải đều full viền */}
+      <header
+        className="staff-hero-banner"
+        style={{
+          marginTop: "0px",
+          marginBottom: "18px",
+          width: "100%",
+          boxSizing: "border-box",
+          border: "1.5px solid #99f6e4",
+          boxShadow: "0 4px 20px rgba(2, 132, 199, 0.05)",
+          borderRadius: "18px",
+        }}
+      >
         <div className="staff-hero-copy">
           <div className="staff-hero-eyebrow">
             <span className="staff-hero-eyebrow-pill">
@@ -411,93 +422,108 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
       ) : null}
 
       {/* Main Container */}
-      <div className="staff-detail-view-container" style={{ background: "#ffffff", border: "1px solid var(--ops-border, #e2e8f0)", borderRadius: "20px", padding: "24px 28px", boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04)" }}>
-        {/* Top Breadcrumbs & Action Navigation */}
-        <div className="staff-detail-top-nav" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+      <div
+        className="staff-detail-view-container"
+        style={{
+          background: "#ffffff",
+          border: "1px solid var(--ops-border, #e2e8f0)",
+          borderRadius: "20px",
+          padding: "20px 24px",
+          boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04)",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* Top Header & Navigation Bar - CÙNG 1 HÀNG NGANG Ở TRÊN DUY NHẤT */}
+        <div className="studio-detail-top-nav-single-row">
+          {/* Left: Back button + Breadcrumb (Submission Details #{trackId}) */}
+          <div className="studio-top-nav-single-left">
             <button
               type="button"
               onClick={() => onNavigate("/studio")}
               className="staff-detail-back-btn"
               title="Back to Content Studio"
+              style={{ padding: "6px 12px", fontSize: "13px" }}
             >
               <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
               <span>Back to Queue</span>
             </button>
 
-            <div className="staff-detail-breadcrumbs">
+            <div className="staff-detail-breadcrumbs" style={{ fontSize: "13px" }}>
               <span className="staff-crumb-muted">Moderation Queue</span>
               <span className="staff-crumb-sep">/</span>
               <span className="staff-crumb-active">Submission Details #{trackId}</span>
             </div>
+          </div>
 
-            {track ? (
-              <span className={`staff-status-chip ${statusClass}`}>
+          {/* Right: Status Badge & 3 CRUD Buttons (Edit, Delete, View) - NẰM NGANG Ở TRÊN */}
+          {track ? (
+            <div className="studio-top-nav-single-right">
+              {/* Status Badge */}
+              <span
+                className={`staff-status-chip ${statusClass}`}
+                style={{ padding: "4px 10px", fontSize: "12.5px" }}
+              >
                 <i />
                 <span>{statusLabel}</span>
               </span>
-            ) : null}
-          </div>
 
-          {/* Action Toolbar on Top Right (Edit, Delete, Submit, etc.) */}
-          {track ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              {/* Edit button */}
+              {/* 1. Edit track button */}
               <button
                 type="button"
-                className="button button-secondary button-small"
+                className="studio-crud-btn studio-crud-btn-edit"
                 onClick={openEditModal}
                 title="Edit track information & media"
-                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                <EditIcon width={14} height={14} />
+                <EditIcon width={13} height={13} />
                 <span>Edit track</span>
               </button>
 
-              {/* Delete button */}
+              {/* 2. Delete button */}
               <button
                 type="button"
-                className="button button-ghost button-small text-danger"
+                className="studio-crud-btn studio-crud-btn-delete"
                 onClick={() => setDeleteConfirmOpen(true)}
                 title="Delete this track"
-                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                <TrashIcon width={14} height={14} />
+                <TrashIcon width={13} height={13} />
                 <span>Delete</span>
               </button>
 
-              {/* Status specific actions */}
+              {/* 3. Status-specific action button */}
               {(isDraft || isRejected) && (
                 <button
                   type="button"
-                  className="button button-primary button-small"
+                  className="studio-crud-btn studio-crud-btn-primary"
                   onClick={() => {
                     setSubmitterNote("");
                     setSubmitCopyrightAgreed(false);
                     setSubmitModalOpen(true);
                   }}
                 >
-                  Submit for review
+                  <UploadIcon width={13} height={13} />
+                  <span>Submit for review</span>
                 </button>
               )}
 
               {isPending && (
                 <button
                   type="button"
-                  className="button button-ghost button-small text-warning"
+                  className="studio-crud-btn studio-crud-btn-warning"
                   onClick={() => setWithdrawModalOpen(true)}
                 >
-                  Withdraw submission
+                  <span>Withdraw submission</span>
                 </button>
               )}
 
               {isApproved && (
                 <button
                   type="button"
-                  className="button button-primary button-small"
+                  className="studio-crud-btn studio-crud-btn-primary"
                   onClick={() => onNavigate(`/track/${track.id}`)}
                 >
-                  View on Public Catalog
+                  <EyeIcon width={13} height={13} />
+                  <span>View on Public Catalog</span>
                 </button>
               )}
             </div>

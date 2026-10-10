@@ -2594,6 +2594,172 @@ body.modal-open .app-scroll-region {
   flex-wrap: wrap;
 }
 
+/* --------------------------------------------------------------------------
+   Studio Track Detail — Distributed Top Header & Action Toolbar
+   -------------------------------------------------------------------------- */
+.studio-detail-header-card {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.studio-top-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ops-border, #e2e8f0);
+  flex-wrap: wrap;
+}
+
+.studio-top-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.studio-top-nav-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.studio-detail-top-nav-single-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ops-border, #e2e8f0);
+  width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: none;
+}
+
+.studio-detail-top-nav-single-row::-webkit-scrollbar {
+  display: none;
+}
+
+.studio-top-nav-single-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.studio-top-nav-single-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Đồng bộ hóa 3 nút CRUD đều tăm tắp */
+.studio-crud-btn {
+  height: 35px;
+  padding: 0 13px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.studio-crud-btn:hover {
+  transform: translateY(-1px);
+}
+
+.studio-crud-btn-edit {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #334155;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.studio-crud-btn-edit:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: var(--ops-brand-hover, #0284c7);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+.studio-crud-btn-delete {
+  background: #fff5f5;
+  border-color: #fecaca;
+  color: #dc2626;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.06);
+}
+
+.studio-crud-btn-delete:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.12);
+}
+
+.studio-crud-btn-primary {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+}
+
+.studio-crud-btn-primary:hover {
+  background: #0369a1;
+  border-color: #0369a1;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+}
+
+.studio-crud-btn-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.studio-crud-btn-warning:hover {
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+@media (max-width: 768px) {
+  .studio-actions-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .studio-actions-context {
+    justify-content: flex-start;
+  }
+
+  .studio-crud-actions-group {
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .studio-crud-actions-group .studio-crud-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
 .staff-detail-back-btn {
   display: inline-flex;
   align-items: center;
