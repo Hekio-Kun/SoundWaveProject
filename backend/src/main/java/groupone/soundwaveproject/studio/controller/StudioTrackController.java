@@ -94,6 +94,15 @@ public class StudioTrackController {
         return studioTrackService.withdrawSubmission(id, authentication.getName());
     }
 
+    /**
+     * Endpoint API cho chức năng View Rejection Reason (UC-20 theo đặc tả RDS).
+     *
+     * Cho phép nghệ sĩ/người tải nhạc xem lý do và phản hồi kiểm duyệt của bài hát bị REJECTED.
+     *
+     * @param id             ID của bài hát
+     * @param authentication Đối tượng xác thực chứa email người dùng hiện tại
+     * @return RejectionDetailsResponse chi tiết lý do và lịch sử kiểm duyệt
+     */
     @GetMapping("/tracks/{id}/rejection")
     public RejectionDetailsResponse getRejectionDetails(
             @PathVariable Long id,

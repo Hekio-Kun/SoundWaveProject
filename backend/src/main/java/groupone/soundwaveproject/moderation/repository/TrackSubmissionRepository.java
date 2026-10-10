@@ -26,12 +26,7 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      * @return Optional chứa yêu cầu kiểm duyệt mới nhất nếu tồn tại
      */
     Optional<TrackSubmission> findFirstByTrackIdOrderBySubmittedAtDesc(Long trackId);
-
-    /**
-     * Xóa toàn bộ các bản ghi yêu cầu kiểm duyệt gắn với một bài hát (dùng khi xóa bài hát).
-     *
-     * @param trackId ID của bài hát
-     */
+    java.util.List<TrackSubmission> findByTrackIdOrderBySubmittedAtDesc(Long trackId);
     void deleteByTrackId(Long trackId);
 
     /**
