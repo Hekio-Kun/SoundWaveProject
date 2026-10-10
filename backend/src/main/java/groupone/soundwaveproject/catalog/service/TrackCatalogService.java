@@ -22,6 +22,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Core business service handling public track catalog queries, streaming metadata resolution,
+ * recommendations, and playback play-count tracking.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,8 +35,14 @@ public class TrackCatalogService {
     private final ListeningHistoryPublicService listeningHistoryPublicService;
 
     /**
-     * Lấy thông tin bài hát và URL streaming trực tiếp từ CDN (Phase 1).
-     * Áp dụng quy tắc BR-09: Chỉ bài hát có publication_status = 'PUBLISHED' mới có thể truy cập để nghe.
+     * Retrieves published track metadata and CDN streaming audio URL (Stream Music Phase 1).
+     * <p>
+     * Enforces business rule BR-09: Only tracks with publication status 'PUBLISHED'
+     * can be accessed for audio streaming.
+     *
+     * @param idOrSlug Numeric ID or unique URL slug of the track.
+     * @return {@link TrackResponse} containing playback details and metadata.
+     * @throws ResourceNotFoundException if the track does not exist or is not published.
      */
     @Transactional(readOnly = true)
     public TrackResponse getTrackByIdOrSlug(String idOrSlug) {
@@ -54,7 +64,14 @@ public class TrackCatalogService {
     }
 
     /**
-     * Lấy danh sách các bài hát đã xuất bản (PUBLISHED) phục vụ hiển thị catalog công khai, tìm kiếm và thêm vào playlist.
+     * Retrieves a paginated and filtered list of published tracks for public exploration,
+     * keyword search, and playlist curation.
+     *
+     * @param genre Genre slug filter, or null/empty/all to ignore genre restriction.
+     * @param search Query keyword matching title, slug, description, or album title.
+     * @param sort Sort option ('trending' for play count, 'title' for alphabetical, or latest).
+     * @param pageable Pagination settings.
+     * @return Paginated {@link Page} of {@link TrackResponse}.
      */
     @Transactional(readOnly = true)
     public Page<TrackResponse> getPublishedTracks(String genre, String search, String sort, Pageable pageable) {
@@ -108,8 +125,14 @@ public class TrackCatalogService {
     }
 
     /**
-     * Alias method tương ứng với Step 18 trong Sequence Diagram [UC-8] Filter Public Catalog:
-     * 18. getFilteredTracks(genre, search, sort, page, size)
+     * Alias method corresponding to Step 18 in Sequence Diagram [UC-8] Filter Public Catalog:
+     * {@code getFilteredTracks(genre, search, sort, page, size)}.
+     *
+     * @param genre Genre slug filter.
+     * @param search Query keyword filter.
+     * @param sort Sort option.
+     * @param pageable Pagination configuration.
+     * @return Paginated {@link Page} of {@link TrackResponse}.
      */
     @Transactional(readOnly = true)
     public Page<TrackResponse> getFilteredTracks(String genre, String search, String sort, Pageable pageable) {
@@ -117,7 +140,17 @@ public class TrackCatalogService {
     }
 
     /**
-     * Ghi nhận lượt nghe và lịch sử nghe nhạc khi người dùng đạt ngưỡng hợp lệ (Phase 3 - BR.13).
+     * Records a valid stream playback event, incrementing play count and persisting listening history.
+     * <p>
+     * Enforces business rule BR.13:
+     * 1. Atomically increments track play count cache within the database transaction.
+     * 2. If the user is authenticated, saves a record to listening history.
+     *
+     * @param trackId ID of the track played.
+     * @param request Listening metrics submitted by client.
+     * @param userEmail Email of the authenticated user, or null if guest.
+     * @return {@link RecordPlayResponse} containing updated play count and history status.
+     * @throws ResourceNotFoundException if the track does not exist or is not published.
      */
     @Transactional
     public RecordPlayResponse recordTrackPlay(Long trackId, RecordPlayRequest request, String userEmail) {
@@ -125,11 +158,11 @@ public class TrackCatalogService {
                 .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_UNAVAILABLE", "Track unavailable"));
 
-        // 1. Tăng play count trong database transaction
+        // 1. Increment play count in database transaction
         trackRepository.incrementPlayCount(trackId);
         long updatedPlayCount = (track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L) + 1;
 
-        // 2. Ghi nhận lịch sử nghe nhạc nếu đã đăng nhập (Authenticated Listener)
+        // 2. Persist listening history if user is authenticated
         boolean recordedHistory = false;
         if (userEmail != null && !userEmail.isBlank()) {
             Optional<Long> userIdOpt = userAccountPublicService.findUserIdByEmail(userEmail);
@@ -150,6 +183,14 @@ public class TrackCatalogService {
         return new RecordPlayResponse(trackId, updatedPlayCount, recordedHistory);
     }
 
+    /**
+     * Retrieves track recommendations matching the same genre as the current track,
+     * falling back to other published tracks if needed.
+     *
+     * @param idOrSlug Current track ID or slug to exclude from results.
+     * @param limit Maximum number of recommended tracks to return.
+     * @return List of recommended {@link TrackResponse} items.
+     */
     @Transactional(readOnly = true)
     public java.util.List<TrackResponse> getRecommendations(String idOrSlug, int limit) {
         Track currentTrack = null;
@@ -183,6 +224,12 @@ public class TrackCatalogService {
         return filtered.stream().map(this::mapToTrackResponse).toList();
     }
 
+    /**
+     * Maps a {@link Track} entity to its corresponding public {@link TrackResponse} DTO.
+     *
+     * @param track Track entity to map.
+     * @return Populated {@link TrackResponse} containing audio URL, genre, album, and creator summaries.
+     */
     private TrackResponse mapToTrackResponse(Track track) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {

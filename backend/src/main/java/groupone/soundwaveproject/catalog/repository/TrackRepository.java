@@ -49,10 +49,21 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
     @Query("UPDATE Track t SET t.album = null, t.trackNumber = null, t.updatedAt = CURRENT_TIMESTAMP WHERE t.album.id = :albumId AND t.uploaderUserId = :userId")
     void unlinkAlbumFromTracks(@Param("albumId") Long albumId, @Param("userId") Long userId);
 
+    /**
+     * Atomically increments the cached play count for the given track ID.
+     *
+     * @param id Identifier of the track to increment.
+     */
     @Modifying
     @Query("UPDATE Track t SET t.playCountCache = t.playCountCache + 1 WHERE t.id = :id")
     void incrementPlayCount(@Param("id") Long id);
 
+    /**
+     * Retrieves the current cached play count for the given track ID.
+     *
+     * @param id Identifier of the track.
+     * @return {@link Optional} containing play count if found.
+     */
     @Query("SELECT t.playCountCache FROM Track t WHERE t.id = :id")
     Optional<Long> getPlayCountById(@Param("id") Long id);
 }

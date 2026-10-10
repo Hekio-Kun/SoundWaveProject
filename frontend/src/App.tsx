@@ -137,13 +137,38 @@ export default function App() {
   const audio = useMemo(() => new Audio(tracks[0]?.audioUrl || ""), []);
   const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(tracks[0] || null);
   const [playing, setPlaying] = useState(false);
-  const [queue, setQueue] = useState<LandingTrack[]>(tracks);
+  const [queue, setQueue] = useState<LandingTrack[]>(() => {
+    try {
+      const saved = sessionStorage.getItem("soundwave_playback_queue");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return tracks;
+  });
   const [queueOpen, setQueueOpen] = useState(false);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [pendingTrack, setPendingTrack] = useState<LandingTrack | null>(null);
 
+  // NF02: Persist active playback queue to sessionStorage across navigations/reloads
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("soundwave_playback_queue", JSON.stringify(queue));
+    } catch {
+      // ignore
+    }
+  }, [queue]);
+
   useEffect(() => () => audio.pause(), [audio]);
 
+  /**
+   * Toggles playback on the underlying audio element.
+   *
+   * @param shouldPlay - True to start audio, false to pause
+   */
   const setAudioPlaying = (shouldPlay: boolean) => {
     if (shouldPlay) {
       void audio
@@ -156,6 +181,14 @@ export default function App() {
     }
   };
 
+  /**
+   * Loads and initiates playback for a target track.
+   *
+   * @param track - Track to play
+   * @param contextQueueOrAutoplay - Optional context queue array or boolean autoplay flag
+   * @param _contextTitle - Optional human-readable context title
+   * @param _contextKey - Optional context identifier key
+   */
   const playTrack = (
     track: LandingTrack,
     contextQueueOrAutoplay?: LandingTrack[] | boolean,
@@ -181,11 +214,19 @@ export default function App() {
     else setPlaying(false);
   };
 
+  /**
+   * Prompts guest users to register/log in after completing a track stream.
+   *
+   * @param next - Next track in queue waiting to be played
+   */
   const handleGuestTrackEnded = (next: LandingTrack) => {
     setPendingTrack(next);
     setGuestPromptOpen(true);
   };
 
+  /**
+   * Dismisses guest prompt and proceeds playing the pending queued track.
+   */
   const continueListening = () => {
     setGuestPromptOpen(false);
     if (pendingTrack) {
@@ -194,6 +235,14 @@ export default function App() {
     setPendingTrack(null);
   };
 
+  /**
+   * Reports a valid listening event to the backend upon reaching threshold (Phase 3 - BR.13).
+   * Atomically updates local play count caches in both current track and queue.
+   *
+   * @param trackId - Identifier of the streamed track
+   * @param listenedDurationMs - Total duration streamed in milliseconds
+   * @param completed - Whether the track was played to completion
+   */
   const handleRecordPlay = useCallback(async (trackId: number, listenedDurationMs: number, completed: boolean) => {
     try {
       const res = await catalogApi.recordPlay(trackId, listenedDurationMs, completed);
@@ -206,17 +255,34 @@ export default function App() {
     }
   }, []);
 
-  // Queue manipulation
+  // Queue manipulation handlers
+  /**
+   * Removes a specific track from the playback queue.
+   *
+   * @param trackId - ID of track to remove
+   */
   const handleRemoveFromQueue = (trackId: number) => {
     setQueue((prev) => prev.filter((t) => t.id !== trackId));
   };
 
+  /**
+   * Clears upcoming tracks in the queue, retaining the current playing track if present.
+   */
   const handleClearQueue = () => {
     if (currentTrack) {
       setQueue([currentTrack]);
     } else {
       setQueue([]);
     }
+  };
+
+  /**
+   * Commits a new ordering of tracks to the active queue (NF02).
+   *
+   * @param newQueue - Reordered list of tracks
+   */
+  const handleReorderQueue = (newQueue: LandingTrack[]) => {
+    setQueue(newQueue);
   };
 
   // 3. Library & Favorites & Playlists State
@@ -826,6 +892,7 @@ export default function App() {
           onPlayTrack={playTrack}
           onRemoveFromQueue={handleRemoveFromQueue}
           onClearQueue={handleClearQueue}
+          onReorderQueue={handleReorderQueue}
           hasPlayer
           showFooter={isExploreRoute}
         >

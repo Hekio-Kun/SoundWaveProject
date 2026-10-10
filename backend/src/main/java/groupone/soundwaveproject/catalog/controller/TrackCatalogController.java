@@ -20,6 +20,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller for public track discovery, streaming playback metadata retrieval,
+ * track recommendations, and playback play-count tracking.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/tracks")
@@ -28,7 +32,13 @@ public class TrackCatalogController {
     private final TrackCatalogService trackCatalogService;
 
     /**
-     * Lấy danh sách bài hát đã phát hành phục vụ catalog, tìm kiếm và thêm vào playlist.
+     * Retrieves a paginated list of published tracks for public browsing, search, and playlist curation.
+     *
+     * @param genre Optional genre slug filter.
+     * @param search Optional search term matching title, description, or album.
+     * @param sort Sorting criteria ('trending', 'title', or default newest).
+     * @param pageable Pagination configuration.
+     * @return {@link ResponseEntity} containing a paginated {@link Page} of {@link TrackResponse}.
      */
     @GetMapping
     public ResponseEntity<Page<TrackResponse>> getTracks(
@@ -43,8 +53,13 @@ public class TrackCatalogController {
     }
 
     /**
-     * Lấy metadata bài hát và URL streaming phục vụ phát nhạc trực tuyến (Phase 1).
-     * Áp dụng quy tắc BR-09: Trả về 404 nếu không tìm thấy hoặc bài hát chưa ở trạng thái PUBLISHED.
+     * Retrieves track playback metadata and audio streaming URL (Stream Music Phase 1).
+     * <p>
+     * Enforces business rule BR-09: Returns 404 NOT_FOUND if the track does not exist
+     * or is not in PUBLISHED status.
+     *
+     * @param idOrSlug Numeric ID or unique slug of the requested track.
+     * @return {@link ResponseEntity} containing {@link TrackResponse} with CDN audio URL.
      */
     @GetMapping("/{idOrSlug}")
     public ResponseEntity<TrackResponse> getTrack(@PathVariable String idOrSlug) {
@@ -53,6 +68,13 @@ public class TrackCatalogController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Retrieves recommended tracks related to the specified track based on genre.
+     *
+     * @param idOrSlug Numeric ID or unique slug of the currently played track.
+     * @param limit Maximum number of recommended tracks to return (default: 5).
+     * @return {@link ResponseEntity} containing a list of recommended {@link TrackResponse} objects.
+     */
     @GetMapping("/{idOrSlug}/recommendations")
     public ResponseEntity<java.util.List<TrackResponse>> getRecommendations(
             @PathVariable String idOrSlug,
@@ -63,8 +85,13 @@ public class TrackCatalogController {
     }
 
     /**
-     * Ghi nhận lượt nghe khi client đạt ngưỡng phát hợp lệ (Phase 3 - BR.13).
-     * Cho phép cả Guest lẫn Authenticated User gọi.
+     * Records a track playback event when client reaches the valid listening threshold (Phase 3 - BR.13).
+     * Permits access by both guest listeners and authenticated users.
+     *
+     * @param id Identifier of the played track.
+     * @param request Listening metrics including duration listened and completed status.
+     * @param authentication Current user authentication context (nullable for guests).
+     * @return {@link ResponseEntity} containing {@link RecordPlayResponse} with updated play count.
      */
     @PostMapping("/{id}/play")
     public ResponseEntity<RecordPlayResponse> recordPlay(
@@ -80,6 +107,12 @@ public class TrackCatalogController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Helper to extract the user email from the authentication principal.
+     *
+     * @param authentication Current security authentication context.
+     * @return The user's email if authenticated; null if anonymous or unauthenticated.
+     */
     private String extractUserEmail(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
