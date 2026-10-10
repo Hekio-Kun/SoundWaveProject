@@ -14,6 +14,7 @@ import { AlbumFormModal } from "../components/AlbumFormModal";
 import { AlbumDetailModal } from "../components/AlbumDetailModal";
 import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/MediaUploadField";
+import { RejectionDetailsModal } from "../components/RejectionDetailsModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -882,16 +883,57 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                       </span>
                     </td>
                     <td>
-                      <span className={`status-badge status-badge--${t.status.toLowerCase()}`}>
-                        {t.status === "APPROVED" && "Published"}
-                        {t.status === "PENDING" && "Pending Review"}
-                        {t.status === "REJECTED" && "Rejected"}
-                        {t.status === "DRAFT" && "Draft"}
-                      </span>
+                      {t.status === "REJECTED" ? (
+                        <button
+                          type="button"
+                          className="status-badge status-badge--rejected"
+                          onClick={() => handleViewRejection(t)}
+                          title="Click to view rejection reason & moderator feedback"
+                          style={{
+                            cursor: "pointer",
+                            border: "none",
+                            backgroundColor: "#fee4e2",
+                            color: "#b42318",
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            borderRadius: "999px",
+                          }}
+                        >
+                          Rejected
+                        </button>
+                      ) : (
+                        <span className={`status-badge status-badge--${t.status.toLowerCase()}`}>
+                          {t.status === "APPROVED" && "Published"}
+                          {t.status === "PENDING" && "Pending Review"}
+                          {t.status === "DRAFT" && "Draft"}
+                        </span>
+                      )}
                     </td>
                     <td>{t.createdAt}</td>
                     <td style={{ textAlign: "right" }}>
-                      <div className="table-action-btns" style={{ justifyContent: "flex-end" }}>
+                      <div className="table-action-btns" style={{ justifyContent: "flex-end", gap: "8px" }}>
+                        {t.status === "REJECTED" && (
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={() => handleViewRejection(t)}
+                            title="View moderator rejection reason & feedback"
+                            style={{
+                              backgroundColor: "#fee4e2",
+                              color: "#b42318",
+                              borderColor: "#fecdca",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              fontWeight: 600,
+                              padding: "5px 12px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <AlertIcon width={13} height={13} />
+                            <span>View Rejection</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="button button-ghost button-small"
@@ -1657,79 +1699,26 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
         document.body
       )}
 
-      {/* Rejection Details Modal (UC-20) */}
-      {rejectionModalTrack && createPortal(
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={() => setRejectionModalTrack(null)}
-        >
-          <div
-            className="modal-card"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h3>Track Rejection Details</h3>
-              <button
-                className="icon-button"
-                onClick={() => setRejectionModalTrack(null)}
-              >
-                <CloseIcon width={18} height={18} />
-              </button>
-            </div>
-            <p className="rejection-track-name" style={{ marginBottom: "6px" }}>
-              Track: <b>{rejectionModalTrack.trackTitle}</b>
-            </p>
-            {rejectionModalTrack.reviewedAt && (
-              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "var(--sw-text-muted)" }}>
-                Decision recorded: {new Date(rejectionModalTrack.reviewedAt).toLocaleString()}
-              </p>
-            )}
-            <div className="rejection-box">
-              <b style={{ display: "block", marginBottom: "4px", color: "#b42318" }}>
-                Staff rejection reason:
-              </b>
-              <p className="rejection-text">{rejectionModalTrack.rejectionReason}</p>
-              {rejectionModalTrack.reviewerNote && (
-                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed rgba(180, 35, 24, 0.2)" }}>
-                  <b style={{ display: "block", marginBottom: "2px", fontSize: "12px", color: "var(--sw-text-secondary)" }}>
-                    Reviewer note:
-                  </b>
-                  <p style={{ margin: 0, fontSize: "13px" }}>{rejectionModalTrack.reviewerNote}</p>
-                </div>
-              )}
-            </div>
-            <p className="rejection-help">
-              You can edit the audio file and metadata to address this feedback, then resubmit the track.
-            </p>
-            <div className="modal-actions">
-              <button
-                className="button button-secondary"
-                onClick={() => setRejectionModalTrack(null)}
-              >
-                Close
-              </button>
-              <button
-                className="button button-primary"
-                onClick={() => {
-                  const targetTrack = trackList.find(
-                    (t) => t.id === rejectionModalTrack.trackId
-                  );
-                  setRejectionModalTrack(null);
-                  if (targetTrack) {
-                    openEditModal(targetTrack);
-                  }
-                }}
-              >
-                Edit track
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Rejection Details Modal (UC-20: View Rejection Reason) */}
+      <RejectionDetailsModal
+        isOpen={Boolean(rejectionModalTrack)}
+        details={rejectionModalTrack}
+        onClose={() => setRejectionModalTrack(null)}
+        onEditTrack={(trackId) => {
+          const targetTrack = trackList.find((t) => t.id === trackId);
+          setRejectionModalTrack(null);
+          if (targetTrack) {
+            openEditModal(targetTrack);
+          }
+        }}
+        onViewTrackDetail={(trackId) => {
+          const targetTrack = trackList.find((t) => t.id === trackId);
+          setRejectionModalTrack(null);
+          if (targetTrack) {
+            handleOpenDetail(targetTrack);
+          }
+        }}
+      />
 
       {/* Withdraw Submission Modal (UC-19.4 Extension) */}
       {withdrawConfirmTrack && createPortal(

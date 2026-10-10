@@ -1,13 +1,15 @@
-﻿import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   studioApi,
   type AlbumOption,
   type ApiTrack,
   type GenreOption,
+  type RejectionDetails,
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { MediaUploadField } from "../components/MediaUploadField";
+import { RejectionDetailsModal } from "../components/RejectionDetailsModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -91,6 +93,31 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+  const [rejectionModalDetails, setRejectionModalDetails] = useState<RejectionDetails | null>(null);
+
+  /**
+   * Mở modal xem chi tiết lý do từ chối kiểm duyệt (UC-20: View Rejection Reason).
+   */
+  const handleOpenRejectionModal = async () => {
+    if (!track) return;
+    try {
+      const details = await studioApi.getRejectionDetails(track.id);
+      setRejectionModalDetails(details);
+    } catch {
+      setRejectionModalDetails({
+        trackId: track.id,
+        trackTitle: track.title,
+        status: "REJECTED",
+        rejectionReason:
+          track.latestRejectionReason ||
+          "Audio content violates community standards.",
+        reviewerNote: track.reviewerNote,
+        reviewedAt: track.reviewedAt || track.createdAt,
+      });
+    }
+    setRejectionModalOpen(true);
+  };
 
   // Edit form state
   const [genres, setGenres] = useState<GenreOption[]>([]);
@@ -442,6 +469,28 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
           {/* Action Toolbar on Top Right (Edit, Delete, Submit, etc.) */}
           {track ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {/* Rejection Details button for rejected tracks (UC-20) */}
+              {isRejected && (
+                <button
+                  type="button"
+                  className="button button-small"
+                  onClick={handleOpenRejectionModal}
+                  title="View moderator rejection reason & feedback"
+                  style={{
+                    backgroundColor: "#fee4e2",
+                    color: "#b42318",
+                    borderColor: "#fecdca",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <AlertIcon width={14} height={14} />
+                  <span>View Rejection</span>
+                </button>
+              )}
+
               {/* Edit button */}
               <button
                 type="button"
@@ -766,27 +815,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
               </div>
             )}
 
-            {isRejected && (
-              <div className="staff-decision-summary is-rejected">
-                <div className="staff-decision-title">
-                  <AlertIcon width={16} height={16} />
-                  <span>Track submission was rejected</span>
-                </div>
-                {track.latestRejectionReason ? (
-                  <p className="staff-decision-reason">
-                    <b>Rejection Reason:</b> {track.latestRejectionReason}
-                  </p>
-                ) : null}
-                {track.reviewerNote ? (
-                  <p className="staff-decision-note">
-                    <b>Reviewer Note:</b> {track.reviewerNote}
-                  </p>
-                ) : null}
-                <small className="staff-decision-meta">
-                  Reviewed by <b>Content Moderator</b> on {formatDate(track.reviewedAt || track.createdAt)}
-                </small>
-              </div>
-            )}
+
 
             {isPending && (
               <div className="staff-decision-summary is-pending" style={{ background: "#fefce8", borderColor: "#fde047", color: "#854d0e" }}>
@@ -1241,6 +1270,17 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
         </div>,
         document.body
       )}
+
+      {/* Rejection Details Modal (UC-20: View Rejection Reason) */}
+      <RejectionDetailsModal
+        isOpen={rejectionModalOpen}
+        details={rejectionModalDetails}
+        onClose={() => setRejectionModalOpen(false)}
+        onEditTrack={() => {
+          setRejectionModalOpen(false);
+          openEditModal();
+        }}
+      />
     </div>
   );
 }

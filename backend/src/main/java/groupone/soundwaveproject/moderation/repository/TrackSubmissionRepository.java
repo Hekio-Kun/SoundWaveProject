@@ -15,6 +15,7 @@ import java.util.Optional;
 @Repository
 public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission, Long> {
     Optional<TrackSubmission> findFirstByTrackIdOrderBySubmittedAtDesc(Long trackId);
+    java.util.List<TrackSubmission> findByTrackIdOrderBySubmittedAtDesc(Long trackId);
     void deleteByTrackId(Long trackId);
     long countByStatus(SubmissionStatus status);
 
