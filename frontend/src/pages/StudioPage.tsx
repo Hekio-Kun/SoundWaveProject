@@ -139,7 +139,7 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
     try {
       setDeletingAlbum(true);
       await albumApi.deleteAlbum(deleteConfirmAlbum.id);
-      setActionSuccess(`Album "${deleteConfirmAlbum.title}" deleted successfully. Associated tracks are preserved as standalone tracks (BR-24).`);
+      setActionSuccess(`Album "${deleteConfirmAlbum.title}" deleted successfully. Associated tracks are preserved as standalone tracks.`);
       setDeleteConfirmAlbum(null);
       await Promise.all([loadAlbums(), loadStudioData()]);
     } catch (err: unknown) {
@@ -530,10 +530,7 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
           ) : (
             <button
               className="button button-primary"
-              onClick={() => {
-                setEditingAlbum(null);
-                setAlbumModalOpen(true);
-              }}
+              onClick={() => onNavigate("/studio/albums/create")}
               id="btn-open-create-album"
             >
               <PlusIcon width={18} height={18} />
@@ -1079,10 +1076,7 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                 <button
                   type="button"
                   className="button button-primary"
-                  onClick={() => {
-                    setEditingAlbum(null);
-                    setAlbumModalOpen(true);
-                  }}
+                  onClick={() => onNavigate("/studio/albums/create")}
                   id="btn-empty-create-album"
                 >
                   <PlusIcon width={16} height={16} />
@@ -1103,6 +1097,7 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                 return (
                   <div
                     key={album.id}
+                    onClick={() => onNavigate(`/studio/albums/${album.id}`)}
                     style={{
                       background: "#ffffff",
                       border: "1px solid var(--color-sand-light, #E6D5B8)",
@@ -1111,8 +1106,18 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                       boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                       display: "flex",
                       flexDirection: "column",
-                      transition: "transform 0.16s ease, box-shadow 0.16s ease",
+                      cursor: "pointer",
+                      transition: "transform 0.18s ease, box-shadow 0.18s ease",
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.boxShadow = "0 10px 24px rgba(2, 132, 199, 0.12)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                    }}
+                    title={`Click to view details & manage "${album.title}"`}
                   >
                     {/* Cover & Publication Status */}
                     <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", backgroundColor: "#f1f5f9" }}>
@@ -1187,40 +1192,10 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                         <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>
                           {album.releaseDate ? `Release: ${album.releaseDate}` : "No release date"}
                         </span>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <button
-                            type="button"
-                            className="button button-ghost"
-                            style={{ padding: "6px 10px", fontSize: "12px" }}
-                            onClick={() => setDetailAlbum(album)}
-                            title="View album details (UC-21.2)"
-                          >
-                            <EyeIcon width={14} height={14} />
-                            <span>Details</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-secondary"
-                            style={{ padding: "6px 10px", fontSize: "12px" }}
-                            onClick={() => {
-                              setEditingAlbum(album);
-                              setAlbumModalOpen(true);
-                            }}
-                            title="Edit album (UC-21.3)"
-                          >
-                            <EditIcon width={14} height={14} />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-ghost text-danger"
-                            style={{ padding: "6px 8px", fontSize: "12px" }}
-                            onClick={() => setDeleteConfirmAlbum(album)}
-                            title="Delete album (UC-21.4 & BR-24)"
-                          >
-                            <TrashIcon width={14} height={14} />
-                          </button>
-                        </div>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ocean-primary, #0284C7)", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <EyeIcon width={13} height={13} />
+                          <span>View album</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1802,6 +1777,45 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
         </div>,
         document.body
       )}
+
+      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.3) */}
+      <AlbumFormModal
+        open={albumModalOpen}
+        onClose={() => setAlbumModalOpen(false)}
+        album={editingAlbum}
+        onSaved={async () => {
+          setAlbumModalOpen(false);
+          await Promise.all([loadAlbums(), loadStudioData()]);
+          setActionSuccess(editingAlbum ? "Album updated successfully." : "Album created successfully.");
+        }}
+      />
+
+      {/* Album Detail Modal (UC-21.2) */}
+      <AlbumDetailModal
+        open={Boolean(detailAlbum)}
+        onClose={() => setDetailAlbum(null)}
+        album={detailAlbum}
+        onEdit={(alb) => {
+          setDetailAlbum(null);
+          setEditingAlbum(alb);
+          setAlbumModalOpen(true);
+        }}
+        onDelete={(alb) => {
+          setDetailAlbum(null);
+          setDeleteConfirmAlbum(alb);
+        }}
+      />
+
+      {/* Album Delete Confirmation Modal (UC-21.4 & BR-24) */}
+      <DeleteConfirmationModal
+        open={Boolean(deleteConfirmAlbum)}
+        title="Delete Album"
+        message={`Are you sure you want to delete "${deleteConfirmAlbum?.title}"? All tracks in this album will remain in your library as standalone tracks and will not be deleted.`}
+        confirmLabel="Delete album"
+        onConfirm={handleDeleteAlbum}
+        onCancel={() => setDeleteConfirmAlbum(null)}
+        submitting={deletingAlbum}
+      />
 
     </div>
   );

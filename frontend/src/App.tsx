@@ -31,6 +31,8 @@ import { StudioPage } from "./pages/StudioPage";
 import { StudioTrackDetailPage } from "./pages/StudioTrackDetailPage";
 import { TrackDetailsPage } from "./pages/TrackDetailsPage";
 import { UploadTrackPage } from "./pages/UploadTrackPage";
+import { CreateAlbumPage } from "./pages/CreateAlbumPage";
+import { StudioAlbumDetailPage } from "./pages/StudioAlbumDetailPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import type { CurrentUser, LandingTrack, Playlist } from "./types";
 
@@ -723,6 +725,38 @@ export default function App() {
           isAuthenticated={isAuthenticated}
           canUpload={user?.role === "LISTENER"}
           onNavigate={navigate}
+        />
+      );
+    }
+
+    if (pathname === "/studio/albums/create" || pathname === "/studio/create-album") {
+      if (!authReady || !isAuthenticated) return null;
+      return (
+        <CreateAlbumPage
+          isAuthenticated={isAuthenticated}
+          canCreate={user?.role === "LISTENER"}
+          currentUser={user}
+          onNavigate={navigate}
+        />
+      );
+    }
+
+    if (pathname.startsWith("/studio/albums/") || pathname.startsWith("/studio/album/")) {
+      if (!authReady || !isAuthenticated) return null;
+      const parts = pathname.split("/");
+      const parsedAlbumId = Number(parts[3]) || Number(parts[2]) || null;
+      if (!parsedAlbumId) {
+        navigate("/studio");
+        return null;
+      }
+      return (
+        <StudioAlbumDetailPage
+          albumId={parsedAlbumId}
+          currentUser={user}
+          onNavigate={navigate}
+          currentTrack={currentTrack}
+          playing={playing}
+          onPlayTrack={playTrack}
         />
       );
     }
