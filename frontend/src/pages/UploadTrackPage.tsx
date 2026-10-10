@@ -393,7 +393,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
             </div>
           </div>
 
-          <div className="form-group" style={{ marginTop: "16px" }}>
+          <div className="form-group">
             <label htmlFor="upload-track-description">Description <span>(optional)</span></label>
             <textarea
               id="upload-track-description"

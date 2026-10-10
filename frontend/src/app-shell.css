@@ -2399,16 +2399,19 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .form-group label {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: #344054;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
 .form-group input, .form-group select, .form-group textarea {
+  font-family: inherit;
   height: 44px;
   padding: 0 14px;
   border: 1px solid #d0d5dd;
@@ -2420,9 +2423,18 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #94a3b8;
+  font-family: inherit;
+}
+
 .form-group textarea {
-  height: 80px;
-  padding: 10px 14px;
+  font-family: inherit;
+  height: auto;
+  min-height: 88px;
+  padding: 12px 14px;
+  line-height: 1.6;
   resize: vertical;
 }
 
@@ -3683,7 +3695,7 @@ body.modal-open .ops-shell-main {
 }
 
 .upload-track-form-card {
-  padding: 28px;
+  padding: 32px;
 }
 
 .upload-track-card-heading {
@@ -3691,11 +3703,17 @@ body.modal-open .ops-shell-main {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
 }
 
 .upload-track-card-heading--section {
-  margin-top: 30px;
+  margin-top: 36px;
+  margin-bottom: 22px;
+}
+
+.upload-track-form-card > .form-group,
+.upload-track-form-card > .studio-form-grid {
+  margin-bottom: 22px;
 }
 
 .upload-track-card-heading > div {

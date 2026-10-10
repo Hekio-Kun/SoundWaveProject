@@ -108,6 +108,15 @@ public class TrackCatalogService {
     }
 
     /**
+     * Alias method tương ứng với Step 18 trong Sequence Diagram [UC-8] Filter Public Catalog:
+     * 18. getFilteredTracks(genre, search, sort, page, size)
+     */
+    @Transactional(readOnly = true)
+    public Page<TrackResponse> getFilteredTracks(String genre, String search, String sort, Pageable pageable) {
+        return getPublishedTracks(genre, search, sort, pageable);
+    }
+
+    /**
      * Ghi nhận lượt nghe và lịch sử nghe nhạc khi người dùng đạt ngưỡng hợp lệ (Phase 3 - BR.13).
      */
     @Transactional
