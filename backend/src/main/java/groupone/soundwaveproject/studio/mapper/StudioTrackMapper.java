@@ -58,7 +58,7 @@ public class StudioTrackMapper {
                 reviewedAt,
                 track.getCreatedAt() != null ? track.getCreatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
                 track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
-                null
+                track.getLyrics()
         );
     }
 
@@ -102,3 +102,4 @@ public class StudioTrackMapper {
         );
     }
 }
+

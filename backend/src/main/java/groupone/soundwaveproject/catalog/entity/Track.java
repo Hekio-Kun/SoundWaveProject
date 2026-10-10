@@ -79,6 +79,9 @@ public class Track {
     @Column(name = "play_count_cache", nullable = false)
     private Long playCountCache = 0L;
 
+    @Column(name = "lyrics", columnDefinition = "TEXT")
+    private String lyrics;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
