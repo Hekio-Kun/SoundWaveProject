@@ -237,17 +237,15 @@ export default function App() {
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
-        if (user?.role === "LISTENER") {
+        if (isAuthenticated) {
           const myPlaylists = await playlistApi.getMyPlaylists();
           setPlaylists(myPlaylists ?? []);
-        } else if (!isAuthenticated) {
+        } else {
           const publicPlaylists = await playlistApi.getPublicPlaylists();
           setPlaylists(publicPlaylists ?? []);
-        } else {
-          setPlaylists([]);
         }
       } catch {
-        // Fallback to local storage or demo playlists
+        // Keep current or empty
       }
     };
     loadPlaylists();
@@ -275,6 +273,18 @@ export default function App() {
     return () => { active = false; };
   }, [authReady, user?.id, user?.role]);
 
+  const [toastNotice, setToastNotice] = useState("");
+
+  const showToast = useCallback((msg: string) => {
+    setToastNotice(msg);
+  }, []);
+
+  useEffect(() => {
+    if (!toastNotice) return;
+    const timeoutId = window.setTimeout(() => setToastNotice(""), 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [toastNotice]);
+
   const [playlistFormOpen, setPlaylistFormOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [addTrackPlaylistId, setAddTrackPlaylistId] = useState<number | null>(null);
@@ -297,11 +307,21 @@ export default function App() {
   };
 
   const handleOpenCreatePlaylist = () => {
+    if (!isAuthenticated) {
+      alert("Please log in to create a playlist.");
+      navigate("/login");
+      return;
+    }
     setEditingPlaylist(null);
     setPlaylistFormOpen(true);
   };
 
   const handleOpenEditPlaylist = (pl: Playlist) => {
+    if (!isAuthenticated) {
+      alert("Please log in to edit the playlist.");
+      navigate("/login");
+      return;
+    }
     setEditingPlaylist(pl);
     setPlaylistFormOpen(true);
   };
@@ -318,43 +338,18 @@ export default function App() {
         setPlaylists((prev) =>
           prev.map((p) => (p.id === editingPlaylist.id ? updated : p))
         );
-      } catch {
-        // Fallback local
-        setPlaylists((prev) =>
-          prev.map((p) =>
-            p.id === editingPlaylist.id
-              ? {
-                ...p,
-                title: data.title,
-                description: data.description,
-                isPrivate: data.isPrivate,
-                coverUrl: data.coverUrl,
-              }
-              : p
-          )
-        );
+        showToast("Playlist updated successfully!");
+        setEditingPlaylist(null);
+      } catch (err: any) {
+        alert(err?.message || "Failed to update playlist.");
       }
-      setEditingPlaylist(null);
     } else {
       try {
         const created = await playlistApi.createPlaylist(data);
         setPlaylists((prev) => [created, ...prev]);
-      } catch {
-        // Fallback local
-        const newPl: Playlist = {
-          id: Date.now(),
-          title: data.title,
-          description: data.description,
-          isPrivate: data.isPrivate,
-          coverUrl: data.coverUrl,
-          trackCount: 0,
-          ownerId: user?.id ?? 1,
-          ownerName: user?.displayName || "You",
-          creatorName: user?.displayName || "You",
-          createdAt: "Just now",
-          trackIds: [],
-        };
-        setPlaylists((prev) => [newPl, ...prev]);
+        showToast("Playlist created successfully!");
+      } catch (err: any) {
+        alert(err?.message || "Failed to create playlist.");
       }
     }
   };
@@ -369,16 +364,26 @@ export default function App() {
     }
     setPlaylists((prev) => prev.filter((pl) => pl.id !== targetId));
     setDeletePlaylistId(null);
+    showToast("Playlist deleted successfully.");
     if (window.location.hash.includes(`/playlist/${targetId}`)) {
       window.location.hash = "#/playlists";
     }
   };
 
   const handleAddToPlaylist = async (playlistId: number, trackId: number) => {
-    const updated = await playlistApi.addTrackToPlaylist(playlistId, trackId);
-    setPlaylists((prev) =>
-      prev.map((pl) => (pl.id === playlistId ? updated : pl))
-    );
+    try {
+      const updated = await playlistApi.addTrackToPlaylist(playlistId, trackId);
+      setPlaylists((prev) =>
+        prev.map((pl) => (pl.id === playlistId ? updated : pl))
+      );
+      showToast("Track added to playlist.");
+    } catch (err: any) {
+      if (err?.status === 409 || err?.message?.includes("already in this playlist")) {
+        alert("This track is already in the playlist.");
+      } else {
+        alert(err?.message || "Failed to add track to playlist.");
+      }
+    }
   };
 
   const handleRemoveTrackFromPlaylist = async (playlistId: number, trackId: number) => {
@@ -865,6 +870,7 @@ export default function App() {
       />
 
       {logoutNotice ? <div className="app-toast" role="status">{logoutNotice}</div> : null}
+      {toastNotice ? <div className="app-toast" role="status">{toastNotice}</div> : null}
 
       {/* Playlist Create / Edit Modal (UC-15.1, UC-15.3) */}
       <PlaylistFormModal

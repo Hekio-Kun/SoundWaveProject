@@ -377,47 +377,6 @@ export function PlaylistDetailsPage({
             {isOwner && (
               <>
                 <button
-                  className="button button-secondary button-large"
-                  onClick={() => {
-                    if (!currentUser) {
-                      alert("Please log in to manage playlist tracks.");
-                      onNavigate("/login");
-                      return;
-                    }
-                    setManageTracksModalOpen(true);
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "#ECFDF5",
-                    color: "#065F46",
-                    border: "1px solid #A7F3D0",
-                    fontWeight: 700,
-                  }}
-                  id="btn-manage-playlist-tracks"
-                >
-                  <QueueIcon width={18} height={18} />
-                  <span>Manage Playlist Tracks</span>
-                </button>
-
-                <button
-                  className="button button-secondary"
-                  onClick={() => {
-                    if (!currentUser) {
-                      alert("Please log in to add tracks to the playlist.");
-                      onNavigate("/login");
-                      return;
-                    }
-                    onOpenAddTrackModal();
-                  }}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-                >
-                  <PlusIcon width={16} height={16} />
-                  <span>Add track</span>
-                </button>
-
-                <button
                   className="button button-ghost"
                   onClick={() => {
                     if (!currentUser) {
@@ -585,7 +544,7 @@ export function PlaylistDetailsPage({
               <span style={{ textAlign: "center" }}>#</span>
               <span />
               <span>Title</span>
-              <span>Genre / Album</span>
+              <span>Album</span>
               <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <ClockIcon width={12} height={12} /> Time
               </span>

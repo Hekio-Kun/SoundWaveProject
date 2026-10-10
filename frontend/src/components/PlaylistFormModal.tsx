@@ -36,7 +36,7 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(true);
   const [coverUrl, setCoverUrl] = useState(PRESET_COVERS[0]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -51,12 +51,12 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
       if (playlist) {
         setTitle(playlist.title);
         setDescription(playlist.description ?? "");
-        setIsPrivate(playlist.isPrivate);
+        setIsPrivate(true);
         setCoverUrl(playlist.coverUrl || PRESET_COVERS[0]);
       } else {
         setTitle("");
         setDescription("");
-        setIsPrivate(false);
+        setIsPrivate(true);
         setCoverUrl(PRESET_COVERS[0]);
       }
       setSelectedFile(null);
@@ -69,7 +69,7 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
   const handleClose = () => {
     setTitle("");
     setDescription("");
-    setIsPrivate(false);
+    setIsPrivate(true);
     setCoverUrl(PRESET_COVERS[0]);
     setSelectedFile(null);
     setFilePreview(null);
@@ -260,73 +260,6 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
             />
           </div>
 
-          {/* Visibility Radio Group per RDS page 130 */}
-          <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sw-text)" }}>
-              Visibility
-            </label>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "10px",
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
-                  border: !isPrivate ? "2px solid var(--sw-primary)" : "1px solid var(--sw-border)",
-                  borderRadius: "12px",
-                  background: !isPrivate ? "var(--sw-cyan-light, #ECFEFF)" : "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="radio"
-                  name="visibility"
-                  checked={!isPrivate}
-                  onChange={() => setIsPrivate(false)}
-                  style={{ marginTop: "2px" }}
-                />
-                <div>
-                  <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sw-text)" }}>Public</div>
-                  <div style={{ fontSize: "11px", color: "var(--sw-muted)", marginTop: "2px" }}>
-                    Anyone can view and listen to this playlist
-                  </div>
-                </div>
-              </label>
-
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
-                  border: isPrivate ? "2px solid var(--sw-primary)" : "1px solid var(--sw-border)",
-                  borderRadius: "12px",
-                  background: isPrivate ? "var(--sw-cyan-light, #ECFEFF)" : "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="radio"
-                  name="visibility"
-                  checked={isPrivate}
-                  onChange={() => setIsPrivate(true)}
-                  style={{ marginTop: "2px" }}
-                />
-                <div>
-                  <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sw-text)" }}>Private</div>
-                  <div style={{ fontSize: "11px", color: "var(--sw-muted)", marginTop: "2px" }}>
-                    Only you can view this playlist
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
 
           {/* Cover Artwork Selection - Upload file (JPG, PNG, WEBP) */}
           <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
