@@ -446,21 +446,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
               disabled={submitting}
               onFileChange={(file) => void handleLyricsChange(file)}
             />
-            <div className="upload-track-lyrics-preview">
-              <div>
-                <FileTextIcon width={16} height={16} />
-                <b>Lyrics preview & content</b>
-                <span>{lyrics ? `${lyrics.split("\n").filter((line) => line.trim()).length} lines` : "Optional"}</span>
-              </div>
-              <textarea
-                value={lyrics}
-                rows={5}
-                disabled={submitting}
-                onChange={(event) => setLyrics(event.target.value)}
-                placeholder="Upload a lyrics file above (.lrc, .txt), or paste / type lyrics directly here..."
-                aria-label="Lyrics content"
-              />
-            </div>
+
           </div>
 
           {submitting && (

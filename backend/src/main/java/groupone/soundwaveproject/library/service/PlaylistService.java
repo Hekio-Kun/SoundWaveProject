@@ -286,6 +286,14 @@ public class PlaylistService {
             Map<Long, PlaylistTrack> trackMap = new HashMap<>();
             tracks.forEach(pt -> trackMap.put(pt.getTrack().getId(), pt));
 
+            // Shift to temporary positions first to avoid UQ_playlist_tracks_position violation
+            for (int i = 0; i < tracks.size(); i++) {
+                PlaylistTrack pt = tracks.get(i);
+                pt.setPosition(1000000 + i + 1);
+                playlistTrackRepository.save(pt);
+            }
+            playlistTrackRepository.flush();
+
             int pos = 1;
             for (Long tId : request.trackIds()) {
                 PlaylistTrack pt = trackMap.get(tId);
@@ -294,6 +302,7 @@ public class PlaylistService {
                     playlistTrackRepository.save(pt);
                 }
             }
+            playlistTrackRepository.flush();
         } else if (request.trackId() != null && request.direction() != null) {
             int targetIdx = -1;
             for (int i = 0; i < tracks.size(); i++) {
@@ -309,12 +318,20 @@ public class PlaylistService {
                     PlaylistTrack current = tracks.get(targetIdx);
                     PlaylistTrack target = tracks.get(swapIdx);
 
-                    int tempPos = current.getPosition();
-                    current.setPosition(target.getPosition());
-                    target.setPosition(tempPos);
+                    int currentPos = current.getPosition();
+                    int targetPos = target.getPosition();
 
-                    playlistTrackRepository.save(current);
-                    playlistTrackRepository.save(target);
+                    // Step 1: Move current to temporary position to avoid duplicate key collision
+                    current.setPosition(1000000 + currentPos);
+                    playlistTrackRepository.saveAndFlush(current);
+
+                    // Step 2: Set target to current's old position
+                    target.setPosition(currentPos);
+                    playlistTrackRepository.saveAndFlush(target);
+
+                    // Step 3: Set current to target's old position
+                    current.setPosition(targetPos);
+                    playlistTrackRepository.saveAndFlush(current);
                 }
             }
         }

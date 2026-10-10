@@ -227,13 +227,7 @@ export function TrackDetailsPage({
         </aside>
       </div>
 
-      <section className="track-recommendations">
-        <SectionHeader title="You may also like" description="Published tracks related by genre, creator, and popularity" actionLabel="Explore more" onAction={() => onNavigate("/")} />
-        {recommendationsLoading ? <div className="track-recommendation-state" role="status">Loading recommendations...</div>
-          : recommendationsError ? <div className="track-recommendation-state is-error">Recommendations are temporarily unavailable.</div>
-            : recommendations.length === 0 ? <div className="track-recommendation-state">No related published tracks found.</div>
-              : <div className="sw-track-grid">{recommendations.map((item) => <TrackCard key={item.id} track={item} active={currentTrack?.id === item.id} playing={currentTrack?.id === item.id && playing} onPlay={onPlayTrack} onNavigate={onNavigate} />)}</div>}
-      </section>
+
 
       {playlistModalOpen ? createPortal(
         <div className="modal-backdrop" role="presentation" onClick={() => setPlaylistModalOpen(false)}>

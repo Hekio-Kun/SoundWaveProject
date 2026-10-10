@@ -1,4 +1,4 @@
-﻿import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   studioApi,
@@ -438,19 +438,15 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
         <div className="studio-detail-top-nav-single-row">
           {/* Left: Back button + Breadcrumb (Submission Details #{trackId}) */}
           <div className="studio-top-nav-single-left">
-            <button
-              type="button"
-              onClick={() => onNavigate("/studio")}
-              className="staff-detail-back-btn"
-              title="Back to Content Studio"
-              style={{ padding: "6px 12px", fontSize: "13px" }}
-            >
-              <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
-              <span>Back to Queue</span>
-            </button>
-
             <div className="staff-detail-breadcrumbs" style={{ fontSize: "13px" }}>
-              <span className="staff-crumb-muted">Moderation Queue</span>
+              <span
+                className="staff-crumb-muted"
+                style={{ cursor: "pointer" }}
+                onClick={() => onNavigate("/studio")}
+                title="Back to Content Studio"
+              >
+                Moderation Queue
+              </span>
               <span className="staff-crumb-sep">/</span>
               <span className="staff-crumb-active">Submission Details #{trackId}</span>
             </div>
@@ -1097,34 +1093,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                   </small>
                 )}
 
-                <div style={{ marginTop: "10px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <span style={{ fontSize: "11px", color: "var(--sw-text-secondary)", fontWeight: 600 }}>
-                      Lyrics content & preview:
-                    </span>
-                    <span style={{ fontSize: "11px", color: "var(--sw-primary)", fontWeight: 600 }}>
-                      {editLyricsContent ? `${editLyricsContent.split("\n").filter((l) => l.trim().length > 0).length} lines` : "Optional"}
-                    </span>
-                  </div>
-                  <textarea
-                    id="edit-track-lyrics-editor"
-                    rows={4}
-                    value={editLyricsContent}
-                    onChange={(e) => setEditLyricsContent(e.target.value)}
-                    placeholder="Upload a lyrics file above, or paste / type lyrics directly here..."
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--sw-border)",
-                      fontFamily: "monospace",
-                      fontSize: "12px",
-                      lineHeight: "1.5",
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
+
               </div>
 
               <div className="modal-actions studio-track-modal__actions">
