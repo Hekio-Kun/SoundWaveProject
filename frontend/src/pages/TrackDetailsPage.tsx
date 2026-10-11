@@ -88,6 +88,16 @@ export function TrackDetailsPage({
   const anyModalOpen = playlistModalOpen || authPromptOpen;
   useModalScrollLock(anyModalOpen);
 
+  const goToCreatorProfile = (targetCreatorId?: number) => {
+    if (!targetCreatorId) return;
+    if (track?.creator) {
+      try {
+        sessionStorage.setItem(`creator_profile_${targetCreatorId}`, JSON.stringify(track.creator));
+      } catch {}
+    }
+    onNavigate(`/creator/${targetCreatorId}`);
+  };
+
   useEffect(() => {
     if (!anyModalOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -161,7 +171,7 @@ export function TrackDetailsPage({
     <div className="track-page-v2">
       <nav className="track-breadcrumb" aria-label="Breadcrumb">
         <button onClick={() => onNavigate("/")}>Explore</button><span>/</span>
-        <button onClick={() => creatorId && onNavigate(`/creator/${creatorId}`)}>{track.creator?.displayName ?? "Unknown Creator"}</button>
+        <button onClick={() => goToCreatorProfile(creatorId)}>{track.creator?.displayName ?? "Unknown Creator"}</button>
         <span>/</span><b>{track.title}</b>
       </nav>
 
@@ -178,7 +188,7 @@ export function TrackDetailsPage({
           <div className="track-labels"><span>TRACK</span><span>{genreLabel}</span><span className="is-approved"><CheckIcon width={12} height={12} /> {publicationLabel}</span></div>
           <h1>{track.title}</h1>
           <p className="track-intro">{track.description?.trim() || "No description has been provided for this track."}</p>
-          <button className="track-creator-chip" onClick={() => creatorId && onNavigate(`/creator/${creatorId}`)}>
+          <button className="track-creator-chip" onClick={() => goToCreatorProfile(creatorId)}>
             {track.creator?.avatarUrl ? <img src={track.creator.avatarUrl} alt="" /> : <span className="track-avatar-fallback" aria-hidden="true"><UserIcon width={18} height={18} /></span>}
             <span><small>Uploaded by</small><strong>{track.creator?.displayName ?? "Unknown Creator"}</strong></span>
           </button>
@@ -221,7 +231,7 @@ export function TrackDetailsPage({
             {track.creator?.avatarUrl ? <img src={track.creator.avatarUrl} alt="" /> : null}
             <span className="track-section-icon"><UserIcon width={18} height={18} /></span><small>CREATOR</small>
             <h3>{track.creator?.displayName ?? "Unknown Creator"}</h3><p>Explore more music and albums from this creator.</p>
-            <button onClick={() => creatorId && onNavigate(`/creator/${creatorId}`)}>View profile</button>
+            <button onClick={() => goToCreatorProfile(creatorId)}>View profile</button>
           </section>
           <p className="track-report-unavailable">Track reporting is not available in this release.</p>
         </aside>
