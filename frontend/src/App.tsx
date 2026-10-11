@@ -744,6 +744,8 @@ export default function App() {
           onReorderTracks={handleReorderPlaylistTracks}
           onOpenAddTrackModal={() => setAddTrackPlaylistId(playlistId)}
           currentUser={user}
+          audio={audio}
+          onPlayingChange={(val) => setAudioPlaying(val)}
         />
       );
     }
@@ -840,6 +842,11 @@ export default function App() {
           trackId={trackId}
           currentUser={user}
           onNavigate={navigate}
+          currentTrack={currentTrack}
+          playing={playing}
+          onPlayTrack={playTrack}
+          audio={audio}
+          onPlayingChange={setAudioPlaying}
         />
       );
     }
@@ -850,6 +857,9 @@ export default function App() {
         <StudioPage
           tracks={initialStudioTracks}
           onNavigate={navigate}
+          audio={audio}
+          playing={playing}
+          onPlayingChange={setAudioPlaying}
         />
       );
     }

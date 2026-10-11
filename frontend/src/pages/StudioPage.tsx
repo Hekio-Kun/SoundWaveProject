@@ -51,9 +51,18 @@ function formatDuration(ms?: number): string {
 type Props = {
   tracks: StudioTrack[];
   onNavigate: (route: string) => void;
+  audio?: HTMLAudioElement;
+  playing?: boolean;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
-export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
+export function StudioPage({
+  tracks: fallbackTracks,
+  onNavigate,
+  audio,
+  playing = false,
+  onPlayingChange,
+}: Props) {
   const [filterStatus, setFilterStatus] = useState<
     "ALL" | "DRAFT" | "PENDING" | "APPROVED" | "REJECTED"
   >("ALL");
@@ -437,6 +446,12 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
       previewAudioRef.current.pause();
       setPreviewAudioPlaying(false);
     } else {
+      if (playing) {
+        onPlayingChange?.(false);
+        if (audio) {
+          audio.pause();
+        }
+      }
       previewAudioRef.current.src = audioUrl;
       previewAudioRef.current.play().then(() => {
         setPreviewAudioUrl(audioUrl);
@@ -446,6 +461,13 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
       });
     }
   };
+
+  useEffect(() => {
+    if (playing && previewAudioPlaying && previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      setPreviewAudioPlaying(false);
+    }
+  }, [playing, previewAudioPlaying]);
 
   // View Rejection Reason (UC-20)
   const handleViewRejection = async (track: StudioTrack) => {
@@ -889,21 +911,13 @@ export function StudioPage({ tracks: fallbackTracks, onNavigate }: Props) {
                           className="status-badge status-badge--rejected"
                           onClick={() => handleViewRejection(t)}
                           title="Click to view rejection reason & moderator feedback"
-                          style={{
-                            cursor: "pointer",
-                            border: "none",
-                            backgroundColor: "#fee4e2",
-                            color: "#b42318",
-                            fontWeight: 700,
-                            padding: "3px 8px",
-                            borderRadius: "999px",
-                          }}
+                          style={{ cursor: "pointer" }}
                         >
                           Rejected
                         </button>
                       ) : (
                         <span className={`status-badge status-badge--${t.status.toLowerCase()}`}>
-                          {t.status === "APPROVED" && "Published"}
+                          {(t.status === "APPROVED" || t.status === "PUBLISHED") && "Published"}
                           {t.status === "PENDING" && "Pending Review"}
                           {t.status === "DRAFT" && "Draft"}
                         </span>

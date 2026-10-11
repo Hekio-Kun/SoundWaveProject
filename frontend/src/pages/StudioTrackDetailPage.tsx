@@ -27,7 +27,7 @@ import {
   UserIcon,
   VolumeIcon,
 } from "../icons";
-import type { CurrentUser } from "../types";
+import type { CurrentUser, LandingTrack } from "../types";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -66,13 +66,55 @@ function formatSeconds(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function studioApiTrackToLanding(track: ApiTrack, currentUser: CurrentUser | null): LandingTrack {
+  return {
+    id: track.id,
+    title: track.title,
+    coverUrl: track.coverUrl || "/pics/album.png",
+    audioUrl: track.audioUrl,
+    durationMs: track.durationMs || 0,
+    playCount: track.playCount || 0,
+    slug: track.slug,
+    publicationStatus: track.status,
+    genreSlug: track.genreSlug,
+    genreName: track.genreName,
+    description: track.description,
+    createdAt: track.createdAt,
+    lyrics: track.lyrics,
+    creator: {
+      userId: currentUser?.id || 0,
+      displayName: currentUser?.displayName || currentUser?.email || "Artist",
+      avatarUrl: currentUser?.avatarUrl || null,
+    },
+    album: track.albumId
+      ? {
+          id: track.albumId,
+          title: track.albumTitle || "Album",
+        }
+      : undefined,
+  };
+}
+
 type Props = {
   trackId: number;
   currentUser: CurrentUser | null;
   onNavigate: (route: string) => void;
+  currentTrack?: LandingTrack | null;
+  playing?: boolean;
+  onPlayTrack?: (track: LandingTrack) => void;
+  audio?: HTMLAudioElement;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
-export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Props) {
+export function StudioTrackDetailPage({
+  trackId,
+  currentUser,
+  onNavigate,
+  currentTrack,
+  playing = false,
+  onPlayTrack,
+  audio,
+}: Props) {
   const [track, setTrack] = useState<ApiTrack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,13 +122,12 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [actionError, setActionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Audio player state
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playPromiseRef = useRef<Promise<void> | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Audio player state - synchronized with global player
+  const isCurrentTrack = Boolean(currentTrack && track && currentTrack.id === track.id);
+  const isPlayingThis = Boolean(isCurrentTrack && playing);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.85);
+  const [volume, setVolume] = useState(() => (audio && Number.isFinite(audio.volume) ? audio.volume : 0.8));
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -172,77 +213,78 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
 
     return () => {
       active = false;
-      if (audioRef.current) {
-        if (playPromiseRef.current) {
-          playPromiseRef.current
-            .then(() => audioRef.current?.pause())
-            .catch(() => {});
-        } else {
-          audioRef.current.pause();
-        }
-      }
     };
   }, [trackId]);
 
+  // Synchronize volume with global audio at all times
+  useEffect(() => {
+    if (!audio) return;
+    const handleVolumeUpdate = () => {
+      setVolume(audio.volume);
+    };
+    audio.addEventListener("volumechange", handleVolumeUpdate);
+    setVolume(audio.volume);
+    return () => {
+      audio.removeEventListener("volumechange", handleVolumeUpdate);
+    };
+  }, [audio]);
+
+  // Synchronize playback timeline with global audio
+  useEffect(() => {
+    if (!audio) return;
+    if (!isCurrentTrack) {
+      setCurrentTime(0);
+      setDuration(track?.durationMs ? track.durationMs / 1000 : 0);
+      return;
+    }
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+
+    setCurrentTime(audio.currentTime);
+    if (audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
+    }
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    };
+  }, [audio, isCurrentTrack, track?.durationMs]);
+
   // Player controls
   const togglePlay = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      if (playPromiseRef.current) {
-        playPromiseRef.current
-          .then(() => {
-            audioRef.current?.pause();
-            setIsPlaying(false);
-          })
-          .catch(() => setIsPlaying(false));
-      } else {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
-    } else {
-      const promise = audioRef.current.play();
-      if (promise !== undefined) {
-        playPromiseRef.current = promise;
-        promise
-          .then(() => setIsPlaying(true))
-          .catch((err: Error) => {
-            if (err.name !== "AbortError") console.error("Audio playback error:", err);
-            setIsPlaying(false);
-          });
-      }
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (!duration && audioRef.current.duration) {
-        setDuration(audioRef.current.duration);
-      }
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      audioRef.current.volume = volume;
-    }
+    if (!track || !onPlayTrack) return;
+    const landing = studioApiTrackToLanding(track, currentUser);
+    onPlayTrack(landing);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const target = Number(e.target.value);
     setCurrentTime(target);
-    if (audioRef.current) {
-      audioRef.current.currentTime = target;
+    if (isCurrentTrack && audio) {
+      audio.currentTime = target;
     }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setVolume(val);
-    if (audioRef.current) {
-      audioRef.current.volume = val;
+    if (audio) {
+      audio.volume = val;
     }
   };
 
@@ -650,24 +692,15 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
 
                 {/* Built-in High-Fidelity Audio Studio Player */}
                 <div className="staff-audio-studio-player staff-detail-audio-player">
-                  <audio
-                    ref={audioRef}
-                    src={track.audioUrl}
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onEnded={() => setIsPlaying(false)}
-                    preload="metadata"
-                  />
-
                   <div className="staff-player-controls-row">
                     <button
                       type="button"
                       onClick={togglePlay}
-                      className={`staff-player-main-btn ${isPlaying ? "is-playing" : ""}`}
-                      title={isPlaying ? "Pause audio stream" : "Play audio stream"}
-                      aria-label={isPlaying ? "Pause audio stream" : "Play audio stream"}
+                      className={`staff-player-main-btn ${isPlayingThis ? "is-playing" : ""}`}
+                      title={isPlayingThis ? "Pause audio stream" : "Play audio stream"}
+                      aria-label={isPlayingThis ? "Pause audio stream" : "Play audio stream"}
                     >
-                      {isPlaying ? (
+                      {isPlayingThis ? (
                         <PauseIcon width={18} height={18} />
                       ) : (
                         <PlayIcon width={18} height={18} />
@@ -675,7 +708,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                     </button>
 
                     {/* Equalizer animation bars while playing */}
-                    <div className={`staff-equalizer-bars ${isPlaying ? "is-active" : ""}`}>
+                    <div className={`staff-equalizer-bars ${isPlayingThis ? "is-active" : ""}`}>
                       <span />
                       <span />
                       <span />
@@ -709,7 +742,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                         type="range"
                         min={0}
                         max={1}
-                        step={0.05}
+                        step={0.01}
                         value={volume}
                         onChange={handleVolumeChange}
                         className="staff-vol-slider-bar"

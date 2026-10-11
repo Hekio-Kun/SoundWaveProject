@@ -66,7 +66,7 @@ export function MusicPlayer({
 }: MusicPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(track.durationMs / 1000);
-  const [volume, setVolume] = useState(0.8);
+  const [volume, setVolume] = useState(() => (Number.isFinite(audio?.volume) ? audio.volume : 0.8));
   const [shuffle, setShuffle] = useState(() => {
     try {
       return sessionStorage.getItem("soundwave_player_shuffle") === "true";
@@ -136,7 +136,19 @@ export function MusicPlayer({
   };
 
   useEffect(() => {
-    audio.volume = volume;
+    const handleVolumeEvent = () => {
+      setVolume(audio.volume);
+    };
+    audio.addEventListener("volumechange", handleVolumeEvent);
+    return () => {
+      audio.removeEventListener("volumechange", handleVolumeEvent);
+    };
+  }, [audio]);
+
+  useEffect(() => {
+    if (Math.abs(audio.volume - volume) > 0.001) {
+      audio.volume = volume;
+    }
   }, [audio, volume]);
 
   /**
@@ -315,7 +327,20 @@ export function MusicPlayer({
       <div className="player-tools">
         <button className={`player-icon ${isQueueActive ? "player-icon--active" : ""}`} onClick={handleQueueClick} aria-label="Queue"><QueueIcon /></button>
         <VolumeIcon />
-        <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} aria-label="Volume" style={{ "--range-progress": `${volume * 100}%` } as CSSProperties} />
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={volume}
+          onChange={(event) => {
+            const val = Number(event.target.value);
+            setVolume(val);
+            audio.volume = val;
+          }}
+          aria-label="Volume"
+          style={{ "--range-progress": `${volume * 100}%` } as CSSProperties}
+        />
       </div>
 
       {!onToggleQueue && localQueueOpen && (
