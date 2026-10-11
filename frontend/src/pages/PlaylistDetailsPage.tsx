@@ -39,6 +39,8 @@ type Props = {
   onOpenAddTrackModal: () => void;
   currentUser: CurrentUser | null;
   allTracks?: LandingTrack[];
+  audio?: HTMLAudioElement;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
 const formatDuration = (ms: number) => {
@@ -62,6 +64,8 @@ export function PlaylistDetailsPage({
   onOpenAddTrackModal,
   currentUser,
   allTracks,
+  audio,
+  onPlayingChange,
 }: Props) {
   // Fetch detailed playlist from backend (UC-15: Manage Playlist Tracks)
   const [detailPlaylist, setDetailPlaylist] = useState<Playlist | null>(() => {
@@ -92,11 +96,26 @@ export function PlaylistDetailsPage({
       detailAudioRef.current.pause();
       setDetailAudioPlaying(false);
     } else {
+      // Pause global audio player so they don't run in parallel
+      if (playing) {
+        onPlayingChange?.(false);
+        if (audio) {
+          audio.pause();
+        }
+      }
       detailAudioRef.current.play()
         .then(() => setDetailAudioPlaying(true))
         .catch(() => setDetailAudioPlaying(false));
     }
   };
+
+  // If global player starts playing, pause modal preview audio
+  useEffect(() => {
+    if (playing && detailAudioPlaying && detailAudioRef.current) {
+      detailAudioRef.current.pause();
+      setDetailAudioPlaying(false);
+    }
+  }, [playing, detailAudioPlaying]);
 
   useEffect(() => {
     if (!selectedDetailTrack) return;
