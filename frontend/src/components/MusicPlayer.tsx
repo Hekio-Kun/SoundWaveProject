@@ -30,6 +30,8 @@ export type MusicPlayerProps = {
   onRecordPlay?: (trackId: number, listenedDurationMs: number, completed: boolean) => void;
   /** Human-readable playback context description (e.g., "Playing from Top Charts") */
   playbackContext?: string | null;
+  /** Optional callback to reorder active queue when shuffle mode is toggled */
+  onReorderQueue?: (newQueue: LandingTrack[]) => void;
 };
 
 /**
@@ -63,6 +65,7 @@ export function MusicPlayer({
   isQueueOpen,
   onRecordPlay,
   playbackContext,
+  onReorderQueue,
 }: MusicPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(track.durationMs / 1000);
@@ -76,7 +79,10 @@ export function MusicPlayer({
   });
   const [repeat, setRepeat] = useState(() => {
     try {
-      return sessionStorage.getItem("soundwave_player_repeat") === "true";
+      // Prevent both shuffle and repeat being active simultaneously from stored session
+      const savedShuffle = sessionStorage.getItem("soundwave_player_shuffle") === "true";
+      const savedRepeat = sessionStorage.getItem("soundwave_player_repeat") === "true";
+      return savedRepeat && !savedShuffle;
     } catch {
       return false;
     }
@@ -88,6 +94,7 @@ export function MusicPlayer({
   const recordedRef = useRef(false);
   const lastTimeRef = useRef<number | null>(null);
   const errorTimerRef = useRef<number | null>(null);
+  const originalQueueRef = useRef<LandingTrack[]>([]);
 
   // NF03: Persist shuffle preference to sessionStorage
   useEffect(() => {
@@ -107,6 +114,50 @@ export function MusicPlayer({
     }
   }, [repeat]);
 
+  const toggleShuffle = () => {
+    setShuffle((prev) => {
+      const next = !prev;
+      if (next) {
+        // Tắt repeat khi bật shuffle để tránh xung đột hành vi
+        setRepeat(false);
+        // Tự động xáo trộn danh sách các bài sắp phát trong hàng đợi
+        if (onReorderQueue && queue.length > 1) {
+          originalQueueRef.current = [...queue];
+          const curTrack = queue.find((t) => t.id === track.id) || track;
+          const upcoming = queue.filter((t) => t.id !== track.id);
+          for (let i = upcoming.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [upcoming[i], upcoming[j]] = [upcoming[j], upcoming[i]];
+          }
+          onReorderQueue([curTrack, ...upcoming]);
+        }
+      } else {
+        // Khôi phục thứ tự gốc khi tắt shuffle
+        if (onReorderQueue && originalQueueRef.current.length > 0) {
+          onReorderQueue(originalQueueRef.current);
+          originalQueueRef.current = [];
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleRepeat = () => {
+    setRepeat((prev) => {
+      const next = !prev;
+      if (next) {
+        // Tắt shuffle khi bật repeat để tránh xung đột
+        setShuffle(false);
+        // Khôi phục thứ tự gốc nếu trước đó đang shuffle
+        if (onReorderQueue && originalQueueRef.current.length > 0) {
+          onReorderQueue(originalQueueRef.current);
+          originalQueueRef.current = [];
+        }
+      }
+      return next;
+    });
+  };
+
   const isQueueActive = isQueueOpen !== undefined ? isQueueOpen : localQueueOpen;
   const handleQueueClick = () => {
     if (onToggleQueue) {
@@ -125,13 +176,15 @@ export function MusicPlayer({
    */
   const nextTrack = () => {
     if (!queue.length) return track;
-    if (shuffle && queue.length > 1) {
+    const curIdx = index >= 0 ? index : 0;
+    // Nếu shuffle đang bật nhưng không có callback reorder thì fallback chọn random candidate
+    if (shuffle && !onReorderQueue && queue.length > 1) {
       const candidates = queue.filter((item) => item.id !== track.id);
       if (candidates.length > 0) {
         return candidates[Math.floor(Math.random() * candidates.length)];
       }
     }
-    const curIdx = index >= 0 ? index : 0;
+    // Khi queue đã được xáo trộn trực tiếp hoặc ở chế độ tuần tự, lấy bài đứng ngay sau
     return queue[(curIdx + 1) % queue.length];
   };
 
@@ -287,16 +340,22 @@ export function MusicPlayer({
           {playbackContext && (
             <span
               style={{
-                display: "block",
-                fontSize: "11px",
+                display: "inline-flex",
+                alignItems: "center",
+                fontSize: "10px",
                 fontWeight: 600,
                 color: "var(--brand, #0284c7)",
+                background: "rgba(224, 242, 254, 0.75)",
+                border: "1px solid rgba(186, 230, 253, 0.6)",
+                padding: "1px 7px",
+                borderRadius: "6px",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
                 maxWidth: "200px",
-                lineHeight: 1.3,
+                lineHeight: 1.4,
                 marginTop: "2px",
+                width: "fit-content",
               }}
               title={playbackContext}
             >
@@ -308,13 +367,13 @@ export function MusicPlayer({
 
       <div className="player-center">
         <div className="player-controls">
-          <button className={`player-icon ${shuffle ? "player-icon--active" : ""}`} onClick={() => setShuffle((value) => !value)} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"}><ShuffleIcon /></button>
+          <button className={`player-icon ${shuffle ? "player-icon--active" : ""}`} onClick={toggleShuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"}><ShuffleIcon /></button>
           <button className="player-icon" onClick={previous} aria-label="Previous"><PreviousIcon /></button>
           <button className="player-play" onClick={() => onPlayingChange(!playing)} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <PauseIcon /> : <PlayIcon />}
           </button>
           <button className="player-icon" onClick={() => onTrackChange(nextTrack(), true)} aria-label="Next"><NextIcon /></button>
-          <button className={`player-icon ${repeat ? "player-icon--active" : ""}`} onClick={() => setRepeat((value) => !value)} aria-label={repeat ? "Turn repeat off" : "Turn repeat on"}><RepeatIcon /></button>
+          <button className={`player-icon ${repeat ? "player-icon--active" : ""}`} onClick={toggleRepeat} aria-label={repeat ? "Turn repeat off" : "Turn repeat on"}><RepeatIcon /></button>
         </div>
         <div className="timeline">
           <span>{formatTime(currentTime)}</span>

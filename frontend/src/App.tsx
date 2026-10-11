@@ -960,6 +960,7 @@ export default function App() {
           onToggleQueue={() => setQueueOpen((prev) => !prev)}
           isQueueOpen={queueOpen}
           onRecordPlay={handleRecordPlay}
+          onReorderQueue={handleReorderQueue}
         />
       )}
 
