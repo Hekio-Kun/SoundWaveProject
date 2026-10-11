@@ -45,11 +45,12 @@ public class TrackCatalogController {
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Long creatorId,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        log.info("Fetching public track catalog: genre={}, search={}, sort={}, page={}",
-                genre, search, sort, pageable.getPageNumber());
-        return ResponseEntity.ok(trackCatalogService.getFilteredTracks(genre, search, sort, pageable));
+        log.info("Fetching public track catalog: genre={}, search={}, sort={}, creatorId={}, page={}",
+                genre, search, sort, creatorId, pageable.getPageNumber());
+        return ResponseEntity.ok(trackCatalogService.getFilteredTracks(genre, search, sort, creatorId, pageable));
     }
 
     /**
