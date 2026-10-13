@@ -19,6 +19,7 @@ import {
   EditIcon,
   EyeIcon,
   FileTextIcon,
+  HeadphonesIcon,
   PauseIcon,
   PlayIcon,
   ShieldIcon,
@@ -120,6 +121,7 @@ export function StudioTrackDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Audio player state - synchronized with global player
@@ -396,12 +398,18 @@ export function StudioTrackDetailPage({
     if (!track) return;
     try {
       setIsProcessing(true);
+      setModalError(null);
       setActionError(null);
       await studioApi.deleteTrack(track.id);
       setDeleteConfirmOpen(false);
       onNavigate("/studio");
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete track.");
+      const msg = err instanceof Error ? err.message : "Failed to delete track.";
+      setModalError(msg);
+      setActionError(msg);
+      setTimeout(() => {
+        setActionError((curr) => (curr === msg ? null : curr));
+      }, 6000);
       setIsProcessing(false);
     }
   };
@@ -464,15 +472,15 @@ export function StudioTrackDetailPage({
         <div className="staff-hero-copy">
           <div className="staff-hero-eyebrow">
             <span className="staff-hero-eyebrow-pill">
-              <ShieldIcon width={13} height={13} />
-              <span>TRACK MODERATION</span>
+              <HeadphonesIcon width={13} height={13} />
+              <span>CREATOR STUDIO</span>
             </span>
           </div>
 
-          <h1 className="staff-hero-title">Moderate Pending Tracks</h1>
+          <h1 className="staff-hero-title">Track Submission Details</h1>
 
           <p className="staff-hero-description">
-            Review pending submissions and record an approval or rejection decision.
+            Manage your audio track details, inspect moderation status, or update submission assets.
           </p>
         </div>
       </header>
@@ -485,8 +493,16 @@ export function StudioTrackDetailPage({
       ) : null}
 
       {actionError ? (
-        <div className="form-error-banner" role="alert" style={{ marginBottom: "16px" }}>
-          {actionError}
+        <div
+          className="form-error-banner"
+          role="alert"
+          style={{ marginBottom: "16px", cursor: "pointer" }}
+          onClick={() => setActionError(null)}
+          title="Click to dismiss"
+        >
+          <AlertIcon width={16} height={16} />
+          <span>{actionError}</span>
+          <span style={{ marginLeft: "auto", fontSize: "14px", fontWeight: 700, padding: "0 4px", opacity: 0.7 }}>✕</span>
         </div>
       ) : null}
 
@@ -514,7 +530,7 @@ export function StudioTrackDetailPage({
                 onClick={() => onNavigate("/studio")}
                 title="Back to Content Studio"
               >
-                Moderation Queue
+                My Tracks
               </span>
               <span className="staff-crumb-sep">/</span>
               <span className="staff-crumb-active">Submission Details #{trackId}</span>
@@ -556,7 +572,9 @@ export function StudioTrackDetailPage({
                 type="button"
                 className="studio-crud-btn studio-crud-btn-edit"
                 onClick={openEditModal}
-                title="Edit track information & media"
+                disabled={isPending}
+                title={isPending ? "Please withdraw submission before editing" : "Edit track information & media"}
+                style={isPending ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
               >
                 <EditIcon width={13} height={13} />
                 <span>Edit track</span>
@@ -566,7 +584,10 @@ export function StudioTrackDetailPage({
               <button
                 type="button"
                 className="studio-crud-btn studio-crud-btn-delete"
-                onClick={() => setDeleteConfirmOpen(true)}
+                onClick={() => {
+                  setModalError(null);
+                  setDeleteConfirmOpen(true);
+                }}
                 title="Delete this track"
               >
                 <TrashIcon width={13} height={13} />
@@ -1177,14 +1198,42 @@ export function StudioTrackDetailPage({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && track && createPortal(
-        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setDeleteConfirmOpen(false)}>
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!isProcessing) {
+              setDeleteConfirmOpen(false);
+              setModalError(null);
+            }
+          }}
+        >
           <div className="modal-card modal-card--narrow" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="text-danger">Delete Track</h3>
-              <button className="icon-button" onClick={() => setDeleteConfirmOpen(false)} disabled={isProcessing}>
+              <button
+                className="icon-button"
+                onClick={() => {
+                  setDeleteConfirmOpen(false);
+                  setModalError(null);
+                }}
+                disabled={isProcessing}
+              >
                 <CloseIcon width={18} height={18} />
               </button>
             </div>
+
+            {modalError && (
+              <div
+                className="form-error-banner"
+                role="alert"
+                style={{ marginTop: "12px", marginBottom: "6px" }}
+              >
+                <AlertIcon width={16} height={16} />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <p style={{ margin: "16px 0", color: "var(--sw-text-secondary)" }}>
               Are you sure you want to permanently delete &quot;<b>{track.title}</b>&quot;? All uploaded audio files, covers, and play stats will be removed and cannot be recovered.
             </p>
@@ -1192,7 +1241,10 @@ export function StudioTrackDetailPage({
               <button
                 type="button"
                 className="button button-secondary"
-                onClick={() => setDeleteConfirmOpen(false)}
+                onClick={() => {
+                  setDeleteConfirmOpen(false);
+                  setModalError(null);
+                }}
                 disabled={isProcessing}
               >
                 Cancel

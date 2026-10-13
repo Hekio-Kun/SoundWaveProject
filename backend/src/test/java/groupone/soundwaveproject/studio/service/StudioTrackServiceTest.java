@@ -12,6 +12,8 @@ import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
+import groupone.soundwaveproject.library.repository.ListeningHistoryRepository;
+import groupone.soundwaveproject.library.repository.PlaylistTrackRepository;
 import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
@@ -51,6 +53,10 @@ class StudioTrackServiceTest {
     private AlbumRepository albumRepository;
     @Mock
     private TrackSubmissionRepository trackSubmissionRepository;
+    @Mock
+    private PlaylistTrackRepository playlistTrackRepository;
+    @Mock
+    private ListeningHistoryRepository listeningHistoryRepository;
     @Mock
     private AppUserRepository appUserRepository;
     @Mock
@@ -143,8 +149,33 @@ class StudioTrackServiceTest {
     }
 
     @Test
-    @DisplayName("updateTrack throws ForbiddenOperationException when track is PUBLISHED")
-    void updateTrack_ThrowsWhenPublished() {
+    @DisplayName("updateTrack throws ForbiddenOperationException when track is PENDING")
+    void updateTrack_ThrowsWhenPending() {
+        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track pendingTrack = Track.builder()
+                .id(200L)
+                .uploaderUserId(10L)
+                .genre(activeGenre)
+                .title("Pending Song")
+                .publicationStatus(TrackPublicationStatus.PENDING)
+                .audioPublicId("audio-pending")
+                .build();
+        when(trackRepository.findByIdAndUploaderUserId(200L, 10L))
+                .thenReturn(Optional.of(pendingTrack));
+
+        UpdateTrackRequest request = new UpdateTrackRequest(
+                "New Title", 1L, null, null, null, null, null);
+
+        assertThatThrownBy(() -> studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com"))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("Tracks currently pending review cannot be modified");
+    }
+
+    @Test
+    @DisplayName("updateTrack allows editing when track is PUBLISHED (approved)")
+    void updateTrack_SuccessWhenPublished() {
         when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
@@ -153,18 +184,26 @@ class StudioTrackServiceTest {
                 .uploaderUserId(10L)
                 .genre(activeGenre)
                 .title("Published Song")
+                .slug("published-song-old")
                 .publicationStatus(TrackPublicationStatus.PUBLISHED)
                 .audioPublicId("audio-pub")
+                .audioUrl("https://cloudinary.com/audio-pub.mp3")
                 .build();
         when(trackRepository.findByIdAndUploaderUserId(200L, 10L))
                 .thenReturn(Optional.of(publishedTrack));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+        when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateTrackRequest request = new UpdateTrackRequest(
-                "New Title", 1L, null, null, null, null, null);
+                "Updated Published Title", 1L, null, null, "Updated description", null, null);
 
-        assertThatThrownBy(() -> studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com"))
-                .isInstanceOf(ForbiddenOperationException.class)
-                .hasMessageContaining("Only DRAFT or REJECTED tracks can be modified");
+        StudioTrackResponse response = studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.id()).isEqualTo(200L);
+        assertThat(response.title()).isEqualTo("Updated Published Title");
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(trackRepository).save(publishedTrack);
     }
 
     @Test
@@ -194,8 +233,8 @@ class StudioTrackServiceTest {
     }
 
     @Test
-    @DisplayName("deleteTrack throws ConflictOperationException when track is PUBLISHED")
-    void deleteTrack_ThrowsWhenPublished() {
+    @DisplayName("deleteTrack successfully removes published track and related associations")
+    void deleteTrack_PublishedSuccess() {
         when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
@@ -205,13 +244,20 @@ class StudioTrackServiceTest {
                 .genre(activeGenre)
                 .title("Published Song")
                 .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .audioPublicId("audio-pub-id")
+                .coverPublicId("cover-pub-id")
                 .build();
         when(trackRepository.findByIdAndUploaderUserId(301L, 10L))
                 .thenReturn(Optional.of(publishedTrack));
 
-        assertThatThrownBy(() -> studioTrackService.deleteTrack(301L, "creator@soundwave.com"))
-                .isInstanceOf(ConflictOperationException.class)
-                .hasMessageContaining("Cannot delete a published or pending track directly");
+        studioTrackService.deleteTrack(301L, "creator@soundwave.com");
+
+        verify(playlistTrackRepository).deleteByTrack_Id(301L);
+        verify(listeningHistoryRepository).deleteByTrackId(301L);
+        verify(trackSubmissionRepository).deleteByTrackId(301L);
+        verify(cloudMediaService).deleteTrackAudioQuietly("audio-pub-id");
+        verify(cloudMediaService).deleteImageQuietly("cover-pub-id");
+        verify(trackRepository).delete(publishedTrack);
     }
 
     @Test

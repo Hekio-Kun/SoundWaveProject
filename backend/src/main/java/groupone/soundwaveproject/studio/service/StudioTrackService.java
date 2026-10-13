@@ -17,6 +17,8 @@ import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.library.repository.ListeningHistoryRepository;
+import groupone.soundwaveproject.library.repository.PlaylistTrackRepository;
 import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
@@ -38,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.text.Normalizer;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -51,6 +55,8 @@ public class StudioTrackService {
     private final GenreRepository genreRepository;
     private final AlbumRepository albumRepository;
     private final TrackSubmissionRepository trackSubmissionRepository;
+    private final PlaylistTrackRepository playlistTrackRepository;
+    private final ListeningHistoryRepository listeningHistoryRepository;
     private final AppUserRepository appUserRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
@@ -160,8 +166,11 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT && track.getPublicationStatus() != TrackPublicationStatus.REJECTED) {
-            throw new ForbiddenOperationException("Only DRAFT or REJECTED tracks can be modified.");
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be modified. Please withdraw the submission first.");
+        }
+        if (track.getPublicationStatus() == TrackPublicationStatus.TAKEN_DOWN) {
+            throw new ForbiddenOperationException("Taken down tracks cannot be modified.");
         }
 
         Genre genre = genreRepository.findById(request.genreId())
@@ -170,6 +179,7 @@ public class StudioTrackService {
             throw new BadRequestOperationException("Selected genre is currently inactive.");
         }
 
+        Album oldAlbum = track.getAlbum();
         Album album = null;
         if (request.albumId() != null) {
             album = albumRepository.findByIdAndCreatedByUserId(request.albumId(), user.getId())
@@ -212,6 +222,26 @@ public class StudioTrackService {
         }
 
         Track updatedTrack = trackRepository.save(track);
+
+        if (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED) {
+            if (oldAlbum != null && (album == null || !oldAlbum.getId().equals(album.getId()))) {
+                boolean oldAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                        oldAlbum.getId(), TrackPublicationStatus.PUBLISHED
+                );
+                if (!oldAlbumHasPublished) {
+                    oldAlbum.setStatus("DRAFT");
+                    albumRepository.save(oldAlbum);
+                }
+            }
+            if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
+                album.setStatus("PUBLISHED");
+                if (album.getPublishedAt() == null) {
+                    album.setPublishedAt(LocalDateTime.now(ZoneOffset.UTC));
+                }
+                albumRepository.save(album);
+            }
+        }
+
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
 
         return studioTrackMapper.toStudioTrackResponse(updatedTrack, genre, album, submission);
@@ -223,15 +253,27 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        if (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED || track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
-            throw new ConflictOperationException("Cannot delete a published or pending track directly.");
-        }
+        Album album = track.getAlbum();
 
+        playlistTrackRepository.deleteByTrack_Id(track.getId());
+        listeningHistoryRepository.deleteByTrackId(track.getId());
         trackSubmissionRepository.deleteByTrackId(track.getId());
         cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
         cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
 
         trackRepository.delete(track);
+
+        if (album != null) {
+            boolean hasPublishedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.PUBLISHED
+            );
+            if (hasPublishedTrack) {
+                album.setStatus("PUBLISHED");
+            } else {
+                album.setStatus("DRAFT");
+            }
+            albumRepository.save(album);
+        }
     }
 
     @Transactional
