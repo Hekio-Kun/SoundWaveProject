@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type DragEvent } from "rea
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import { covers } from "../../data";
-import { CloseIcon, UploadIcon } from "../../icons";
+import { CloseIcon, LockIcon, UploadIcon } from "../../icons";
 import { playlistApi } from "../../api/playlists";
 import type { Playlist } from "../../types";
 
@@ -209,6 +209,26 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
         )}
 
         <form onSubmit={handleSubmit} className="modal-form" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {/* Privacy Notice Banner */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 14px",
+              background: "#F3F4F6",
+              border: "1px solid #E5E7EB",
+              borderRadius: "10px",
+              fontSize: "12px",
+              color: "#4B5563",
+            }}
+          >
+            <LockIcon width={14} height={14} />
+            <span>
+              <strong>Private playlist:</strong> Only you can view and listen to this playlist.
+            </span>
+          </div>
+
           {/* Name Field per RDS */}
           <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <label htmlFor="pl-name" style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sw-text)" }}>

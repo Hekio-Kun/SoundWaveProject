@@ -81,7 +81,7 @@ class PlaylistServiceTest {
                 .slug("chill-vibes")
                 .description("Relaxing tracks")
                 .coverUrl("https://cloudinary.com/cover.jpg")
-                .isPrivate(false)
+                .isPrivate(true)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .updatedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .playlistTracks(new ArrayList<>())
@@ -89,7 +89,7 @@ class PlaylistServiceTest {
     }
 
     @Test
-    @DisplayName("Tạo Playlist thành công khi nhập tiêu đề hợp lệ")
+    @DisplayName("Tạo Playlist thành công và luôn mặc định là Private")
     void createPlaylist_success() {
         when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.existsBySlug(anyString())).thenReturn(false);
@@ -100,14 +100,21 @@ class PlaylistServiceTest {
         });
         when(playlistTrackRepository.findByPlaylist_IdOrderByPositionAsc(100L)).thenReturn(List.of());
 
-        PlaylistRequest request = new PlaylistRequest("Chill Vibes", "Relaxing tracks", false, "https://cloudinary.com/cover.jpg");
+        PlaylistRequest request = new PlaylistRequest("Chill Vibes", "Relaxing tracks", null, "https://cloudinary.com/cover.jpg");
         PlaylistResponse response = playlistService.createPlaylist(request, "listener@soundwave.com");
 
         assertThat(response).isNotNull();
         assertThat(response.id()).isEqualTo(100L);
         assertThat(response.title()).isEqualTo("Chill Vibes");
-        assertThat(response.isPrivate()).isFalse();
+        assertThat(response.isPrivate()).isTrue();
         verify(playlistRepository).save(any(Playlist.class));
+    }
+
+    @Test
+    @DisplayName("Danh sách playlist public luôn rỗng do toàn bộ playlist là riêng tư")
+    void getPublicPlaylists_returnsEmpty() {
+        List<PlaylistResponse> result = playlistService.getPublicPlaylists();
+        assertThat(result).isEmpty();
     }
 
     @Test
