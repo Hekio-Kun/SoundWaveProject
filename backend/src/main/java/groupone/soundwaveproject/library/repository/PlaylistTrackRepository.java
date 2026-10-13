@@ -28,4 +28,8 @@ public interface PlaylistTrackRepository extends JpaRepository<PlaylistTrack, Lo
     @Modifying
     @Query("DELETE FROM PlaylistTrack pt WHERE pt.playlist.id = :playlistId AND pt.track.id = :trackId")
     void deleteByPlaylist_IdAndTrack_Id(@Param("playlistId") Long playlistId, @Param("trackId") Long trackId);
+
+    @Modifying
+    @Query("DELETE FROM PlaylistTrack pt WHERE pt.track.id = :trackId")
+    void deleteByTrack_Id(@Param("trackId") Long trackId);
 }
