@@ -153,29 +153,34 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .cta-decoration { position: absolute; inset: 0 0 0 auto; width: 430px; display: flex; align-items: center; justify-content: end; gap: 13px; padding-right: 32px; opacity: .12; }.cta-decoration span { width: 14px; border-radius: 10px; background: white; }.cta-decoration span:nth-child(1), .cta-decoration span:nth-child(7) { height: 45px; }.cta-decoration span:nth-child(2), .cta-decoration span:nth-child(6) { height: 95px; }.cta-decoration span:nth-child(3), .cta-decoration span:nth-child(5) { height: 160px; }.cta-decoration span:nth-child(4) { height: 220px; }
 
 /* Footer */
-.site-footer { border-top: 1px solid var(--line); background: #fdfaf4; }.site-footer--player { padding-bottom: 98px; }
+.site-footer { border-top: 1px solid var(--line); background: #fdfaf4; }.site-footer--player { padding-bottom: 86px; }
 .footer-grid { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 50px; padding-block: 55px 40px; }.footer-brand { max-width: 330px; }.footer-brand p { margin: 18px 0 20px; color: #667085; font-size: 12px; line-height: 1.7; }.footer-brand > span { color: #98a2b3; font-size: 10px; }.footer-grid > div:not(.footer-brand) { display: flex; flex-direction: column; align-items: flex-start; gap: 13px; }.footer-grid h3 { margin: 4px 0 7px; font-size: 12px; }.footer-grid a:not(.brand) { color: #667085; font-size: 11px; }.footer-grid a:hover { color: var(--brand); }.footer-bottom { display: flex; justify-content: space-between; padding-block: 20px; border-top: 1px solid var(--line); color: #98a2b3; font-size: 9px; }
 
-/* Player - Floating Sand Island Concept (Ocean Breeze & Warm Sand) */
+/* Player - Full-Width Bottom Bar (Ocean Breeze & Warm Sand) */
 .music-player {
   position: fixed;
-  inset: auto 20px 14px 20px;
-  margin-inline: auto;
-  max-width: 1240px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   z-index: 60;
   height: 86px;
   display: grid;
-  grid-template-columns: minmax(210px, 1.15fr) minmax(360px, 1.65fr) minmax(190px, 1fr);
+  grid-template-columns: minmax(240px, 1fr) minmax(400px, 2fr) minmax(220px, 1fr);
   align-items: center;
-  gap: 20px;
-  padding: 10px 24px;
-  border-radius: 20px;
-  border: 1px solid rgba(232, 220, 203, 0.95);
-  background: rgba(254, 251, 246, 0.94);
+  gap: 24px;
+  padding: 10px clamp(20px, 3.5vw, 40px);
+  border-radius: 0;
+  border-top: 1px solid rgba(232, 220, 203, 0.95);
+  border-inline: 0;
+  border-bottom: 0;
+  background: rgba(254, 251, 246, 0.96);
   box-shadow:
-    0 16px 42px -10px rgba(140, 88, 40, 0.16),
-    0 4px 16px rgba(180, 140, 90, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 -8px 28px rgba(140, 88, 40, 0.09),
+    0 -1px 3px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease;
@@ -186,11 +191,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   content: "";
   position: absolute;
   top: 0;
-  left: 28px;
-  right: 28px;
+  left: 0;
+  right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(212, 163, 115, 0.5) 25%, rgba(2, 132, 199, 0.35) 50%, rgba(212, 163, 115, 0.5) 75%, transparent 100%);
-  border-radius: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 163, 115, 0.5) 25%, rgba(2, 132, 199, 0.4) 50%, rgba(212, 163, 115, 0.5) 75%, transparent 100%);
   pointer-events: none;
 }
 
@@ -518,11 +522,19 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .creator-grid { grid-template-columns: 1fr; }
   .creator-cta { grid-template-columns: 1fr; padding: 42px; }.creator-cta > .button { justify-self: start; }
   .music-player {
-    inset: auto 16px 12px 16px;
-    height: 82px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    height: 86px;
     grid-template-columns: minmax(170px, .85fr) minmax(320px, 1.45fr) auto;
     padding-inline: 18px;
-    border-radius: 18px;
+    border-radius: 0;
+    border-top: 1px solid rgba(232, 220, 203, 0.95);
+    border-inline: 0;
+    border-bottom: 0;
   }
   .player-tools input { display: none; }
 }
@@ -543,13 +555,17 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .app--with-player .page-main { padding-bottom: 78px; }
   .site-footer--player { padding-bottom: 76px; }
   .music-player {
-    inset: auto 0 0;
-    max-width: none;
-    border-radius: 18px 18px 0 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
     height: 74px;
     grid-template-columns: 1fr auto;
     padding: 8px 14px;
-    margin-inline: 0;
+    margin: 0;
+    border-top: 1px solid rgba(232, 220, 203, 0.95);
     border-bottom: 0;
     border-inline: 0;
     box-shadow: 0 -8px 24px rgba(140, 88, 40, 0.14);

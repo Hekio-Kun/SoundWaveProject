@@ -34,13 +34,40 @@ export interface PlayerContextType {
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const audio = useMemo(() => new Audio(tracks[0]?.audioUrl || ""), []);
-  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(tracks[0] || null);
+  const defaultTrack = useMemo(() => tracks.find((t) => t.id === 10) || tracks[0] || null, []);
+  const audio = useMemo(() => {
+    const el = new Audio(defaultTrack?.audioUrl || "");
+    el.preload = "metadata";
+    return el;
+  }, [defaultTrack]);
+
+  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(() => {
+    try {
+      const savedId = sessionStorage.getItem("soundwave_current_track_id");
+      if (savedId) {
+        const found = tracks.find((t) => t.id === Number(savedId));
+        if (found) return found;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultTrack;
+  });
   const [playing, setPlaying] = useState(false);
   const [queue, setQueue] = useState<LandingTrack[]>(tracks);
   const [queueOpen, setQueueOpen] = useState(false);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [pendingTrack, setPendingTrack] = useState<LandingTrack | null>(null);
+
+  useEffect(() => {
+    if (currentTrack) {
+      try {
+        sessionStorage.setItem("soundwave_current_track_id", String(currentTrack.id));
+      } catch {
+        // ignore
+      }
+    }
+  }, [currentTrack]);
 
   useEffect(() => {
     return () => {
