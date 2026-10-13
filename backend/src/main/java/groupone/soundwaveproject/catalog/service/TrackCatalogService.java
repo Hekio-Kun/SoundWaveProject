@@ -75,9 +75,20 @@ public class TrackCatalogService {
      */
     @Transactional(readOnly = true)
     public Page<TrackResponse> getPublishedTracks(String genre, String search, String sort, Pageable pageable) {
+        return getPublishedTracks(genre, search, sort, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TrackResponse> getPublishedTracks(String genre, String search, String sort, Long creatorId, Pageable pageable) {
         List<Track> allPublished = trackRepository.findAll().stream()
                 .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
                 .toList();
+
+        if (creatorId != null) {
+            allPublished = allPublished.stream()
+                    .filter(t -> creatorId.equals(t.getUploaderUserId()))
+                    .toList();
+        }
 
         if (genre != null && !genre.isBlank() && !"all".equalsIgnoreCase(genre)) {
             allPublished = allPublished.stream()
@@ -136,7 +147,12 @@ public class TrackCatalogService {
      */
     @Transactional(readOnly = true)
     public Page<TrackResponse> getFilteredTracks(String genre, String search, String sort, Pageable pageable) {
-        return getPublishedTracks(genre, search, sort, pageable);
+        return getPublishedTracks(genre, search, sort, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TrackResponse> getFilteredTracks(String genre, String search, String sort, Long creatorId, Pageable pageable) {
+        return getPublishedTracks(genre, search, sort, creatorId, pageable);
     }
 
     /**

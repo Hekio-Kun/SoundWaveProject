@@ -10,6 +10,7 @@ import {
   SearchIcon,
   TrashIcon,
 } from "../icons";
+import { DeleteConfirmationModal } from "./DeleteConfirmationModal";
 import type { LandingTrack, Playlist } from "../types";
 
 type Props = {
@@ -39,17 +40,19 @@ export function ManagePlaylistTracksModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [actionLoadingTrackId, setActionLoadingTrackId] = useState<number | null>(null);
+  const [trackToRemove, setTrackToRemove] = useState<LandingTrack | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   useModalScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !trackToRemove) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, trackToRemove]);
 
   const filteredTracks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -551,7 +554,7 @@ export function ManagePlaylistTracksModal({
                       <button
                         type="button"
                         disabled={isLoading}
-                        onClick={() => handleRemove(track.id)}
+                        onClick={() => setTrackToRemove(track)}
                         title="Remove track from playlist"
                         style={{
                           display: "inline-flex",
@@ -636,6 +639,26 @@ export function ManagePlaylistTracksModal({
           </button>
         </div>
       </div>
+
+      {/* Delete Track Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={Boolean(trackToRemove)}
+        title="Remove Track from Playlist"
+        message={`Are you sure you want to remove "${trackToRemove?.title}" from this playlist?`}
+        confirmLabel="Remove Track"
+        submitting={isRemoving}
+        onCancel={() => setTrackToRemove(null)}
+        onConfirm={async () => {
+          if (!trackToRemove) return;
+          setIsRemoving(true);
+          try {
+            await handleRemove(trackToRemove.id);
+            setTrackToRemove(null);
+          } finally {
+            setIsRemoving(false);
+          }
+        }}
+      />
     </div>,
     document.body
   );

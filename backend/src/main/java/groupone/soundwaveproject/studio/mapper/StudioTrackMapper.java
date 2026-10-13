@@ -7,8 +7,11 @@ import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
+import groupone.soundwaveproject.studio.dto.response.RejectionHistoryItemResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class StudioTrackMapper {
@@ -79,27 +82,71 @@ public class StudioTrackMapper {
         );
     }
 
-    public RejectionDetailsResponse toRejectionDetails(Track track, TrackSubmission submission) {
+    /**
+     * Chuyển đổi dữ liệu bài hát và danh sách các đợt nộp duyệt thành RejectionDetailsResponse.
+     *
+     * Đáp ứng đặc tả RDS:
+     * - Normal Flow: Lấy thông tin phản hồi kiểm duyệt của đợt nộp mới nhất.
+     * - Alternative Flow AF01: Ánh xạ danh sách tất cả các đợt nộp duyệt trước đó (history).
+     * - Exception EX01: Nếu lý do từ chối trống, fallback về thông báo tiêu chuẩn:
+     *   "Audio content violates community standards."
+     *
+     * @param track       Bản ghi bài hát bị từ chối
+     * @param submissions Danh sách các đợt nộp duyệt của bài hát (sắp xếp mới nhất trước)
+     * @return RejectionDetailsResponse chứa đầy đủ phản hồi và lịch sử
+     */
+    public RejectionDetailsResponse toRejectionDetails(Track track, List<TrackSubmission> submissions) {
+        TrackSubmission latestSubmission = (submissions != null && !submissions.isEmpty())
+                ? submissions.get(0)
+                : null;
+
         String reason = track.getLatestRejectionReason();
         String note = null;
         java.time.Instant reviewedAt = null;
 
-        if (submission != null) {
+        if (latestSubmission != null) {
             if (reason == null || reason.isBlank()) {
-                reason = submission.getRejectionReason();
+                reason = latestSubmission.getRejectionReason();
             }
-            note = submission.getReviewerNote();
-            reviewedAt = submission.getReviewedAt();
+            note = latestSubmission.getReviewerNote();
+            reviewedAt = latestSubmission.getReviewedAt();
         }
+
+        // Exception EX01: Reason unavailable -> Display standard moderation notice
+        String effectiveReason = (reason != null && !reason.isBlank())
+                ? reason.trim()
+                : "Audio content violates community standards.";
+
+        List<RejectionHistoryItemResponse> history = (submissions != null)
+                ? submissions.stream()
+                        .map(sub -> new RejectionHistoryItemResponse(
+                                sub.getId(),
+                                sub.getStatus() != null ? sub.getStatus().name() : "UNKNOWN",
+                                sub.getRejectionReason(),
+                                sub.getReviewerNote(),
+                                sub.getSubmittedAt(),
+                                sub.getReviewedAt()
+                        ))
+                        .toList()
+                : List.of();
 
         return new RejectionDetailsResponse(
                 track.getId(),
                 track.getTitle(),
                 track.getPublicationStatus().name(),
-                reason != null ? reason : "Content was rejected during moderation.",
+                effectiveReason,
                 note,
-                reviewedAt
+                reviewedAt,
+                history
         );
+    }
+
+    /**
+     * Phương thức tương thích ngược khi chỉ truyền một TrackSubmission đơn lẻ.
+     */
+    public RejectionDetailsResponse toRejectionDetails(Track track, TrackSubmission submission) {
+        List<TrackSubmission> list = submission != null ? List.of(submission) : List.of();
+        return toRejectionDetails(track, list);
     }
 }
 

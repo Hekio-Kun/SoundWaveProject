@@ -21,6 +21,7 @@ import {
   TrashIcon,
 } from "../icons";
 import { ManagePlaylistTracksModal } from "../components/ManagePlaylistTracksModal";
+import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
 import type { CurrentUser, LandingTrack, Playlist } from "../types";
 
 type Props = {
@@ -38,6 +39,8 @@ type Props = {
   onOpenAddTrackModal: () => void;
   currentUser: CurrentUser | null;
   allTracks?: LandingTrack[];
+  audio?: HTMLAudioElement;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
 const formatDuration = (ms: number) => {
@@ -61,19 +64,23 @@ export function PlaylistDetailsPage({
   onOpenAddTrackModal,
   currentUser,
   allTracks,
+  audio,
+  onPlayingChange,
 }: Props) {
   // Fetch detailed playlist from backend (UC-15: Manage Playlist Tracks)
   const [detailPlaylist, setDetailPlaylist] = useState<Playlist | null>(() => {
     return playlists.find((p) => p.id === playlistId) ?? null;
   });
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
+  const [trackToRemove, setTrackToRemove] = useState<LandingTrack | null>(null);
+  const [isRemovingTrack, setIsRemovingTrack] = useState(false);
   const [selectedDetailTrack, setSelectedDetailTrack] = useState<LandingTrack | null>(null);
   const [detailAudioPlaying, setDetailAudioPlaying] = useState(false);
   const [detailAudioCurrentTime, setDetailAudioCurrentTime] = useState(0);
   const [detailAudioDuration, setDetailAudioDuration] = useState(0);
   const detailAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  useModalScrollLock(Boolean(selectedDetailTrack || manageTracksModalOpen));
+  useModalScrollLock(Boolean(selectedDetailTrack || manageTracksModalOpen || trackToRemove));
 
   const closeDetailModal = () => {
     if (detailAudioRef.current) {
@@ -89,11 +96,26 @@ export function PlaylistDetailsPage({
       detailAudioRef.current.pause();
       setDetailAudioPlaying(false);
     } else {
+      // Pause global audio player so they don't run in parallel
+      if (playing) {
+        onPlayingChange?.(false);
+        if (audio) {
+          audio.pause();
+        }
+      }
       detailAudioRef.current.play()
         .then(() => setDetailAudioPlaying(true))
         .catch(() => setDetailAudioPlaying(false));
     }
   };
+
+  // If global player starts playing, pause modal preview audio
+  useEffect(() => {
+    if (playing && detailAudioPlaying && detailAudioRef.current) {
+      detailAudioRef.current.pause();
+      setDetailAudioPlaying(false);
+    }
+  }, [playing, detailAudioPlaying]);
 
   useEffect(() => {
     if (!selectedDetailTrack) return;
@@ -753,7 +775,7 @@ export function PlaylistDetailsPage({
 
                         <button
                           type="button"
-                          onClick={() => handleRemoveTrack(playlist.id, track.id)}
+                          onClick={() => setTrackToRemove(track)}
                           title="Remove from playlist"
                           style={{
                             width: "28px",
@@ -791,6 +813,26 @@ export function PlaylistDetailsPage({
         onOpenAddTrackModal={() => {
           setManageTracksModalOpen(false);
           onOpenAddTrackModal();
+        }}
+      />
+
+      {/* Delete Track Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={Boolean(trackToRemove)}
+        title="Remove Track from Playlist"
+        message={`Are you sure you want to remove "${trackToRemove?.title}" from this playlist?`}
+        confirmLabel="Remove Track"
+        submitting={isRemovingTrack}
+        onCancel={() => setTrackToRemove(null)}
+        onConfirm={async () => {
+          if (!trackToRemove) return;
+          setIsRemovingTrack(true);
+          try {
+            await handleRemoveTrack(playlist.id, trackToRemove.id);
+            setTrackToRemove(null);
+          } finally {
+            setIsRemovingTrack(false);
+          }
         }}
       />
 

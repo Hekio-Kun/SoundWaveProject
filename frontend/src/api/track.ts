@@ -48,6 +48,15 @@ export type AlbumOption = {
   slug: string;
 };
 
+export type RejectionHistoryItem = {
+  submissionId: number;
+  status: string;
+  rejectionReason?: string;
+  reviewerNote?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+};
+
 export type RejectionDetails = {
   trackId: number;
   trackTitle: string;
@@ -55,6 +64,7 @@ export type RejectionDetails = {
   rejectionReason: string;
   reviewerNote?: string;
   reviewedAt?: string;
+  history?: RejectionHistoryItem[];
 };
 
 export type CreateTrackPayload = {

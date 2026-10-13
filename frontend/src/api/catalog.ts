@@ -24,6 +24,7 @@ export const catalogApi = {
     genre?: string;
     search?: string;
     sort?: "newest" | "trending" | "title";
+    creatorId?: number;
     page?: number;
     size?: number;
   }): Promise<PageResponse<LandingTrack>> => {
@@ -31,6 +32,7 @@ export const catalogApi = {
     if (params?.genre && params.genre !== "all") query.set("genre", params.genre);
     if (params?.search) query.set("search", params.search);
     if (params?.sort) query.set("sort", params.sort);
+    if (params?.creatorId !== undefined) query.set("creatorId", String(params.creatorId));
     if (params?.page !== undefined) query.set("page", String(params.page));
     if (params?.size !== undefined) query.set("size", String(params.size));
 

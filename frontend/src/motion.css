@@ -256,10 +256,10 @@ html { scroll-behavior: smooth; }
 }
 
 .player-track img { transition: transform 420ms var(--sw-ease-emphasized), box-shadow 420ms ease; }
-.music-player--playing .player-track img { animation: sw-player-cover 2.8s ease-in-out infinite; }
+.music-player--playing .player-track img { animation: sw-player-cover 3s ease-in-out infinite; }
 @keyframes sw-player-cover {
-  0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(16,24,40,.1); }
-  50% { transform: scale(1.035); box-shadow: 0 7px 18px rgba(2, 132, 199,.2); }
+  0%, 100% { transform: scale(1); box-shadow: 0 3px 10px rgba(140, 88, 40, .12); }
+  50% { transform: scale(1.035); box-shadow: 0 8px 22px rgba(2, 132, 199, .22), 0 0 0 1.5px rgba(212, 163, 115, .45); }
 }
 
 .player-play { position: relative; isolation: isolate; }
@@ -268,13 +268,13 @@ html { scroll-behavior: smooth; }
   position: absolute;
   inset: -5px;
   z-index: -1;
-  border: 2px solid rgba(2, 132, 199, .32);
+  border: 2px solid rgba(2, 132, 199, .36);
   border-radius: 50%;
-  animation: sw-player-ring 1.8s ease-out infinite;
+  animation: sw-player-ring 2s ease-out infinite;
 }
 @keyframes sw-player-ring {
-  from { opacity: .8; transform: scale(.82); }
-  to { opacity: 0; transform: scale(1.28); }
+  from { opacity: .85; transform: scale(.85); }
+  to { opacity: 0; transform: scale(1.32); }
 }
 
 .player-icon--active svg { animation: sw-icon-pop 360ms var(--sw-ease-emphasized); }

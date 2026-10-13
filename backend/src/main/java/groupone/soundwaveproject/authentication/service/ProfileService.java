@@ -36,6 +36,16 @@ public class ProfileService {
     }
 
     /**
+     * Lấy hồ sơ công khai của người dùng / creator theo userId.
+     */
+    @Transactional(readOnly = true)
+    public ProfileResponse getPublicProfile(Long userId) {
+        UserProfile profile = profileRepository.findByUserId(userId)
+                .orElseThrow(ProfileNotFoundException::new);
+        return profileMapper.toResponse(profile);
+    }
+
+    /**
      * Cập nhật các thông tin hồ sơ được phép của người dùng hiện tại.
      */
     @Transactional

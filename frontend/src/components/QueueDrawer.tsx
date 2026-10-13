@@ -147,118 +147,107 @@ export function QueueDrawer({
       </div>
 
       <div className="queue-drawer-body">
-        {currentTrack && (
-          <div className="queue-now-playing">
-            <span className="queue-section-label">NOW PLAYING</span>
-            <div className="queue-track-card queue-track-card--active">
-              <div className="queue-track-cover">
-                <img src={currentTrack.coverUrl ?? undefined} alt="" />
-                <span className={`queue-playing-indicator ${playing ? "is-playing" : "is-paused"}`} aria-label={playing ? "Now playing" : "Paused"}>
-                  <i /><i /><i />
-                </span>
-              </div>
-              <div className="queue-track-info">
-                <p className="queue-track-title">{currentTrack.title}</p>
-                <p className="queue-track-artist">{currentTrack.creator.displayName}</p>
-              </div>
-              <span className="queue-track-duration">{formatDuration(currentTrack.durationMs)}</span>
-            </div>
+        {tab === "recent" ? (
+          <div className="queue-empty-state" style={{ marginTop: "24px" }}>
+            <p>No recently played tracks</p>
+            <small>Tracks you listen to will appear in your listening history.</small>
           </div>
-        )}
-
-        <div className="queue-next-section">
-          <div className="queue-next-header">
-            <span className="queue-section-label">NEXT TRACKS</span>
-            {nextTracks.length > 0 && (
-              <button className="queue-clear-btn" onClick={onClearQueue}>
-                Clear queue
-              </button>
+        ) : (
+          <>
+            {currentTrack && (
+              <div className="queue-now-playing">
+                <span className="queue-section-label">NOW PLAYING</span>
+                <div className="queue-track-card queue-track-card--active">
+                  <div className="queue-track-cover">
+                    <img src={currentTrack.coverUrl ?? undefined} alt="" />
+                    <span className={`queue-playing-indicator ${playing ? "is-playing" : "is-paused"}`} aria-label={playing ? "Now playing" : "Paused"}>
+                      <i /><i /><i />
+                    </span>
+                  </div>
+                  <div className="queue-track-info">
+                    <p className="queue-track-title">{currentTrack.title}</p>
+                    <p className="queue-track-artist">{currentTrack.creator.displayName}</p>
+                  </div>
+                  <span className="queue-track-duration">{formatDuration(currentTrack.durationMs)}</span>
+                </div>
+              </div>
             )}
-          </div>
 
-          {nextTracks.length === 0 ? (
-            <div className="queue-empty-state">
-              <p>There are no upcoming tracks.</p>
-              <small>Add tracks from your Library or Explore.</small>
-            </div>
-          ) : (
-            <div className="queue-track-list">
-              {nextTracks.map((item, index) => (
-                <div
-                  key={`${item.id}-${index}`}
-                  className={`queue-track-card ${draggedIndex === index ? "queue-track-card--dragging" : ""}`}
-                  draggable={Boolean(onReorderQueue)}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                >
-                  <div className="queue-track-cover" onClick={() => onPlayTrack(item)}>
-                    <img src={item.coverUrl ?? undefined} alt="" />
-                    <button className="queue-play-hover-btn" aria-label={`Play ${item.title}`}>
-                      <PlayIcon width={14} height={14} />
-                    </button>
-                  </div>
-                  <div className="queue-track-info" onClick={() => onPlayTrack(item)}>
-                    <p className="queue-track-title">{item.title}</p>
-                    <p className="queue-track-artist">{item.creator.displayName}</p>
-                  </div>
-                  <span className="queue-track-duration">{formatDuration(item.durationMs)}</span>
-                  {onReorderQueue && (
-                    <div className="queue-item-reorder-actions" style={{ display: "flex", gap: "2px", alignItems: "center" }}>
+            <div className="queue-next-section">
+              <div className="queue-next-header">
+                <span className="queue-section-label">NEXT TRACKS</span>
+                {nextTracks.length > 0 && (
+                  <button className="queue-clear-btn" onClick={onClearQueue}>
+                    Clear queue
+                  </button>
+                )}
+              </div>
+
+              {nextTracks.length === 0 ? (
+                <div className="queue-empty-state">
+                  <p>There are no upcoming tracks.</p>
+                  <small>Add tracks from your Library or Explore.</small>
+                </div>
+              ) : (
+                <div className="queue-track-list">
+                  {nextTracks.map((item, index) => (
+                    <div
+                      key={`${item.id}-${index}`}
+                      className={`queue-track-card ${draggedIndex === index ? "queue-track-card--dragging" : ""}`}
+                      draggable={Boolean(onReorderQueue)}
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                    >
+                      <div className="queue-track-cover" onClick={() => onPlayTrack(item)}>
+                        <img src={item.coverUrl ?? undefined} alt="" />
+                        <button className="queue-play-hover-btn" aria-label={`Play ${item.title}`}>
+                          <PlayIcon width={14} height={14} />
+                        </button>
+                      </div>
+                      <div className="queue-track-info" onClick={() => onPlayTrack(item)}>
+                        <p className="queue-track-title">{item.title}</p>
+                        <p className="queue-track-artist">{item.creator.displayName}</p>
+                      </div>
+                      <span className="queue-track-duration">{formatDuration(item.durationMs)}</span>
+                      {onReorderQueue && (
+                        <div className="queue-item-reorder-actions">
+                          <button
+                            type="button"
+                            className="queue-reorder-btn"
+                            onClick={() => moveTrack(index, index - 1)}
+                            disabled={index === 0}
+                            aria-label={`Move ${item.title} up`}
+                            title="Move up"
+                          >
+                            <ArrowUpIcon width={14} height={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="queue-reorder-btn"
+                            onClick={() => moveTrack(index, index + 1)}
+                            disabled={index === nextTracks.length - 1}
+                            aria-label={`Move ${item.title} down`}
+                            title="Move down"
+                          >
+                            <ArrowDownIcon width={14} height={14} />
+                          </button>
+                        </div>
+                      )}
                       <button
-                        type="button"
-                        className="queue-reorder-btn"
-                        onClick={() => moveTrack(index, index - 1)}
-                        disabled={index === 0}
-                        aria-label={`Move ${item.title} up`}
-                        title="Move up"
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          cursor: index === 0 ? "default" : "pointer",
-                          opacity: index === 0 ? 0.25 : 0.7,
-                          padding: "4px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
+                        className="queue-remove-btn"
+                        onClick={() => onRemoveFromQueue(item.id)}
+                        aria-label={`Remove ${item.title} from queue`}
                       >
-                        <ArrowUpIcon width={14} height={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="queue-reorder-btn"
-                        onClick={() => moveTrack(index, index + 1)}
-                        disabled={index === nextTracks.length - 1}
-                        aria-label={`Move ${item.title} down`}
-                        title="Move down"
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          cursor: index === nextTracks.length - 1 ? "default" : "pointer",
-                          opacity: index === nextTracks.length - 1 ? 0.25 : 0.7,
-                          padding: "4px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <ArrowDownIcon width={14} height={14} />
+                        <TrashIcon width={14} height={14} />
                       </button>
                     </div>
-                  )}
-                  <button
-                    className="queue-remove-btn"
-                    onClick={() => onRemoveFromQueue(item.id)}
-                    aria-label={`Remove ${item.title} from queue`}
-                  >
-                    <TrashIcon width={14} height={14} />
-                  </button>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </aside>
   </>

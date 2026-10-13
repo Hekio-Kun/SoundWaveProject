@@ -1,13 +1,15 @@
-﻿import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   studioApi,
   type AlbumOption,
   type ApiTrack,
   type GenreOption,
+  type RejectionDetails,
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { MediaUploadField } from "../components/MediaUploadField";
+import { RejectionDetailsModal } from "../components/RejectionDetailsModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -25,7 +27,7 @@ import {
   UserIcon,
   VolumeIcon,
 } from "../icons";
-import type { CurrentUser } from "../types";
+import type { CurrentUser, LandingTrack } from "../types";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -64,13 +66,55 @@ function formatSeconds(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function studioApiTrackToLanding(track: ApiTrack, currentUser: CurrentUser | null): LandingTrack {
+  return {
+    id: track.id,
+    title: track.title,
+    coverUrl: track.coverUrl || "/pics/album.png",
+    audioUrl: track.audioUrl,
+    durationMs: track.durationMs || 0,
+    playCount: track.playCount || 0,
+    slug: track.slug,
+    publicationStatus: track.status,
+    genreSlug: track.genreSlug,
+    genreName: track.genreName,
+    description: track.description,
+    createdAt: track.createdAt,
+    lyrics: track.lyrics,
+    creator: {
+      userId: currentUser?.id || 0,
+      displayName: currentUser?.displayName || currentUser?.email || "Artist",
+      avatarUrl: currentUser?.avatarUrl || null,
+    },
+    album: track.albumId
+      ? {
+          id: track.albumId,
+          title: track.albumTitle || "Album",
+        }
+      : undefined,
+  };
+}
+
 type Props = {
   trackId: number;
   currentUser: CurrentUser | null;
   onNavigate: (route: string) => void;
+  currentTrack?: LandingTrack | null;
+  playing?: boolean;
+  onPlayTrack?: (track: LandingTrack) => void;
+  audio?: HTMLAudioElement;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
-export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Props) {
+export function StudioTrackDetailPage({
+  trackId,
+  currentUser,
+  onNavigate,
+  currentTrack,
+  playing = false,
+  onPlayTrack,
+  audio,
+}: Props) {
   const [track, setTrack] = useState<ApiTrack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,19 +122,43 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [actionError, setActionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Audio player state
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playPromiseRef = useRef<Promise<void> | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Audio player state - synchronized with global player
+  const isCurrentTrack = Boolean(currentTrack && track && currentTrack.id === track.id);
+  const isPlayingThis = Boolean(isCurrentTrack && playing);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.85);
+  const [volume, setVolume] = useState(() => (audio && Number.isFinite(audio.volume) ? audio.volume : 0.8));
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+  const [rejectionModalDetails, setRejectionModalDetails] = useState<RejectionDetails | null>(null);
+
+  /**
+   * Mở modal xem chi tiết lý do từ chối kiểm duyệt (UC-20: View Rejection Reason).
+   */
+  const handleOpenRejectionModal = async () => {
+    if (!track) return;
+    try {
+      const details = await studioApi.getRejectionDetails(track.id);
+      setRejectionModalDetails(details);
+    } catch {
+      setRejectionModalDetails({
+        trackId: track.id,
+        trackTitle: track.title,
+        status: "REJECTED",
+        rejectionReason:
+          track.latestRejectionReason ||
+          "Audio content violates community standards.",
+        reviewerNote: track.reviewerNote,
+        reviewedAt: track.reviewedAt || track.createdAt,
+      });
+    }
+    setRejectionModalOpen(true);
+  };
 
   // Edit form state
   const [genres, setGenres] = useState<GenreOption[]>([]);
@@ -111,7 +179,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
   const [submitterNote, setSubmitterNote] = useState("");
   const [submitCopyrightAgreed, setSubmitCopyrightAgreed] = useState(false);
 
-  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen);
+  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen || rejectionModalOpen);
 
   const fetchTrackData = async (active = true) => {
     try {
@@ -145,77 +213,78 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
 
     return () => {
       active = false;
-      if (audioRef.current) {
-        if (playPromiseRef.current) {
-          playPromiseRef.current
-            .then(() => audioRef.current?.pause())
-            .catch(() => {});
-        } else {
-          audioRef.current.pause();
-        }
-      }
     };
   }, [trackId]);
 
+  // Synchronize volume with global audio at all times
+  useEffect(() => {
+    if (!audio) return;
+    const handleVolumeUpdate = () => {
+      setVolume(audio.volume);
+    };
+    audio.addEventListener("volumechange", handleVolumeUpdate);
+    setVolume(audio.volume);
+    return () => {
+      audio.removeEventListener("volumechange", handleVolumeUpdate);
+    };
+  }, [audio]);
+
+  // Synchronize playback timeline with global audio
+  useEffect(() => {
+    if (!audio) return;
+    if (!isCurrentTrack) {
+      setCurrentTime(0);
+      setDuration(track?.durationMs ? track.durationMs / 1000 : 0);
+      return;
+    }
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+
+    setCurrentTime(audio.currentTime);
+    if (audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
+    }
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    };
+  }, [audio, isCurrentTrack, track?.durationMs]);
+
   // Player controls
   const togglePlay = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      if (playPromiseRef.current) {
-        playPromiseRef.current
-          .then(() => {
-            audioRef.current?.pause();
-            setIsPlaying(false);
-          })
-          .catch(() => setIsPlaying(false));
-      } else {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
-    } else {
-      const promise = audioRef.current.play();
-      if (promise !== undefined) {
-        playPromiseRef.current = promise;
-        promise
-          .then(() => setIsPlaying(true))
-          .catch((err: Error) => {
-            if (err.name !== "AbortError") console.error("Audio playback error:", err);
-            setIsPlaying(false);
-          });
-      }
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (!duration && audioRef.current.duration) {
-        setDuration(audioRef.current.duration);
-      }
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      audioRef.current.volume = volume;
-    }
+    if (!track || !onPlayTrack) return;
+    const landing = studioApiTrackToLanding(track, currentUser);
+    onPlayTrack(landing);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const target = Number(e.target.value);
     setCurrentTime(target);
-    if (audioRef.current) {
-      audioRef.current.currentTime = target;
+    if (isCurrentTrack && audio) {
+      audio.currentTime = target;
     }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setVolume(val);
-    if (audioRef.current) {
-      audioRef.current.volume = val;
+    if (audio) {
+      audio.volume = val;
     }
   };
 
@@ -379,7 +448,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
 
   return (
     <div className="studio-track-detail-page" style={{ padding: "0 0 48px", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-      {/* Top Banner - sát lên trên và trải đều full viền */}
+      {/* Top Banner */}
       <header
         className="staff-hero-banner"
         style={{
@@ -436,27 +505,23 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
       >
         {/* Top Header & Navigation Bar - CÙNG 1 HÀNG NGANG Ở TRÊN DUY NHẤT */}
         <div className="studio-detail-top-nav-single-row">
-          {/* Left: Back button + Breadcrumb (Submission Details #{trackId}) */}
+          {/* Left: Back button + Breadcrumb */}
           <div className="studio-top-nav-single-left">
-            <button
-              type="button"
-              onClick={() => onNavigate("/studio")}
-              className="staff-detail-back-btn"
-              title="Back to Content Studio"
-              style={{ padding: "6px 12px", fontSize: "13px" }}
-            >
-              <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
-              <span>Back to Queue</span>
-            </button>
-
             <div className="staff-detail-breadcrumbs" style={{ fontSize: "13px" }}>
-              <span className="staff-crumb-muted">Moderation Queue</span>
+              <span
+                className="staff-crumb-muted"
+                style={{ cursor: "pointer" }}
+                onClick={() => onNavigate("/studio")}
+                title="Back to Content Studio"
+              >
+                Moderation Queue
+              </span>
               <span className="staff-crumb-sep">/</span>
               <span className="staff-crumb-active">Submission Details #{trackId}</span>
             </div>
           </div>
 
-          {/* Right: Status Badge & 3 CRUD Buttons (Edit, Delete, View) - NẰM NGANG Ở TRÊN */}
+          {/* Right: Status Badge & Action CRUD Buttons */}
           {track ? (
             <div className="studio-top-nav-single-right">
               {/* Status Badge */}
@@ -467,6 +532,24 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                 <i />
                 <span>{statusLabel}</span>
               </span>
+
+              {/* View Rejection button (UC-20) */}
+              {isRejected && (
+                <button
+                  type="button"
+                  className="studio-crud-btn"
+                  onClick={handleOpenRejectionModal}
+                  title="View moderator rejection reason & feedback"
+                  style={{
+                    backgroundColor: "#fee4e2",
+                    color: "#b42318",
+                    borderColor: "#fecdca",
+                  }}
+                >
+                  <AlertIcon width={13} height={13} />
+                  <span>View Rejection</span>
+                </button>
+              )}
 
               {/* 1. Edit track button */}
               <button
@@ -609,24 +692,15 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
 
                 {/* Built-in High-Fidelity Audio Studio Player */}
                 <div className="staff-audio-studio-player staff-detail-audio-player">
-                  <audio
-                    ref={audioRef}
-                    src={track.audioUrl}
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onEnded={() => setIsPlaying(false)}
-                    preload="metadata"
-                  />
-
                   <div className="staff-player-controls-row">
                     <button
                       type="button"
                       onClick={togglePlay}
-                      className={`staff-player-main-btn ${isPlaying ? "is-playing" : ""}`}
-                      title={isPlaying ? "Pause audio stream" : "Play audio stream"}
-                      aria-label={isPlaying ? "Pause audio stream" : "Play audio stream"}
+                      className={`staff-player-main-btn ${isPlayingThis ? "is-playing" : ""}`}
+                      title={isPlayingThis ? "Pause audio stream" : "Play audio stream"}
+                      aria-label={isPlayingThis ? "Pause audio stream" : "Play audio stream"}
                     >
-                      {isPlaying ? (
+                      {isPlayingThis ? (
                         <PauseIcon width={18} height={18} />
                       ) : (
                         <PlayIcon width={18} height={18} />
@@ -634,7 +708,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                     </button>
 
                     {/* Equalizer animation bars while playing */}
-                    <div className={`staff-equalizer-bars ${isPlaying ? "is-active" : ""}`}>
+                    <div className={`staff-equalizer-bars ${isPlayingThis ? "is-active" : ""}`}>
                       <span />
                       <span />
                       <span />
@@ -668,7 +742,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                         type="range"
                         min={0}
                         max={1}
-                        step={0.05}
+                        step={0.01}
                         value={volume}
                         onChange={handleVolumeChange}
                         className="staff-vol-slider-bar"
@@ -786,28 +860,6 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                   <CheckIcon width={16} height={16} />
                   <span>Track approved and published to catalog</span>
                 </div>
-                <small className="staff-decision-meta">
-                  Reviewed by <b>Content Moderator</b> on {formatDate(track.reviewedAt || track.createdAt)}
-                </small>
-              </div>
-            )}
-
-            {isRejected && (
-              <div className="staff-decision-summary is-rejected">
-                <div className="staff-decision-title">
-                  <AlertIcon width={16} height={16} />
-                  <span>Track submission was rejected</span>
-                </div>
-                {track.latestRejectionReason ? (
-                  <p className="staff-decision-reason">
-                    <b>Rejection Reason:</b> {track.latestRejectionReason}
-                  </p>
-                ) : null}
-                {track.reviewerNote ? (
-                  <p className="staff-decision-note">
-                    <b>Reviewer Note:</b> {track.reviewerNote}
-                  </p>
-                ) : null}
                 <small className="staff-decision-meta">
                   Reviewed by <b>Content Moderator</b> on {formatDate(track.reviewedAt || track.createdAt)}
                 </small>
@@ -1097,34 +1149,7 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
                   </small>
                 )}
 
-                <div style={{ marginTop: "10px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <span style={{ fontSize: "11px", color: "var(--sw-text-secondary)", fontWeight: 600 }}>
-                      Lyrics content & preview:
-                    </span>
-                    <span style={{ fontSize: "11px", color: "var(--sw-primary)", fontWeight: 600 }}>
-                      {editLyricsContent ? `${editLyricsContent.split("\n").filter((l) => l.trim().length > 0).length} lines` : "Optional"}
-                    </span>
-                  </div>
-                  <textarea
-                    id="edit-track-lyrics-editor"
-                    rows={4}
-                    value={editLyricsContent}
-                    onChange={(e) => setEditLyricsContent(e.target.value)}
-                    placeholder="Upload a lyrics file above, or paste / type lyrics directly here..."
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--sw-border)",
-                      fontFamily: "monospace",
-                      fontSize: "12px",
-                      lineHeight: "1.5",
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
+
               </div>
 
               <div className="modal-actions studio-track-modal__actions">
@@ -1267,6 +1292,17 @@ export function StudioTrackDetailPage({ trackId, currentUser, onNavigate }: Prop
         </div>,
         document.body
       )}
+
+      {/* Rejection Details Modal (UC-20: View Rejection Reason) */}
+      <RejectionDetailsModal
+        isOpen={rejectionModalOpen}
+        details={rejectionModalDetails}
+        onClose={() => setRejectionModalOpen(false)}
+        onEditTrack={() => {
+          setRejectionModalOpen(false);
+          openEditModal();
+        }}
+      />
     </div>
   );
 }

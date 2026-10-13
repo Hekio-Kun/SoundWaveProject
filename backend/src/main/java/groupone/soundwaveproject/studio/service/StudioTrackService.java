@@ -287,14 +287,31 @@ public class StudioTrackService {
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, null);
     }
 
+    /**
+     * Lấy thông tin chi tiết lý do từ chối kiểm duyệt của bài hát.
+     *
+     * Đáp ứng đặc tả RDS:
+     * - Use Case: UC-20 (View Rejection Reason)
+     * - Actor: Listener (Chủ sở hữu bản nhạc đã tải lên)
+     * - Precondition PRE-1: Người dùng đã đăng nhập (currentUserEmail).
+     * - Precondition PRE-2: Bài hát thuộc quyền sở hữu của người dùng (Uploader).
+     * - Exception EX02: Nếu bài hát không tồn tại hoặc không thuộc quyền sở hữu, từ chối truy cập.
+     * - Normal Flow: Trả về lý do từ chối (BR-20), ghi chú của kiểm duyệt viên và thời gian duyệt.
+     * - Alternative Flow AF01: Trả về toàn bộ lịch sử các đợt nộp duyệt và phản hồi trước đó.
+     * - Business Rule BR-24: Dữ liệu này chỉ đọc (read-only), làm cơ sở để nghệ sĩ chỉnh sửa và nộp lại.
+     *
+     * @param id               ID của bài hát cần xem lý do từ chối
+     * @param currentUserEmail Email của người dùng đang đăng nhập
+     * @return RejectionDetailsResponse chi tiết lý do từ chối và lịch sử
+     */
     @Transactional(readOnly = true)
     public RejectionDetailsResponse getRejectionDetails(Long id, String currentUserEmail) {
         AppUser user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-        return studioTrackMapper.toRejectionDetails(track, submission);
+        List<TrackSubmission> submissions = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(track.getId());
+        return studioTrackMapper.toRejectionDetails(track, submissions);
     }
 
     @Transactional(readOnly = true)

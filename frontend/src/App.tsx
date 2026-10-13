@@ -100,6 +100,7 @@ function AppContent() {
           onToggleQueue={toggleQueue}
           isQueueOpen={queueOpen}
           onRecordPlay={handleRecordPlay}
+          onReorderQueue={handleReorderQueue}
         />
       )}
 

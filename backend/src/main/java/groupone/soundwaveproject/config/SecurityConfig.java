@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/genres/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tracks", "/api/v1/tracks/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/tracks/*/play").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/profile/*").permitAll()
                         .requestMatchers("/api/v1/playlists/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/playlists", "/api/v1/playlists/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/studio/genres").permitAll()

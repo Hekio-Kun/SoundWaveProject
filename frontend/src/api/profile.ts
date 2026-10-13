@@ -49,5 +49,6 @@ async function request<T>(method: "GET" | "PATCH", body?: UpdateProfileInput, av
 
 export const profileApi = {
   getCurrent: () => request<ProfileDetails>("GET"),
+  getPublicProfile: (userId: number) => apiFetch<ProfileDetails>(`/profile/${userId}`),
   updateCurrent: (body: UpdateProfileInput, avatar?: File) => request<ProfileDetails>("PATCH", body, avatar),
 };

@@ -569,9 +569,10 @@
 .queue-drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(16, 24, 40, 0.24);
-  backdrop-filter: blur(2px);
-  z-index: 50;
+  background: rgba(16, 24, 40, 0.38);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 54;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -585,17 +586,18 @@
 }
 
 .queue-drawer {
-  width: 330px;
+  width: 380px;
+  max-width: 100vw;
   height: 100vh;
   position: fixed;
   top: 0;
   right: 0;
-  background: #ffffff;
-  border-left: 1px solid #e4e7ec;
+  background: #fdfaf4;
+  border-left: 1px solid #e8dccb;
   display: flex;
   flex-direction: column;
   z-index: 55;
-  box-shadow: -4px 0 24px rgba(16, 24, 40, 0.06);
+  box-shadow: -8px 0 32px rgba(140, 88, 40, 0.1);
   transform: translateX(100%);
   visibility: hidden;
   pointer-events: none;
@@ -606,20 +608,23 @@
   transform: translateX(0);
   visibility: visible;
   pointer-events: auto;
-  box-shadow: -12px 0 36px rgba(16, 24, 40, 0.12);
+  box-shadow: -14px 0 42px rgba(140, 88, 40, 0.15);
 }
 
 .music-app-shell--with-player .queue-drawer {
-  height: calc(100dvh - 98px);
+  height: 100vh;
 }
 
+/* 1. Header & Navigation Tabs */
 .queue-drawer-header {
-  height: 64px;
+  height: 60px;
   padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f2f4f7;
+  border-bottom: 1px solid #e8dccb;
+  background: rgba(253, 250, 244, 0.95);
+  flex-shrink: 0;
 }
 
 .queue-drawer-tabs {
@@ -628,155 +633,304 @@
 }
 
 .queue-tab {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: 0 !important;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   font-size: 12.5px;
   font-weight: 600;
-  color: #667085;
+  color: #786f65;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.16s ease;
+}
+
+.queue-tab:hover {
+  background: #f5ead8;
+  color: #1c1917;
 }
 
 .queue-tab--active {
   background: #e0f2fe !important;
   color: #0284c7 !important;
   font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.2);
 }
 
 .queue-close-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border: 0 !important;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
-  color: #667085;
+  color: #786f65;
   display: grid;
   place-items: center;
   cursor: pointer;
+  transition: all 0.16s ease;
 }
 
 .queue-close-btn:hover {
-  background: #f2f4f7;
-  color: #101828;
+  background: #f5ead8;
+  color: #1c1917;
 }
 
-.queue-content {
+/* 2. Scrollable Body */
+.queue-drawer-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 16px 16px 110px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  overscroll-behavior: contain;
 }
 
-.queue-section {
+.queue-drawer-body::-webkit-scrollbar {
+  width: 6px;
+}
+.queue-drawer-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.queue-drawer-body::-webkit-scrollbar-thumb {
+  background: #dec3a6;
+  border-radius: 8px;
+}
+
+/* 3. Section Labels */
+.queue-section-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8c5828;
+  margin: 0;
+}
+
+/* 4. Now Playing Hero Card */
+.queue-now-playing {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.queue-subtitle {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #98a2b3;
-  margin: 0;
-}
-
-.current-track-item {
+.queue-track-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 12px;
-  background: #e0f2fe;
-  border: 1px solid #a5f3fc;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.16s ease;
+  user-select: none;
 }
 
-.queue-cover-wrap {
+.queue-track-card:hover {
+  background: #f5ead8;
+  border-color: rgba(232, 220, 203, 0.6);
+}
+
+.queue-track-card--active {
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #fbf3e5 100%);
+  border: 1px solid #bae6fd;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.08);
+}
+
+.queue-track-card--dragging {
+  opacity: 0.45;
+  border: 1.5px dashed #0284c7;
+  background: #e0f2fe;
+}
+
+/* 5. Track Cover Thumbnail */
+.queue-track-cover {
   position: relative;
-  width: 46px;
-  height: 46px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
   overflow: hidden;
   flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid rgba(232, 220, 203, 0.6);
 }
 
-.queue-cover-wrap img {
+.queue-track-card--active .queue-track-cover {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+}
+
+.queue-track-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
-.queue-bars {
+/* 6. Soundwave Equalizer Indicator */
+.queue-playing-indicator {
   position: absolute;
   inset: 0;
-  background: rgba(2, 132, 199, 0.45);
+  background: rgba(2, 132, 199, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
+  border-radius: inherit;
 }
 
-.queue-bars i {
-  width: 3px;
+.queue-playing-indicator i {
+  width: 2.5px;
+  height: 14px;
   background: #ffffff;
   border-radius: 2px;
-  height: 14px;
   animation: eq-anim 0.8s infinite ease-in-out alternate;
 }
 
-.queue-bars i:nth-child(2) { animation-delay: 0.2s; height: 18px; }
-.queue-bars i:nth-child(3) { animation-delay: 0.4s; height: 12px; }
+.queue-playing-indicator i:nth-child(2) {
+  animation-delay: 0.2s;
+  height: 18px;
+}
 
-.queue-track-meta {
+.queue-playing-indicator i:nth-child(3) {
+  animation-delay: 0.4s;
+  height: 12px;
+}
+
+.queue-playing-indicator.is-paused i {
+  animation: none;
+  height: 6px;
+}
+
+@keyframes eq-anim {
+  0% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+  100% {
+    height: 8px;
+  }
+}
+
+/* 7. Hover Play Button Overlay */
+.queue-play-hover-btn {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 132, 199, 0.65);
+  color: #ffffff;
+  border: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  border-radius: inherit;
+  cursor: pointer;
+  transition: opacity 0.16s ease;
+}
+
+.queue-track-cover:hover .queue-play-hover-btn {
+  opacity: 1;
+}
+
+/* 8. Track Info */
+.queue-track-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
 }
 
 .queue-track-title {
-  font-size: 13.5px;
+  margin: 0;
+  font-size: 13px;
   font-weight: 700;
-  color: #0284c7;
+  color: #1c1917;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.35;
+}
+
+.queue-track-card--active .queue-track-title {
+  color: #0284c7;
+  font-size: 13.5px;
 }
 
 .queue-track-artist {
-  font-size: 12px;
-  color: #475467;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #786f65;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
 }
 
-.queue-item-duration {
-  font-size: 11.5px;
-  color: #98a2b3;
+.queue-track-duration {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8d877f;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
-.queue-header-row {
+/* 9. Next Tracks Section */
+.queue-next-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.queue-next-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.queue-clear-button {
+.queue-clear-btn {
   border: 0 !important;
-  background: none;
-  font-size: 11.5px;
-  font-weight: 600;
+  background: transparent;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
   color: #b42318;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.queue-clear-button:hover {
-  text-decoration: underline;
+.queue-clear-btn:hover {
+  background: #fef3f2;
+}
+
+.queue-empty-state {
+  padding: 36px 16px;
+  text-align: center;
+  border: 1px dashed #e8dccb;
+  border-radius: 14px;
+  background: rgba(254, 251, 246, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.queue-empty-state p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #57534e;
+}
+
+.queue-empty-state small {
+  font-size: 11px;
+  color: #8d877f;
 }
 
 .queue-track-list {
@@ -785,64 +939,60 @@
   gap: 4px;
 }
 
-.queue-track-item {
+/* 10. Reorder & Remove Actions */
+.queue-item-reorder-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-radius: 10px;
-  background: transparent;
-  transition: background 0.14s ease;
+  gap: 2px;
+  margin-left: 2px;
 }
 
-.queue-track-item:hover {
-  background: #f8fafc;
-}
-
-.queue-item-cover {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.queue-item-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.queue-remove-button {
+.queue-reorder-btn {
+  width: 24px;
+  height: 24px;
   border: 0 !important;
-  background: none;
-  color: #98a2b3;
+  border-radius: 6px;
+  background: transparent;
+  color: #786f65;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.queue-reorder-btn:hover:not(:disabled) {
+  background: #ede3d2;
+  color: #1c1917;
+}
+
+.queue-reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.queue-remove-btn {
   width: 26px;
   height: 26px;
-  display: grid;
-  place-items: center;
+  border: 0 !important;
   border-radius: 6px;
+  background: transparent;
+  color: #8d877f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: all 0.15s ease;
   opacity: 0;
-  transition: all 0.14s ease;
 }
 
-.queue-track-item:hover .queue-remove-button {
+.queue-track-card:hover .queue-remove-btn {
   opacity: 1;
 }
 
-.queue-remove-button:hover {
-  background: #fee2e2;
+.queue-remove-btn:hover {
+  background: #fef3f2;
   color: #b42318;
-}
-
-.empty-queue {
-  padding: 32px 16px;
-  text-align: center;
-  color: #98a2b3;
-  font-size: 13px;
 }
 
 /* --------------------------------------------------------------------------
@@ -2321,34 +2471,70 @@
   background: #f8fafc;
 }
 
-.status-pill {
+.status-pill,
+.status-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
-.status-pill--draft {
-  background: #f2f4f7;
-  color: #344054;
+.status-pill::before,
+.status-badge::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex-shrink: 0;
 }
 
-.status-pill--pending {
-  background: #fef0c7;
-  color: #b54708;
+.status-pill--draft,
+.status-badge--draft {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
-.status-pill--approved {
-  background: #d1fadf;
-  color: #027a48;
+.status-pill--pending,
+.status-badge--pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }
 
-.status-pill--rejected {
-  background: #fee4e2;
-  color: #b42318;
+.status-pill--approved,
+.status-badge--approved,
+.status-pill--published,
+.status-badge--published {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.status-pill--rejected,
+.status-badge--rejected,
+.status-pill--taken_down,
+.status-badge--taken_down {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+button.status-badge--rejected:hover,
+button.status-pill--rejected:hover {
+  background: #fecaca;
+  color: #991b1b;
+  transform: translateY(-1px);
 }
 
 /* --------------------------------------------------------------------------
