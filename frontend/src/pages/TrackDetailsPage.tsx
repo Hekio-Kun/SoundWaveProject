@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
-import { SectionHeader, TrackCard } from "../components/MusicCards";
+import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { CheckIcon, FileTextIcon, HeadphonesIcon, HeartFillIcon, HeartIcon, PauseIcon, PlayIcon, PlusIcon, UserIcon } from "../icons";

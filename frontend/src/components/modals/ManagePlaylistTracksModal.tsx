@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -9,9 +9,9 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
-} from "../icons";
+} from "../../icons";
 import { DeleteConfirmationModal } from "./DeleteConfirmationModal";
-import type { LandingTrack, Playlist } from "../types";
+import type { LandingTrack, Playlist } from "../../types";
 
 type Props = {
   open: boolean;

@@ -1,5 +1,5 @@
 import { useRef, type DragEvent } from "react";
-import { CloseIcon, FileTextIcon, UploadIcon } from "../icons";
+import { CloseIcon, FileTextIcon, UploadIcon } from "../../icons";
 
 type Props = {
   id: string;

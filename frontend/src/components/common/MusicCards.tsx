@@ -1,5 +1,5 @@
-import type { FeaturedAlbum, FeaturedCreator, LandingTrack } from "../types";
-import { ArrowIcon, HeadphonesIcon, PauseIcon, PlayIcon } from "../icons";
+import type { FeaturedAlbum, FeaturedCreator, LandingTrack } from "../../types";
+import { ArrowIcon, HeadphonesIcon, PauseIcon, PlayIcon } from "../../icons";
 
 const compactNumber = (value: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);

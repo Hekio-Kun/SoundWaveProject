@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import type { RejectionDetails } from "../api/track";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import type { RejectionDetails } from "../../api/track";
 import {
   AlertIcon,
   CloseIcon,
@@ -9,7 +9,7 @@ import {
   EditIcon,
   EyeIcon,
   CheckIcon,
-} from "../icons";
+} from "../../icons";
 
 /**
  * Props cho RejectionDetailsModal.

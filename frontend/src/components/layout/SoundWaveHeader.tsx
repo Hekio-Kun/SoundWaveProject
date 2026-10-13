@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { CloseIcon, MenuIcon, SearchIcon } from "../icons";
+import { CloseIcon, MenuIcon, SearchIcon } from "../../icons";
 
 type Props = {
   isAuthenticated: boolean;

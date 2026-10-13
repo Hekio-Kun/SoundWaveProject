@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { ApiError } from "../api/client";
-import type { AdminGenre, GenreInput } from "../api/adminGenres";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import { AlertIcon, CloseIcon } from "../icons";
+import { ApiError } from "../../api/client";
+import type { AdminGenre, GenreInput } from "../../api/adminGenres";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import { AlertIcon, CloseIcon } from "../../icons";
 
 type Props = {
   open: boolean;

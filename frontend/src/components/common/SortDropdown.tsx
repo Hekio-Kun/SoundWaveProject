@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ClockIcon, TrendingUpIcon, CheckIcon } from "../icons";
+import { ClockIcon, TrendingUpIcon, CheckIcon } from "../../icons";
 
 export type SortOptionValue = "newest" | "trending" | "title";
 

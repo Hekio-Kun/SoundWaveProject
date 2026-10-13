@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { albums, featuredCreators, genres as initialGenres } from "../data";
 import { catalogApi } from "../api/catalog";
-import { AlbumCard, CreatorCard, SectionHeader, TrackCard } from "../components/MusicCards";
+import { AlbumCard, CreatorCard, SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { ArrowIcon, PauseIcon, PlayIcon } from "../icons";
 import type { Genre, LandingTrack } from "../types";
 

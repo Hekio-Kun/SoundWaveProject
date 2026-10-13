@@ -8,8 +8,8 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import { MediaUploadField } from "../components/MediaUploadField";
-import { RejectionDetailsModal } from "../components/RejectionDetailsModal";
+import { MediaUploadField } from "../components/common/MediaUploadField";
+import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 import {
   AlertIcon,
   CheckIcon,

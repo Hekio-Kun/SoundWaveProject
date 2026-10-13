@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowDownIcon, ArrowUpIcon, CloseIcon, PlayIcon, TrashIcon } from "../icons";
-import type { LandingTrack } from "../types";
+import { ArrowDownIcon, ArrowUpIcon, CloseIcon, PlayIcon, TrashIcon } from "../../icons";
+import type { LandingTrack } from "../../types";
 
 /**
  * Props for the {@link QueueDrawer} component.

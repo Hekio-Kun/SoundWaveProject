@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { playlistApi } from "../api/playlists";
 import { demoPlaylists } from "../data";
-import { AddTrackToPlaylistModal } from "../components/AddTrackToPlaylistModal";
-import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
-import { PlaylistFormModal } from "../components/PlaylistFormModal";
+import { AddTrackToPlaylistModal } from "../components/modals/AddTrackToPlaylistModal";
+import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { PlaylistFormModal } from "../components/modals/PlaylistFormModal";
 import { useAuth } from "./AuthContext";
 import { usePlayer } from "./PlayerContext";
 import type { LandingTrack, Playlist } from "../types";
