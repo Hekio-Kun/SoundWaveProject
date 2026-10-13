@@ -185,8 +185,10 @@ public class StudioAlbumService {
             }
         }
 
-        // Đồng bộ danh sách bài hát thuộc Album
-        List<Track> updatedTracks = syncAlbumTracks(album, request.getTrackIds(), user.getId());
+        // Đồng bộ danh sách bài hát thuộc Album (chỉ thực hiện nếu request chỉ định trackIds)
+        List<Track> updatedTracks = request.getTrackIds() != null
+                ? syncAlbumTracks(album, request.getTrackIds(), user.getId())
+                : trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
 
         // Đánh giá lại trạng thái xuất bản theo BR-18 & BR-22
         recalculateAndSaveAlbumStatus(album);
@@ -270,7 +272,11 @@ public class StudioAlbumService {
     private List<Track> syncAlbumTracks(Album album, List<Long> trackIds, Long currentUserId) {
         List<Track> currentAlbumTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
 
-        if (trackIds == null || trackIds.isEmpty()) {
+        if (trackIds == null) {
+            return currentAlbumTracks;
+        }
+
+        if (trackIds.isEmpty()) {
             // Gỡ tất cả bài hát nếu danh sách gửi lên là rỗng
             for (Track t : currentAlbumTracks) {
                 t.setAlbum(null);

@@ -75,6 +75,7 @@ export function StudioAlbumDetailPage({
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
+  const [manageTracksTab, setManageTracksTab] = useState<"MANAGE" | "ADD">("MANAGE");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -466,7 +467,10 @@ export function StudioAlbumDetailPage({
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <button
               className="button button-secondary button-small"
-              onClick={() => setManageTracksModalOpen(true)}
+              onClick={() => {
+                setManageTracksTab("MANAGE");
+                setManageTracksModalOpen(true);
+              }}
               id="btn-open-manage-tracks"
               style={{
                 display: "inline-flex",
@@ -483,7 +487,10 @@ export function StudioAlbumDetailPage({
             </button>
             <button
               className="button button-primary button-small"
-              onClick={() => setManageTracksModalOpen(true)}
+              onClick={() => {
+                setManageTracksTab("ADD");
+                setManageTracksModalOpen(true);
+              }}
               id="btn-open-add-tracks"
               style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
@@ -517,7 +524,10 @@ export function StudioAlbumDetailPage({
             </span>
             <button
               className="button button-primary"
-              onClick={() => setManageTracksModalOpen(true)}
+              onClick={() => {
+                setManageTracksTab("ADD");
+                setManageTracksModalOpen(true);
+              }}
               style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
               <PlusIcon width={16} height={16} /> Add tracks to album
@@ -770,6 +780,7 @@ export function StudioAlbumDetailPage({
         open={manageTracksModalOpen}
         onClose={() => setManageTracksModalOpen(false)}
         album={album}
+        initialTab={manageTracksTab}
         onTracksUpdated={fetchAlbumData}
       />
 
