@@ -75,8 +75,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           const myPlaylists = await playlistApi.getMyPlaylists();
           setPlaylists(myPlaylists ?? []);
         } else {
-          const publicPlaylists = await playlistApi.getPublicPlaylists();
-          setPlaylists(publicPlaylists ?? []);
+          setPlaylists([]);
         }
       } catch {
         // Retain current or fallback
@@ -124,9 +123,10 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       isPrivate: boolean;
       coverUrl: string;
     }) => {
+      const payload = { ...data, isPrivate: true };
       if (editingPlaylist) {
         try {
-          const updated = await playlistApi.updatePlaylist(editingPlaylist.id, data);
+          const updated = await playlistApi.updatePlaylist(editingPlaylist.id, payload);
           setPlaylists((prev) =>
             prev.map((p) => (p.id === editingPlaylist.id ? updated : p))
           );
@@ -137,7 +137,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         try {
-          const created = await playlistApi.createPlaylist(data);
+          const created = await playlistApi.createPlaylist(payload);
           setPlaylists((prev) => [created, ...prev]);
           showToast("Playlist created successfully!");
           closePlaylistForm();

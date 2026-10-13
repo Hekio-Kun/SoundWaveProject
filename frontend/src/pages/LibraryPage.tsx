@@ -204,12 +204,12 @@ export function LibraryPage({
                       fontWeight: 800,
                       padding: "2px 6px",
                       borderRadius: "6px",
-                      background: pl.isPrivate ? "#F3F4F6" : "#ECFEFF",
-                      color: pl.isPrivate ? "#6B7280" : "var(--sw-primary-dark)",
-                      border: pl.isPrivate ? "1px solid #E5E7EB" : "1px solid #BAE6FD",
+                      background: "#F3F4F6",
+                      color: "#6B7280",
+                      border: "1px solid #E5E7EB",
                     }}
                   >
-                    {pl.isPrivate ? "Private" : "Public"}
+                    Private
                   </span>
                 </div>
                 <p className="playlist-meta">

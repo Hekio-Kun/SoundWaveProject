@@ -69,13 +69,11 @@ public class PlaylistService {
 
     /**
      * Lấy danh sách Playlist công khai (Public Playlists).
+     * Toàn bộ playlist do người dùng tạo đều mặc định và bắt buộc là Private, chỉ tài khoản tạo mới được xem & nghe.
      */
     @Transactional(readOnly = true)
     public List<PlaylistResponse> getPublicPlaylists() {
-        List<Playlist> playlists = playlistRepository.findByIsPrivateFalseOrderByCreatedAtDesc();
-        return playlists.stream()
-                .map(p -> mapToPlaylistResponse(p, false))
-                .toList();
+        return List.of();
     }
 
     /**
@@ -93,11 +91,9 @@ public class PlaylistService {
                     .orElse(null);
         }
 
-        // Kiểm tra quyền riêng tư: nếu playlist isPrivate = true thì chỉ chủ sở hữu mới xem được
-        if (playlist.isPrivate()) {
-            if (currentUser == null || !currentUser.getId().equals(playlist.getCreatedByUserId())) {
-                throw new ForbiddenOperationException("FORBIDDEN", "You do not have permission to view this private playlist.");
-            }
+        // Kiểm tra quyền riêng tư: Playlist chỉ chủ sở hữu (người tạo) mới được xem và nghe
+        if (currentUser == null || !currentUser.getId().equals(playlist.getCreatedByUserId())) {
+            throw new ForbiddenOperationException("FORBIDDEN", "You do not have permission to view this private playlist.");
         }
 
         return mapToPlaylistResponse(playlist, true);
@@ -105,6 +101,7 @@ public class PlaylistService {
 
     /**
      * Tạo Playlist mới (Sequence: Create).
+     * Mặc định và bắt buộc là Private (chỉ tài khoản tạo mới được xem và nghe).
      */
     @Transactional
     public PlaylistResponse createPlaylist(PlaylistRequest request, String currentUserEmail) {
@@ -116,7 +113,6 @@ public class PlaylistService {
         }
 
         String slug = generateUniqueSlug(trimmedTitle);
-        boolean isPrivate = Boolean.TRUE.equals(request.isPrivate());
 
         Playlist playlist = Playlist.builder()
                 .ownerUserId(user.getId())
@@ -126,8 +122,8 @@ public class PlaylistService {
                 .slug(slug)
                 .description(request.description() != null ? request.description().trim() : null)
                 .coverUrl(request.coverUrl() != null && !request.coverUrl().isBlank() ? request.coverUrl().trim() : null)
-                .visibility(isPrivate ? "PRIVATE" : "PUBLIC")
-                .isPrivate(isPrivate)
+                .visibility("PRIVATE")
+                .isPrivate(true)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .updatedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .playlistTracks(new ArrayList<>())
@@ -165,10 +161,9 @@ public class PlaylistService {
             playlist.setDescription(request.description().trim());
         }
 
-        if (request.isPrivate() != null) {
-            playlist.setPrivate(request.isPrivate());
-            playlist.setVisibility(request.isPrivate() ? "PRIVATE" : "PUBLIC");
-        }
+        // Bắt buộc duy trì playlist ở trạng thái Private
+        playlist.setPrivate(true);
+        playlist.setVisibility("PRIVATE");
 
         if (request.coverUrl() != null) {
             playlist.setCoverUrl(request.coverUrl().trim());
