@@ -21,6 +21,7 @@ type Props = {
   onClose: () => void;
   album: StudioAlbum;
   onTracksUpdated: () => Promise<void>;
+  initialTab?: "MANAGE" | "ADD";
 };
 
 function formatDuration(ms?: number): string {
@@ -36,8 +37,9 @@ export function ManageAlbumTracksModal({
   onClose,
   album,
   onTracksUpdated,
+  initialTab = "MANAGE",
 }: Props) {
-  const [activeTab, setActiveTab] = useState<"MANAGE" | "ADD">("MANAGE");
+  const [activeTab, setActiveTab] = useState<"MANAGE" | "ADD">(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [addSearchQuery, setAddSearchQuery] = useState("");
 
@@ -71,12 +73,12 @@ export function ManageAlbumTracksModal({
       setCurrentTracks(album.tracks || []);
       setErrorMessage(null);
       setSuccessMessage(null);
-      setActiveTab("MANAGE");
+      setActiveTab(initialTab || "MANAGE");
       setSearchQuery("");
       setAddSearchQuery("");
       void loadAvailableTracks();
     }
-  }, [open, album]);
+  }, [open, album, initialTab]);
 
   const loadAvailableTracks = async () => {
     try {
