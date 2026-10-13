@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   moderationApi,
   type SubmissionDetail,
-} from "../api/moderation";
+} from "../../api/moderation";
 import {
   AlertIcon,
   CheckIcon,
@@ -15,7 +15,7 @@ import {
   PlayIcon,
   UserIcon,
   VolumeIcon,
-} from "../icons";
+} from "../../icons";
 
 function formatDuration(ms?: number | null): string {
   if (!ms || ms <= 0) return "0:00";

@@ -4,7 +4,7 @@ import {
   type PageResponse,
   type SubmissionQueueItem,
   type SubmissionStats,
-} from "../api/moderation";
+} from "../../api/moderation";
 import { PendingTrackDetailView } from "./PendingTrackDetailView";
 import {
   AlertIcon,
@@ -16,7 +16,7 @@ import {
   RefreshIcon,
   SearchIcon,
   UserIcon,
-} from "../icons";
+} from "../../icons";
 
 function formatDuration(ms?: number | null): string {
   if (!ms || ms <= 0) return "--:--";

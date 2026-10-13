@@ -20,8 +20,8 @@ import {
   QueueIcon,
   TrashIcon,
 } from "../icons";
-import { ManagePlaylistTracksModal } from "../components/ManagePlaylistTracksModal";
-import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
+import { ManagePlaylistTracksModal } from "../components/modals/ManagePlaylistTracksModal";
+import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import type { CurrentUser, LandingTrack, Playlist } from "../types";
 
 type Props = {

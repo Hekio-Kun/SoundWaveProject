@@ -1,9 +1,9 @@
 import { useEffect, type ReactNode } from "react";
-import { AppTopBar } from "../components/AppTopBar";
-import { MobileBottomNav } from "../components/MobileBottomNav";
-import { QueueDrawer } from "../components/QueueDrawer";
-import { Sidebar } from "../components/Sidebar";
-import { SoundWaveFooter } from "../components/SoundWaveFooter";
+import { AppTopBar } from "../components/layout/AppTopBar";
+import { MobileBottomNav } from "../components/layout/MobileBottomNav";
+import { QueueDrawer } from "../components/player/QueueDrawer";
+import { Sidebar } from "../components/layout/Sidebar";
+import { SoundWaveFooter } from "../components/layout/SoundWaveFooter";
 import type { CurrentUser, LandingTrack } from "../types";
 
 /**

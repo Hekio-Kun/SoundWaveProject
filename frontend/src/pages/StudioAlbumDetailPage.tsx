@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
-import { AlbumFormModal } from "../components/AlbumFormModal";
-import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
-import { ManageAlbumTracksModal } from "../components/ManageAlbumTracksModal";
+import { AlbumFormModal } from "../components/modals/AlbumFormModal";
+import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
 import {
   AlertIcon,
   ArrowDownIcon,

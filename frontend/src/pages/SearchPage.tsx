@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlbumCard, CreatorCard, TrackCard } from "../components/MusicCards";
+import { AlbumCard, CreatorCard, TrackCard } from "../components/common/MusicCards";
 import { albums, featuredCreators, tracks } from "../data";
 import { catalogApi } from "../api/catalog";
 import { CloseIcon, CompassIcon, SearchIcon, TrendingUpIcon } from "../icons";

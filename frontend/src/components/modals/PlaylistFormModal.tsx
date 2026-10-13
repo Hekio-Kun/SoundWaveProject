@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent, type DragEvent } from "react";
 import { createPortal } from "react-dom";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import { covers } from "../data";
-import { CloseIcon, UploadIcon } from "../icons";
-import { playlistApi } from "../api/playlists";
-import type { Playlist } from "../types";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import { covers } from "../../data";
+import { CloseIcon, UploadIcon } from "../../icons";
+import { playlistApi } from "../../api/playlists";
+import type { Playlist } from "../../types";
 
 const PRESET_COVERS = [
   covers.dawn,

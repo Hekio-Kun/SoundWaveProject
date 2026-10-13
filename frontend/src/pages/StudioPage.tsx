@@ -10,11 +10,11 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { albumApi } from "../api/album";
-import { AlbumFormModal } from "../components/AlbumFormModal";
-import { AlbumDetailModal } from "../components/AlbumDetailModal";
-import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
-import { MediaUploadField } from "../components/MediaUploadField";
-import { RejectionDetailsModal } from "../components/RejectionDetailsModal";
+import { AlbumFormModal } from "../components/modals/AlbumFormModal";
+import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
+import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { MediaUploadField } from "../components/common/MediaUploadField";
+import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 import {
   AlertIcon,
   CheckIcon,

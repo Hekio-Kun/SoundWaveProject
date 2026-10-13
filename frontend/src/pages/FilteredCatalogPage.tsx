@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { TrackCard } from "../components/MusicCards";
-import { SortDropdown } from "../components/SortDropdown";
+import { TrackCard } from "../components/common/MusicCards";
+import { SortDropdown } from "../components/common/SortDropdown";
 import { HeadphonesIcon } from "../icons";
 import type { Genre, LandingTrack } from "../types";
 

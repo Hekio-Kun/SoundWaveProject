@@ -7,7 +7,7 @@ import {
   type AlbumOption,
   type GenreOption,
 } from "../api/track";
-import { MediaUploadField } from "../components/MediaUploadField";
+import { MediaUploadField } from "../components/common/MediaUploadField";
 import {
   AlertIcon,
   CheckIcon,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertIcon, BellIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DashboardIcon, LogoutIcon, SearchIcon, ShieldIcon, UploadIcon, UserIcon } from "../icons";
-import type { CurrentUser } from "../types";
+import { AlertIcon, BellIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DashboardIcon, LogoutIcon, SearchIcon, ShieldIcon, UploadIcon, UserIcon } from "../../icons";
+import type { CurrentUser } from "../../types";
 
 type Props = {
   user: CurrentUser | null;

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { adminGenreApi, type AdminGenre, type AdminGenrePage, type GenreInput } from "../api/adminGenres";
 import { ApiError } from "../api/client";
-import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
-import { GenreFormModal } from "../components/GenreFormModal";
+import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { GenreFormModal } from "../components/modals/GenreFormModal";
 import { AlertIcon, CheckIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";

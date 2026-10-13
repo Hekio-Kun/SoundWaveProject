@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { albumApi, AlbumApiError } from "../api/album";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { albumApi, AlbumApiError } from "../../api/album";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import {
   AlertIcon,
   ArrowDownIcon,
@@ -13,8 +13,8 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
-} from "../icons";
-import type { StudioAlbum, StudioTrack } from "../types";
+} from "../../icons";
+import type { StudioAlbum, StudioTrack } from "../../types";
 
 type Props = {
   open: boolean;

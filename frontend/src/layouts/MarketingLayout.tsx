@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { SoundWaveFooter } from "../components/SoundWaveFooter";
-import { SoundWaveHeader } from "../components/SoundWaveHeader";
+import { SoundWaveFooter } from "../components/layout/SoundWaveFooter";
+import { SoundWaveHeader } from "../components/layout/SoundWaveHeader";
 
 type Props = {
   children: ReactNode;

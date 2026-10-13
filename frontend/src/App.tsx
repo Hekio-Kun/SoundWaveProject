@@ -6,9 +6,9 @@ import { useRouter } from "./hooks/useRouter";
 import { AppRouter } from "./routes/AppRouter";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { MusicAppShell } from "./layouts/MusicAppShell";
-import { MusicPlayer } from "./components/MusicPlayer";
-import { GuestLoginPrompt } from "./components/GuestLoginPrompt";
-import { LogoutConfirmationDialog } from "./components/LogoutConfirmationDialog";
+import { MusicPlayer } from "./components/player/MusicPlayer";
+import { GuestLoginPrompt } from "./components/modals/GuestLoginPrompt";
+import { LogoutConfirmationDialog } from "./components/modals/LogoutConfirmationDialog";
 
 function AppContent() {
   const {

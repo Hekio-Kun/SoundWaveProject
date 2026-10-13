@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import { HeadphonesIcon } from "../icons";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import { HeadphonesIcon } from "../../icons";
 
 type Props = {
   open: boolean;

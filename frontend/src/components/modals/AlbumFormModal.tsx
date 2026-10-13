@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
-import { albumApi, AlbumApiError } from "../api/album";
+import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import { albumApi, AlbumApiError } from "../../api/album";
 import {
   AlertIcon,
   CheckIcon,
@@ -9,8 +9,8 @@ import {
   DiscIcon,
   EditIcon,
   UploadIcon,
-} from "../icons";
-import type { StudioAlbum } from "../types";
+} from "../../icons";
+import type { StudioAlbum } from "../../types";
 
 type Props = {
   open: boolean;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { albums, featuredCreators, genres, heroCovers, tracks } from "../data";
-import { ArrowIcon, CheckIcon, HeadphonesIcon, MoreIcon, PauseIcon, PlayIcon, UploadIcon } from "../icons";
-import type { LandingTrack } from "../types";
+import { albums, featuredCreators, genres, heroCovers, tracks } from "../../data";
+import { ArrowIcon, CheckIcon, HeadphonesIcon, MoreIcon, PauseIcon, PlayIcon, UploadIcon } from "../../icons";
+import type { LandingTrack } from "../../types";
 
 type Props = {
   currentTrack: LandingTrack | null;

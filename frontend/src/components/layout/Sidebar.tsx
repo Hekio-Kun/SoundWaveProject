@@ -1,5 +1,5 @@
-import { CompassIcon, DashboardIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, UploadIcon } from "../icons";
-import type { CurrentUser } from "../types";
+import { CompassIcon, DashboardIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, UploadIcon } from "../../icons";
+import type { CurrentUser } from "../../types";
 
 type Props = {
   activeRoute: string;
