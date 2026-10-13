@@ -27,6 +27,7 @@ export interface PlayerContextType {
   continueListening: () => void;
   closeGuestPrompt: () => void;
   handleRecordPlay: (trackId: number, listenedDurationMs: number, completed: boolean) => Promise<void>;
+  reorderQueue: (newQueue: LandingTrack[]) => void;
   pause: () => void;
 }
 
@@ -152,6 +153,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const reorderQueue = useCallback((newQueue: LandingTrack[]) => {
+    setQueue(newQueue);
+  }, []);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -169,6 +174,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setQueueOpen,
         removeFromQueue,
         clearQueue,
+        reorderQueue,
         handleGuestTrackEnded,
         continueListening,
         closeGuestPrompt,

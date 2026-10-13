@@ -39,6 +39,7 @@ function AppContent() {
     handleRecordPlay,
     removeFromQueue,
     clearQueue,
+    reorderQueue,
   } = usePlayer();
 
   const { openCreatePlaylist, toastNotice } = usePlaylists();
@@ -77,6 +78,7 @@ function AppContent() {
           onPlayTrack={playTrack}
           onRemoveFromQueue={removeFromQueue}
           onClearQueue={clearQueue}
+          onReorderQueue={reorderQueue}
           hasPlayer
           showFooter={isExploreRoute}
         >
@@ -100,7 +102,7 @@ function AppContent() {
           onToggleQueue={toggleQueue}
           isQueueOpen={queueOpen}
           onRecordPlay={handleRecordPlay}
-          onReorderQueue={handleReorderQueue}
+          onReorderQueue={reorderQueue}
         />
       )}
 
