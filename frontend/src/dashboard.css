@@ -492,6 +492,29 @@ body.modal-open .app-scroll-region {
   gap: 12px;
 }
 
+.ops-shell-actions .topbar-notification-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ops-shell-actions .topbar-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--ops-border);
+  background: #ffffff;
+  color: var(--ops-text-secondary);
+}
+
+.ops-shell-actions .topbar-icon-btn:hover,
+.ops-shell-actions .topbar-icon-btn.is-active {
+  border-color: var(--ops-brand);
+  background: var(--ops-brand-light);
+  color: var(--ops-brand-hover);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.12);
+}
+
 .ops-topbar-shift-badge {
   display: inline-flex;
   align-items: center;

@@ -21,6 +21,7 @@ import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateExce
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,7 @@ class ModerationServiceTest {
     @Mock private TrackSubmissionMapper mapper;
     @Mock private AppUserRepository userRepository;
     @Mock private UserProfileRepository profileRepository;
+    @Mock private NotificationService notificationService;
 
     private ModerationService moderationService;
     private AppUser staffUser;
@@ -59,7 +61,8 @@ class ModerationServiceTest {
                 mailService,
                 mapper,
                 userRepository,
-                profileRepository
+                profileRepository,
+                notificationService
         );
 
         staffUser = new AppUser(

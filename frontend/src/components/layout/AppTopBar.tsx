@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertIcon, BellIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DashboardIcon, LogoutIcon, SearchIcon, ShieldIcon, UploadIcon, UserIcon } from "../../icons";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DashboardIcon, LogoutIcon, SearchIcon, ShieldIcon, UploadIcon, UserIcon } from "../../icons";
+import { NotificationDropdown } from "./NotificationDropdown";
 import type { CurrentUser } from "../../types";
 
 type Props = {
@@ -10,27 +11,24 @@ type Props = {
   unreadNotifications?: number;
 };
 
-export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadNotifications = 2 }: Props) {
+export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadNotifications = 0 }: Props) {
   const [query, setQuery] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(unreadNotifications);
   const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setUnreadCount(unreadNotifications), [unreadNotifications]);
 
   useEffect(() => {
-    if (!userMenuOpen && !notifOpen) return;
+    if (!userMenuOpen) return;
     const closeMenus = (event: MouseEvent) => {
       if (!actionsRef.current?.contains(event.target as Node)) {
         setUserMenuOpen(false);
-        setNotifOpen(false);
       }
     };
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setUserMenuOpen(false);
-        setNotifOpen(false);
       }
     };
     document.addEventListener("mousedown", closeMenus);
@@ -39,7 +37,7 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
       document.removeEventListener("mousedown", closeMenus);
       document.removeEventListener("keydown", closeWithEscape);
     };
-  }, [notifOpen, userMenuOpen]);
+  }, [userMenuOpen]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -110,48 +108,11 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
         )}
 
         {isAuthenticated && (
-          <div className="topbar-notification-wrapper">
-            <button
-              className={`topbar-icon-btn ${notifOpen ? "is-active" : ""}`}
-              onClick={() => {
-                setNotifOpen((open) => !open);
-                setUserMenuOpen(false);
-              }}
-              aria-label="System notifications"
-              aria-expanded={notifOpen}
-              aria-controls="notification-popover"
-            >
-              <BellIcon width={20} height={20} />
-              {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-            </button>
-
-            {notifOpen && (
-              <div className="notif-popover" id="notification-popover" role="dialog" aria-label="Notifications">
-                <div className="notif-header">
-                  <div>
-                    <span className="popover-eyebrow">ACTIVITY</span>
-                    <h4>Notifications</h4>
-                  </div>
-                  {unreadCount > 0
-                    ? <button className="notif-read-all" onClick={() => setUnreadCount(0)}><CheckIcon width={14} height={14} />Mark all read</button>
-                    : <span className="notif-all-read"><CheckIcon width={13} height={13} />All caught up</span>}
-                </div>
-                <div className="notif-list">
-                  <button className={`notif-item ${unreadCount > 0 ? "is-unread" : ""}`} onClick={() => { setUnreadCount((count) => Math.max(0, count - 1)); setNotifOpen(false); onNavigate("/studio"); }}>
-                    <span className="notif-item-icon notif-item-icon--success"><CheckIcon width={17} height={17} /></span>
-                    <span className="notif-item-copy"><strong>Track approved</strong><span>Your track “Sớm Mai Dịu Dàng” is now available in the public catalog.</span><small>2 hours ago</small></span>
-                    <ChevronRightIcon width={16} height={16} className="notif-item-arrow" />
-                  </button>
-                  <button className={`notif-item notif-item--warning ${unreadCount > 1 ? "is-unread" : ""}`} onClick={() => { setUnreadCount(0); setNotifOpen(false); onNavigate("/studio"); }}>
-                    <span className="notif-item-icon notif-item-icon--warning"><AlertIcon width={17} height={17} /></span>
-                    <span className="notif-item-copy"><strong>Revision requested</strong><span>“Vũ Điệu Đêm Hè” needs an audio quality update before review.</span><small>Yesterday</small></span>
-                    <ChevronRightIcon width={16} height={16} className="notif-item-arrow" />
-                  </button>
-                </div>
-                <div className="notif-footer"><span><i />Updates from your SoundWave workspace</span></div>
-              </div>
-            )}
-          </div>
+          <NotificationDropdown
+            unreadCount={unreadCount}
+            onNavigate={onNavigate}
+            onMarkAllRead={() => setUnreadCount(0)}
+          />
         )}
 
         {isAuthenticated && user ? (
@@ -160,7 +121,6 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
               className={`topbar-user-btn ${userMenuOpen ? "is-active" : ""}`}
               onClick={() => {
                 setUserMenuOpen((open) => !open);
-                setNotifOpen(false);
               }}
               aria-label="Account menu"
               aria-expanded={userMenuOpen}
