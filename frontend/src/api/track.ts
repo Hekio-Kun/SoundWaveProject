@@ -132,7 +132,7 @@ function buildTrackFormData(
   cover?: File,
 ): FormData {
   const formData = new FormData();
-  formData.append("track", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  formData.append("track", new Blob([JSON.stringify(payload)], { type: "application/json" }), "track.json");
   if (audio) formData.append("audio", audio);
   if (cover) formData.append("cover", cover);
   return formData;

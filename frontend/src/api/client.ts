@@ -121,12 +121,35 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  let response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, getAuthToken()));
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, getAuthToken()));
+  } catch (error: unknown) {
+    if (error instanceof TypeError && (error.message.includes("fetch") || error.message.includes("network") || error.message.includes("Failed"))) {
+      throw new ApiError(
+        0,
+        "Không thể kết nối đến máy chủ backend (Port 8080) hoặc kết nối bị ngắt quãng. Vui lòng đảm bảo Spring Boot backend đang chạy và file không vượt quá dung lượng cho phép.",
+        "CONNECTION_ERROR"
+      );
+    }
+    throw error;
+  }
 
   if (response.status === 401 && !path.startsWith("/auth/")) {
     const session = await silentRefresh<RefreshSession>();
     if (session) {
-      response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, session.accessToken));
+      try {
+        response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, session.accessToken));
+      } catch (retryError: unknown) {
+        if (retryError instanceof TypeError && (retryError.message.includes("fetch") || retryError.message.includes("network") || retryError.message.includes("Failed"))) {
+          throw new ApiError(
+            0,
+            "Không thể kết nối đến máy chủ backend (Port 8080).",
+            "CONNECTION_ERROR"
+          );
+        }
+        throw retryError;
+      }
     }
   }
 

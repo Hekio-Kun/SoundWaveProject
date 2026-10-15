@@ -571,9 +571,9 @@ export function StudioTrackDetailPage({
               <button
                 type="button"
                 className="studio-crud-btn studio-crud-btn-edit"
-                onClick={openEditModal}
+                onClick={() => onNavigate(`/studio/tracks/${track.id}/edit`)}
                 disabled={isPending}
-                title={isPending ? "Please withdraw submission before editing" : "Edit track information & media"}
+                title={isPending ? "Please withdraw submission before editing" : "Edit track information & synchronized lyrics"}
                 style={isPending ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
               >
                 <EditIcon width={13} height={13} />
@@ -1352,7 +1352,9 @@ export function StudioTrackDetailPage({
         onClose={() => setRejectionModalOpen(false)}
         onEditTrack={() => {
           setRejectionModalOpen(false);
-          openEditModal();
+          if (track) {
+            onNavigate(`/studio/tracks/${track.id}/edit`);
+          }
         }}
       />
     </div>

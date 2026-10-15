@@ -1,4 +1,4 @@
-import { useRef, type DragEvent } from "react";
+import { useRef, type DragEvent, type ReactNode } from "react";
 import { CloseIcon, FileTextIcon, UploadIcon } from "../../icons";
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
   required?: boolean;
   disabled?: boolean;
   onFileChange: (file: File | null) => void;
+  extraActions?: ReactNode;
 };
 
 function formatFileSize(size: number) {
@@ -30,6 +31,7 @@ export function MediaUploadField({
   required = false,
   disabled = false,
   onFileChange,
+  extraActions,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasExistingFile = Boolean(existingFileLabel) && !file;
@@ -82,6 +84,7 @@ export function MediaUploadField({
         </span>
 
         <span className="studio-upload-field__actions">
+          {extraActions}
           <button
             id={`${id}-button`}
             type="button"
