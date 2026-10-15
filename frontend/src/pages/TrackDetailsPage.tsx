@@ -246,7 +246,7 @@ export function TrackDetailsPage({
             <p>Select one of your playlists for “{track.title}”.</p>
             {actionError ? <p className="track-action-message is-error" role="alert">{actionError}</p> : null}
             {playlists.length === 0 ? <div className="track-dialog-empty"><strong>No playlists yet</strong><span>Create a playlist from Your Library first.</span><button className="button button-primary" onClick={() => onNavigate("/playlists")}>Open Your Library</button></div>
-              : <div className="track-dialog-list">{playlists.map((playlist) => <button key={playlist.id} disabled={submittingAction} onClick={() => { void handleAddToPlaylist(playlist.id); }}><img src={playlist.coverUrl || covers.dawn} alt="" onError={(event) => { event.currentTarget.src = covers.dawn; }} /><span><b>{playlist.title}</b><small>{playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"} · {playlist.isPrivate ? "Private" : "Public"}</small></span><PlusIcon width={17} height={17} /></button>)}</div>}
+              : <div className="track-dialog-list">{playlists.map((playlist) => <button key={playlist.id} disabled={submittingAction} onClick={() => { void handleAddToPlaylist(playlist.id); }}><img src={playlist.coverUrl || covers.dawn} alt="" onError={(event) => { event.currentTarget.src = covers.dawn; }} /><span><b>{playlist.title}</b><small>{playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"} · Private</small></span><PlusIcon width={17} height={17} /></button>)}</div>}
             <button className="button button-secondary" onClick={() => setPlaylistModalOpen(false)}>Close</button>
           </section>
         </div>, document.body) : null}

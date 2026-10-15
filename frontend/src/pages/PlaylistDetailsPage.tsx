@@ -239,25 +239,18 @@ export function PlaylistDetailsPage({
     );
   }
 
-  // Check ownership (BR-14, BR-15)
+  // Check ownership: Playlist is strictly private and only viewable/playable by its creator
+  const currentUserId = currentUser ? (currentUser.id ?? (currentUser as any).userId) : null;
   const isOwner = Boolean(
-    !currentUser ||
-    (currentUser && (
-      currentUser.id === playlist.ownerId ||
-      (currentUser as any).userId === playlist.ownerId ||
-      currentUser.role === "ADMIN" ||
-      (currentUser.displayName && playlist.ownerName && currentUser.displayName.trim().toLowerCase() === playlist.ownerName.trim().toLowerCase()) ||
-      (playlist.id === 1 && (currentUser.id === 1 || currentUser.id === 5 || (currentUser as any).userId === 1 || (currentUser as any).userId === 5))
-    ))
+    currentUserId && playlist.ownerId && currentUserId === playlist.ownerId
   );
-  const isPrivateAndForbidden = playlist.isPrivate && !isOwner;
 
-  if (isPrivateAndForbidden) {
+  if (!isOwner) {
     return (
       <div className="state-empty-box" style={{ margin: "60px auto", maxWidth: "480px" }}>
         <LockIcon width={48} height={48} />
         <h2 className="empty-title">Private Playlist</h2>
-        <p className="empty-desc">This playlist is set to private and can only be viewed by its owner.</p>
+        <p className="empty-desc">This playlist is private and can only be viewed and listened to by its creator.</p>
         <button className="button button-primary" onClick={() => onNavigate("/playlists")}>
           Back to Playlists
         </button>
@@ -335,12 +328,15 @@ export function PlaylistDetailsPage({
                   fontSize: "10.5px",
                   fontWeight: 800,
                   textTransform: "uppercase",
-                  background: playlist.isPrivate ? "#F3F4F6" : "#ECFEFF",
-                  color: playlist.isPrivate ? "#4B5563" : "var(--sw-primary-dark)",
-                  border: playlist.isPrivate ? "1px solid #E5E7EB" : "1px solid #BAE6FD",
+                  background: "#F3F4F6",
+                  color: "#4B5563",
+                  border: "1px solid #E5E7EB",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {playlist.isPrivate ? "Private" : "Public"}
+                <LockIcon width={11} height={11} /> Private
               </span>
             </div>
 

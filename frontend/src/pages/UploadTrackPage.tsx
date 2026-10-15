@@ -5,6 +5,7 @@ import {
   studioApi,
   TrackApiError,
   type AlbumOption,
+  type ApiTrack,
   type GenreOption,
 } from "../api/track";
 import { MediaUploadField } from "../components/common/MediaUploadField";
@@ -13,9 +14,12 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   CloseIcon,
+  EditIcon,
   FileTextIcon,
   UploadIcon,
 } from "../icons";
+import { LyricSyncTab } from "../components/common/LyricSyncTab";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -28,11 +32,21 @@ type Props = {
   isAuthenticated: boolean;
   canUpload: boolean;
   onNavigate: (route: string) => void;
+  editTrackId?: number | null;
 };
 
 type FormErrors = Record<string, string>;
 
-export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Props) {
+export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTrackId }: Props) {
+  const isEditMode = Boolean(editTrackId && editTrackId > 0);
+  const [existingTrack, setExistingTrack] = useState<ApiTrack | null>(null);
+  const [loadingTrack, setLoadingTrack] = useState(false);
+  const [trackFetchError, setTrackFetchError] = useState("");
+  const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null);
+  const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
+  const [existingAudioName, setExistingAudioName] = useState<string>("");
+  const [existingCoverName, setExistingCoverName] = useState<string>("");
+
   const [genres, setGenres] = useState<GenreOption[]>([]);
   const [albums, setAlbums] = useState<AlbumOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -53,8 +67,10 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
   const [uploadedTrackTitle, setUploadedTrackTitle] = useState("");
   const [uploadedStatus, setUploadedStatus] = useState<"DRAFT" | "PENDING">("DRAFT");
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [showLyricMaker, setShowLyricMaker] = useState(false);
   const [copyrightAgreed, setCopyrightAgreed] = useState(false);
   const [submitterNote, setSubmitterNote] = useState("");
+  const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
   useModalScrollLock(confirmModalOpen);
 
@@ -78,7 +94,9 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
       ]);
       setGenres(fetchedGenres);
       setAlbums(fetchedAlbums);
-      setGenreId((current) => current || fetchedGenres[0]?.id || 0);
+      if (!isEditMode) {
+        setGenreId((current) => current || fetchedGenres[0]?.id || 0);
+      }
     } catch (error: unknown) {
       setOptionsError(error instanceof Error
         ? error.message
@@ -91,6 +109,40 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
   useEffect(() => {
     void loadOptions();
   }, [isAuthenticated, canUpload]);
+
+  // Load existing track data when editTrackId is supplied
+  useEffect(() => {
+    if (!editTrackId) return;
+    let active = true;
+    setLoadingTrack(true);
+    setTrackFetchError("");
+
+    studioApi.getTrackById(editTrackId)
+      .then((data) => {
+        if (!active) return;
+        setExistingTrack(data);
+        setTitle(data.title || "");
+        setGenreId(data.genreId || 0);
+        setAlbumId(data.albumId ?? "");
+        setDescription(data.description || "");
+        setLyrics(data.lyrics || "");
+        setDurationMs(data.durationMs);
+        setExistingAudioUrl(data.audioUrl || null);
+        setExistingCoverUrl(data.coverUrl || null);
+        setExistingAudioName(data.audioUrl ? "Current audio file attached" : "");
+        setExistingCoverName(data.coverUrl ? "Current cover artwork attached" : "");
+        setLoadingTrack(false);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setTrackFetchError(err instanceof Error ? err.message : "Failed to load track details.");
+        setLoadingTrack(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [editTrackId]);
 
   const clearError = (field: string) => {
     if (formErrors[field]) {
@@ -152,6 +204,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
       setLyrics(await readLyricsFile(file));
       setLyricsFile(file);
       clearError("lyrics");
+      setPageToast({ type: "success", message: "Lyrics file loaded successfully." });
     } catch (error: unknown) {
       setFormErrors((current) => ({
         ...current,
@@ -160,13 +213,20 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     }
   };
 
+  const handleApplyGeneratedLyrics = (lrcString: string, virtualFile: File) => {
+    setLyrics(lrcString);
+    setLyricsFile(virtualFile);
+    clearError("lyrics");
+    setPageToast({ type: "success", message: "Lyrics applied to track successfully!" });
+  };
+
   const validateForm = () => {
     const errors: FormErrors = {};
     if (!title.trim()) errors.title = "Please enter the track title.";
     else if (title.trim().length > 200) errors.title = "Track title cannot exceed 200 characters.";
     if (!genreId) errors.genre = "Please select a music genre.";
-    if (!audioFile) errors.audio = "Please select an MP3, WAV or FLAC audio file.";
-    else {
+    if (!audioFile && !existingAudioUrl) errors.audio = "Please select an MP3, WAV or FLAC audio file.";
+    else if (audioFile) {
       const audioError = validateAudioFile(audioFile);
       if (audioError) errors.audio = audioError;
     }
@@ -203,22 +263,52 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     setSubmitting(true);
     setSubmitError("");
     try {
-      const created = await studioApi.createDraft({
-        title: title.trim(),
-        genreId,
-        albumId: albumId === "" ? undefined : Number(albumId),
-        description: description.trim() || undefined,
-        durationMs,
-        lyrics: lyrics.trim() || undefined,
-      }, audioFile!, coverFile ?? undefined);
+      let targetTrackId: number;
 
-      if (submitForReview && created && created.id) {
-        await studioApi.submitForReview(created.id, note);
+      if (isEditMode && editTrackId) {
+        const updated = await studioApi.updateTrack(
+          editTrackId,
+          {
+            title: title.trim(),
+            genreId,
+            albumId: albumId === "" ? undefined : Number(albumId),
+            description: description.trim() || undefined,
+            durationMs,
+            lyrics: lyrics.trim() || undefined,
+          },
+          audioFile ?? undefined,
+          coverFile ?? undefined
+        );
+        targetTrackId = updated.id;
+      } else {
+        const created = await studioApi.createDraft({
+          title: title.trim(),
+          genreId,
+          albumId: albumId === "" ? undefined : Number(albumId),
+          description: description.trim() || undefined,
+          durationMs,
+          lyrics: lyrics.trim() || undefined,
+        }, audioFile!, coverFile ?? undefined);
+        targetTrackId = created.id;
+      }
+
+      if (submitForReview && targetTrackId) {
+        await studioApi.submitForReview(targetTrackId, note);
         setUploadedStatus("PENDING");
       } else {
         setUploadedStatus("DRAFT");
       }
       setUploadedTrackTitle(title.trim());
+      setPageToast({
+        type: "success",
+        message: isEditMode
+          ? submitForReview
+            ? "Track submitted for review successfully!"
+            : "Draft updated successfully!"
+          : submitForReview
+          ? "Track submitted for review successfully!"
+          : "Draft saved successfully!",
+      });
       document.getElementById("app-scroll-region")?.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: unknown) {
       if (error instanceof TrackApiError && Object.keys(error.fieldErrors).length > 0) {
@@ -227,7 +317,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
         setFormErrors((current) => ({ ...current, ...errors }));
         focusFirstError(errors);
       }
-      setSubmitError(error instanceof Error ? error.message : "The track could not be uploaded.");
+      setSubmitError(error instanceof Error ? error.message : "The track could not be saved.");
     } finally {
       setSubmitting(false);
     }
@@ -255,6 +345,10 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
   };
 
   const resetForm = () => {
+    if (isEditMode) {
+      onNavigate("/studio");
+      return;
+    }
     setTitle("");
     setGenreId(genres[0]?.id ?? 0);
     setAlbumId("");
@@ -269,8 +363,11 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     setUploadedTrackTitle("");
     setUploadedStatus("DRAFT");
     setConfirmModalOpen(false);
+    setShowLyricMaker(false);
     setCopyrightAgreed(false);
     setSubmitterNote("");
+    setExistingAudioUrl(null);
+    setExistingCoverUrl(null);
   };
 
   if (!isAuthenticated || !canUpload) {
@@ -293,23 +390,84 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
     );
   }
 
+  if (loadingTrack) {
+    return (
+      <div className="upload-track-page">
+        <div style={{ textAlign: "center", padding: "80px 20px" }}>
+          <div className="studio-spinner" style={{ margin: "0 auto 16px" }} />
+          <p style={{ color: "#786F65", fontWeight: 600 }}>Loading draft details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (trackFetchError) {
+    return (
+      <div className="upload-track-page">
+        <button className="upload-track-back" type="button" onClick={() => onNavigate("/studio")}>
+          <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
+        </button>
+        <div className="auth-v2-error upload-track-alert" role="alert" style={{ margin: "24px 0" }}>
+          <span><AlertIcon width={17} height={17} /></span>
+          <div><b>Unable to load track</b><small>{trackFetchError}</small></div>
+          <button className="button button-secondary button-small" type="button" onClick={() => onNavigate("/studio")}>Back to Studio</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (existingTrack && existingTrack.status === "PENDING") {
+    return (
+      <div className="upload-track-page">
+        <button className="upload-track-back" type="button" onClick={() => onNavigate(`/studio/tracks/${existingTrack.id}`)}>
+          <ChevronLeftIcon width={17} height={17} /> Back to Track Details
+        </button>
+        <section className="upload-track-success" role="status" style={{ borderTop: "4px solid #EAB308" }}>
+          <span className="upload-track-success__icon" style={{ background: "#FEF9C3", color: "#CA8A04" }}>
+            <AlertIcon width={34} height={34} />
+          </span>
+          <span className="eyebrow" style={{ color: "#CA8A04" }}>PENDING REVIEW</span>
+          <h1>Track currently in review</h1>
+          <p>
+            <strong>{existingTrack.title}</strong> is currently being reviewed by staff and cannot be modified directly.
+            If you need to make changes, please withdraw the submission first from the track details page.
+          </p>
+          <div className="upload-track-success__actions">
+            <button className="button button-primary" onClick={() => onNavigate(`/studio/tracks/${existingTrack.id}`)}>
+              Go to Track Details
+            </button>
+            <button className="button button-secondary" onClick={() => onNavigate("/studio")}>
+              Return to Content Studio
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   if (uploadedTrackTitle) {
     return (
       <div className="upload-track-page">
         <section className="upload-track-success" role="status">
           <span className="upload-track-success__icon"><CheckIcon width={34} height={34} /></span>
-          <span className="eyebrow">{uploadedStatus === "PENDING" ? "SUBMITTED FOR REVIEW" : "UPLOAD COMPLETE"}</span>
-          <h1>{uploadedStatus === "PENDING" ? "Track queued for staff review" : "Your draft is ready"}</h1>
+          <span className="eyebrow">{uploadedStatus === "PENDING" ? "SUBMITTED FOR REVIEW" : isEditMode ? "DRAFT UPDATED" : "UPLOAD COMPLETE"}</span>
+          <h1>{uploadedStatus === "PENDING" ? "Track queued for staff review" : isEditMode ? "Draft updated successfully" : "Your draft is ready"}</h1>
           <p>
             {uploadedStatus === "PENDING" ? (
               <><strong>{uploadedTrackTitle}</strong> has been submitted to the moderation queue. Staff will examine the audio and metadata before making it publicly accessible.</>
+            ) : isEditMode ? (
+              <><strong>{uploadedTrackTitle}</strong> has been updated and saved in your drafts. You can review it in Content Studio before submitting it to staff.</>
             ) : (
               <><strong>{uploadedTrackTitle}</strong> has been uploaded and saved as a private draft. Review it in Content Studio before submitting it to staff.</>
             )}
           </p>
           <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate("/studio")}>Open Content Studio</button>
-            <button className="button button-secondary" onClick={resetForm}>Upload another track</button>
+            <button className="button button-primary" onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>
+              {isEditMode ? "View track details" : "Open Content Studio"}
+            </button>
+            <button className="button button-secondary" onClick={() => onNavigate("/studio")}>
+              Return to Content Studio
+            </button>
           </div>
         </section>
       </div>
@@ -318,16 +476,22 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
 
   return (
     <div className="upload-track-page">
-      <button className="upload-track-back" type="button" onClick={() => onNavigate("/studio")}>
-        <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
+      <button className="upload-track-back" type="button" onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>
+        <ChevronLeftIcon width={17} height={17} /> {isEditMode ? "Back to Track Details" : "Back to Content Studio"}
       </button>
 
       <header className="upload-track-hero">
-        <span className="upload-track-hero__icon"><UploadIcon width={24} height={24} /></span>
+        <span className="upload-track-hero__icon">
+          {isEditMode ? <EditIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
+        </span>
         <div>
-          <span className="eyebrow">CONTENT STUDIO</span>
-          <h1>Upload a new track</h1>
-          <p>Add the audio and track information now. The track stays private as a draft until you submit it for review.</p>
+          <span className="eyebrow">{isEditMode ? "CONTENT STUDIO · EDIT DRAFT" : "CONTENT STUDIO"}</span>
+          <h1>{isEditMode ? `Edit draft: ${existingTrack?.title || title || "Track"}` : "Upload a new track"}</h1>
+          <p>
+            {isEditMode
+              ? "Update track details, replace audio or cover artwork, and synchronize lyrics. Changes remain in your private drafts until submitted."
+              : "Add the audio and track information now. The track stays private as a draft until you submit it for review."}
+          </p>
         </div>
       </header>
 
@@ -415,56 +579,127 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
             <MediaUploadField
               id="audio-upload"
               label="Audio file"
-              helperText="MP3, WAV or FLAC · Max 30MB"
+              helperText={isEditMode && existingAudioName ? "MP3, WAV, FLAC · Optional (existing file kept if empty)" : "MP3, WAV or FLAC · Max 30MB"}
               accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
               file={audioFile}
+              existingFileLabel={existingAudioName}
               error={formErrors.audio}
-              required
+              required={!isEditMode && !existingAudioUrl}
               disabled={submitting}
               onFileChange={(file) => void handleAudioChange(file)}
             />
             <MediaUploadField
               id="cover-upload"
               label="Cover artwork"
-              helperText="JPG or PNG · Max 5MB"
+              helperText={isEditMode && existingCoverName ? "JPG, PNG · Optional (existing cover kept if empty)" : "JPG or PNG · Max 5MB"}
               accept=".jpg,.jpeg,.png,image/jpeg,image/png"
               file={coverFile}
+              existingFileLabel={existingCoverName}
               error={formErrors.cover}
               disabled={submitting}
               onFileChange={handleCoverChange}
             />
           </div>
 
-          <div className="upload-track-lyrics-field">
-            <MediaUploadField
-              id="lyrics-upload"
-              label="Lyrics file"
-              helperText="LRC or TXT · Max 1MB · Optional"
-              accept=".lrc,.txt,text/plain"
-              file={lyricsFile}
-              error={formErrors.lyrics}
-              disabled={submitting}
-              onFileChange={(file) => void handleLyricsChange(file)}
-            />
+          <div className="upload-track-lyrics-section" style={{ marginTop: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "10px",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
+              <label style={{ fontSize: "13px", fontWeight: 700, color: "#1C1917" }}>
+                Lyrics <span style={{ fontWeight: 400, color: "#786F65", fontSize: "12px" }}>(optional)</span>
+              </label>
+              {lyrics && (
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--brand, #0284c7)",
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "#E0F2FE",
+                    padding: "3px 10px",
+                    borderRadius: "20px",
+                  }}
+                >
+                  <CheckIcon width={14} height={14} />
+                  Lyrics loaded ({lyrics.split("\n").filter((l) => l.trim().length > 0).length} lines)
+                </span>
+              )}
+            </div>
 
+            <div className="upload-track-lyrics-field">
+              <MediaUploadField
+                id="lyrics-upload"
+                label="Lyrics file"
+                helperText="LRC or TXT · Max 1MB · Optional"
+                accept=".lrc,.txt,text/plain"
+                file={lyricsFile}
+                existingFileLabel={lyrics ? "Existing lyrics attached" : undefined}
+                error={formErrors.lyrics}
+                disabled={submitting}
+                onFileChange={(file) => void handleLyricsChange(file)}
+                extraActions={
+                  <button
+                    type="button"
+                    className={`button button-small ${showLyricMaker ? "button-primary" : "button-secondary"}`}
+                    disabled={submitting || (!audioFile && !existingAudioUrl)}
+                    title={(!audioFile && !existingAudioUrl) ? "Upload audio or choose a track first to synchronize lyrics" : undefined}
+                    onClick={() => setShowLyricMaker((prev) => !prev)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
+                  >
+                    <EditIcon width={14} height={14} />
+                    <span>{showLyricMaker ? "Close LRC Maker" : lyrics ? "Edit lyrics" : "Create lyrics"}</span>
+                  </button>
+                }
+              />
+            </div>
+
+            {showLyricMaker && (
+              <div style={{ marginTop: "14px" }}>
+                <LyricSyncTab
+                  audioFile={audioFile}
+                  audioUrl={existingAudioUrl}
+                  initialLyrics={lyrics}
+                  trackTitle={title}
+                  onApplyLyrics={(lrcString, virtualFile) => {
+                    handleApplyGeneratedLyrics(lrcString, virtualFile);
+                    setShowLyricMaker(false);
+                  }}
+                  onClearLyrics={() => {
+                    setLyrics("");
+                    setLyricsFile(null);
+                    setPageToast({ type: "success", message: "Lyrics cleared." });
+                  }}
+                  onSwitchToUpload={() => setShowLyricMaker(false)}
+                />
+              </div>
+            )}
           </div>
 
           {submitting && (
             <div className="studio-upload-progress" role="status" aria-live="polite">
               <span className="studio-upload-progress__bar" />
-              <div><b>Uploading your track</b><small>Please keep this page open while media is being processed.</small></div>
+              <div><b>{isEditMode ? "Updating your track" : "Uploading your track"}</b><small>Please keep this page open while media is being processed.</small></div>
             </div>
           )}
 
           <div className="upload-track-actions">
-            <button className="button button-secondary" type="button" disabled={submitting} onClick={() => onNavigate("/studio")}>Cancel</button>
+            <button className="button button-secondary" type="button" disabled={submitting} onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>Cancel</button>
             <button
               className="button button-secondary"
               type="submit"
               disabled={submitting || loadingOptions || Boolean(optionsError)}
               id="btn-upload-save-draft"
             >
-              Save draft
+              {isEditMode ? "Save draft changes" : "Save draft"}
             </button>
             <button
               className="button button-primary"
@@ -473,7 +708,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
               onClick={handleStartSubmitReview}
               id="btn-upload-submit-review"
             >
-              <UploadIcon width={17} height={17} /> {submitting ? "Uploading..." : "Submit for review"}
+              <UploadIcon width={17} height={17} /> {submitting ? "Saving..." : isEditMode ? "Save & submit for review" : "Submit for review"}
             </button>
           </div>
         </form>
@@ -548,6 +783,15 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate }: Prop
           </div>
         </div>,
         document.body
+      )}
+
+      {pageToast && (
+        <CenterNotificationPopup
+          open={Boolean(pageToast)}
+          type={pageToast.type}
+          message={pageToast.message}
+          onClose={() => setPageToast(null)}
+        />
       )}
     </div>
   );

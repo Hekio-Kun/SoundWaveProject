@@ -263,13 +263,37 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   // 4. Creator Studio Routes
-  if (pathname === "/studio/upload") {
+  if (
+    (pathname.startsWith("/studio/tracks/") && pathname.endsWith("/edit")) ||
+    (pathname.startsWith("/studio/track/") && pathname.endsWith("/edit"))
+  ) {
     if (!authReady || !isAuthenticated) return null;
+    const parts = pathname.split("/");
+    const trackId = Number(parts[3]) || Number(parts[2]) || null;
+    if (!trackId) {
+      navigate("/studio");
+      return null;
+    }
     return (
       <UploadTrackPage
         isAuthenticated={isAuthenticated}
         canUpload={user?.role === "LISTENER"}
         onNavigate={navigate}
+        editTrackId={trackId}
+      />
+    );
+  }
+
+  if (pathname === "/studio/upload") {
+    if (!authReady || !isAuthenticated) return null;
+    const editParam = queryParams.get("edit") || queryParams.get("trackId");
+    const editTrackId = editParam ? Number(editParam) : undefined;
+    return (
+      <UploadTrackPage
+        isAuthenticated={isAuthenticated}
+        canUpload={user?.role === "LISTENER"}
+        onNavigate={navigate}
+        editTrackId={editTrackId}
       />
     );
   }

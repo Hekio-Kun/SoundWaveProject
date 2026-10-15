@@ -9,6 +9,8 @@ import { MusicAppShell } from "./layouts/MusicAppShell";
 import { MusicPlayer } from "./components/player/MusicPlayer";
 import { GuestLoginPrompt } from "./components/modals/GuestLoginPrompt";
 import { LogoutConfirmationDialog } from "./components/modals/LogoutConfirmationDialog";
+import { CenterNotificationPopup } from "./components/modals/CenterNotificationPopup";
+import { tracks } from "./data";
 
 function AppContent() {
   const {
@@ -20,6 +22,7 @@ function AppContent() {
     confirmLogout,
     cancelLogout,
     logoutNotice,
+    setLogoutNotice,
   } = useAuth();
 
   const {
@@ -42,8 +45,11 @@ function AppContent() {
     reorderQueue,
   } = usePlayer();
 
-  const { openCreatePlaylist, toastNotice } = usePlaylists();
+  const { openCreatePlaylist, toastNotice, showToast } = usePlaylists();
   const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
+
+  const activeTrack = currentTrack || tracks[0];
+  const activeQueue = queue.length > 0 ? queue : tracks;
 
   return (
     <div className={isMusicRoute ? "app-root app-root--has-player" : "app-root"}>
@@ -72,9 +78,9 @@ function AppContent() {
           onCreatePlaylist={openCreatePlaylist}
           queueOpen={queueOpen}
           onCloseQueue={() => setQueueOpen(false)}
-          currentTrack={currentTrack}
+          currentTrack={activeTrack}
           playing={playing}
-          queue={queue}
+          queue={activeQueue}
           onPlayTrack={playTrack}
           onRemoveFromQueue={removeFromQueue}
           onClearQueue={clearQueue}
@@ -88,11 +94,11 @@ function AppContent() {
         </MusicAppShell>
       )}
 
-      {/* Global Music Player fixed at bottom */}
-      {isMusicRoute && currentTrack && (
+      {/* Global Music Player fixed at bottom - luôn luôn giữ được bật không được tắt */}
+      {isMusicRoute && activeTrack && (
         <MusicPlayer
-          track={currentTrack}
-          queue={queue}
+          track={activeTrack}
+          queue={activeQueue}
           audio={audio}
           playing={playing}
           onPlayingChange={setAudioPlaying}
@@ -124,9 +130,24 @@ function AppContent() {
         onConfirm={confirmLogout}
       />
 
-      {/* Global Toast Notifications */}
-      {logoutNotice ? <div className="app-toast" role="status">{logoutNotice}</div> : null}
-      {toastNotice ? <div className="app-toast" role="status">{toastNotice}</div> : null}
+      {/* Global Top-Center Toast Notifications */}
+      {logoutNotice ? (
+        <CenterNotificationPopup
+          open={Boolean(logoutNotice)}
+          type="success"
+          message={logoutNotice}
+          onClose={() => setLogoutNotice("")}
+        />
+      ) : null}
+
+      {toastNotice ? (
+        <CenterNotificationPopup
+          open={Boolean(toastNotice)}
+          type="success"
+          message={toastNotice}
+          onClose={() => showToast("")}
+        />
+      ) : null}
     </div>
   );
 }

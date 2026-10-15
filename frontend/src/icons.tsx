@@ -50,4 +50,10 @@ export const EditIcon = (p: IconProps) => <svg {...base} {...p}><path d="M11 4H4
 export const ArrowUpIcon = (p: IconProps) => <svg {...base} {...p}><path d="m18 15-6-6-6 6"/></svg>;
 export const ArrowDownIcon = (p: IconProps) => <svg {...base} {...p}><path d="m6 9 6 6 6-6"/></svg>;
 export const RefreshIcon = (p: IconProps) => <svg {...base} {...p}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
+export const RewindIcon = (p: IconProps) => <svg {...base} {...p}><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>;
+export const FastForwardIcon = (p: IconProps) => <svg {...base} {...p}><polygon points="13 19 22 12 13 5 13 19"/><polygon points="2 19 11 12 2 5 2 19"/></svg>;
+export const RotateCcwIcon = (p: IconProps) => <svg {...base} {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+export const DownloadIcon = (p: IconProps) => <svg {...base} {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+export const MusicIcon = (p: IconProps) => <svg {...base} {...p}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+export const ZapIcon = (p: IconProps) => <svg {...base} {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
 

@@ -56,3 +56,7 @@ nhạc dự án/
 docs/backlog_corrected.csv
 docs/backlog_corrected.tsv
 docs/UC-21_Manage_Album_Specification.md
+### Diagrams & Design Assets ###
+diagram/
+**/diagram/
+*.drawio
