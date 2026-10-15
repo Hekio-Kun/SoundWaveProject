@@ -8,6 +8,7 @@ export * from "./modals/DeleteConfirmationModal";
 export * from "./modals/GenreFormModal";
 export * from "./modals/GuestLoginPrompt";
 export * from "./modals/LogoutConfirmationDialog";
+export * from "./modals/CenterNotificationPopup";
 export * from "./modals/ManageAlbumTracksModal";
 export * from "./modals/ManagePlaylistTracksModal";
 export * from "./modals/PlaylistFormModal";
@@ -29,6 +30,7 @@ export * from "./common/MediaUploadField";
 export * from "./common/MusicCards";
 export * from "./common/SortDropdown";
 export * from "./common/LandingPage";
+export * from "./common/LyricSyncTab";
 
 // Moderation
 export * from "./moderation/ModeratePendingTracks";

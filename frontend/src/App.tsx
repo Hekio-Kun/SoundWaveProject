@@ -9,6 +9,7 @@ import { MusicAppShell } from "./layouts/MusicAppShell";
 import { MusicPlayer } from "./components/player/MusicPlayer";
 import { GuestLoginPrompt } from "./components/modals/GuestLoginPrompt";
 import { LogoutConfirmationDialog } from "./components/modals/LogoutConfirmationDialog";
+import { CenterNotificationPopup } from "./components/modals/CenterNotificationPopup";
 import { tracks } from "./data";
 
 function AppContent() {
@@ -21,6 +22,7 @@ function AppContent() {
     confirmLogout,
     cancelLogout,
     logoutNotice,
+    setLogoutNotice,
   } = useAuth();
 
   const {
@@ -43,7 +45,7 @@ function AppContent() {
     reorderQueue,
   } = usePlayer();
 
-  const { openCreatePlaylist, toastNotice } = usePlaylists();
+  const { openCreatePlaylist, toastNotice, showToast } = usePlaylists();
   const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
 
   const activeTrack = currentTrack || tracks[0];
@@ -128,9 +130,24 @@ function AppContent() {
         onConfirm={confirmLogout}
       />
 
-      {/* Global Toast Notifications */}
-      {logoutNotice ? <div className="app-toast" role="status">{logoutNotice}</div> : null}
-      {toastNotice ? <div className="app-toast" role="status">{toastNotice}</div> : null}
+      {/* Global Top-Center Toast Notifications */}
+      {logoutNotice ? (
+        <CenterNotificationPopup
+          open={Boolean(logoutNotice)}
+          type="success"
+          message={logoutNotice}
+          onClose={() => setLogoutNotice("")}
+        />
+      ) : null}
+
+      {toastNotice ? (
+        <CenterNotificationPopup
+          open={Boolean(toastNotice)}
+          type="success"
+          message={toastNotice}
+          onClose={() => showToast("")}
+        />
+      ) : null}
     </div>
   );
 }

@@ -52,3 +52,7 @@ build/
 ### Local Project Media Assets ###
 nhạc dự án/
 
+### Diagrams & Design Assets ###
+diagram/
+**/diagram/
+*.drawio
