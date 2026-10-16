@@ -12,4 +12,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByEmailIgnoreCase(String email);
 
     java.util.List<AppUser> findByEmailContainingIgnoreCase(String email);
+
+    java.util.List<AppUser> findByRole_CodeIn(java.util.Collection<String> roleCodes);
 }

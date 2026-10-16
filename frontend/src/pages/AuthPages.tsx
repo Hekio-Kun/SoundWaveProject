@@ -77,7 +77,7 @@ export function AuthExperience({
 
           <div className="auth-v2-now-playing">
             <span className="auth-v2-cover"><i /><i /><i /><i /></span>
-            <span><small>NOW PLAYING ON SOUNDWAVE</small><strong>Sớm Mai Dịu Dàng</strong><em>Minh An · Acoustic</em></span>
+            <span><small>NOW PLAYING ON SOUNDWAVE</small><strong>Thành Phố Sau Mưa</strong><em>Bảo Lam · Pop</em></span>
             <b><PlayIcon width={17} height={17} /></b>
           </div>
 
