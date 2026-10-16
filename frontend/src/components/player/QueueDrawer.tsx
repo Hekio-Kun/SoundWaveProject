@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { ArrowDownIcon, ArrowUpIcon, CloseIcon, PlayIcon, TrashIcon } from "../../icons";
-import type { LandingTrack } from "../../types";
+import type { LandingTrack, ListeningHistoryItem } from "../../types";
+import { historyApi } from "../../api/history";
+import { historyItemToTrack } from "../../pages/LibraryPage";
+import { DeleteConfirmationModal } from "../modals/DeleteConfirmationModal";
 
 /**
  * Props for the {@link QueueDrawer} component.
@@ -60,6 +63,50 @@ export function QueueDrawer({
 }: QueueDrawerProps) {
   const [tab, setTab] = useState<"queue" | "recent">("queue");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [recentItems, setRecentItems] = useState<ListeningHistoryItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [deleteRecentTarget, setDeleteRecentTarget] = useState<ListeningHistoryItem | null>(null);
+  const [isClearRecentModalOpen, setIsClearRecentModalOpen] = useState(false);
+  const [isDeletingRecent, setIsDeletingRecent] = useState(false);
+  const [isClearingRecent, setIsClearingRecent] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && tab === "recent") {
+      setRecentLoading(true);
+      historyApi
+        .getListeningHistory(0, 15)
+        .then((res) => setRecentItems(res.content || []))
+        .catch(() => setRecentItems([]))
+        .finally(() => setRecentLoading(false));
+    }
+  }, [isOpen, tab]);
+
+  const handleConfirmDeleteRecent = async () => {
+    if (!deleteRecentTarget) return;
+    setIsDeletingRecent(true);
+    try {
+      await historyApi.deleteHistoryItem(deleteRecentTarget.id);
+      setRecentItems((prev) => prev.filter((item) => item.id !== deleteRecentTarget.id));
+      setDeleteRecentTarget(null);
+    } catch {
+      // ignore
+    } finally {
+      setIsDeletingRecent(false);
+    }
+  };
+
+  const handleConfirmClearRecent = async () => {
+    setIsClearingRecent(true);
+    try {
+      await historyApi.clearHistory();
+      setRecentItems([]);
+      setIsClearRecentModalOpen(false);
+    } catch {
+      // ignore
+    } finally {
+      setIsClearingRecent(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -148,10 +195,56 @@ export function QueueDrawer({
 
       <div className="queue-drawer-body">
         {tab === "recent" ? (
-          <div className="queue-empty-state" style={{ marginTop: "24px" }}>
-            <p>No recently played tracks</p>
-            <small>Tracks you listen to will appear in your listening history.</small>
-          </div>
+          recentLoading && recentItems.length === 0 ? (
+            <div className="queue-empty-state" style={{ marginTop: "24px" }}>
+              <p>Loading recent history...</p>
+            </div>
+          ) : recentItems.length === 0 ? (
+            <div className="queue-empty-state" style={{ marginTop: "24px" }}>
+              <p>No recently played tracks</p>
+              <small>Tracks you listen to will appear in your listening history.</small>
+            </div>
+          ) : (
+            <div className="queue-next-section">
+              <div className="queue-next-header">
+                <span className="queue-section-label">RECENTLY PLAYED ({recentItems.length})</span>
+                <button className="queue-clear-btn" onClick={() => setIsClearRecentModalOpen(true)}>
+                  Clear all
+                </button>
+              </div>
+              <div className="queue-track-list">
+                {recentItems.map((item) => {
+                  const track = historyItemToTrack(item);
+                  return (
+                    <div key={item.id} className="queue-track-card">
+                      <div className="queue-track-cover" onClick={() => onPlayTrack(track)}>
+                        <img src={item.coverUrl ?? undefined} alt="" />
+                        <button className="queue-play-hover-btn" aria-label={`Play ${item.title}`}>
+                          <PlayIcon width={14} height={14} />
+                        </button>
+                      </div>
+                      <div className="queue-track-info" onClick={() => onPlayTrack(track)}>
+                        <p className="queue-track-title">{item.title}</p>
+                        <p className="queue-track-artist">{item.artistName}</p>
+                      </div>
+                      <span className="queue-track-duration">{formatDuration(item.durationMs)}</span>
+                      <button
+                        className="queue-remove-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteRecentTarget(item);
+                        }}
+                        aria-label={`Remove ${item.title} from history`}
+                        title="Remove from history"
+                      >
+                        <TrashIcon width={14} height={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
         ) : (
           <>
             {currentTrack && (
@@ -250,6 +343,28 @@ export function QueueDrawer({
         )}
       </div>
     </aside>
+
+    {/* Confirmation modal for removing single recent track */}
+    <DeleteConfirmationModal
+      open={Boolean(deleteRecentTarget)}
+      title="Remove from history"
+      message={`Remove "${deleteRecentTarget?.title}" from your recently played tracks?`}
+      confirmLabel="Remove"
+      submitting={isDeletingRecent}
+      onConfirm={handleConfirmDeleteRecent}
+      onCancel={() => setDeleteRecentTarget(null)}
+    />
+
+    {/* Confirmation modal for clearing all recent history */}
+    <DeleteConfirmationModal
+      open={isClearRecentModalOpen}
+      title="Clear recent history"
+      message="Are you sure you want to clear your recent listening history?"
+      confirmLabel="Clear all"
+      submitting={isClearingRecent}
+      onConfirm={handleConfirmClearRecent}
+      onCancel={() => setIsClearRecentModalOpen(false)}
+    />
   </>
 );
 }
