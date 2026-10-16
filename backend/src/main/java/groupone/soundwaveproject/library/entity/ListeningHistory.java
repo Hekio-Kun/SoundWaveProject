@@ -23,6 +23,10 @@ public class ListeningHistory {
     @Column(name = "track_id", nullable = false)
     private Long trackId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "track_id", insertable = false, updatable = false)
+    private groupone.soundwaveproject.catalog.entity.Track track;
+
     @Column(name = "listened_duration_ms", nullable = false)
     private Integer listenedDurationMs;
 

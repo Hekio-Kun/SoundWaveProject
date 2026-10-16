@@ -121,3 +121,17 @@ export type StudioAlbum = {
   tracks?: StudioTrack[];
 };
 
+export type ListeningHistoryItem = {
+  id: number;
+  trackId: number;
+  title: string;
+  slug: string;
+  artistName: string;
+  durationMs: number;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  playedAt: string;
+  listenedDurationMs: number;
+  completed: boolean;
+};
+
