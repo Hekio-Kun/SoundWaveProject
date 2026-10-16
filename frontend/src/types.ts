@@ -121,3 +121,23 @@ export type StudioAlbum = {
   tracks?: StudioTrack[];
 };
 
+export type NotificationType =
+  | "TRACK_APPROVED"
+  | "TRACK_REJECTED"
+  | "TRACK_SUBMISSION"
+  | "CONTENT_REPORT"
+  | "SYSTEM_NOTICE"
+  | string;
+
+export type NotificationItem = {
+  id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  navigationUrl?: string | null;
+};
+

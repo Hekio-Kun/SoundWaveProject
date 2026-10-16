@@ -9,6 +9,7 @@ import {
   ShieldIcon,
   UserIcon,
 } from "../icons";
+import { NotificationDropdown } from "../components/layout/NotificationDropdown";
 import type { CurrentUser } from "../types";
 
 type Props = {
@@ -221,6 +222,7 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           </div>
 
           <div className="ops-shell-actions">
+            <NotificationDropdown onNavigate={handleNavClick} />
             {user ? (
               <div className="ops-topbar-user-pill">
                 <div className="ops-topbar-avatar">
