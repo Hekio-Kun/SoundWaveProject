@@ -54,17 +54,19 @@ public class StudioAlbumController {
     }
 
     /**
-     * Tạo Album mới với trạng thái mặc định DRAFT và tải ảnh bìa lên Cloudinary (UC-21.1 Create Album).
+     * Tạo Album mới kèm tải lên một lượt toàn bộ bài hát cấu thành hoặc lưu bản nháp (UC-21.1 Create Album).
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<StudioAlbumResponse> createAlbum(
             @RequestPart("album") @Valid CreateAlbumRequest request,
             @RequestPart(value = "cover", required = false) MultipartFile cover,
+            @RequestPart(value = "audioFiles", required = false) List<MultipartFile> audioFiles,
             Authentication authentication
     ) {
-        StudioAlbumResponse response = studioAlbumService.createAlbum(request, cover, authentication.getName());
+        StudioAlbumResponse response = studioAlbumService.createAlbum(request, cover, audioFiles, authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
 
     /**
      * Cập nhật thông tin Album, thay ảnh bìa hoặc sắp xếp lại danh sách bài hát (UC-21.3 Update Album).
