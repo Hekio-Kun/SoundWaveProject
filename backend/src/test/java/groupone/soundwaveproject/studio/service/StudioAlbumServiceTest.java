@@ -11,12 +11,14 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.library.repository.ListeningHistoryRepository;
 import groupone.soundwaveproject.library.repository.PlaylistTrackRepository;
 import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
+import groupone.soundwaveproject.media.exception.CloudStorageUnavailableException;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.studio.dto.request.AlbumTrackItemRequest;
@@ -337,5 +339,118 @@ class StudioAlbumServiceTest {
         verify(cloudMediaService).deleteImageQuietly("album-cover-pub-id");
         // Xóa entity album
         verify(albumRepository).delete(mockAlbum);
+    }
+
+    @Test
+    @DisplayName("UC-21.1 EX: Báo lỗi khi tạo album với tiêu đề để trống")
+    void createAlbum_BlankTitle_ThrowsBadRequest() {
+        CreateAlbumRequest request = CreateAlbumRequest.builder().title("   ").build();
+        assertThatThrownBy(() -> studioAlbumService.createAlbum(request, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Album title is required");
+    }
+
+    @Test
+    @DisplayName("UC-21.1 EX: Báo lỗi khi tiêu đề album vượt quá 200 ký tự")
+    void createAlbum_TitleTooLong_ThrowsBadRequest() {
+        String longTitle = "A".repeat(201);
+        CreateAlbumRequest request = CreateAlbumRequest.builder().title(longTitle).build();
+        assertThatThrownBy(() -> studioAlbumService.createAlbum(request, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("must not exceed 200 characters");
+    }
+
+    @Test
+    @DisplayName("UC-21.1 EX: Báo lỗi khi gửi kiểm duyệt album trống không có bài hát nào")
+    void createAlbum_SubmitForReviewWithNoTracks_ThrowsBadRequest() {
+        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Empty Album")).thenReturn(false);
+
+        CreateAlbumRequest request = CreateAlbumRequest.builder()
+                .title("Empty Album")
+                .submitForReview(true)
+                .tracks(Collections.emptyList())
+                .build();
+
+        assertThatThrownBy(() -> studioAlbumService.createAlbum(request, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("An album must contain at least one track to be submitted for review");
+    }
+
+    @Test
+    @DisplayName("UC-21.1 EX: Tự động dọn dẹp (compensating rollback) media đã tải lên Cloudinary khi xảy ra lỗi")
+    void createAlbum_CloudinaryFailure_RollsBackUploadedMediaAndThrows() {
+        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Crash Album")).thenReturn(false);
+
+        MockMultipartFile coverFile = new MockMultipartFile("cover", "cover.png", "image/png", new byte[]{1, 2});
+        when(cloudMediaService.uploadAlbumCover(any(), eq(10L)))
+                .thenReturn(new StoredMediaResponse("uploaded-cover-id", "https://cloud/cover.png"));
+
+        when(albumRepository.save(any(Album.class))).thenAnswer(inv -> {
+            Album a = inv.getArgument(0);
+            a.setId(999L);
+            return a;
+        });
+
+        Genre genre = Genre.builder().id(1L).name("Pop").isActive(true).build();
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(genre));
+        when(cloudMediaService.uploadTrackAudio(any(), eq(10L)))
+                .thenThrow(new CloudStorageUnavailableException());
+
+        AlbumTrackItemRequest trackItem = AlbumTrackItemRequest.builder()
+                .title("Track 1")
+                .genreId(1L)
+                .build();
+
+        CreateAlbumRequest request = CreateAlbumRequest.builder()
+                .title("Crash Album")
+                .tracks(List.of(trackItem))
+                .build();
+
+        MockMultipartFile audioFile = new MockMultipartFile("audioFiles", "track1.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> studioAlbumService.createAlbum(request, coverFile, List.of(audioFile), mockUser.getEmail()))
+                .isInstanceOf(CloudStorageUnavailableException.class);
+
+        // Xác nhận ảnh bìa đã upload phải được dọn dẹp ngay lập tức
+        verify(cloudMediaService).deleteImageQuietly("uploaded-cover-id");
+    }
+
+    @Test
+    @DisplayName("UC-21.2 EX: Báo lỗi BadRequest khi ID album không hợp lệ (<= 0 hoặc null)")
+    void getAlbumById_InvalidId_ThrowsBadRequest() {
+        assertThatThrownBy(() -> studioAlbumService.getAlbumById(-1L, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Invalid album ID");
+    }
+
+    @Test
+    @DisplayName("UC-21.3 EX: Báo lỗi khi cập nhật gán bài hát đã thuộc album khác")
+    void updateAlbum_TrackBelongsToAnotherAlbum_ThrowsBadRequest() {
+        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(10L, "New Album Title", 100L)).thenReturn(false);
+
+        Album otherAlbum = Album.builder().id(200L).title("Other Album").build();
+        Track stolenTrack = Track.builder().id(600L).uploaderUserId(10L).title("Belongs to Other").album(otherAlbum).build();
+        when(trackRepository.findByIdAndUploaderUserId(600L, 10L)).thenReturn(Optional.of(stolenTrack));
+
+        UpdateAlbumRequest request = UpdateAlbumRequest.builder()
+                .title("New Album Title")
+                .trackIds(List.of(600L))
+                .build();
+
+        assertThatThrownBy(() -> studioAlbumService.updateAlbum(100L, request, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("already belongs to another album");
+    }
+
+    @Test
+    @DisplayName("UC-21.4 EX: Báo lỗi BadRequest khi xóa album với ID không hợp lệ")
+    void deleteAlbum_InvalidId_ThrowsBadRequest() {
+        assertThatThrownBy(() -> studioAlbumService.deleteAlbum(0L, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Invalid album ID");
     }
 }
