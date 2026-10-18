@@ -22,12 +22,12 @@ import java.security.Principal;
 
 /**
  * Controller quản lý toàn bộ chức năng kiểm duyệt bài hát và album (UC-24: Manage Content Moderation).
- * Dành riêng cho nhân viên kiểm duyệt (STAFF) và Quản trị viên (ADMIN).
+ * Dành riêng cho nhân viên kiểm duyệt (STAFF).
  */
 @RestController
 @RequestMapping({"/api/v1/moderation/submissions", "/api/v1/admin/moderation/tracks", "/api/v1/moderation"})
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+@PreAuthorize("hasRole('STAFF')")
 public class ModerationController {
     private final ModerationService moderationService;
 

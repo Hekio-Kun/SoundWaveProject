@@ -172,6 +172,30 @@ public class TrackSubmissionMapper {
                                                      AppUser reviewer,
                                                      UserProfile reviewerProfile,
                                                      String lyrics) {
+        return toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, null);
+    }
+
+    /**
+     * Ánh xạ thông tin yêu cầu kiểm duyệt sang DTO chi tiết kèm lời bài hát (lyrics) và thông tin điều hướng Album.
+     *
+     * @param submission       Thực thể yêu cầu kiểm duyệt
+     * @param track            Thực thể bài hát
+     * @param submitter        Tài khoản tác giả gửi bài
+     * @param submitterProfile Hồ sơ cá nhân của tác giả
+     * @param reviewer         Tài khoản nhân viên kiểm duyệt
+     * @param reviewerProfile  Hồ sơ cá nhân của nhân viên kiểm duyệt
+     * @param lyrics           Lời bài hát (nội dung text/lrc)
+     * @param albumNavigation  Thông tin điều hướng các bài hát trong Album
+     * @return DTO SubmissionDetailResponse chi tiết đầy đủ kèm thông tin điều hướng Album
+     */
+    public SubmissionDetailResponse toDetailResponse(TrackSubmission submission,
+                                                     Track track,
+                                                     AppUser submitter,
+                                                     UserProfile submitterProfile,
+                                                     AppUser reviewer,
+                                                     UserProfile reviewerProfile,
+                                                     String lyrics,
+                                                     AlbumTrackNavigationResponse albumNavigation) {
         if (submission == null) {
             return null;
         }
@@ -190,7 +214,8 @@ public class TrackSubmissionMapper {
                 submission.getReviewedAt(),
                 trackDetail,
                 submitterSummary,
-                reviewerSummary
+                reviewerSummary,
+                albumNavigation
         );
     }
 

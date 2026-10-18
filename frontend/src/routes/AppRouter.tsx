@@ -422,7 +422,7 @@ export function AppRouter(): React.ReactElement | null {
       pathname.startsWith("/staff/submissions/") || pathname.startsWith("/staff/moderation/")
         ? Number(parts[3]) || null
         : null;
-    return user?.role === "STAFF" || user?.role === "ADMIN" ? (
+    return user?.role === "STAFF" ? (
       <StaffDashboardPage onNavigate={navigate} initialSubmissionId={submissionId} />
     ) : (
       <DashboardAccessDenied onNavigate={navigate} requiredRole="Moderation Staff" />
