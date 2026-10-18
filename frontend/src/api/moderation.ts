@@ -11,9 +11,12 @@ export type SubmissionStats = {
 
 export type SubmissionQueueItem = {
   id: number;
-  trackId: number;
+  itemType?: "SINGLE" | "ALBUM" | "ALBUM_TRACK";
+  trackId?: number | null;
   trackTitle: string;
+  trackNumber?: number | null;
   genreName: string | null;
+  albumId?: number | null;
   albumTitle: string | null;
   coverUrl: string | null;
   durationMs: number | null;
@@ -24,6 +27,8 @@ export type SubmissionQueueItem = {
   submittedAt: string;
   reviewedAt: string | null;
   reviewerDisplayName: string | null;
+  trackCount?: number;
+  albumTracks?: SubmissionQueueItem[] | null;
 };
 
 export type SubmissionDetail = {

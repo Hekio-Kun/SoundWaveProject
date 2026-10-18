@@ -39,12 +39,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Service xử lý toàn bộ nghiệp vụ Quản lý kiểm duyệt bài hát (UC-24: Manage Track Moderation).
+ * Service xử lý toàn bộ nghiệp vụ Quản lý kiểm duyệt bài hát và album (UC-24: Manage Content Moderation).
  * Bao gồm các quy trình:
  * - Xem hàng đợi duyệt và tìm kiếm bài hát theo từ khóa (UC-24.1)
  * - Xem chi tiết bài hát, tệp âm thanh và lời bài hát (lyrics) (UC-24.1)
- * - Phê duyệt bài hát kèm tự động xuất bản Album theo BR-18 và gửi email (UC-24.2)
- * - Từ chối bài hát kèm lý do tối thiểu 10 ký tự và gửi email (UC-24.2)
+ * - Phê duyệt bài hát kèm tự động xuất bản Album theo BR-18 và gửi thông báo (UC-24.2)
+ * - Từ chối bài hát kèm lý do tối thiểu 10 ký tự và gửi thông báo (UC-24.2)
  * - Gỡ bài hát đã xuất bản (Take Down) (UC-24.2)
  */
 @Service
@@ -60,23 +60,31 @@ public class ModerationService {
     private final NotificationService notificationService;
 
     /**
-     * Lấy danh sách hàng đợi các bài hát cần kiểm duyệt theo phân trang và bộ lọc tìm kiếm (UC-24.1 View Moderation Queue).
+     * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt theo phân trang và bộ lọc tìm kiếm (UC-24.1 View Moderation Queue).
      *
      * @param status   Trạng thái yêu cầu kiểm duyệt cần lọc (PENDING, APPROVED, REJECTED)
-     * @param search   Từ khóa tìm kiếm theo tên bài hát hoặc email người gửi
+     * @param search   Từ khóa tìm kiếm theo tên bài hát, tên album hoặc email người gửi
      * @param pageable Cấu hình phân trang và sắp xếp
-     * @return Trang danh sách các mục trong hàng đợi kiểm duyệt
+     * @return Trang danh sách các mục (Track đơn hoặc Album) trong hàng đợi kiểm duyệt
      */
     @Transactional(readOnly = true)
     public Page<SubmissionQueueItemResponse> getQueue(SubmissionStatus status, String search, Pageable pageable) {
         boolean searchProvided = search != null && !search.trim().isBlank();
         Page<TrackSubmission> page;
 
-        // 1. Nếu có từ khóa tìm kiếm: lọc trước theo tên bài hát hoặc email người gửi
+        // 1. Nếu có từ khóa tìm kiếm: lọc trước theo tên bài hát, tên album hoặc email người gửi
         if (searchProvided) {
             String trimmedSearch = search.trim().toLowerCase(Locale.ROOT);
             List<Long> matchingTrackIds = trackRepository.findAll().stream()
-                    .filter(t -> t.getTitle() != null && t.getTitle().toLowerCase(Locale.ROOT).contains(trimmedSearch))
+                    .filter(t -> {
+                        if (t.getTitle() != null && t.getTitle().toLowerCase(Locale.ROOT).contains(trimmedSearch)) {
+                            return true;
+                        }
+                        if (t.getAlbum() != null && t.getAlbum().getTitle() != null && t.getAlbum().getTitle().toLowerCase(Locale.ROOT).contains(trimmedSearch)) {
+                            return true;
+                        }
+                        return false;
+                    })
                     .map(Track::getId)
                     .toList();
 
@@ -121,15 +129,70 @@ public class ModerationService {
                 userRepository.findAllById(userIds).stream()
                         .collect(Collectors.toMap(AppUser::getId, Function.identity()));
 
-        // 5. Ánh xạ sang danh sách DTO SubmissionQueueItemResponse
-        return page.map(submission -> {
+        // 5. Ánh xạ sang danh sách DTO SubmissionQueueItemResponse:
+        // - Single tracks được hiển thị riêng lẻ với itemType = "SINGLE"
+        // - Các bài hát thuộc Album được gom nhóm theo Album với itemType = "ALBUM" và chứa albumTracks
+        List<SubmissionQueueItemResponse> queueItems = new ArrayList<>();
+        Set<Long> processedAlbumIds = new HashSet<>();
+
+        for (TrackSubmission submission : page.getContent()) {
             Track track = tracksMap.get(submission.getTrackId());
-            AppUser submitter = usersMap.get(submission.getSubmittedByUserId());
-            UserProfile submitterProfile = profilesMap.get(submission.getSubmittedByUserId());
-            AppUser reviewer = submission.getReviewerUserId() != null ? usersMap.get(submission.getReviewerUserId()) : null;
-            UserProfile reviewerProfile = submission.getReviewerUserId() != null ? profilesMap.get(submission.getReviewerUserId()) : null;
-            return mapper.toQueueItemResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile);
-        });
+            if (track == null) continue;
+
+            if (track.getAlbum() == null) {
+                AppUser submitter = usersMap.get(submission.getSubmittedByUserId());
+                UserProfile submitterProfile = profilesMap.get(submission.getSubmittedByUserId());
+                AppUser reviewer = submission.getReviewerUserId() != null ? usersMap.get(submission.getReviewerUserId()) : null;
+                UserProfile reviewerProfile = submission.getReviewerUserId() != null ? profilesMap.get(submission.getReviewerUserId()) : null;
+                queueItems.add(mapper.toQueueItemResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile));
+            } else {
+                Long albumId = track.getAlbum().getId();
+                if (!processedAlbumIds.contains(albumId)) {
+                    processedAlbumIds.add(albumId);
+                    Album album = track.getAlbum();
+
+                    // Lấy tất cả tracks thuộc album này theo thứ tự trackNumber
+                    List<Track> albumTracksList = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(albumId);
+                    List<Long> albumTrackIds = albumTracksList.stream().map(Track::getId).toList();
+                    List<TrackSubmission> albumSubmissions = submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(albumTrackIds);
+                    Map<Long, TrackSubmission> latestSubByTrackId = albumSubmissions.stream()
+                            .collect(Collectors.toMap(TrackSubmission::getTrackId, Function.identity(), (existing, replacement) -> existing));
+
+                    AppUser albumCreator = usersMap.get(album.getCreatedByUserId());
+                    if (albumCreator == null) {
+                        albumCreator = userRepository.findById(album.getCreatedByUserId()).orElse(null);
+                    }
+                    UserProfile albumCreatorProfile = profilesMap.get(album.getCreatedByUserId());
+                    if (albumCreatorProfile == null && albumCreator != null) {
+                        albumCreatorProfile = profileRepository.findByUserId(albumCreator.getId()).orElse(null);
+                    }
+
+                    List<SubmissionQueueItemResponse> mappedAlbumTracks = new ArrayList<>();
+                    for (Track at : albumTracksList) {
+                        TrackSubmission atSub = latestSubByTrackId.get(at.getId());
+                        if (atSub == null) {
+                            atSub = TrackSubmission.builder()
+                                    .id(at.getId())
+                                    .trackId(at.getId())
+                                    .submittedByUserId(album.getCreatedByUserId())
+                                    .status(submission.getStatus())
+                                    .submittedAt(submission.getSubmittedAt())
+                                    .build();
+                        }
+                        AppUser atReviewer = atSub.getReviewerUserId() != null ? usersMap.get(atSub.getReviewerUserId()) : null;
+                        UserProfile atRevProfile = atSub.getReviewerUserId() != null ? profilesMap.get(atSub.getReviewerUserId()) : null;
+                        mappedAlbumTracks.add(mapper.toQueueItemResponse(atSub, at, albumCreator, albumCreatorProfile, atReviewer, atRevProfile));
+                    }
+
+                    SubmissionQueueItemResponse albumItem = mapper.createAlbumQueueItem(album, mappedAlbumTracks, albumCreator, albumCreatorProfile);
+                    if (albumItem != null) {
+                        queueItems.add(albumItem);
+                    }
+                }
+            }
+        }
+
+        return new org.springframework.data.domain.PageImpl<>(queueItems, pageable, page.getTotalElements());
     }
 
     /**

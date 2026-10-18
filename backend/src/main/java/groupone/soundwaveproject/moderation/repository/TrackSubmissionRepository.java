@@ -27,6 +27,7 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      */
     Optional<TrackSubmission> findFirstByTrackIdOrderBySubmittedAtDesc(Long trackId);
     java.util.List<TrackSubmission> findByTrackIdOrderBySubmittedAtDesc(Long trackId);
+    java.util.List<TrackSubmission> findByTrackIdInOrderBySubmittedAtDesc(Collection<Long> trackIds);
     void deleteByTrackId(Long trackId);
 
     /**
