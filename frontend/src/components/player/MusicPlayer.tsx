@@ -92,7 +92,8 @@ export function MusicPlayer({
   const [errorMessage, setErrorMessage] = useState("");
 
   const recordedRef = useRef(false);
-  const lastTimeRef = useRef<number | null>(null);
+  const lastPlayheadTimeRef = useRef<number | null>(null);
+  const actualListenedSecondsRef = useRef(0);
   const errorTimerRef = useRef<number | null>(null);
   const originalQueueRef = useRef<LandingTrack[]>([]);
 
@@ -205,17 +206,23 @@ export function MusicPlayer({
   }, [audio, volume]);
 
   /**
-   * Handles natural track completion: records listening event, respects repeat mode,
-   * or advances to the next track.
+   * Handles natural track completion: records listening event if actual listening threshold met,
+   * respects repeat mode, or advances to the next track.
    */
   const handleEnded = () => {
-    if (!recordedRef.current) {
+    const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000;
+    const threshold = dur <= 30 ? dur * 0.9 : 30;
+
+    // BR.13: Only count as valid play if actual accumulated listening time met the threshold
+    if (!recordedRef.current && actualListenedSecondsRef.current >= threshold) {
       recordedRef.current = true;
-      onRecordPlay?.(track.id, Math.round(audio.currentTime * 1000), true);
+      onRecordPlay?.(track.id, Math.round(actualListenedSecondsRef.current * 1000), true);
     }
     if (repeat) {
       audio.currentTime = 0;
       recordedRef.current = false;
+      actualListenedSecondsRef.current = 0;
+      lastPlayheadTimeRef.current = 0;
       void audio.play();
       return;
     }
@@ -236,6 +243,7 @@ export function MusicPlayer({
     if (audio.currentTime > 4) {
       audio.currentTime = 0;
       setCurrentTime(0);
+      lastPlayheadTimeRef.current = 0;
       return;
     }
     if (!queue.length) return;
@@ -244,6 +252,7 @@ export function MusicPlayer({
     if (curIdx === 0) {
       audio.currentTime = 0;
       setCurrentTime(0);
+      lastPlayheadTimeRef.current = 0;
       return;
     }
     // AF02 [26-28]: Previous track exists in queue -> load and play previous track
@@ -261,6 +270,8 @@ export function MusicPlayer({
     const clamped = Math.max(0, Math.min(value, maxDur));
     audio.currentTime = clamped;
     setCurrentTime(clamped);
+    // Align lastPlayheadTime to target position so scrub/seek jumps are not accumulated
+    lastPlayheadTimeRef.current = clamped;
   };
 
   useEffect(() => {
@@ -273,7 +284,8 @@ export function MusicPlayer({
     setAudioError(false);
     setErrorMessage("");
     recordedRef.current = false;
-    lastTimeRef.current = null;
+    actualListenedSecondsRef.current = 0;
+    lastPlayheadTimeRef.current = null;
   }, [track.id, track.durationMs]);
 
   useEffect(() => {
@@ -281,15 +293,26 @@ export function MusicPlayer({
       const cur = audio.currentTime;
       setCurrentTime(cur);
 
+      // Accumulate actual listened duration during continuous forward playback
+      if (lastPlayheadTimeRef.current !== null) {
+        const delta = cur - lastPlayheadTimeRef.current;
+        // Normal HTML5 audio timeupdate occurs every ~250ms.
+        // A delta between 0 and 1.5 seconds indicates continuous listening (not seeking/skipping).
+        if (delta > 0 && delta < 1.5) {
+          actualListenedSecondsRef.current += delta;
+        }
+      }
+      lastPlayheadTimeRef.current = cur;
+
       // BR.13: Listening event is counted when valid listening threshold is reached
       // Duration <= 30s: Threshold = 90% duration; Duration > 30s: Threshold = 30 seconds
-      if (!recordedRef.current && playing && cur > 0) {
+      if (!recordedRef.current && playing) {
         const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000;
         const threshold = dur <= 30 ? dur * 0.9 : 30;
-        if (cur >= threshold) {
+        if (actualListenedSecondsRef.current >= threshold) {
           recordedRef.current = true;
-          const completed = cur >= dur * 0.9;
-          onRecordPlay?.(track.id, Math.round(cur * 1000), completed);
+          const completed = cur >= dur * 0.9 || actualListenedSecondsRef.current >= dur * 0.9;
+          onRecordPlay?.(track.id, Math.round(actualListenedSecondsRef.current * 1000), completed);
         }
       }
     };

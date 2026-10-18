@@ -43,6 +43,16 @@ public class ListeningHistory {
         this.completed = completed != null ? completed : false;
     }
 
+    public void updatePlayback(Integer listenedDurationMs, Boolean completed) {
+        if (listenedDurationMs != null) {
+            this.listenedDurationMs = listenedDurationMs;
+        }
+        if (completed != null) {
+            this.completed = completed;
+        }
+        this.playedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
+
     @PrePersist
     void initializePlayedAt() {
         if (playedAt == null) {

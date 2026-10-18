@@ -13,6 +13,8 @@ import java.util.List;
 public interface ListeningHistoryRepository extends JpaRepository<ListeningHistory, Long> {
     List<ListeningHistory> findByUserIdOrderByPlayedAtDesc(Long userId, Pageable pageable);
 
+    List<ListeningHistory> findByUserIdAndTrackIdOrderByPlayedAtDesc(Long userId, Long trackId);
+
     @Query(value = "SELECT lh FROM ListeningHistory lh JOIN FETCH lh.track t WHERE lh.userId = :userId AND t.publicationStatus = groupone.soundwaveproject.catalog.entity.TrackPublicationStatus.PUBLISHED ORDER BY lh.playedAt DESC",
            countQuery = "SELECT count(lh) FROM ListeningHistory lh JOIN lh.track t WHERE lh.userId = :userId AND t.publicationStatus = groupone.soundwaveproject.catalog.entity.TrackPublicationStatus.PUBLISHED")
     Page<ListeningHistory> findPublishedHistoryByUserId(@Param("userId") Long userId, Pageable pageable);
