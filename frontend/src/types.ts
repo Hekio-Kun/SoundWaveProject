@@ -154,3 +154,15 @@ export type ListeningHistoryItem = {
   completed: boolean;
 };
 
+export type NotificationItem = {
+  id: number;
+  type: "TRACK_APPROVED" | "TRACK_REJECTED" | "TRACK_SUBMISSION" | "CONTENT_REPORT" | string;
+  title: string;
+  message: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  navigationUrl?: string | null;
+};
+

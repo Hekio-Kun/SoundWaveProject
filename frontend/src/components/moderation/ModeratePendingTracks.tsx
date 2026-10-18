@@ -8,11 +8,14 @@ import {
 import { PendingTrackDetailView } from "./PendingTrackDetailView";
 import {
   AlertIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   CheckIcon,
   ClockIcon,
   CloseIcon,
   DiscIcon,
   EyeIcon,
+  MusicIcon,
   RefreshIcon,
   SearchIcon,
   UserIcon,
@@ -106,6 +109,21 @@ export function ModeratePendingTracks({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [page, setPage] = useState<number>(0);
   const pageSize = 10;
+
+  // Set of expanded album IDs
+  const [expandedAlbumIds, setExpandedAlbumIds] = useState<Set<number>>(new Set());
+
+  const toggleAlbumExpand = (albumId: number) => {
+    setExpandedAlbumIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(albumId)) {
+        next.delete(albumId);
+      } else {
+        next.add(albumId);
+      }
+      return next;
+    });
+  };
 
   // Safe toast notifier with timer cleanup
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -533,113 +551,300 @@ export function ModeratePendingTracks({
           </div>
         ) : (
           <div className="staff-track-cards-list">
-            {queuePage.content.map((item) => (
-              <article
-                className={`staff-track-card ${
-                  item.status === "PENDING" ? "is-pending-track" : ""
-                }`}
-                key={item.id}
-              >
-                {/* Artwork Thumbnail with quick-listen overlay */}
-                <div className="staff-thumb-container">
-                  <img
-                    src={
-                      item.coverUrl ||
-                      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400"
-                    }
-                    alt={item.trackTitle}
-                    className="staff-thumb-image"
-                  />
-                  <button
-                    type="button"
-                    className="staff-thumb-inspect-btn"
-                    onClick={() => handleSelectSubmission(item.id)}
-                    title="Inspect track details"
-                    aria-label={`Inspect ${item.trackTitle}`}
-                  >
-                    <EyeIcon width={17} height={17} />
-                  </button>
-                </div>
+            {queuePage.content.map((item) => {
+              const isAlbum = item.itemType === "ALBUM";
+              const isExpanded = expandedAlbumIds.has(item.id);
 
-                {/* Core Track & Creator Metadata with accessible button title */}
-                <div className="staff-track-meta-section">
-                  <div className="staff-track-name-row">
+              if (isAlbum) {
+                const albumTrackList = item.albumTracks || [];
+                return (
+                  <div
+                    className={`staff-album-card-wrap ${item.status === "PENDING" ? "is-pending-track" : ""}`}
+                    key={`album-${item.id}`}
+                  >
+                    <div className="staff-album-main-row">
+                      {/* Album Artwork Thumbnail */}
+                      <div className="staff-thumb-container">
+                        {item.coverUrl ? (
+                          <img
+                            src={item.coverUrl}
+                            alt={item.trackTitle}
+                            className="staff-thumb-image"
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "grid",
+                              placeItems: "center",
+                              background: "var(--ops-brand-light)",
+                              color: "var(--ops-brand)",
+                            }}
+                          >
+                            <DiscIcon width={28} height={28} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Album Metadata */}
+                      <div className="staff-track-meta-section" onClick={() => toggleAlbumExpand(item.id)}>
+                        <div className="staff-track-name-row">
+                          <button
+                            type="button"
+                            className="staff-track-title-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAlbumExpand(item.id);
+                            }}
+                            title={`View tracks in album ${item.trackTitle}`}
+                          >
+                            {item.trackTitle}
+                          </button>
+
+                          {/* Nhãn Album */}
+                          <span className="staff-tag-badge is-album" title="Album Collection">
+                            <DiscIcon width={12} height={12} />
+                            <span>Album</span>
+                          </span>
+
+                          <span className="staff-meta-pill is-duration">
+                            {item.trackCount || albumTrackList.length} tracks
+                          </span>
+
+                          {item.durationMs ? (
+                            <span className="staff-meta-pill is-duration">
+                              {formatDuration(item.durationMs)}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="staff-creator-row">
+                          <span className="staff-creator-label">
+                            <UserIcon width={13} height={13} />
+                            <b>{item.submitterDisplayName || "Unknown Artist"}</b>
+                          </span>
+
+                          <span className="staff-queue-time-chip">
+                            <ClockIcon width={12} height={12} />
+                            <span>{formatRelativeTime(item.submittedAt)}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Trạng thái duyệt */}
+                      <div className="staff-track-status-col">
+                        <span
+                          className={`staff-status-chip ${
+                            item.status === "APPROVED"
+                              ? "is-approved"
+                              : item.status === "REJECTED"
+                              ? "is-rejected"
+                              : "is-pending"
+                          }`}
+                        >
+                          <i />
+                          <span>
+                            {item.status === "APPROVED"
+                              ? "Approved"
+                              : item.status === "REJECTED"
+                              ? "Rejected"
+                              : "Pending"}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Nút thao tác mở rộng / thu gọn danh sách bài trong album */}
+                      <div className="staff-track-actions-col">
+                        <button
+                          type="button"
+                          className="staff-album-expand-btn"
+                          onClick={() => toggleAlbumExpand(item.id)}
+                          title="Click to view tracks in this album"
+                        >
+                          <span>
+                            {isExpanded
+                              ? "Collapse"
+                              : `View tracks (${item.trackCount || albumTrackList.length})`}
+                          </span>
+                          {isExpanded ? (
+                            <ArrowUpIcon width={14} height={14} />
+                          ) : (
+                            <ArrowDownIcon width={14} height={14} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Danh sách các bài hát trong Album khi mở rộng */}
+                    {isExpanded && albumTrackList.length > 0 && (
+                      <div className="staff-album-tracks-panel">
+                        <div className="staff-album-tracks-header">
+                          Tracks in album ({albumTrackList.length} tracks)
+                        </div>
+                        <div className="staff-album-tracks-table">
+                          {albumTrackList.map((subTrack, idx) => (
+                            <div key={subTrack.id} className="staff-album-track-row">
+                              <div className="staff-album-track-left">
+                                <span className="staff-track-idx">#{subTrack.trackNumber || (idx + 1)}</span>
+                                <div className="staff-subtrack-meta">
+                                  <strong className="staff-subtrack-title">{subTrack.trackTitle}</strong>
+                                  <div className="staff-subtrack-details">
+                                    {subTrack.genreName && (
+                                      <span className="staff-meta-pill is-genre">{subTrack.genreName}</span>
+                                    )}
+                                    <span className="staff-meta-pill is-duration">
+                                      {formatDuration(subTrack.durationMs)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="staff-album-track-right">
+                                <span
+                                  className={`staff-status-chip ${
+                                    subTrack.status === "APPROVED"
+                                      ? "is-approved"
+                                      : subTrack.status === "REJECTED"
+                                      ? "is-rejected"
+                                      : "is-pending"
+                                  }`}
+                                >
+                                  <i />
+                                  <span>
+                                    {subTrack.status === "APPROVED"
+                                      ? "Approved"
+                                      : subTrack.status === "REJECTED"
+                                      ? "Rejected"
+                                      : "Pending"}
+                                  </span>
+                                </span>
+
+                                <button
+                                  type="button"
+                                  className="staff-btn-review"
+                                  onClick={() => handleSelectSubmission(subTrack.id)}
+                                  title={`View details and moderate "${subTrack.trackTitle}"`}
+                                >
+                                  <EyeIcon width={14} height={14} />
+                                  <span>View Details</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Bài hát đơn lẻ (Single Track)
+              return (
+                <article
+                  className={`staff-track-card ${item.status === "PENDING" ? "is-pending-track" : ""}`}
+                  key={item.id}
+                >
+                  {/* Ảnh bìa bài hát */}
+                  <div className="staff-thumb-container">
+                    <img
+                      src={
+                        item.coverUrl ||
+                        "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400"
+                      }
+                      alt={item.trackTitle}
+                      className="staff-thumb-image"
+                    />
                     <button
                       type="button"
-                      className="staff-track-title-btn"
+                      className="staff-thumb-inspect-btn"
                       onClick={() => handleSelectSubmission(item.id)}
-                      title={`Inspect ${item.trackTitle}`}
+                      title="View track details"
+                      aria-label={`Inspect ${item.trackTitle}`}
                     >
-                      {item.trackTitle}
+                      <EyeIcon width={17} height={17} />
                     </button>
-
-                    {item.albumTitle ? (
-                      <span className="staff-meta-pill is-album" title={`Album: ${item.albumTitle}`}>
-                        <DiscIcon width={12} height={12} />
-                        <span>{item.albumTitle}</span>
-                      </span>
-                    ) : null}
-
-                    {item.genreName ? (
-                      <span className="staff-meta-pill is-genre">{item.genreName}</span>
-                    ) : null}
-
-                    {item.durationMs ? (
-                      <span className="staff-meta-pill is-duration">
-                        {formatDuration(item.durationMs)}
-                      </span>
-                    ) : null}
                   </div>
 
-                  <div className="staff-creator-row">
-                    <span className="staff-creator-label">
-                      <UserIcon width={13} height={13} />
-                      <b>{item.submitterDisplayName || "Unknown Creator"}</b>
-                    </span>
+                  {/* Thông tin bài hát & nghệ sĩ */}
+                  <div className="staff-track-meta-section">
+                    <div className="staff-track-name-row">
+                      <button
+                        type="button"
+                        className="staff-track-title-btn"
+                        onClick={() => handleSelectSubmission(item.id)}
+                        title={`View details ${item.trackTitle}`}
+                      >
+                        {item.trackTitle}
+                      </button>
 
-                    <span className="staff-queue-time-chip">
-                      <ClockIcon width={12} height={12} />
-                      <span>{formatRelativeTime(item.submittedAt)}</span>
+                      {/* Nhãn Track đơn */}
+                      <span className="staff-tag-badge is-single" title="Single Track">
+                        <MusicIcon width={12} height={12} />
+                        <span>Single</span>
+                      </span>
+
+                      {item.genreName ? (
+                        <span className="staff-meta-pill is-genre">{item.genreName}</span>
+                      ) : null}
+
+                      {item.durationMs ? (
+                        <span className="staff-meta-pill is-duration">
+                          {formatDuration(item.durationMs)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="staff-creator-row">
+                      <span className="staff-creator-label">
+                        <UserIcon width={13} height={13} />
+                        <b>{item.submitterDisplayName || "Unknown Creator"}</b>
+                      </span>
+
+                      <span className="staff-queue-time-chip">
+                        <ClockIcon width={12} height={12} />
+                        <span>{formatRelativeTime(item.submittedAt)}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Trạng thái kiểm duyệt */}
+                  <div className="staff-track-status-col">
+                    <span
+                      className={`staff-status-chip ${
+                        item.status === "APPROVED"
+                          ? "is-approved"
+                          : item.status === "REJECTED"
+                          ? "is-rejected"
+                          : "is-pending"
+                      }`}
+                    >
+                      <i />
+                      <span>
+                        {item.status === "APPROVED"
+                          ? "Approved"
+                          : item.status === "REJECTED"
+                          ? "Rejected"
+                          : "Pending"}
+                      </span>
                     </span>
                   </div>
-                </div>
 
-                {/* Status Badge */}
-                <div className="staff-track-status-col">
-                  <span
-                    className={`staff-status-chip ${
-                      item.status === "APPROVED"
-                        ? "is-approved"
-                        : item.status === "REJECTED"
-                        ? "is-rejected"
-                        : "is-pending"
-                    }`}
-                  >
-                    <i />
-                    <span>
-                      {item.status === "APPROVED"
-                        ? "Approved"
-                        : item.status === "REJECTED"
-                        ? "Rejected"
-                        : "Pending"}
-                    </span>
-                  </span>
-                </div>
-
-                {/* Action Buttons: Only 1 Inspect button */}
-                <div className="staff-track-actions-col">
-                  <button
-                    type="button"
-                    className="staff-btn-review"
-                    onClick={() => handleSelectSubmission(item.id)}
-                    title="Inspect track details and audio"
-                  >
-                    <EyeIcon width={15} height={15} />
-                    <span>Inspect</span>
-                  </button>
-                </div>
-              </article>
-            ))}
+                  {/* Nút xem chi tiết để kiểm duyệt */}
+                  <div className="staff-track-actions-col">
+                    <button
+                      type="button"
+                      className="staff-btn-review"
+                      onClick={() => handleSelectSubmission(item.id)}
+                      title="View track details and moderate"
+                    >
+                      <EyeIcon width={15} height={15} />
+                      <span>View Details</span>
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
 
