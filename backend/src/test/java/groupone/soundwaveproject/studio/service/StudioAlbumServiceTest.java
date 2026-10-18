@@ -9,11 +9,17 @@ import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
+import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.library.repository.ListeningHistoryRepository;
+import groupone.soundwaveproject.library.repository.PlaylistTrackRepository;
+import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
+import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.studio.dto.request.AlbumTrackItemRequest;
 import groupone.soundwaveproject.studio.dto.request.CreateAlbumRequest;
 import groupone.soundwaveproject.studio.dto.request.UpdateAlbumRequest;
 import groupone.soundwaveproject.studio.dto.response.StudioAlbumResponse;
@@ -52,6 +58,18 @@ class StudioAlbumServiceTest {
     private TrackRepository trackRepository;
 
     @Mock
+    private GenreRepository genreRepository;
+
+    @Mock
+    private PlaylistTrackRepository playlistTrackRepository;
+
+    @Mock
+    private ListeningHistoryRepository listeningHistoryRepository;
+
+    @Mock
+    private TrackSubmissionRepository trackSubmissionRepository;
+
+    @Mock
     private AppUserRepository appUserRepository;
 
     @Mock
@@ -73,6 +91,10 @@ class StudioAlbumServiceTest {
         studioAlbumService = new StudioAlbumService(
                 albumRepository,
                 trackRepository,
+                genreRepository,
+                playlistTrackRepository,
+                listeningHistoryRepository,
+                trackSubmissionRepository,
                 appUserRepository,
                 cloudMediaService,
                 studioAlbumMapper,
@@ -93,7 +115,7 @@ class StudioAlbumServiceTest {
                 .releaseDate(LocalDate.now())
                 .build();
 
-        Genre genre = Genre.builder().id(1L).name("Pop").slug("pop").build();
+        Genre genre = Genre.builder().id(1L).name("Pop").slug("pop").isActive(true).build();
         mockTrack = Track.builder()
                 .id(500L)
                 .uploaderUserId(10L)
@@ -133,6 +155,47 @@ class StudioAlbumServiceTest {
         assertThat(response.getTitle()).isEqualTo("Summer Sunset");
         assertThat(response.getStatus()).isEqualTo("DRAFT");
         verify(albumRepository, atLeastOnce()).save(any(Album.class));
+    }
+
+    @Test
+    @DisplayName("UC-21.1: Tạo album trọn gói kèm upload nhiều bài hát thành công")
+    void createAlbum_WithConstituentTracks_Success() {
+        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "New Package Album")).thenReturn(false);
+        when(albumRepository.save(any(Album.class))).thenAnswer(inv -> {
+            Album a = inv.getArgument(0);
+            a.setId(200L);
+            return a;
+        });
+
+        Genre genre = Genre.builder().id(1L).name("Pop").isActive(true).build();
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(genre));
+        when(cloudMediaService.uploadTrackAudio(any(), eq(10L))).thenReturn(
+                new StoredAudioResponse("audio-pub-1", "https://cloud/audio.mp3", "mp3", 200000)
+        );
+        when(trackRepository.save(any(Track.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AlbumTrackItemRequest trackItem = AlbumTrackItemRequest.builder()
+                .title("Track 1")
+                .genreId(1L)
+                .trackNumber(1)
+                .build();
+
+        CreateAlbumRequest request = CreateAlbumRequest.builder()
+                .title("New Package Album")
+                .submitForReview(true)
+                .tracks(List.of(trackItem))
+                .build();
+
+        MockMultipartFile audioFile = new MockMultipartFile("audioFiles", "track1.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+
+        StudioAlbumResponse response = studioAlbumService.createAlbum(request, null, List.of(audioFile), mockUser.getEmail());
+
+        assertThat(response).isNotNull();
+        assertThat(response.getTitle()).isEqualTo("New Package Album");
+        assertThat(response.getTrackCount()).isEqualTo(1);
+        verify(trackSubmissionRepository).save(any());
+        verify(trackRepository).save(any(Track.class));
     }
 
     @Test
@@ -254,17 +317,23 @@ class StudioAlbumServiceTest {
     }
 
     @Test
-    @DisplayName("UC-21.4 BR-23/BR-24: Xóa album gỡ liên kết bài hát và xóa ảnh Cloudinary")
-    void deleteAlbum_Success_UnlinksTracksAndDeletesMedia() {
+    @DisplayName("UC-21.4: Xóa album xóa toàn bộ các bài hát cấu thành và xóa ảnh Cloudinary")
+    void deleteAlbum_Success_DeletesAllConstituentTracksAndMedia() {
         mockAlbum.setCoverPublicId("album-cover-pub-id");
         when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(List.of(mockTrack));
 
         studioAlbumService.deleteAlbum(100L, mockUser.getEmail());
 
-        // Phải gọi unlink các bài hát, không xóa bài hát
-        verify(trackRepository).unlinkAlbumFromTracks(100L, 10L);
-        // Phải dọn dẹp ảnh cũ trên Cloudinary
+        // Phải xóa các liên kết của track và media của track
+        verify(playlistTrackRepository).deleteByTrack_Id(mockTrack.getId());
+        verify(listeningHistoryRepository).deleteByTrackId(mockTrack.getId());
+        verify(trackSubmissionRepository).deleteByTrackId(mockTrack.getId());
+        verify(cloudMediaService).deleteTrackAudioQuietly(mockTrack.getAudioPublicId());
+        verify(trackRepository).delete(mockTrack);
+
+        // Phải dọn dẹp ảnh album trên Cloudinary
         verify(cloudMediaService).deleteImageQuietly("album-cover-pub-id");
         // Xóa entity album
         verify(albumRepository).delete(mockAlbum);

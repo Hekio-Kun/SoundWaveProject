@@ -106,12 +106,31 @@ export type CurrentUser = {
   countryCode?: string;
 };
 
+export type AlbumTrackItemPayload = {
+  title: string;
+  genreId: number;
+  trackNumber?: number;
+  description?: string;
+  lyrics?: string;
+  durationMs?: number;
+  audioIndex?: number;
+};
+
+export type CreateAlbumPayload = {
+  title: string;
+  description?: string;
+  releaseDate?: string;
+  submitForReview?: boolean;
+  tracks?: AlbumTrackItemPayload[];
+  trackIds?: number[];
+};
+
 export type StudioAlbum = {
   id: number;
   title: string;
   slug: string;
   description?: string | null;
-  status: "DRAFT" | "PUBLISHED";
+  status: "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | string;
   coverUrl?: string | null;
   releaseDate?: string | null;
   trackCount: number;

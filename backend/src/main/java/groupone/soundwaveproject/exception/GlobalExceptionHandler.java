@@ -132,6 +132,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException exception,
+            HttpServletRequest request
+    ) {
+        log.error("Data integrity violation while processing {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "DATA_INTEGRITY_VIOLATION",
+                "Data constraint violation. Please verify unique fields and valid foreign keys.", request, Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpectedException(
             Exception exception,

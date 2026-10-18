@@ -1,12 +1,7 @@
 import { ApiError, apiFetch } from "./client";
-import type { StudioAlbum, StudioTrack } from "../types";
+import type { CreateAlbumPayload, StudioAlbum, StudioTrack } from "../types";
 
-export type CreateAlbumPayload = {
-  title: string;
-  description?: string;
-  releaseDate?: string;
-  trackIds?: number[];
-};
+export type { CreateAlbumPayload };
 
 export type UpdateAlbumPayload = {
   title: string;
@@ -53,7 +48,8 @@ async function albumRequest<T>(
 
 function buildAlbumFormData(
   payload: CreateAlbumPayload | UpdateAlbumPayload,
-  cover?: File
+  cover?: File,
+  audioFiles?: File[]
 ): FormData {
   const formData = new FormData();
   formData.append(
@@ -62,6 +58,11 @@ function buildAlbumFormData(
   );
   if (cover) {
     formData.append("cover", cover);
+  }
+  if (audioFiles && audioFiles.length > 0) {
+    audioFiles.forEach((file) => {
+      formData.append("audioFiles", file);
+    });
   }
   return formData;
 }
@@ -91,13 +92,17 @@ export const albumApi = {
   },
 
   /**
-   * Tạo album mới với ảnh bìa (UC-21.1)
+   * Tạo album mới kèm tải lên toàn bộ bài hát cấu thành hoặc lưu nháp (UC-21.1)
    */
-  createAlbum: (payload: CreateAlbumPayload, cover?: File): Promise<StudioAlbum> => {
+  createAlbum: (
+    payload: CreateAlbumPayload,
+    cover?: File,
+    audioFiles?: File[]
+  ): Promise<StudioAlbum> => {
     return albumRequest<StudioAlbum>(
       "/studio/albums",
       "POST",
-      buildAlbumFormData(payload, cover)
+      buildAlbumFormData(payload, cover, audioFiles)
     );
   },
 
@@ -117,7 +122,7 @@ export const albumApi = {
   },
 
   /**
-   * Xóa album cá nhân (UC-21.4)
+   * Xóa album cá nhân và toàn bộ bài hát trong album (UC-21.4)
    */
   deleteAlbum: (id: number): Promise<void> => {
     return albumRequest<void>(`/studio/albums/${id}`, "DELETE");

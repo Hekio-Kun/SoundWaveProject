@@ -7,6 +7,7 @@ import { useRouter } from "../hooks/useRouter";
 import { initialStudioTracks } from "../data";
 
 import { AlbumDetailsPage } from "../pages/AlbumDetailsPage";
+import { CreateAlbumPage } from "../pages/CreateAlbumPage";
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../pages/AuthPages";
 import { CreatorProfilePage } from "../pages/CreatorProfilePage";
 import { ExplorePage } from "../pages/ExplorePage";
@@ -18,8 +19,10 @@ import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from ".
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
+import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
 import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
+
 import { TrackDetailsPage } from "../pages/TrackDetailsPage";
 import { UploadTrackPage } from "../pages/UploadTrackPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
@@ -341,10 +344,43 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  if (pathname === "/studio/albums/create") {
+    if (!authReady || !isAuthenticated) return null;
+    return (
+      <CreateAlbumPage
+        isAuthenticated={isAuthenticated}
+        canCreate={user?.role === "LISTENER"}
+        currentUser={user}
+        onNavigate={navigate}
+      />
+    );
+  }
+
+  if (pathname.startsWith("/studio/albums/")) {
+    if (!authReady || !isAuthenticated) return null;
+    const parts = pathname.split("/");
+    const albumId = Number(parts[3]) || null;
+    if (!albumId) {
+      navigate("/studio");
+      return null;
+    }
+    return (
+      <StudioAlbumDetailPage
+        albumId={albumId}
+        currentUser={user}
+        onNavigate={navigate}
+        currentTrack={currentTrack}
+        playing={playing}
+        onPlayTrack={playTrack}
+      />
+    );
+  }
+
   if (pathname === "/studio") {
     if (!authReady || !isAuthenticated) return null;
     return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} />;
   }
+
 
   // 5. Operations & Administration Routes
   if (pathname === "/admin/genres") {
