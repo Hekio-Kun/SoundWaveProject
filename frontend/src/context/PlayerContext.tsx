@@ -109,7 +109,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const autoplay = typeof contextQueueOrAutoplay === "boolean" ? contextQueueOrAutoplay : true;
       const contextQueue = Array.isArray(contextQueueOrAutoplay) ? contextQueueOrAutoplay : undefined;
 
-      if (currentTrack?.id === track.id) {
+      if (currentTrack && Number(currentTrack.id) === Number(track.id)) {
         setAudioPlaying(!playing);
         return;
       }
@@ -117,7 +117,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (contextQueue && contextQueue.length > 0) {
         setQueue(contextQueue);
       } else {
-        setQueue((prev) => (prev.some((item) => item.id === track.id) ? prev : [track, ...prev]));
+        setQueue((prev) => (prev.some((item) => Number(item.id) === Number(track.id)) ? prev : [track, ...prev]));
       }
       audio.src = track.audioUrl;
       audio.load();

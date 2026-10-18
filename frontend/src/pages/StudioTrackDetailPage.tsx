@@ -8,8 +8,10 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { usePlayer } from "../context/PlayerContext";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import {
   AlertIcon,
   CheckIcon,
@@ -71,7 +73,7 @@ function studioApiTrackToLanding(track: ApiTrack, currentUser: CurrentUser | nul
   return {
     id: track.id,
     title: track.title,
-    coverUrl: track.coverUrl || "/pics/album.png",
+    coverUrl: track.coverUrl || "/soundwave-logo.png",
     audioUrl: track.audioUrl,
     durationMs: track.durationMs || 0,
     playCount: track.playCount || 0,
@@ -124,12 +126,20 @@ export function StudioTrackDetailPage({
   const [modalError, setModalError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const player = usePlayer();
+  const activeCurrentTrack = currentTrack ?? player.currentTrack;
+  const isPlayingGlobal = playing ?? player.playing;
+  const activeAudio = audio ?? player.audio;
+  const handlePlayTrack = onPlayTrack ?? player.playTrack;
+
   // Audio player state - synchronized with global player
-  const isCurrentTrack = Boolean(currentTrack && track && currentTrack.id === track.id);
-  const isPlayingThis = Boolean(isCurrentTrack && playing);
+  const isCurrentTrack = Boolean(
+    activeCurrentTrack && track && Number(activeCurrentTrack.id) === Number(track.id)
+  );
+  const isPlayingThis = Boolean(isCurrentTrack && isPlayingGlobal);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(() => (audio && Number.isFinite(audio.volume) ? audio.volume : 0.8));
+  const [duration, setDuration] = useState(() => (track?.durationMs ? track.durationMs / 1000 : 0));
+  const [volume, setVolume] = useState(() => (activeAudio && Number.isFinite(activeAudio.volume) ? activeAudio.volume : 0.8));
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -218,22 +228,29 @@ export function StudioTrackDetailPage({
     };
   }, [trackId]);
 
+  // Synchronize duration when track metadata is loaded
+  useEffect(() => {
+    if (track?.durationMs) {
+      setDuration(track.durationMs / 1000);
+    }
+  }, [track?.durationMs]);
+
   // Synchronize volume with global audio at all times
   useEffect(() => {
-    if (!audio) return;
+    if (!activeAudio) return;
     const handleVolumeUpdate = () => {
-      setVolume(audio.volume);
+      setVolume(activeAudio.volume);
     };
-    audio.addEventListener("volumechange", handleVolumeUpdate);
-    setVolume(audio.volume);
+    activeAudio.addEventListener("volumechange", handleVolumeUpdate);
+    setVolume(activeAudio.volume);
     return () => {
-      audio.removeEventListener("volumechange", handleVolumeUpdate);
+      activeAudio.removeEventListener("volumechange", handleVolumeUpdate);
     };
-  }, [audio]);
+  }, [activeAudio]);
 
   // Synchronize playback timeline with global audio
   useEffect(() => {
-    if (!audio) return;
+    if (!activeAudio) return;
     if (!isCurrentTrack) {
       setCurrentTime(0);
       setDuration(track?.durationMs ? track.durationMs / 1000 : 0);
@@ -241,52 +258,66 @@ export function StudioTrackDetailPage({
     }
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      if (audio.duration && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
+      setCurrentTime(activeAudio.currentTime);
+      if (activeAudio.duration && !isNaN(activeAudio.duration)) {
+        setDuration(activeAudio.duration);
       }
     };
 
     const handleLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
+      if (activeAudio.duration && !isNaN(activeAudio.duration)) {
+        setDuration(activeAudio.duration);
       }
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    activeAudio.addEventListener("timeupdate", handleTimeUpdate);
+    activeAudio.addEventListener("loadedmetadata", handleLoadedMetadata);
 
-    setCurrentTime(audio.currentTime);
-    if (audio.duration && !isNaN(audio.duration)) {
-      setDuration(audio.duration);
+    setCurrentTime(activeAudio.currentTime);
+    if (activeAudio.duration && !isNaN(activeAudio.duration)) {
+      setDuration(activeAudio.duration);
     }
 
     return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      activeAudio.removeEventListener("timeupdate", handleTimeUpdate);
+      activeAudio.removeEventListener("loadedmetadata", handleLoadedMetadata);
     };
-  }, [audio, isCurrentTrack, track?.durationMs]);
+  }, [activeAudio, isCurrentTrack, track?.durationMs]);
 
   // Player controls
   const togglePlay = () => {
-    if (!track || !onPlayTrack) return;
+    if (!track) return;
+    if (!track.audioUrl) {
+      setActionError("Audio file is not available for this track.");
+      return;
+    }
     const landing = studioApiTrackToLanding(track, currentUser);
-    onPlayTrack(landing);
+    if (isCurrentTrack) {
+      player.setAudioPlaying(!isPlayingGlobal);
+    } else {
+      handlePlayTrack(landing);
+    }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const target = Number(e.target.value);
     setCurrentTime(target);
-    if (isCurrentTrack && audio) {
-      audio.currentTime = target;
+    if (isCurrentTrack && activeAudio) {
+      activeAudio.currentTime = target;
+    } else if (track) {
+      const landing = studioApiTrackToLanding(track, currentUser);
+      handlePlayTrack(landing);
+      if (activeAudio) {
+        activeAudio.currentTime = target;
+      }
     }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setVolume(val);
-    if (audio) {
-      audio.volume = val;
+    if (activeAudio) {
+      activeAudio.volume = val;
     }
   };
 
@@ -298,6 +329,7 @@ export function StudioTrackDetailPage({
   const isPending = rawStatus === "PENDING";
   const isRejected = rawStatus === "REJECTED" || rawStatus === "TAKEN_DOWN";
   const isDraft = rawStatus === "DRAFT";
+  const canEditOrDelete = isDraft || isRejected || isApproved;
 
   const statusLabel = isApproved
     ? "Approved & Published"
@@ -487,9 +519,12 @@ export function StudioTrackDetailPage({
 
       {/* Action Alerts */}
       {actionSuccess ? (
-        <div className="app-toast" role="status" style={{ marginBottom: "16px", position: "static" }}>
-          {actionSuccess}
-        </div>
+        <CenterNotificationPopup
+          open={Boolean(actionSuccess)}
+          type="success"
+          message={actionSuccess}
+          onClose={() => setActionSuccess(null)}
+        />
       ) : null}
 
       {actionError ? (
@@ -567,32 +602,34 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {/* 1. Edit track button */}
-              <button
-                type="button"
-                className="studio-crud-btn studio-crud-btn-edit"
-                onClick={() => onNavigate(`/studio/tracks/${track.id}/edit`)}
-                disabled={isPending}
-                title={isPending ? "Please withdraw submission before editing" : "Edit track information & synchronized lyrics"}
-                style={isPending ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
-              >
-                <EditIcon width={13} height={13} />
-                <span>Edit track</span>
-              </button>
+              {/* 1. Edit track button - only allowed for DRAFT, REJECTED, PUBLISHED */}
+              {canEditOrDelete && (
+                <button
+                  type="button"
+                  className="studio-crud-btn studio-crud-btn-edit"
+                  onClick={() => onNavigate(`/studio/tracks/${track.id}/edit`)}
+                  title="Edit track information & synchronized lyrics"
+                >
+                  <EditIcon width={13} height={13} />
+                  <span>Edit track</span>
+                </button>
+              )}
 
-              {/* 2. Delete button */}
-              <button
-                type="button"
-                className="studio-crud-btn studio-crud-btn-delete"
-                onClick={() => {
-                  setModalError(null);
-                  setDeleteConfirmOpen(true);
-                }}
-                title="Delete this track"
-              >
-                <TrashIcon width={13} height={13} />
-                <span>Delete</span>
-              </button>
+              {/* 2. Delete button - only allowed for DRAFT, REJECTED, PUBLISHED */}
+              {canEditOrDelete && (
+                <button
+                  type="button"
+                  className="studio-crud-btn studio-crud-btn-delete"
+                  onClick={() => {
+                    setModalError(null);
+                    setDeleteConfirmOpen(true);
+                  }}
+                  title="Delete this track"
+                >
+                  <TrashIcon width={13} height={13} />
+                  <span>Delete</span>
+                </button>
+              )}
 
               {/* 3. Status-specific action button */}
               {(isDraft || isRejected) && (
@@ -606,7 +643,7 @@ export function StudioTrackDetailPage({
                   }}
                 >
                   <UploadIcon width={13} height={13} />
-                  <span>Submit for review</span>
+                  <span>{isRejected ? "Resubmit for review" : "Submit for review"}</span>
                 </button>
               )}
 
@@ -677,7 +714,7 @@ export function StudioTrackDetailPage({
             <div className="staff-inspector-hero-card staff-detail-hero-card">
               <div className="staff-hero-artwork-wrap staff-detail-artwork-wrap">
                 <img
-                  src={track.coverUrl || "/pics/album.png"}
+                  src={track.coverUrl || "/soundwave-logo.png"}
                   alt={track.title}
                   className="staff-hero-artwork"
                 />
@@ -1270,7 +1307,7 @@ export function StudioTrackDetailPage({
           <div className="modal-card modal-card--medium" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3>Submit Track for Moderation Review</h3>
+                <h3>{isRejected ? "Resubmit Track for Moderation Review" : "Submit Track for Moderation Review"}</h3>
                 <p className="modal-subtitle">Track: <b>{track.title}</b></p>
               </div>
               <button className="icon-button" onClick={() => setSubmitModalOpen(false)} disabled={isProcessing}>
@@ -1310,7 +1347,7 @@ export function StudioTrackDetailPage({
                   Cancel
                 </button>
                 <button type="submit" className="button button-primary" disabled={isProcessing || !submitCopyrightAgreed}>
-                  {isProcessing ? "Submitting..." : "Submit track"}
+                  {isProcessing ? (isRejected ? "Resubmitting..." : "Submitting...") : (isRejected ? "Resubmit track" : "Submit track")}
                 </button>
               </div>
             </form>

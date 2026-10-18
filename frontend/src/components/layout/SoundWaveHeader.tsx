@@ -28,7 +28,7 @@ export function SoundWaveHeader({ isAuthenticated, hasPlayer }: Props) {
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
     const value = query.trim();
-    if (value) go(`/search?q=${encodeURIComponent(value)}`);
+    if (value) go(`/browse?search=${encodeURIComponent(value)}`);
   };
 
   return (

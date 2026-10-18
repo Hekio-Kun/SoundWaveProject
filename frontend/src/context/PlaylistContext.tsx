@@ -188,11 +188,18 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         setPlaylists((prev) => prev.map((pl) => (pl.id === playlistId ? updated : pl)));
         showToast("Track added to playlist.");
       } catch (err: any) {
-        if (err?.status === 409 || err?.message?.includes("already in this playlist")) {
-          alert("This track is already in the playlist.");
-        } else {
-          alert(err?.message || "Failed to add track to playlist.");
+        let msg = "Failed to add track to playlist.";
+        if (
+          err?.status === 409 ||
+          err?.message?.includes("already in this playlist") ||
+          err?.message?.includes("uk_playlist_track") ||
+          err?.message?.includes("constraint")
+        ) {
+          msg = "This track is already in the playlist.";
+        } else if (err?.message) {
+          msg = err.message;
         }
+        throw new Error(msg);
       }
     },
     [showToast]
@@ -310,9 +317,9 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         currentTrackIds={
           playlists.find((p) => p.id === addTrackPlaylistId)?.trackIds ?? []
         }
-        onAddTrack={(trackId) => {
+        onAddTrack={async (trackId) => {
           if (addTrackPlaylistId) {
-            void addTrackToPlaylist(addTrackPlaylistId, trackId);
+            await addTrackToPlaylist(addTrackPlaylistId, trackId);
           }
         }}
       />

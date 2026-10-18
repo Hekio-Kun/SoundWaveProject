@@ -172,8 +172,10 @@ public class StudioTrackService {
         if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
             throw new ForbiddenOperationException("Tracks currently pending review cannot be modified. Please withdraw the submission first.");
         }
-        if (track.getPublicationStatus() == TrackPublicationStatus.TAKEN_DOWN) {
-            throw new ForbiddenOperationException("Taken down tracks cannot be modified.");
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT
+                && track.getPublicationStatus() != TrackPublicationStatus.REJECTED
+                && track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
+            throw new ForbiddenOperationException("Tracks in " + track.getPublicationStatus() + " status cannot be modified.");
         }
 
         Genre genre = genreRepository.findById(request.genreId())
@@ -255,6 +257,15 @@ public class StudioTrackService {
         AppUser user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be deleted. Please withdraw the submission first.");
+        }
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT
+                && track.getPublicationStatus() != TrackPublicationStatus.REJECTED
+                && track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
+            throw new ForbiddenOperationException("Tracks in " + track.getPublicationStatus() + " status cannot be deleted.");
+        }
 
         Album album = track.getAlbum();
 

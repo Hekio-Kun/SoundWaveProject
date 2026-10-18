@@ -18,7 +18,6 @@ import { PlaylistDetailsPage } from "../pages/PlaylistDetailsPage";
 import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from "../pages/OperationsDashboardPage";
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
 import { ProfilePage } from "../pages/ProfilePage";
-import { SearchPage } from "../pages/SearchPage";
 import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
 import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
@@ -26,10 +25,11 @@ import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
 import { TrackDetailsPage } from "../pages/TrackDetailsPage";
 import { UploadTrackPage } from "../pages/UploadTrackPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
+import { SearchIcon } from "../icons";
 
 export function AppRouter(): React.ReactElement | null {
   const { user, authReady, isAuthenticated, handleLoginSuccess, handleProfileUpdated } = useAuth();
-  const { currentTrack, playing, playTrack, pause } = usePlayer();
+  const { currentTrack, playing, playTrack, pause, audio } = usePlayer();
   const { favoriteTracks, favoriteIds, toggleFavorite } = useFavorites();
   const {
     playlists,
@@ -131,15 +131,31 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   if (pathname === "/search") {
-    const query = queryParams.get("q") || "";
     return (
-      <SearchPage
-        currentTrack={currentTrack}
-        playing={playing}
-        onPlayTrack={playTrack}
-        onNavigate={navigate}
-        initialQuery={query}
-      />
+      <div className="state-page" style={{ padding: "64px 20px", textAlign: "center" }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            background: "#fbf5ea",
+            border: "1px solid #e6d5b8",
+            display: "grid",
+            placeItems: "center",
+            margin: "0 auto 16px",
+            color: "#8c5828",
+          }}
+        >
+          <SearchIcon width={28} height={28} />
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#101828", marginBottom: 8 }}>Search Catalog</h1>
+        <p style={{ color: "#667085", maxWidth: 440, margin: "0 auto 24px", fontSize: 14 }}>
+          Search feature is currently under development.
+        </p>
+        <button className="button button-primary button-small" onClick={() => navigate("/")}>
+          Back to Explore
+        </button>
+      </div>
     );
   }
 
@@ -340,6 +356,10 @@ export function AppRouter(): React.ReactElement | null {
         trackId={trackId}
         currentUser={user}
         onNavigate={navigate}
+        currentTrack={currentTrack}
+        playing={playing}
+        onPlayTrack={playTrack}
+        audio={audio}
       />
     );
   }

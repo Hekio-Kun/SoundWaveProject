@@ -1047,8 +1047,8 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                   <MediaUploadField
                     id="lyrics-upload"
                     label="Lyrics file"
-                    helperText="LRC or TXT · Max 1MB · Optional"
-                    accept=".lrc,.txt,text/plain"
+                    helperText="LRC · Max 1MB · Optional"
+                    accept=".lrc,text/plain"
                     file={currentLyricsFile}
                     existingFileLabel={currentLyrics ? "Lyrics attached" : undefined}
                     error={trackFormErrors.lyrics}
