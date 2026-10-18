@@ -7,7 +7,6 @@ import {
   CloseIcon,
   ClockIcon,
   EditIcon,
-  EyeIcon,
   CheckIcon,
 } from "../../icons";
 
@@ -392,21 +391,6 @@ export function RejectionDetailsModal({
             margin: 0,
           }}
         >
-          {onViewTrackDetail && (
-            <button
-              type="button"
-              className="button button-ghost button-small"
-              onClick={() => {
-                onClose();
-                onViewTrackDetail(details.trackId);
-              }}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-            >
-              <EyeIcon width={14} height={14} />
-              <span>Full Details</span>
-            </button>
-          )}
-
           <button
             type="button"
             className="button button-secondary"

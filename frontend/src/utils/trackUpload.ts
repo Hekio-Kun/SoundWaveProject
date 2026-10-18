@@ -25,7 +25,7 @@ export function validateCoverFile(file: File) {
 
 export function validateLyricsFile(file: File) {
   if (file.size > MAX_LYRICS_SIZE) return "Lyrics file must be smaller than 1MB.";
-  if (!hasAllowedExtension(file, LYRICS_EXTENSIONS)) return "Choose an LRC or TXT lyrics file.";
+  if (!hasAllowedExtension(file, LYRICS_EXTENSIONS)) return "Choose an LRC lyrics file.";
   return "";
 }
 

@@ -476,8 +476,12 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   return (
     <div className="upload-track-page">
-      <button className="upload-track-back" type="button" onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>
-        <ChevronLeftIcon width={17} height={17} /> {isEditMode ? "Back to Track Details" : "Back to Content Studio"}
+      <button
+        className="upload-track-back"
+        type="button"
+        onClick={() => onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/studio/tracks/${editTrackId}` : "/studio")}
+      >
+        <ChevronLeftIcon width={17} height={17} /> {isEditMode && existingTrack?.status !== "DRAFT" ? "Back to Track Details" : "Back to Content Studio"}
       </button>
 
       <header className="upload-track-hero">
@@ -485,11 +489,21 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
           {isEditMode ? <EditIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
         </span>
         <div>
-          <span className="eyebrow">{isEditMode ? "CONTENT STUDIO · EDIT DRAFT" : "CONTENT STUDIO"}</span>
-          <h1>{isEditMode ? `Edit draft: ${existingTrack?.title || title || "Track"}` : "Upload a new track"}</h1>
+          <span className="eyebrow">
+            {isEditMode
+              ? (existingTrack?.status === "REJECTED" ? "CONTENT STUDIO · RESUBMIT TRACK" : "CONTENT STUDIO · EDIT DRAFT")
+              : "CONTENT STUDIO"}
+          </span>
+          <h1>
+            {isEditMode
+              ? (existingTrack?.status === "REJECTED" ? `Edit & resubmit: ${existingTrack?.title || title || "Track"}` : `Edit draft: ${existingTrack?.title || title || "Track"}`)
+              : "Upload a new track"}
+          </h1>
           <p>
             {isEditMode
-              ? "Update track details, replace audio or cover artwork, and synchronize lyrics. Changes remain in your private drafts until submitted."
+              ? (existingTrack?.status === "REJECTED"
+                  ? "Update your track audio, artwork, lyrics, or notes to address reviewer feedback and resubmit for review."
+                  : "Update track details, replace audio or cover artwork, and synchronize lyrics. Changes remain in your private drafts until submitted.")
               : "Add the audio and track information now. The track stays private as a draft until you submit it for review."}
           </p>
         </div>
@@ -639,8 +653,8 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
               <MediaUploadField
                 id="lyrics-upload"
                 label="Lyrics file"
-                helperText="LRC or TXT · Max 1MB · Optional"
-                accept=".lrc,.txt,text/plain"
+                helperText="LRC · Max 1MB · Optional"
+                accept=".lrc,text/plain"
                 file={lyricsFile}
                 existingFileLabel={lyrics ? "Existing lyrics attached" : undefined}
                 error={formErrors.lyrics}
@@ -692,7 +706,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
           )}
 
           <div className="upload-track-actions">
-            <button className="button button-secondary" type="button" disabled={submitting} onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>Cancel</button>
+            <button className="button button-secondary" type="button" disabled={submitting} onClick={() => onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/studio/tracks/${editTrackId}` : "/studio")}>Cancel</button>
             <button
               className="button button-secondary"
               type="submit"
@@ -708,7 +722,14 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
               onClick={handleStartSubmitReview}
               id="btn-upload-submit-review"
             >
-              <UploadIcon width={17} height={17} /> {submitting ? "Saving..." : isEditMode ? "Save & submit for review" : "Submit for review"}
+              <UploadIcon width={17} height={17} />{" "}
+              {submitting
+                ? "Saving..."
+                : existingTrack?.status === "REJECTED"
+                ? "Resubmit for review"
+                : isEditMode
+                ? "Save & submit for review"
+                : "Submit for review"}
             </button>
           </div>
         </form>
@@ -734,13 +755,13 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
         <div className="modal-backdrop" role="presentation" onClick={() => !submitting && setConfirmModalOpen(false)}>
           <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Submit track for Staff review</h3>
+              <h3>{existingTrack?.status === "REJECTED" ? "Resubmit track for Staff review" : "Submit track for Staff review"}</h3>
               <button className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>
                 <CloseIcon width={18} height={18} />
               </button>
             </div>
             <p style={{ margin: "12px 0 8px", color: "var(--sw-text-secondary)" }}>
-              You are submitting <b>“{title}”</b> to the moderation queue. Once submitted, editing is locked until staff completes review.
+              You are {existingTrack?.status === "REJECTED" ? "resubmitting" : "submitting"} <b>“{title}”</b> to the moderation queue. Once submitted, editing is locked until staff completes review.
             </p>
             <div className="form-group" style={{ marginTop: "12px" }}>
               <label htmlFor="upload-submitter-note">Note for reviewer (optional)</label>
@@ -777,7 +798,9 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
                 onClick={() => void handleConfirmSubmitReview()}
                 id="btn-confirm-agree-submit"
               >
-                {submitting ? "Submitting..." : "Agree & Submit"}
+                {submitting
+                  ? (existingTrack?.status === "REJECTED" ? "Resubmitting..." : "Submitting...")
+                  : (existingTrack?.status === "REJECTED" ? "Agree & Resubmit" : "Agree & Submit")}
               </button>
             </div>
           </div>
