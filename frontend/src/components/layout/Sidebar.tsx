@@ -33,13 +33,6 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
               <span>Administration overview</span>
               <small className="sidebar-badge">ADMIN</small>
             </button>
-            <button
-              className={`nav-item ${isCurrent("/staff") ? "nav-item--active" : ""}`}
-              onClick={() => onNavigate("/staff/dashboard")}
-            >
-              <DashboardIcon />
-              <span>Content moderation</span>
-            </button>
           </div>
         ) : userRole === "STAFF" ? (
           <div className="nav-group">

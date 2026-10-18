@@ -13,6 +13,8 @@ import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.ApproveTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
+import groupone.soundwaveproject.moderation.dto.response.AlbumTrackNavigationResponse;
+import groupone.soundwaveproject.moderation.dto.response.AlbumTrackSummaryResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
@@ -220,8 +222,11 @@ public class ModerationService {
         UserProfile reviewerProfile = submission.getReviewerUserId() != null ?
                 profileRepository.findByUserId(submission.getReviewerUserId()).orElse(null) : null;
 
-        // 4. Ánh xạ dữ liệu trả về cho giao diện chi tiết
-        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics);
+        // 4. Nếu bài hát thuộc Album, xây dựng dữ liệu điều hướng Album
+        AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+
+        // 5. Ánh xạ dữ liệu trả về cho giao diện chi tiết
+        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, albumNavigation);
     }
 
     /**
@@ -317,7 +322,8 @@ public class ModerationService {
 
         UserProfile reviewerProfile = profileRepository.findByUserId(reviewer.getId()).orElse(null);
         String lyrics = track.getLyrics();
-        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics);
+        AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, albumNavigation);
     }
 
     /**
@@ -388,7 +394,8 @@ public class ModerationService {
 
         UserProfile reviewerProfile = profileRepository.findByUserId(reviewer.getId()).orElse(null);
         String lyrics = track.getLyrics();
-        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics);
+        AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, albumNavigation);
     }
 
     /**
@@ -450,6 +457,114 @@ public class ModerationService {
 
         UserProfile reviewerProfile = profileRepository.findByUserId(reviewer.getId()).orElse(null);
         String lyrics = track.getLyrics();
-        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics);
+        AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, albumNavigation);
+    }
+
+    /**
+     * Xây dựng dữ liệu điều hướng danh sách các bài hát trong Album dành cho nhân viên kiểm duyệt.
+     * Cho phép duyệt liên tục từ bài này sang bài tiếp theo trong cùng Album mà không cần quay lại danh sách.
+     *
+     * @param currentSubmission Bản ghi kiểm duyệt bài hát hiện tại
+     * @param currentTrack      Thực thể bài hát hiện tại
+     * @return DTO AlbumTrackNavigationResponse chứa ID bài trước, bài sau, bài pending kế tiếp và toàn bộ bài hát trong album
+     */
+    public AlbumTrackNavigationResponse buildAlbumNavigation(TrackSubmission currentSubmission, Track currentTrack) {
+        if (currentTrack == null || currentTrack.getAlbum() == null) {
+            return null;
+        }
+
+        Album album = currentTrack.getAlbum();
+        List<Track> albumTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        if (albumTracks == null || albumTracks.isEmpty()) {
+            return null;
+        }
+
+        List<Long> trackIds = albumTracks.stream().map(Track::getId).toList();
+        List<TrackSubmission> submissions = submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(trackIds);
+        Map<Long, TrackSubmission> latestSubByTrackId = submissions.stream()
+                .collect(Collectors.toMap(TrackSubmission::getTrackId, Function.identity(), (existing, replacement) -> existing));
+
+        List<AlbumTrackSummaryResponse> trackSummaries = new ArrayList<>();
+        int currentIndex = -1;
+
+        for (int i = 0; i < albumTracks.size(); i++) {
+            Track t = albumTracks.get(i);
+            TrackSubmission sub = latestSubByTrackId.get(t.getId());
+            Long subId = sub != null ? sub.getId() : null;
+            SubmissionStatus status = sub != null ? sub.getStatus() : null;
+
+            if (Objects.equals(t.getId(), currentTrack.getId())
+                    || (currentSubmission != null && currentSubmission.getId() != null && Objects.equals(subId, currentSubmission.getId()))) {
+                currentIndex = i;
+                if (currentSubmission != null) {
+                    subId = currentSubmission.getId();
+                    status = currentSubmission.getStatus();
+                }
+            }
+
+            trackSummaries.add(new AlbumTrackSummaryResponse(
+                    subId,
+                    t.getId(),
+                    t.getTitle(),
+                    t.getTrackNumber(),
+                    t.getDurationMs(),
+                    status
+            ));
+        }
+
+        if (currentIndex == -1) {
+            currentIndex = 0;
+        }
+
+        Long prevSubmissionId = null;
+        for (int i = currentIndex - 1; i >= 0; i--) {
+            if (trackSummaries.get(i).submissionId() != null) {
+                prevSubmissionId = trackSummaries.get(i).submissionId();
+                break;
+            }
+        }
+
+        Long nextSubmissionId = null;
+        for (int i = currentIndex + 1; i < trackSummaries.size(); i++) {
+            if (trackSummaries.get(i).submissionId() != null) {
+                nextSubmissionId = trackSummaries.get(i).submissionId();
+                break;
+            }
+        }
+
+        Long nextPendingSubmissionId = null;
+        // Tìm bài PENDING tiếp theo phía sau
+        for (int i = currentIndex + 1; i < trackSummaries.size(); i++) {
+            AlbumTrackSummaryResponse item = trackSummaries.get(i);
+            if (item.submissionId() != null && item.status() == SubmissionStatus.PENDING) {
+                nextPendingSubmissionId = item.submissionId();
+                break;
+            }
+        }
+        // Nếu phía sau không còn, kiểm tra vòng lặp từ đầu album xem còn bài nào PENDING chưa duyệt
+        if (nextPendingSubmissionId == null) {
+            for (int i = 0; i < currentIndex; i++) {
+                AlbumTrackSummaryResponse item = trackSummaries.get(i);
+                if (item.submissionId() != null && item.status() == SubmissionStatus.PENDING) {
+                    nextPendingSubmissionId = item.submissionId();
+                    break;
+                }
+            }
+        }
+
+        Long currentSubId = currentSubmission != null ? currentSubmission.getId() : null;
+
+        return new AlbumTrackNavigationResponse(
+                album.getId(),
+                album.getTitle(),
+                currentSubId,
+                prevSubmissionId,
+                nextSubmissionId,
+                nextPendingSubmissionId,
+                currentIndex + 1,
+                trackSummaries.size(),
+                trackSummaries
+        );
     }
 }

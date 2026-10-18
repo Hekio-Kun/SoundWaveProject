@@ -215,33 +215,19 @@ export function ModeratePendingTracks({
   if (selectedSubmissionId) {
     return (
       <div className="mod-track-view">
-        {toast ? (
-          <div
-            className={`staff-floating-toast is-${toast.type}`}
-            role="status"
-            aria-live="polite"
-          >
-            {toast.type === "success" ? (
-              <CheckIcon width={16} height={16} />
-            ) : (
-              <AlertIcon width={16} height={16} />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        ) : null}
-
         <PendingTrackDetailView
           submissionId={selectedSubmissionId}
           onBack={() => handleSelectSubmission(null)}
+          onNavigateToSubmission={(nextId) => {
+            handleSelectSubmission(nextId);
+            void loadStats();
+            void loadQueue();
+          }}
           onApproveSuccess={() => {
-            showToast("Track approved and published successfully!");
-            handleSelectSubmission(null);
             void loadStats();
             void loadQueue();
           }}
           onRejectSuccess={() => {
-            showToast("Track submission rejected.");
-            handleSelectSubmission(null);
             void loadStats();
             void loadQueue();
           }}
@@ -602,7 +588,7 @@ export function ModeratePendingTracks({
                             {item.trackTitle}
                           </button>
 
-                          {/* Nhãn Album */}
+                          {/* Album badge */}
                           <span className="staff-tag-badge is-album" title="Album Collection">
                             <DiscIcon width={12} height={12} />
                             <span>Album</span>
@@ -632,7 +618,7 @@ export function ModeratePendingTracks({
                         </div>
                       </div>
 
-                      {/* Trạng thái duyệt */}
+                      {/* Moderation status */}
                       <div className="staff-track-status-col">
                         <span
                           className={`staff-status-chip ${
@@ -654,7 +640,7 @@ export function ModeratePendingTracks({
                         </span>
                       </div>
 
-                      {/* Nút thao tác mở rộng / thu gọn danh sách bài trong album */}
+                      {/* Action button to expand / collapse track list in album */}
                       <div className="staff-track-actions-col">
                         <button
                           type="button"
@@ -676,7 +662,7 @@ export function ModeratePendingTracks({
                       </div>
                     </div>
 
-                    {/* Danh sách các bài hát trong Album khi mở rộng */}
+                    {/* Expanded album constituent tracks list */}
                     {isExpanded && albumTrackList.length > 0 && (
                       <div className="staff-album-tracks-panel">
                         <div className="staff-album-tracks-header">
@@ -739,13 +725,13 @@ export function ModeratePendingTracks({
                 );
               }
 
-              // Bài hát đơn lẻ (Single Track)
+              // Single track release
               return (
                 <article
                   className={`staff-track-card ${item.status === "PENDING" ? "is-pending-track" : ""}`}
                   key={item.id}
                 >
-                  {/* Ảnh bìa bài hát */}
+                  {/* Track artwork */}
                   <div className="staff-thumb-container">
                     <img
                       src={
@@ -766,7 +752,7 @@ export function ModeratePendingTracks({
                     </button>
                   </div>
 
-                  {/* Thông tin bài hát & nghệ sĩ */}
+                  {/* Track & artist metadata */}
                   <div className="staff-track-meta-section">
                     <div className="staff-track-name-row">
                       <button
@@ -778,7 +764,7 @@ export function ModeratePendingTracks({
                         {item.trackTitle}
                       </button>
 
-                      {/* Nhãn Track đơn */}
+                      {/* Single track badge */}
                       <span className="staff-tag-badge is-single" title="Single Track">
                         <MusicIcon width={12} height={12} />
                         <span>Single</span>
@@ -808,7 +794,7 @@ export function ModeratePendingTracks({
                     </div>
                   </div>
 
-                  {/* Trạng thái kiểm duyệt */}
+                  {/* Moderation status */}
                   <div className="staff-track-status-col">
                     <span
                       className={`staff-status-chip ${
@@ -830,7 +816,7 @@ export function ModeratePendingTracks({
                     </span>
                   </div>
 
-                  {/* Nút xem chi tiết để kiểm duyệt */}
+                  {/* View details to moderate */}
                   <div className="staff-track-actions-col">
                     <button
                       type="button"

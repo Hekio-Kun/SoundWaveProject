@@ -31,6 +31,27 @@ export type SubmissionQueueItem = {
   albumTracks?: SubmissionQueueItem[] | null;
 };
 
+export type AlbumTrackSummary = {
+  submissionId: number | null;
+  trackId: number;
+  title: string;
+  trackNumber: number | null;
+  durationMs: number | null;
+  status: SubmissionStatus | null;
+};
+
+export type AlbumTrackNavigation = {
+  albumId: number;
+  albumTitle: string;
+  currentSubmissionId: number | null;
+  prevSubmissionId: number | null;
+  nextSubmissionId: number | null;
+  nextPendingSubmissionId: number | null;
+  currentIndex: number;
+  totalTracks: number;
+  tracks: AlbumTrackSummary[];
+};
+
 export type SubmissionDetail = {
   id: number;
   status: SubmissionStatus;
@@ -60,6 +81,7 @@ export type SubmissionDetail = {
   };
   submitter: { id: number; email: string; username: string; displayName: string } | null;
   reviewer: { id: number; email: string; username: string; displayName: string } | null;
+  albumNavigation?: AlbumTrackNavigation | null;
 };
 
 export type PageResponse<T> = {
