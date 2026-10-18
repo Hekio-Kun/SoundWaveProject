@@ -22,6 +22,8 @@ import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateExce
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.entity.NotificationType;
+import groupone.soundwaveproject.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +57,7 @@ public class ModerationService {
     private final TrackSubmissionMapper mapper;
     private final AppUserRepository userRepository;
     private final UserProfileRepository profileRepository;
+    private final NotificationService notificationService;
 
     /**
      * Lấy danh sách hàng đợi các bài hát cần kiểm duyệt theo phân trang và bộ lọc tìm kiếm (UC-24.1 View Moderation Queue).
@@ -238,6 +241,15 @@ public class ModerationService {
 
         if (submitter != null) {
             mailService.sendTrackApprovedEmail(submitter.getEmail(), submitterDisplayName, track.getTitle());
+            notificationService.createNotification(
+                    submitter.getId(),
+                    reviewer.getId(),
+                    NotificationType.TRACK_APPROVED,
+                    "Track approved",
+                    "Your track \"" + track.getTitle() + "\" has been approved and is now available in the public catalog.",
+                    "TRACK",
+                    String.valueOf(track.getId())
+            );
         }
 
         UserProfile reviewerProfile = profileRepository.findByUserId(reviewer.getId()).orElse(null);
@@ -300,6 +312,15 @@ public class ModerationService {
 
         if (submitter != null) {
             mailService.sendTrackRejectedEmail(submitter.getEmail(), submitterDisplayName, track.getTitle(), rejectionReason);
+            notificationService.createNotification(
+                    submitter.getId(),
+                    reviewer.getId(),
+                    NotificationType.TRACK_REJECTED,
+                    "Revision requested",
+                    "\"" + track.getTitle() + "\" needs revision: " + rejectionReason,
+                    "TRACK",
+                    String.valueOf(track.getId())
+            );
         }
 
         UserProfile reviewerProfile = profileRepository.findByUserId(reviewer.getId()).orElse(null);

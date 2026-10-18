@@ -230,6 +230,14 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   if (pathname === "/library" || pathname === "/favorites") {
+    const tabParam = queryParams.get("tab");
+    const initialTab =
+      tabParam === "history" || tabParam === "playlists" || tabParam === "favorites"
+        ? tabParam
+        : pathname === "/favorites"
+        ? "favorites"
+        : "favorites";
+
     return (
       <LibraryPage
         currentTrack={currentTrack}
@@ -242,7 +250,7 @@ export function AppRouter(): React.ReactElement | null {
         onCreatePlaylist={openCreatePlaylist}
         onEditPlaylist={openEditPlaylist}
         onDeletePlaylist={openDeletePlaylist}
-        initialTab="favorites"
+        initialTab={initialTab}
       />
     );
   }
@@ -261,6 +269,24 @@ export function AppRouter(): React.ReactElement | null {
         onEditPlaylist={openEditPlaylist}
         onDeletePlaylist={openDeletePlaylist}
         initialTab="playlists"
+      />
+    );
+  }
+
+  if (pathname === "/history") {
+    return (
+      <LibraryPage
+        currentTrack={currentTrack}
+        playing={playing}
+        onPlayTrack={playTrack}
+        onNavigate={navigate}
+        favoriteTracks={favoriteTracks}
+        onToggleFavorite={toggleFavorite}
+        playlists={playlists}
+        onCreatePlaylist={openCreatePlaylist}
+        onEditPlaylist={openEditPlaylist}
+        onDeletePlaylist={openDeletePlaylist}
+        initialTab="history"
       />
     );
   }

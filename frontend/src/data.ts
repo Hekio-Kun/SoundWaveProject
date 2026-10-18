@@ -176,19 +176,7 @@ export const projectTracks: LandingTrack[] = [
 ];
 
 export const demoTracks: LandingTrack[] = [
-  {
-    id: 1,
-    title: "Sớm Mai Dịu Dàng",
-    coverUrl: covers.dawn,
-    audioUrl: "/audio/soundwave-demo.wav",
-    durationMs: 60000,
-    playCount: 284521,
-    publicationStatus: "APPROVED",
-    genreSlug: "acoustic",
-    lyrics: `Từng tia nắng ấm khẽ luồn qua ô cửa\nGió hát thì thầm bài ca mùa mới\nEm nghe trong lòng những xốn xang đầu tiên\nChào ngày mới bình yên và trong trẻo.`,
-    creator: creators.minh,
-    album: { id: 1, title: "Những Ngày Trong Veo" },
-  },
+
   {
     id: 2,
     title: "Thành Phố Sau Mưa",
