@@ -93,6 +93,9 @@ public class StudioAlbumService {
      */
     @Transactional(readOnly = true)
     public StudioAlbumResponse getAlbumById(Long id, String currentUserEmail) {
+        if (id == null || id <= 0) {
+            throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
+        }
         AppUser user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
@@ -118,124 +121,171 @@ public class StudioAlbumService {
             List<MultipartFile> audioFiles,
             String currentUserEmail
     ) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        if (request == null) {
+            throw new BadRequestOperationException("MISSING_PAYLOAD", "Album creation request payload is required.");
+        }
+        if (request.getTitle() == null || request.getTitle().trim().isBlank()) {
+            throw new BadRequestOperationException("TITLE_REQUIRED", "Album title is required.");
+        }
         String cleanTitle = request.getTitle().trim();
+        if (cleanTitle.length() > 200) {
+            throw new BadRequestOperationException("TITLE_TOO_LONG", "Album title must not exceed 200 characters.");
+        }
+        if (request.getDescription() != null && request.getDescription().trim().length() > 2000) {
+            throw new BadRequestOperationException("DESCRIPTION_TOO_LONG", "Album description must not exceed 2000 characters.");
+        }
+
+        AppUser user = getAuthenticatedUser(currentUserEmail);
 
         // 1. Kiểm tra tính duy nhất của tên Album theo từng tài khoản (EX01)
         if (albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(user.getId(), cleanTitle)) {
             throw new ConflictOperationException("An album with the title '" + cleanTitle + "' already exists in your library.");
         }
 
-        // 2. Upload ảnh bìa album lên Cloudinary nếu có (UC-30)
-        StoredMediaResponse storedCover = null;
-        if (cover != null && !cover.isEmpty()) {
-            storedCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
+        boolean isSubmit = Boolean.TRUE.equals(request.getSubmitForReview());
+        boolean hasTracks = request.getTracks() != null && !request.getTracks().isEmpty();
+        boolean hasTrackIds = request.getTrackIds() != null && !request.getTrackIds().isEmpty();
+
+        if (isSubmit && !hasTracks && !hasTrackIds) {
+            throw new BadRequestOperationException("EMPTY_ALBUM_SUBMISSION", "An album must contain at least one track to be submitted for review.");
         }
 
-        boolean isSubmit = Boolean.TRUE.equals(request.getSubmitForReview());
-        // Theo ràng buộc CSDL (CK_albums_status), Album chỉ có thể mang trạng thái 'DRAFT' hoặc 'PUBLISHED'.
-        // Album sẽ tự động chuyển sang 'PUBLISHED' khi có bài hát trong album được duyệt thành công (BR-18).
-        String initialAlbumStatus = "DRAFT";
-        TrackPublicationStatus initialTrackStatus = isSubmit ? TrackPublicationStatus.PENDING : TrackPublicationStatus.DRAFT;
-
-        String uniqueSlug = generateUniqueSlug(cleanTitle);
-
-        Album album = Album.builder()
-                .createdByUserId(user.getId())
-                .title(cleanTitle)
-                .slug(uniqueSlug)
-                .description(request.getDescription() != null ? request.getDescription().trim() : null)
-                .releaseDate(request.getReleaseDate())
-                .status(initialAlbumStatus)
-                .coverPublicId(storedCover != null ? storedCover.publicId() : null)
-                .coverUrl(storedCover != null ? storedCover.secureUrl() : null)
-                .build();
-
-        Album savedAlbum = albumRepository.save(album);
-        List<Track> constituentTracks = new ArrayList<>();
-
-        // 3. Quy trình tải lên toàn bộ bài hát cấu thành album cùng một lượt (UC-21.1)
-        if (request.getTracks() != null && !request.getTracks().isEmpty()) {
+        // Validate metadata của toàn bộ track trước khi gọi Cloudinary
+        if (hasTracks) {
             if (audioFiles == null || audioFiles.isEmpty()) {
                 throw new BadRequestOperationException("Audio files are required for constituent album tracks.");
             }
-
             for (int i = 0; i < request.getTracks().size(); i++) {
                 AlbumTrackItemRequest item = request.getTracks().get(i);
-                int fileIndex = item.getAudioIndex() != null ? item.getAudioIndex() : i;
-
-                if (fileIndex < 0 || fileIndex >= audioFiles.size()) {
-                    throw new BadRequestOperationException("Audio file index out of bounds for track '" + item.getTitle() + "'.");
+                if (item == null || item.getTitle() == null || item.getTitle().trim().isBlank()) {
+                    throw new BadRequestOperationException("Track title is required for track #" + (i + 1) + ".");
                 }
-
+                if (item.getTitle().trim().length() > 200) {
+                    throw new BadRequestOperationException("Track title must not exceed 200 characters for track #" + (i + 1) + ".");
+                }
+                if (item.getGenreId() == null || item.getGenreId() <= 0) {
+                    throw new BadRequestOperationException("Genre is required for track '" + item.getTitle().trim() + "'.");
+                }
+                int fileIndex = item.getAudioIndex() != null ? item.getAudioIndex() : i;
+                if (fileIndex < 0 || fileIndex >= audioFiles.size()) {
+                    throw new BadRequestOperationException("Audio file index out of bounds for track '" + item.getTitle().trim() + "'.");
+                }
                 MultipartFile audioFile = audioFiles.get(fileIndex);
                 if (audioFile == null || audioFile.isEmpty()) {
-                    throw new BadRequestOperationException("Audio file is required for track '" + item.getTitle() + "'.");
-                }
-
-                Genre genre = genreRepository.findById(item.getGenreId())
-                        .orElseThrow(() -> new BadRequestOperationException("Selected genre for track '" + item.getTitle() + "' is invalid."));
-                if (!Boolean.TRUE.equals(genre.getIsActive())) {
-                    throw new BadRequestOperationException("Selected genre '" + genre.getName() + "' is currently inactive.");
-                }
-
-                // Upload tệp âm thanh lên Cloudinary
-                StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audioFile, user.getId());
-
-                int trackOrder = item.getTrackNumber() != null ? item.getTrackNumber() : (i + 1);
-                int duration = (item.getDurationMs() != null && item.getDurationMs() > 0)
-                        ? item.getDurationMs()
-                        : (audioResponse.durationMs() != null ? audioResponse.durationMs() : 0);
-
-                String trackSlug = generateUniqueTrackSlug(item.getTitle().trim());
-
-                Track track = Track.builder()
-                        .uploaderUserId(user.getId())
-                        .album(savedAlbum)
-                        .genre(genre)
-                        .title(item.getTitle().trim())
-                        .slug(trackSlug)
-                        .description(item.getDescription() != null ? item.getDescription().trim() : null)
-                        .trackNumber(trackOrder)
-                        .publicationStatus(initialTrackStatus)
-                        .audioPublicId(audioResponse.publicId())
-                        .audioUrl(audioResponse.secureUrl())
-                        .audioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3")
-                        .durationMs(duration)
-                        .playCountCache(0L)
-                        .coverPublicId(savedAlbum.getCoverPublicId())
-                        .coverUrl(savedAlbum.getCoverUrl())
-                        .lyrics(item.getLyrics() != null && !item.getLyrics().isBlank() ? item.getLyrics().trim() : null)
-                        .createdAt(LocalDateTime.now(ZoneOffset.UTC))
-                        .updatedAt(LocalDateTime.now(ZoneOffset.UTC))
-                        .build();
-
-                Track savedTrack = trackRepository.save(track);
-                constituentTracks.add(savedTrack);
-
-                // Nếu gửi duyệt: tạo bản ghi kiểm duyệt TrackSubmission
-                if (isSubmit) {
-                    TrackSubmission submission = TrackSubmission.builder()
-                            .trackId(savedTrack.getId())
-                            .submittedByUserId(user.getId())
-                            .status(SubmissionStatus.PENDING)
-                            .submitterNote("Album submission: " + savedAlbum.getTitle())
-                            .build();
-                    trackSubmissionRepository.save(submission);
+                    throw new BadRequestOperationException("Audio file is required for track '" + item.getTitle().trim() + "'.");
                 }
             }
-        } else if (request.getTrackIds() != null && !request.getTrackIds().isEmpty()) {
-            // Hỗ trợ luồng tương thích ngược nếu gán danh sách bài hát có sẵn
-            constituentTracks = assignTracksToAlbum(savedAlbum, request.getTrackIds(), user.getId());
         }
 
-        // 4. Đánh giá lại trạng thái xuất bản của Album theo BR-18 và quy chuẩn
-        recalculateAndSaveAlbumStatus(savedAlbum);
+        List<String> uploadedAudioPublicIds = new ArrayList<>();
+        String uploadedCoverPublicId = null;
 
-        log.info("Album '{}' (ID: {}) created with {} constituent tracks by user ID {}",
-                savedAlbum.getTitle(), savedAlbum.getId(), constituentTracks.size(), user.getId());
+        try {
+            // 2. Upload ảnh bìa album lên Cloudinary nếu có (UC-30)
+            StoredMediaResponse storedCover = null;
+            if (cover != null && !cover.isEmpty()) {
+                storedCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
+                uploadedCoverPublicId = storedCover.publicId();
+            }
 
-        return studioAlbumMapper.toStudioAlbumResponse(savedAlbum, constituentTracks.size(), constituentTracks);
+            String initialAlbumStatus = "DRAFT";
+            TrackPublicationStatus initialTrackStatus = isSubmit ? TrackPublicationStatus.PENDING : TrackPublicationStatus.DRAFT;
+            String uniqueSlug = generateUniqueSlug(cleanTitle);
+
+            Album album = Album.builder()
+                    .createdByUserId(user.getId())
+                    .title(cleanTitle)
+                    .slug(uniqueSlug)
+                    .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                    .releaseDate(request.getReleaseDate())
+                    .status(initialAlbumStatus)
+                    .coverPublicId(storedCover != null ? storedCover.publicId() : null)
+                    .coverUrl(storedCover != null ? storedCover.secureUrl() : null)
+                    .build();
+
+            Album savedAlbum = albumRepository.save(album);
+            List<Track> constituentTracks = new ArrayList<>();
+
+            // 3. Quy trình tải lên toàn bộ bài hát cấu thành album cùng một lượt (UC-21.1)
+            if (hasTracks) {
+                for (int i = 0; i < request.getTracks().size(); i++) {
+                    AlbumTrackItemRequest item = request.getTracks().get(i);
+                    int fileIndex = item.getAudioIndex() != null ? item.getAudioIndex() : i;
+                    MultipartFile audioFile = audioFiles.get(fileIndex);
+
+                    Genre genre = genreRepository.findById(item.getGenreId())
+                            .orElseThrow(() -> new BadRequestOperationException("Selected genre for track '" + item.getTitle() + "' is invalid."));
+                    if (!Boolean.TRUE.equals(genre.getIsActive())) {
+                        throw new BadRequestOperationException("Selected genre '" + genre.getName() + "' is currently inactive.");
+                    }
+
+                    // Upload tệp âm thanh lên Cloudinary
+                    StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audioFile, user.getId());
+                    uploadedAudioPublicIds.add(audioResponse.publicId());
+
+                    int trackOrder = item.getTrackNumber() != null ? item.getTrackNumber() : (i + 1);
+                    int duration = (item.getDurationMs() != null && item.getDurationMs() > 0)
+                            ? item.getDurationMs()
+                            : (audioResponse.durationMs() != null ? audioResponse.durationMs() : 0);
+
+                    String trackSlug = generateUniqueTrackSlug(item.getTitle().trim());
+
+                    Track track = Track.builder()
+                            .uploaderUserId(user.getId())
+                            .album(savedAlbum)
+                            .genre(genre)
+                            .title(item.getTitle().trim())
+                            .slug(trackSlug)
+                            .description(item.getDescription() != null ? item.getDescription().trim() : null)
+                            .trackNumber(trackOrder)
+                            .publicationStatus(initialTrackStatus)
+                            .audioPublicId(audioResponse.publicId())
+                            .audioUrl(audioResponse.secureUrl())
+                            .audioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3")
+                            .durationMs(duration)
+                            .playCountCache(0L)
+                            .coverPublicId(savedAlbum.getCoverPublicId())
+                            .coverUrl(savedAlbum.getCoverUrl())
+                            .lyrics(item.getLyrics() != null && !item.getLyrics().isBlank() ? item.getLyrics().trim() : null)
+                            .createdAt(LocalDateTime.now(ZoneOffset.UTC))
+                            .updatedAt(LocalDateTime.now(ZoneOffset.UTC))
+                            .build();
+
+                    Track savedTrack = trackRepository.save(track);
+                    constituentTracks.add(savedTrack);
+
+                    if (isSubmit) {
+                        TrackSubmission submission = TrackSubmission.builder()
+                                .trackId(savedTrack.getId())
+                                .submittedByUserId(user.getId())
+                                .status(SubmissionStatus.PENDING)
+                                .submitterNote("Album submission: " + savedAlbum.getTitle())
+                                .build();
+                        trackSubmissionRepository.save(submission);
+                    }
+                }
+            } else if (hasTrackIds) {
+                constituentTracks = assignTracksToAlbum(savedAlbum, request.getTrackIds(), user.getId());
+            }
+
+            // 4. Đánh giá lại trạng thái xuất bản của Album theo BR-18 và quy chuẩn
+            recalculateAndSaveAlbumStatus(savedAlbum);
+
+            log.info("Album '{}' (ID: {}) created with {} constituent tracks by user ID {}",
+                    savedAlbum.getTitle(), savedAlbum.getId(), constituentTracks.size(), user.getId());
+
+            return studioAlbumMapper.toStudioAlbumResponse(savedAlbum, constituentTracks.size(), constituentTracks);
+
+        } catch (Exception ex) {
+            log.error("Exception during createAlbum for user ID {}. Cleaning up uploaded Cloudinary assets...", user.getId(), ex);
+            if (uploadedCoverPublicId != null) {
+                cloudMediaService.deleteImageQuietly(uploadedCoverPublicId);
+            }
+            for (String audioPublicId : uploadedAudioPublicIds) {
+                cloudMediaService.deleteTrackAudioQuietly(audioPublicId);
+            }
+            throw ex;
+        }
     }
 
     /**
@@ -257,51 +307,77 @@ public class StudioAlbumService {
      */
     @Transactional
     public StudioAlbumResponse updateAlbum(Long id, UpdateAlbumRequest request, MultipartFile cover, String currentUserEmail) {
+        if (id == null || id <= 0) {
+            throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
+        }
+        if (request == null) {
+            throw new BadRequestOperationException("MISSING_PAYLOAD", "Update album request payload is required.");
+        }
+        if (request.getTitle() == null || request.getTitle().trim().isBlank()) {
+            throw new BadRequestOperationException("TITLE_REQUIRED", "Album title is required.");
+        }
+        String cleanTitle = request.getTitle().trim();
+        if (cleanTitle.length() > 200) {
+            throw new BadRequestOperationException("TITLE_TOO_LONG", "Album title must not exceed 200 characters.");
+        }
+        if (request.getDescription() != null && request.getDescription().trim().length() > 2000) {
+            throw new BadRequestOperationException("DESCRIPTION_TOO_LONG", "Album description must not exceed 2000 characters.");
+        }
+
         AppUser user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
-
-        String cleanTitle = request.getTitle().trim();
 
         // Kiểm tra trùng tên album khác cùng tài khoản (EX01)
         if (albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(user.getId(), cleanTitle, id)) {
             throw new ConflictOperationException("Another album with the title '" + cleanTitle + "' already exists.");
         }
 
-        // Nếu đổi tiêu đề thì cập nhật lại slug duy nhất
-        if (!album.getTitle().equalsIgnoreCase(cleanTitle)) {
-            album.setTitle(cleanTitle);
-            album.setSlug(generateUniqueSlug(cleanTitle));
-        }
+        String newCoverPublicId = null;
+        try {
+            // Nếu đổi tiêu đề thì cập nhật lại slug duy nhất
+            if (!album.getTitle().equalsIgnoreCase(cleanTitle)) {
+                album.setTitle(cleanTitle);
+                album.setSlug(generateUniqueSlug(cleanTitle));
+            }
 
-        album.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
-        album.setReleaseDate(request.getReleaseDate());
+            album.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+            album.setReleaseDate(request.getReleaseDate());
 
-        // Nếu tải ảnh bìa mới: upload ảnh mới lên Cloudinary và xóa ảnh cũ
-        if (cover != null && !cover.isEmpty()) {
-            StoredMediaResponse newCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
             String oldCoverPublicId = album.getCoverPublicId();
+            if (cover != null && !cover.isEmpty()) {
+                StoredMediaResponse newCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
+                newCoverPublicId = newCover.publicId();
 
-            album.setCoverPublicId(newCover.publicId());
-            album.setCoverUrl(newCover.secureUrl());
+                album.setCoverPublicId(newCover.publicId());
+                album.setCoverUrl(newCover.secureUrl());
+            }
 
-            if (oldCoverPublicId != null && !oldCoverPublicId.isBlank()) {
+            // Đồng bộ danh sách bài hát thuộc Album
+            List<Track> updatedTracks = request.getTrackIds() != null
+                    ? syncAlbumTracks(album, request.getTrackIds(), user.getId())
+                    : trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+
+            // Đánh giá lại trạng thái xuất bản theo BR-18 & BR-22
+            recalculateAndSaveAlbumStatus(album);
+
+            Album updatedAlbum = albumRepository.save(album);
+
+            // Xóa ảnh bìa cũ trên Cloudinary sau khi lưu CSDL thành công
+            if (newCoverPublicId != null && oldCoverPublicId != null && !oldCoverPublicId.isBlank()) {
                 cloudMediaService.deleteImageQuietly(oldCoverPublicId);
             }
+
+            log.info("Album '{}' (ID: {}) updated by user ID {}", updatedAlbum.getTitle(), updatedAlbum.getId(), user.getId());
+            return studioAlbumMapper.toStudioAlbumResponse(updatedAlbum, updatedTracks.size(), updatedTracks);
+
+        } catch (Exception ex) {
+            log.error("Exception during updateAlbum for ID {}. Rolling back newly uploaded media...", id, ex);
+            if (newCoverPublicId != null) {
+                cloudMediaService.deleteImageQuietly(newCoverPublicId);
+            }
+            throw ex;
         }
-
-        // Đồng bộ danh sách bài hát thuộc Album
-        List<Track> updatedTracks = request.getTrackIds() != null
-                ? syncAlbumTracks(album, request.getTrackIds(), user.getId())
-                : trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
-
-        // Đánh giá lại trạng thái xuất bản theo BR-18 & BR-22
-        recalculateAndSaveAlbumStatus(album);
-
-        Album updatedAlbum = albumRepository.save(album);
-        log.info("Album '{}' (ID: {}) updated by user ID {}", updatedAlbum.getTitle(), updatedAlbum.getId(), user.getId());
-
-        return studioAlbumMapper.toStudioAlbumResponse(updatedAlbum, updatedTracks.size(), updatedTracks);
     }
 
     /**
@@ -313,6 +389,9 @@ public class StudioAlbumService {
      */
     @Transactional
     public void deleteAlbum(Long id, String currentUserEmail) {
+        if (id == null || id <= 0) {
+            throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
+        }
         AppUser user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
@@ -320,14 +399,19 @@ public class StudioAlbumService {
         // 1. Xóa tất cả các bài hát cấu thành bên trong album khỏi CSDL và Cloudinary (UC-21.4 POST-1 & POST-2)
         List<Track> constituentTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
         for (Track track : constituentTracks) {
-            playlistTrackRepository.deleteByTrack_Id(track.getId());
-            listeningHistoryRepository.deleteByTrackId(track.getId());
-            trackSubmissionRepository.deleteByTrackId(track.getId());
-            cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
-            if (track.getCoverPublicId() != null && !track.getCoverPublicId().equals(album.getCoverPublicId())) {
-                cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
+            try {
+                playlistTrackRepository.deleteByTrack_Id(track.getId());
+                listeningHistoryRepository.deleteByTrackId(track.getId());
+                trackSubmissionRepository.deleteByTrackId(track.getId());
+                cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
+                if (track.getCoverPublicId() != null && !track.getCoverPublicId().equals(album.getCoverPublicId())) {
+                    cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
+                }
+                trackRepository.delete(track);
+            } catch (Exception ex) {
+                log.warn("Error while deleting constituent track ID {} of album ID {}: {}", track.getId(), id, ex.getMessage());
+                trackRepository.delete(track);
             }
-            trackRepository.delete(track);
         }
 
         // 2. Dọn dẹp ảnh bìa album trên Cloudinary nếu có (POST-2 của UC-21.4)
@@ -350,6 +434,9 @@ public class StudioAlbumService {
      */
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getAvailableTracksForAlbum(Long currentAlbumId, String currentUserEmail) {
+        if (currentAlbumId != null && currentAlbumId <= 0) {
+            throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
+        }
         AppUser user = getAuthenticatedUser(currentUserEmail);
         List<Track> allUserTracks = trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(user.getId());
 
@@ -369,10 +456,15 @@ public class StudioAlbumService {
     private List<Track> assignTracksToAlbum(Album album, List<Long> trackIds, Long currentUserId) {
         List<Track> assigned = new ArrayList<>();
         int trackNumber = 1;
+        List<Long> distinctTrackIds = trackIds.stream().distinct().toList();
 
-        for (Long trackId : trackIds) {
+        for (Long trackId : distinctTrackIds) {
             Track track = trackRepository.findByIdAndUploaderUserId(trackId, currentUserId)
                     .orElseThrow(() -> new BadRequestOperationException("Track ID " + trackId + " not found or does not belong to you."));
+
+            if (track.getAlbum() != null && !track.getAlbum().getId().equals(album.getId())) {
+                throw new BadRequestOperationException("Track '" + track.getTitle() + "' already belongs to another album ('" + track.getAlbum().getTitle() + "').");
+            }
 
             track.setAlbum(album);
             track.setTrackNumber(trackNumber++);
@@ -392,32 +484,43 @@ public class StudioAlbumService {
             return currentAlbumTracks;
         }
 
-        if (trackIds.isEmpty()) {
+        List<Long> distinctTrackIds = trackIds.stream().distinct().toList();
+
+        if (distinctTrackIds.isEmpty()) {
             throw new BadRequestOperationException("An album must contain at least one track. To remove all tracks, please delete the album instead.");
         }
 
-        Set<Long> newTrackIdSet = new HashSet<>(trackIds);
+        Set<Long> newTrackIdSet = new HashSet<>(distinctTrackIds);
 
         // Xóa vĩnh viễn những bài bị loại bỏ khỏi album (UC-21.3 POST-3)
         for (Track t : currentAlbumTracks) {
             if (!newTrackIdSet.contains(t.getId())) {
-                playlistTrackRepository.deleteByTrack_Id(t.getId());
-                listeningHistoryRepository.deleteByTrackId(t.getId());
-                trackSubmissionRepository.deleteByTrackId(t.getId());
-                cloudMediaService.deleteTrackAudioQuietly(t.getAudioPublicId());
-                if (t.getCoverPublicId() != null && !t.getCoverPublicId().equals(album.getCoverPublicId())) {
-                    cloudMediaService.deleteImageQuietly(t.getCoverPublicId());
+                try {
+                    playlistTrackRepository.deleteByTrack_Id(t.getId());
+                    listeningHistoryRepository.deleteByTrackId(t.getId());
+                    trackSubmissionRepository.deleteByTrackId(t.getId());
+                    cloudMediaService.deleteTrackAudioQuietly(t.getAudioPublicId());
+                    if (t.getCoverPublicId() != null && !t.getCoverPublicId().equals(album.getCoverPublicId())) {
+                        cloudMediaService.deleteImageQuietly(t.getCoverPublicId());
+                    }
+                    trackRepository.delete(t);
+                } catch (Exception ex) {
+                    log.warn("Error cleaning up removed track ID {}: {}", t.getId(), ex.getMessage());
+                    trackRepository.delete(t);
                 }
-                trackRepository.delete(t);
             }
         }
 
         // Cập nhật album và thứ tự bài hát mới cho các bài giữ lại
         List<Track> resultTracks = new ArrayList<>();
         int order = 1;
-        for (Long trackId : trackIds) {
+        for (Long trackId : distinctTrackIds) {
             Track track = trackRepository.findByIdAndUploaderUserId(trackId, currentUserId)
                     .orElseThrow(() -> new BadRequestOperationException("Track ID " + trackId + " not found or does not belong to you."));
+
+            if (track.getAlbum() != null && !track.getAlbum().getId().equals(album.getId())) {
+                throw new BadRequestOperationException("Track '" + track.getTitle() + "' already belongs to another album ('" + track.getAlbum().getTitle() + "').");
+            }
 
             track.setAlbum(album);
             track.setTrackNumber(order++);

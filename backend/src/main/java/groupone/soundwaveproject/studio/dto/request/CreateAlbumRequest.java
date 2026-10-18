@@ -1,5 +1,6 @@
 package groupone.soundwaveproject.studio.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -39,6 +40,7 @@ public class CreateAlbumRequest {
     /**
      * Danh sách thông tin chi tiết từng bài hát cấu thành khi upload toàn bộ bài hát cùng album (UC-21.1).
      */
+    @Valid
     private List<AlbumTrackItemRequest> tracks;
 
     /**

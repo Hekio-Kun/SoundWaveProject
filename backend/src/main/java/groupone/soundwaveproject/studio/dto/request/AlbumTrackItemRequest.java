@@ -2,6 +2,7 @@ package groupone.soundwaveproject.studio.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class AlbumTrackItemRequest {
     private String title;
 
     @NotNull(message = "Genre is required.")
+    @Positive(message = "Genre ID must be positive.")
     private Long genreId;
 
     private Integer trackNumber;

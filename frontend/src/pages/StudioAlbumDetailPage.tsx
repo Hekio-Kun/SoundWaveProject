@@ -72,7 +72,8 @@ export function StudioAlbumDetailPage({
 }: Props) {
   const [album, setAlbum] = useState<StudioAlbum | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -90,11 +91,11 @@ export function StudioAlbumDetailPage({
   const fetchAlbumData = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       const data = await albumApi.getAlbumById(albumId);
       setAlbum(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load album details.");
+      setLoadError(err instanceof Error ? err.message : "Failed to load album details.");
     } finally {
       setLoading(false);
     }
@@ -109,11 +110,13 @@ export function StudioAlbumDetailPage({
     if (!album) return;
     try {
       setDeleting(true);
+      setActionError(null);
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
       onNavigate("/studio");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete album.");
+      setActionError(err instanceof Error ? err.message : "Failed to delete album.");
+      setDeleteConfirmOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -123,10 +126,11 @@ export function StudioAlbumDetailPage({
   const handleRequestDeleteTrack = (track: StudioTrack) => {
     if (!album || !album.tracks) return;
     if (album.tracks.length <= 1) {
-      setError("An album must contain at least one track. To remove all tracks, please delete the album instead.");
+      setActionError("An album must contain at least one track. To remove all tracks, please delete the album instead.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    setActionError(null);
     setTrackToDelete(track);
   };
 
@@ -135,12 +139,13 @@ export function StudioAlbumDetailPage({
     if (!trackToDelete) return;
     try {
       setDeletingTrack(true);
+      setActionError(null);
       await studioApi.deleteTrack(trackToDelete.id);
       setTrackToDelete(null);
       await fetchAlbumData();
       setActionSuccess(`Track "${trackToDelete.title}" has been permanently deleted. The album remains intact.`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete track.");
+      setActionError(err instanceof Error ? err.message : "Failed to delete track.");
     } finally {
       setDeletingTrack(false);
     }
@@ -160,6 +165,7 @@ export function StudioAlbumDetailPage({
     // Optimistic UI update
     setAlbum({ ...album, tracks: newTracks });
     setReordering(true);
+    setActionError(null);
 
     try {
       await albumApi.updateAlbum(album.id, {
@@ -171,7 +177,7 @@ export function StudioAlbumDetailPage({
       await fetchAlbumData();
       setActionSuccess("Track sequence updated successfully.");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to reorder tracks.");
+      setActionError(err instanceof Error ? err.message : "Failed to reorder tracks.");
       await fetchAlbumData();
     } finally {
       setReordering(false);
@@ -205,14 +211,14 @@ export function StudioAlbumDetailPage({
     );
   }
 
-  if (error || !album) {
+  if (loadError || !album) {
     return (
       <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "28px 24px" }}>
         <div className="auth-v2-error" role="alert" style={{ margin: "24px 0" }}>
           <span><AlertIcon width={18} height={18} /></span>
           <div>
             <b>Unable to load album</b>
-            <small>{error || "Album not found."}</small>
+            <small>{loadError || "Album not found or access denied."}</small>
           </div>
           <button className="button button-secondary button-small" onClick={() => void fetchAlbumData()}>
             Retry
@@ -256,6 +262,24 @@ export function StudioAlbumDetailPage({
         <span>/</span>
         <span style={{ color: "var(--color-ocean-dark, #0F172A)", fontWeight: 700 }}>{album.title}</span>
       </div>
+
+      {actionError && (
+        <div className="auth-v2-error upload-track-alert" role="alert" style={{ marginBottom: "20px" }}>
+          <span><AlertIcon width={18} height={18} /></span>
+          <div style={{ flex: 1 }}>
+            <b>Notice</b>
+            <small>{actionError}</small>
+          </div>
+          <button
+            className="icon-button"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss notice"
+            style={{ color: "inherit", background: "none", border: "none", cursor: "pointer" }}
+          >
+            <CloseIcon width={16} height={16} />
+          </button>
+        </div>
+      )}
 
       {actionSuccess && (
         <div className="studio-success-alert" role="status" style={{ marginBottom: "20px" }}>
