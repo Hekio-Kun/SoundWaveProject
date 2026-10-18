@@ -203,7 +203,7 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
       </section>
 
       <section className="sw-section">
-        <SectionHeader title="Featured albums" description="Complete stories told through every album" actionLabel="Open library" onAction={() => onNavigate("/library")} />
+        <SectionHeader title="Featured albums" description="Complete stories told through every album" actionLabel="View all albums" onAction={() => onNavigate("/albums")} />
         <div className="sw-album-grid">{albums.map((album) => <AlbumCard key={album.id} album={album} onNavigate={onNavigate} />)}</div>
       </section>
 

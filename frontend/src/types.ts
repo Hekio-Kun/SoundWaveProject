@@ -33,6 +33,27 @@ export type FeaturedAlbum = {
   description?: string;
 };
 
+export type PublicAlbum = {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string | null;
+  coverUrl: string | null;
+  releaseDate?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string;
+  trackCount: number;
+  creator: {
+    userId: number;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+};
+
+export type PublicAlbumDetails = PublicAlbum & {
+  tracks: LandingTrack[];
+};
+
 export type FeaturedCreator = {
   userId: number;
   displayName: string;
@@ -152,5 +173,17 @@ export type ListeningHistoryItem = {
   playedAt: string;
   listenedDurationMs: number;
   completed: boolean;
+};
+
+export type NotificationItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  navigationUrl?: string | null;
 };
 
