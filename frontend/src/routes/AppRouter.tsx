@@ -19,6 +19,7 @@ import { PlaylistDetailsPage } from "../pages/PlaylistDetailsPage";
 import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from "../pages/OperationsDashboardPage";
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { RankingBoardPage } from "../pages/RankingBoardPage";
 import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
 import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
@@ -127,6 +128,19 @@ export function AppRouter(): React.ReactElement | null {
         onNavigate={navigate}
         initialGenre={initialGenre}
         initialSort={initialSort}
+      />
+    );
+  }
+
+  if (pathname === "/ranking" || pathname === "/charts" || pathname === "/leaderboard") {
+    const initialGenre = queryParams.get("genre") || undefined;
+    return (
+      <RankingBoardPage
+        currentTrack={currentTrack}
+        playing={playing}
+        onPlayTrack={playTrack}
+        onNavigate={navigate}
+        initialGenre={initialGenre}
       />
     );
   }

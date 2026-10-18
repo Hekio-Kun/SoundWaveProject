@@ -40,6 +40,28 @@ export const catalogApi = {
     return apiFetch<PageResponse<LandingTrack>>(`/tracks${qs ? `?${qs}` : ""}`);
   },
 
+  getRankingBoard: async (params?: { genre?: string; limit?: number }): Promise<LandingTrack[]> => {
+    const query = new URLSearchParams();
+    if (params?.genre && params.genre !== "all") query.set("genre", params.genre);
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+
+    const qs = query.toString();
+    try {
+      return await apiFetch<LandingTrack[]>(`/tracks/ranking${qs ? `?${qs}` : ""}`);
+    } catch {
+      // Fallback: If running backend server has not yet been restarted with /tracks/ranking endpoint,
+      // fallback smoothly to /tracks?sort=trending so the user gets real live data immediately
+      const fallbackQuery = new URLSearchParams();
+      if (params?.genre && params.genre !== "all") fallbackQuery.set("genre", params.genre);
+      fallbackQuery.set("sort", "trending");
+      fallbackQuery.set("page", "0");
+      fallbackQuery.set("size", String(params?.limit ?? 50));
+
+      const fallbackRes = await apiFetch<PageResponse<LandingTrack>>(`/tracks?${fallbackQuery.toString()}`);
+      return fallbackRes?.content ?? [];
+    }
+  },
+
   getTrackById: async (idOrSlug: string | number): Promise<LandingTrack> => {
     return apiFetch<LandingTrack>(`/tracks/${idOrSlug}`);
   },

@@ -159,4 +159,46 @@ class TrackCatalogServiceTest {
 
         verify(trackRepository, never()).incrementPlayCount(anyLong());
     }
+
+    @Test
+    void getRankingBoard_ordersByPlayCountDescAndRecency() {
+        Track t1 = createMockTrack(1L, "track-1", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t1, "playCountCache", 100L);
+        ReflectionTestUtils.setField(t1, "createdAt", java.time.LocalDateTime.now().minusDays(5));
+
+        Track t2 = createMockTrack(2L, "track-2", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t2, "playCountCache", 500L);
+        ReflectionTestUtils.setField(t2, "createdAt", java.time.LocalDateTime.now().minusDays(10));
+
+        Track t3 = createMockTrack(3L, "track-3", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t3, "playCountCache", 100L);
+        ReflectionTestUtils.setField(t3, "createdAt", java.time.LocalDateTime.now().minusDays(1)); // Newer than t1 with same playCount
+
+        when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2, t3));
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        java.util.List<TrackResponse> ranking = trackCatalogService.getRankingBoard(null, 10);
+
+        assertEquals(3, ranking.size());
+        assertEquals(2L, ranking.get(0).id()); // #1: 500 plays
+        assertEquals(3L, ranking.get(1).id()); // #2: 100 plays (newer)
+        assertEquals(1L, ranking.get(2).id()); // #3: 100 plays (older)
+    }
+
+    @Test
+    void getRankingBoard_filtersByGenre() {
+        Track t1 = createMockTrack(1L, "track-1", TrackPublicationStatus.PUBLISHED);
+        Genre rock = new Genre("Rock", "rock", "Rock music", 1L);
+        Track t2 = createMockTrack(2L, "track-2", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t2, "genre", rock);
+
+        when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2));
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        java.util.List<TrackResponse> ranking = trackCatalogService.getRankingBoard("rock", 10);
+
+        assertEquals(1, ranking.size());
+        assertEquals(2L, ranking.get(0).id());
+    }
 }
+
