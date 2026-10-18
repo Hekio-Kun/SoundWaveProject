@@ -33,6 +33,27 @@ export type FeaturedAlbum = {
   description?: string;
 };
 
+export type PublicAlbum = {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string | null;
+  coverUrl: string | null;
+  releaseDate?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string;
+  trackCount: number;
+  creator: {
+    userId: number;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+};
+
+export type PublicAlbumDetails = PublicAlbum & {
+  tracks: LandingTrack[];
+};
+
 export type FeaturedCreator = {
   userId: number;
   displayName: string;
@@ -106,12 +127,31 @@ export type CurrentUser = {
   countryCode?: string;
 };
 
+export type AlbumTrackItemPayload = {
+  title: string;
+  genreId: number;
+  trackNumber?: number;
+  description?: string;
+  lyrics?: string;
+  durationMs?: number;
+  audioIndex?: number;
+};
+
+export type CreateAlbumPayload = {
+  title: string;
+  description?: string;
+  releaseDate?: string;
+  submitForReview?: boolean;
+  tracks?: AlbumTrackItemPayload[];
+  trackIds?: number[];
+};
+
 export type StudioAlbum = {
   id: number;
   title: string;
   slug: string;
   description?: string | null;
-  status: "DRAFT" | "PUBLISHED";
+  status: "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | string;
   coverUrl?: string | null;
   releaseDate?: string | null;
   trackCount: number;
@@ -133,5 +173,17 @@ export type ListeningHistoryItem = {
   playedAt: string;
   listenedDurationMs: number;
   completed: boolean;
+};
+
+export type NotificationItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  navigationUrl?: string | null;
 };
 

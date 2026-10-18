@@ -948,17 +948,6 @@ export function StudioPage({
                             <span>View Rejection</span>
                           </button>
                         )}
-                        {(t.status === "DRAFT" || t.status === "REJECTED") && (
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={() => onNavigate(`/studio/tracks/${t.id}/edit`)}
-                            title="Edit track information & synchronized lyrics"
-                          >
-                            <EditIcon width={14} height={14} />
-                            <span>Edit</span>
-                          </button>
-                        )}
                         <button
                           type="button"
                           className="button button-ghost button-small"
@@ -1734,13 +1723,6 @@ export function StudioPage({
           setRejectionModalTrack(null);
           if (targetTrack) {
             onNavigate(`/studio/tracks/${targetTrack.id}/edit`);
-          }
-        }}
-        onViewTrackDetail={(trackId) => {
-          const targetTrack = trackList.find((t) => t.id === trackId);
-          setRejectionModalTrack(null);
-          if (targetTrack) {
-            handleOpenDetail(targetTrack);
           }
         }}
       />

@@ -1,5 +1,6 @@
 package groupone.soundwaveproject.studio.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -31,7 +32,20 @@ public class CreateAlbumRequest {
     private LocalDate releaseDate;
 
     /**
-     * Danh sách ID các bài hát thuộc quyền sở hữu của người dùng muốn đưa vào Album.
+     * True nếu người dùng chọn "Submit Album for Review" (chuyển sang PENDING).
+     * False hoặc null nếu người dùng chọn "Save as Draft" (giữ trạng thái DRAFT).
+     */
+    private Boolean submitForReview;
+
+    /**
+     * Danh sách thông tin chi tiết từng bài hát cấu thành khi upload toàn bộ bài hát cùng album (UC-21.1).
+     */
+    @Valid
+    private List<AlbumTrackItemRequest> tracks;
+
+    /**
+     * Danh sách ID các bài hát đã có sẵn trong studio muốn đưa vào Album (hỗ trợ tương thích ngược).
      */
     private List<Long> trackIds;
 }
+

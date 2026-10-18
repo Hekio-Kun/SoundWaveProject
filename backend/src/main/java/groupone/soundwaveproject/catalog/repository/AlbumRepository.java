@@ -8,6 +8,9 @@ import java.util.Optional;
 
 public interface AlbumRepository extends JpaRepository<Album, Long> {
     Optional<Album> findBySlug(String slug);
+    Optional<Album> findByIdAndStatusIgnoreCase(Long id, String status);
+    Optional<Album> findBySlugAndStatusIgnoreCase(String slug, String status);
+    List<Album> findByStatusIgnoreCaseOrderByCreatedAtDesc(String status);
     List<Album> findByCreatedByUserIdOrderByCreatedAtDesc(Long createdByUserId);
     Optional<Album> findByIdAndCreatedByUserId(Long id, Long createdByUserId);
     long countByCreatedByUserId(Long createdByUserId);

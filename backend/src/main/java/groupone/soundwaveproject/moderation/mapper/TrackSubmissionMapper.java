@@ -6,11 +6,12 @@ import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.moderation.dto.response.*;
+import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import org.springframework.stereotype.Component;
 
 /**
- * Mapper chuyển đổi dữ liệu giữa Entity và DTO cho chức năng Kiểm duyệt bài hát (UC-24: Manage Track Moderation).
+ * Mapper chuyển đổi dữ liệu giữa Entity và DTO cho chức năng Kiểm duyệt nội dung (UC-24: Manage Track & Album Moderation).
  */
 @Component
 public class TrackSubmissionMapper {
@@ -38,8 +39,11 @@ public class TrackSubmissionMapper {
 
         Long trackId = track != null ? track.getId() : submission.getTrackId();
         String trackTitle = track != null ? track.getTitle() : null;
+        Integer trackNumber = track != null ? track.getTrackNumber() : null;
         String genreName = (track != null && track.getGenre() != null) ? track.getGenre().getName() : null;
+        Long albumId = (track != null && track.getAlbum() != null) ? track.getAlbum().getId() : null;
         String albumTitle = (track != null && track.getAlbum() != null) ? track.getAlbum().getTitle() : null;
+        String itemType = (albumId != null) ? "ALBUM_TRACK" : "SINGLE";
         String coverUrl = track != null ? track.getCoverUrl() : null;
         Integer durationMs = track != null ? track.getDurationMs() : null;
 
@@ -50,10 +54,13 @@ public class TrackSubmissionMapper {
 
         return new SubmissionQueueItemResponse(
                 submission.getId(),
+                itemType,
                 trackId,
                 trackTitle,
-                genreName,
+                trackNumber,
+                albumId,
                 albumTitle,
+                genreName,
                 coverUrl,
                 durationMs,
                 submitterId,
@@ -62,7 +69,67 @@ public class TrackSubmissionMapper {
                 submission.getStatus(),
                 submission.getSubmittedAt(),
                 submission.getReviewedAt(),
-                reviewerDisplayName
+                reviewerDisplayName,
+                1,
+                null
+        );
+    }
+
+    /**
+     * Tạo mục Queue Item đại diện cho Album chứa danh sách các bài hát bên trong.
+     */
+    public SubmissionQueueItemResponse createAlbumQueueItem(
+            Album album,
+            java.util.List<SubmissionQueueItemResponse> tracks,
+            AppUser submitter,
+            UserProfile submitterProfile
+    ) {
+        if (album == null || tracks == null || tracks.isEmpty()) {
+            return null;
+        }
+
+        SubmissionStatus overallStatus = tracks.stream().anyMatch(t -> t.status() == SubmissionStatus.PENDING)
+                ? SubmissionStatus.PENDING
+                : (tracks.stream().allMatch(t -> t.status() == SubmissionStatus.APPROVED)
+                    ? SubmissionStatus.APPROVED
+                    : SubmissionStatus.REJECTED);
+
+        java.time.Instant latestSubmittedAt = tracks.stream()
+                .map(SubmissionQueueItemResponse::submittedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.naturalOrder())
+                .orElse(java.time.Instant.now());
+
+        int totalDuration = tracks.stream()
+                .map(SubmissionQueueItemResponse::durationMs)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        String coverUrl = album.getCoverUrl() != null ? album.getCoverUrl() : tracks.getFirst().coverUrl();
+        String submitterDisplayName = resolveDisplayName(submitter, submitterProfile);
+        String submitterEmail = submitter != null ? submitter.getEmail() : tracks.getFirst().submitterEmail();
+
+        return new SubmissionQueueItemResponse(
+                album.getId(),
+                "ALBUM",
+                null,
+                album.getTitle(),
+                null,
+                album.getId(),
+                album.getTitle(),
+                tracks.getFirst().genreName(),
+                coverUrl,
+                totalDuration,
+                album.getCreatedByUserId(),
+                submitterDisplayName,
+                submitterEmail,
+                overallStatus,
+                latestSubmittedAt,
+                null,
+                null,
+                tracks.size(),
+                tracks
         );
     }
 
@@ -105,6 +172,30 @@ public class TrackSubmissionMapper {
                                                      AppUser reviewer,
                                                      UserProfile reviewerProfile,
                                                      String lyrics) {
+        return toDetailResponse(submission, track, submitter, submitterProfile, reviewer, reviewerProfile, lyrics, null);
+    }
+
+    /**
+     * Ánh xạ thông tin yêu cầu kiểm duyệt sang DTO chi tiết kèm lời bài hát (lyrics) và thông tin điều hướng Album.
+     *
+     * @param submission       Thực thể yêu cầu kiểm duyệt
+     * @param track            Thực thể bài hát
+     * @param submitter        Tài khoản tác giả gửi bài
+     * @param submitterProfile Hồ sơ cá nhân của tác giả
+     * @param reviewer         Tài khoản nhân viên kiểm duyệt
+     * @param reviewerProfile  Hồ sơ cá nhân của nhân viên kiểm duyệt
+     * @param lyrics           Lời bài hát (nội dung text/lrc)
+     * @param albumNavigation  Thông tin điều hướng các bài hát trong Album
+     * @return DTO SubmissionDetailResponse chi tiết đầy đủ kèm thông tin điều hướng Album
+     */
+    public SubmissionDetailResponse toDetailResponse(TrackSubmission submission,
+                                                     Track track,
+                                                     AppUser submitter,
+                                                     UserProfile submitterProfile,
+                                                     AppUser reviewer,
+                                                     UserProfile reviewerProfile,
+                                                     String lyrics,
+                                                     AlbumTrackNavigationResponse albumNavigation) {
         if (submission == null) {
             return null;
         }
@@ -123,7 +214,8 @@ public class TrackSubmissionMapper {
                 submission.getReviewedAt(),
                 trackDetail,
                 submitterSummary,
-                reviewerSummary
+                reviewerSummary,
+                albumNavigation
         );
     }
 

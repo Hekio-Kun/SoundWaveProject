@@ -492,6 +492,29 @@ body.modal-open .app-scroll-region {
   gap: 12px;
 }
 
+.ops-shell-actions .topbar-notification-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ops-shell-actions .topbar-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--ops-border);
+  background: #ffffff;
+  color: var(--ops-text-secondary);
+}
+
+.ops-shell-actions .topbar-icon-btn:hover,
+.ops-shell-actions .topbar-icon-btn.is-active {
+  border-color: var(--ops-brand);
+  background: var(--ops-brand-light);
+  color: var(--ops-brand-hover);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.12);
+}
+
 .ops-topbar-shift-badge {
   display: inline-flex;
   align-items: center;
@@ -3584,3 +3607,449 @@ body.modal-open .app-scroll-region {
   display: flex;
   gap: 12px;
 }
+
+/* --------------------------------------------------------------------------
+   Staff Moderation Track & Album List Badges and Nested List
+   -------------------------------------------------------------------------- */
+.staff-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staff-tag-badge.is-single {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.staff-tag-badge.is-album {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.staff-album-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--ops-border);
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.staff-album-card-wrap:hover {
+  border-color: #bae6fd;
+  box-shadow: 0 4px 18px rgba(2, 132, 199, 0.06);
+}
+
+.staff-album-card-wrap.is-pending-track {
+  border-left: 4px solid var(--ops-amber);
+}
+
+.staff-album-main-row {
+  display: grid;
+  grid-template-columns: 64px minmax(240px, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+}
+
+.staff-album-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--ops-border);
+  background: #f8fafc;
+  color: var(--ops-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.staff-album-expand-btn:hover {
+  background: var(--ops-brand-light);
+  color: var(--ops-brand-hover);
+  border-color: #bae6fd;
+}
+
+.staff-album-tracks-panel {
+  border-top: 1px solid var(--ops-border);
+  background: #f8fafc;
+  padding: 16px 20px 20px 20px;
+}
+
+.staff-album-tracks-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ops-text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staff-album-tracks-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staff-album-track-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid var(--ops-border);
+  gap: 16px;
+  transition: background 0.15s ease;
+}
+
+.staff-album-track-row:hover {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.staff-album-track-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.staff-track-idx {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ops-text-muted);
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.staff-subtrack-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.staff-subtrack-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ops-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staff-subtrack-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.staff-album-track-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Staff Continuous Album Moderation & Navigation Ribbon
+   -------------------------------------------------------------------------- */
+/* Album Moderation Ribbon (above Hero Card) */
+.staff-album-nav-ribbon {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--ops-border);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+}
+
+.staff-album-ribbon-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.staff-album-ribbon-title-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.staff-album-ribbon-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-album-ribbon-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ops-text-main);
+}
+
+.staff-album-ribbon-count {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.staff-album-ribbon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.staff-ribbon-step-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--ops-border);
+  background: #ffffff;
+  color: var(--ops-text-main);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.staff-ribbon-step-btn:hover:not(:disabled) {
+  border-color: #0284c7;
+  color: #0284c7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.12);
+}
+
+.staff-ribbon-step-btn.is-next:not(:disabled) {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.staff-ribbon-step-btn.is-next:hover:not(:disabled) {
+  background: #0369a1;
+  border-color: #0369a1;
+}
+
+.staff-ribbon-step-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Horizontal Track Strip */
+.staff-album-ribbon-tracklist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.staff-ribbon-track-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ops-border);
+  background: #ffffff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.staff-ribbon-track-chip:hover:not(:disabled) {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.staff-ribbon-track-chip.is-current {
+  border-color: #0284c7;
+  background: #e0f2fe;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+
+.staff-chip-num {
+  font-size: 11px;
+  color: var(--ops-text-muted);
+  font-weight: 700;
+}
+
+.staff-chip-title {
+  color: var(--ops-text-main);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-chip-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.staff-ribbon-track-chip.is-pending .staff-chip-status-dot {
+  background: var(--ops-amber);
+}
+
+.staff-ribbon-track-chip.is-approved .staff-chip-status-dot {
+  background: var(--ops-green);
+}
+
+.staff-ribbon-track-chip.is-rejected .staff-chip-status-dot {
+  background: var(--ops-red);
+}
+
+/* Continuous Review Next Action Card (After Review Decision) */
+.staff-album-next-action-card {
+  margin-top: 16px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1.5px solid var(--ops-border);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.staff-album-next-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.staff-album-next-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #dcfce7;
+  color: #15803d;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.staff-album-next-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.staff-album-next-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.staff-album-next-album-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ops-text-main);
+}
+
+.staff-album-progress-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.staff-album-next-prompt {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ops-text-secondary);
+  line-height: 1.5;
+}
+
+.staff-album-next-prompt b {
+  color: var(--ops-text-main);
+}
+
+.staff-album-next-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.staff-btn-next-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px !important;
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.staff-btn-next-track:hover {
+  background: #0369a1 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.36);
+}
+
+.staff-btn-next-track.is-neutral {
+  background: #475569 !important;
+  box-shadow: 0 4px 14px rgba(71, 85, 105, 0.25);
+}
+
+.staff-btn-next-track.is-neutral:hover {
+  background: #334155 !important;
+}
+
+

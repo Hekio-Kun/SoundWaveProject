@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import { tracks as staticTracks } from "../../data";
 import { catalogApi } from "../../api/catalog";
-import { CloseIcon, PlusIcon, SearchIcon, CheckIcon } from "../../icons";
+import { CloseIcon, PlusIcon, SearchIcon, CheckIcon, AlertIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   onClose: () => void;
   playlistTitle: string;
   currentTrackIds: number[];
-  onAddTrack: (trackId: number) => void;
+  onAddTrack: (trackId: number) => Promise<void> | void;
   allTracks?: LandingTrack[];
 };
 
@@ -25,6 +25,35 @@ export function AddTrackToPlaylistModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [availableTracks, setAvailableTracks] = useState<LandingTrack[]>([]);
+  const [addingTrackId, setAddingTrackId] = useState<number | null>(null);
+  const [modalNotice, setModalNotice] = useState<{ message: string; type: "error" | "success" } | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setModalNotice(null);
+      setAddingTrackId(null);
+    }
+  }, [open]);
+
+  const handleAddTrack = async (trackId: number) => {
+    setModalNotice(null);
+    setAddingTrackId(trackId);
+    try {
+      await onAddTrack(trackId);
+      setModalNotice({
+        type: "success",
+        message: "Track added to playlist successfully.",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add track to playlist.";
+      setModalNotice({
+        type: "error",
+        message: msg,
+      });
+    } finally {
+      setAddingTrackId(null);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -220,7 +249,8 @@ export function AddTrackToPlaylistModal({
                 ) : (
                   <button
                     className="button button-secondary"
-                    onClick={() => onAddTrack(t.id)}
+                    onClick={() => void handleAddTrack(t.id)}
+                    disabled={addingTrackId === t.id}
                     style={{
                       padding: "6px 14px",
                       fontSize: "11.5px",
@@ -228,9 +258,10 @@ export function AddTrackToPlaylistModal({
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "4px",
+                      opacity: addingTrackId === t.id ? 0.7 : 1,
                     }}
                   >
-                    <PlusIcon width={13} height={13} /> Add
+                    <PlusIcon width={13} height={13} /> {addingTrackId === t.id ? "Adding..." : "Add"}
                   </button>
                 )}
               </div>
@@ -239,12 +270,59 @@ export function AddTrackToPlaylistModal({
         )}
         </div>
 
+        {/* Inline notification banner directly above the Done button */}
+        {modalNotice && (
+          <div
+            role="alert"
+            style={{
+              marginTop: "12px",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
+              fontSize: "13px",
+              fontWeight: 600,
+              backgroundColor: modalNotice.type === "error" ? "#FEF3F2" : "#ECFDF5",
+              color: modalNotice.type === "error" ? "#B42318" : "#059669",
+              border: `1px solid ${modalNotice.type === "error" ? "#FECDCA" : "#A7F3D0"}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              {modalNotice.type === "error" ? (
+                <AlertIcon width={16} height={16} style={{ flexShrink: 0 }} />
+              ) : (
+                <CheckIcon width={16} height={16} style={{ flexShrink: 0 }} />
+              )}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{modalNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalNotice(null)}
+              aria-label="Dismiss notice"
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px",
+                color: "inherit",
+                display: "inline-flex",
+                opacity: 0.7,
+                flexShrink: 0,
+              }}
+            >
+              <CloseIcon width={13} height={13} />
+            </button>
+          </div>
+        )}
+
         {/* Modal Footer */}
         <div
           style={{
             display: "flex",
             justifyContent: "flex-end",
-            marginTop: "16px",
+            marginTop: "12px",
             paddingTop: "14px",
             borderTop: "1px solid var(--sw-border)",
           }}

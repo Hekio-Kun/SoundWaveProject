@@ -166,13 +166,18 @@ export function ManageAlbumTracksModal({
     await syncTracksToBackend(newOrder);
   };
 
-  // Remove track from album (BR-24 preserves track as standalone)
+  // Remove track from album (UC-21.3)
   const handleRemoveTrack = async (track: StudioTrack) => {
+    if (currentTracks.length <= 1) {
+      setErrorMessage("An album must contain at least one track. To remove all tracks, please delete the album instead.");
+      return;
+    }
     setActionLoadingTrackId(track.id);
     const updated = currentTracks.filter((t) => t.id !== track.id);
     await syncTracksToBackend(updated);
-    setSuccessMessage(`Removed "${track.title}" from album. The track is preserved as a standalone single.`);
+    setSuccessMessage(`Track "${track.title}" has been removed from the album.`);
   };
+
 
   // Add standalone track into album
   const handleAddTrack = async (track: StudioTrack) => {

@@ -1,4 +1,4 @@
-import { ClockIcon, CompassIcon, DashboardIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, UploadIcon } from "../../icons";
+import { ClockIcon, CompassIcon, DashboardIcon, DiscIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, UploadIcon } from "../../icons";
 import type { CurrentUser } from "../../types";
 
 type Props = {
@@ -33,13 +33,6 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
               <span>Administration overview</span>
               <small className="sidebar-badge">ADMIN</small>
             </button>
-            <button
-              className={`nav-item ${isCurrent("/staff") ? "nav-item--active" : ""}`}
-              onClick={() => onNavigate("/staff/dashboard")}
-            >
-              <DashboardIcon />
-              <span>Content moderation</span>
-            </button>
           </div>
         ) : userRole === "STAFF" ? (
           <div className="nav-group">
@@ -70,6 +63,13 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           >
             <FilterIcon width={18} height={18} />
             <span>Browse Catalog</span>
+          </button>
+          <button
+            className={`nav-item ${isCurrent("/albums") ? "nav-item--active" : ""}`}
+            onClick={() => onNavigate("/albums")}
+          >
+            <DiscIcon width={18} height={18} />
+            <span>Albums</span>
           </button>
           <button
             className={`nav-item ${isCurrent("/search") ? "nav-item--active" : ""}`}

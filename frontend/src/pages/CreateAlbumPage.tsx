@@ -1,25 +1,50 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { albumApi, AlbumApiError } from "../api/album";
+import { catalogApi } from "../api/catalog";
+import { LyricSyncTab } from "../components/common/LyricSyncTab";
+import { MediaUploadField } from "../components/common/MediaUploadField";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   AlertIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
   ChevronLeftIcon,
+  ChevronRightIcon,
   CloseIcon,
   DiscIcon,
+  EditIcon,
+  FileTextIcon,
   HeadphonesIcon,
   PlusIcon,
-  SearchIcon,
+  TrashIcon,
   UploadIcon,
 } from "../icons";
-import type { CurrentUser, StudioTrack } from "../types";
+import type { CurrentUser, Genre } from "../types";
+import {
+  readAudioDuration,
+  readLyricsFile,
+  validateAudioFile,
+  validateLyricsFile,
+} from "../utils/trackUpload";
 
 type Props = {
   isAuthenticated: boolean;
   canCreate: boolean;
   currentUser?: CurrentUser | null;
   onNavigate: (route: string) => void;
+};
+
+type TrackItem = {
+  id: string; // temporary client ID
+  file: File;
+  title: string;
+  genreId: number;
+  durationMs: number;
+  description: string;
+  lyrics: string;
 };
 
 type FormErrors = Record<string, string>;
@@ -32,47 +57,91 @@ function formatDuration(ms?: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNavigate }: Props) {
+function cleanFilenameToTitle(filename: string): string {
+  const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
+  return nameWithoutExt.replace(/^\d+[\s.-]+/, "").trim() || nameWithoutExt;
+}
+
+export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Props) {
+  // Wizard steps: 1 = Album Details, 2 = Add Tracks (Track by Track builder)
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // 1. Album metadata (Album does NOT have a genre column)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [releaseDate, setReleaseDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  // Artwork
+  // Cover artwork
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
-  // Tracks selection & sequencing
-  const [availableTracks, setAvailableTracks] = useState<StudioTrack[]>([]);
-  const [selectedTrackIds, setSelectedTrackIds] = useState<number[]>([]);
-  const [loadingTracks, setLoadingTracks] = useState(false);
-  const [tracksError, setTracksError] = useState("");
-  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  // Available genres (used for individual track assignment)
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [loadingGenres, setLoadingGenres] = useState(false);
 
-  // Submission state
+  // 2. Added tracks list
+  const [tracks, setTracks] = useState<TrackItem[]>([]);
+
+  // 3. Current track form (identical layout and controls to UploadTrackPage)
+  const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null);
+  const [currentAudioFile, setCurrentAudioFile] = useState<File | null>(null);
+  const [currentTitle, setCurrentTitle] = useState("");
+  const [currentGenreId, setCurrentGenreId] = useState<number>(0);
+  const [currentDurationMs, setCurrentDurationMs] = useState<number>(0);
+  const [currentDescription, setCurrentDescription] = useState("");
+  const [currentLyrics, setCurrentLyrics] = useState("");
+  const [currentLyricsFile, setCurrentLyricsFile] = useState<File | null>(null);
+  const [showLyricMaker, setShowLyricMaker] = useState(false);
+
+  // Validation & Submission state
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [trackFormErrors, setTrackFormErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [createdAlbumTitle, setCreatedAlbumTitle] = useState("");
+  const [successInfo, setSuccessInfo] = useState<{ title: string; status: string; count: number } | null>(null);
+  const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
-  // Load available tracks (standalone tracks owned by current user)
-  const loadTracks = async () => {
-    if (!isAuthenticated || !canCreate) return;
-    setLoadingTracks(true);
-    setTracksError("");
-    try {
-      const tracks = await albumApi.getAvailableTracks();
-      setAvailableTracks(tracks);
-    } catch (err: unknown) {
-      setTracksError(err instanceof Error ? err.message : "Failed to load standalone tracks.");
-    } finally {
-      setLoadingTracks(false);
-    }
-  };
+  // Submit for Review confirmation modal
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [copyrightAgreed, setCopyrightAgreed] = useState(false);
+  const [submitterNote, setSubmitterNote] = useState("");
+
+  useModalScrollLock(confirmModalOpen);
 
   useEffect(() => {
-    void loadTracks();
-  }, [isAuthenticated, canCreate]);
+    if (!confirmModalOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) setConfirmModalOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [confirmModalOpen, submitting]);
+
+  // Load genres for track assignment
+  useEffect(() => {
+    let mounted = true;
+    const fetchGenres = async () => {
+      setLoadingGenres(true);
+      try {
+        const data = await catalogApi.getGenres();
+        if (mounted) {
+          setGenres(data);
+          if (data.length > 0) {
+            setCurrentGenreId((prev) => (prev ? prev : data[0].id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load genres", err);
+      } finally {
+        if (mounted) setLoadingGenres(false);
+      }
+    };
+    void fetchGenres();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const clearError = (field: string) => {
     if (formErrors[field]) {
@@ -80,7 +149,14 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNav
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const clearTrackError = (field: string) => {
+    if (trackFormErrors[field]) {
+      setTrackFormErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  // Cover upload
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -107,32 +183,12 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNav
     e.stopPropagation();
     setCoverFile(null);
     setCoverPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (coverInputRef.current) coverInputRef.current.value = "";
   };
 
-  const toggleTrackSelection = (trackId: number) => {
-    setSelectedTrackIds((prev) => {
-      if (prev.includes(trackId)) {
-        return prev.filter((id) => id !== trackId);
-      } else {
-        return [...prev, trackId];
-      }
-    });
-  };
-
-  const moveTrackOrder = (index: number, direction: "up" | "down") => {
-    const newOrder = [...selectedTrackIds];
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
-
-    const temp = newOrder[index];
-    newOrder[index] = newOrder[targetIndex];
-    newOrder[targetIndex] = temp;
-    setSelectedTrackIds(newOrder);
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  // Step 1 Validation -> Proceed to Step 2
+  const handleProceedToTracks = (e?: FormEvent) => {
+    if (e) e.preventDefault();
     const errors: FormErrors = {};
 
     if (!title.trim()) {
@@ -146,47 +202,283 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNav
       return;
     }
 
+    setFormErrors({});
+    setStep(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Audio file selection for active track form
+  const handleCurrentAudioChange = async (file: File | null) => {
+    setCurrentAudioFile(null);
+    setCurrentDurationMs(0);
+    if (!file) {
+      clearTrackError("audio");
+      return;
+    }
+
+    const error = validateAudioFile(file);
+    if (error) {
+      setTrackFormErrors((prev) => ({ ...prev, audio: error }));
+      return;
+    }
+
+    setCurrentAudioFile(file);
+    clearTrackError("audio");
+
+    // Autofill track title from filename if title is currently empty
+    if (!currentTitle.trim()) {
+      setCurrentTitle(cleanFilenameToTitle(file.name));
+      clearTrackError("title");
+    }
+
+    const duration = await readAudioDuration(file);
+    if (duration) {
+      setCurrentDurationMs(duration);
+    }
+  };
+
+  // Lyrics file selection for active track form
+  const handleCurrentLyricsChange = async (file: File | null) => {
+    setCurrentLyricsFile(null);
+    setCurrentLyrics("");
+    if (!file) {
+      clearTrackError("lyrics");
+      return;
+    }
+
+    const error = validateLyricsFile(file);
+    if (error) {
+      setTrackFormErrors((prev) => ({ ...prev, lyrics: error }));
+      return;
+    }
+
+    try {
+      const text = await readLyricsFile(file);
+      setCurrentLyrics(text);
+      setCurrentLyricsFile(file);
+      clearTrackError("lyrics");
+      setPageToast({ type: "success", message: "Lyrics file loaded successfully." });
+    } catch (err: unknown) {
+      setTrackFormErrors((prev) => ({
+        ...prev,
+        lyrics: err instanceof Error ? err.message : "Lyrics file could not be read.",
+      }));
+    }
+  };
+
+  // Reset active track form
+  const resetTrackForm = () => {
+    setEditingTrackIndex(null);
+    setCurrentAudioFile(null);
+    setCurrentTitle("");
+    setCurrentDurationMs(0);
+    setCurrentDescription("");
+    setCurrentLyrics("");
+    setCurrentLyricsFile(null);
+    setShowLyricMaker(false);
+    setTrackFormErrors({});
+  };
+
+  // Save current track and advance to next track ("Add Next Track")
+  const handleSaveAndNextTrack = () => {
+    const errors: FormErrors = {};
+
+    if (!currentAudioFile && editingTrackIndex === null) {
+      errors.audio = "Please select an MP3, WAV or FLAC audio file.";
+    }
+    if (!currentTitle.trim()) {
+      errors.title = "Track title is required.";
+    } else if (currentTitle.trim().length > 200) {
+      errors.title = "Track title cannot exceed 200 characters.";
+    }
+    if (!currentGenreId) {
+      errors.genre = "Please select a music genre.";
+    }
+    if (currentDescription.trim().length > 2000) {
+      errors.description = "Description cannot exceed 2000 characters.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setTrackFormErrors(errors);
+      const firstField = Object.keys(errors)[0];
+      const targetId = firstField === "audio" ? "audio-upload-button" : `upload-track-${firstField}`;
+      requestAnimationFrame(() => document.getElementById(targetId)?.focus());
+      return;
+    }
+
+    const genreIdVal = Number(currentGenreId);
+
+    if (editingTrackIndex !== null) {
+      // Update existing track in list
+      const target = tracks[editingTrackIndex];
+      const updatedItem: TrackItem = {
+        ...target,
+        file: currentAudioFile || target.file,
+        title: currentTitle.trim(),
+        genreId: genreIdVal,
+        durationMs: currentDurationMs > 0 ? currentDurationMs : target.durationMs,
+        description: currentDescription.trim(),
+        lyrics: currentLyrics.trim(),
+      };
+      setTracks((prev) => prev.map((t, idx) => (idx === editingTrackIndex ? updatedItem : t)));
+      setPageToast({ type: "success", message: `Updated "${currentTitle.trim()}" successfully!` });
+    } else {
+      // Add new track into album tracklist
+      const newItem: TrackItem = {
+        id: `track-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        file: currentAudioFile!,
+        title: currentTitle.trim(),
+        genreId: genreIdVal,
+        durationMs: currentDurationMs,
+        description: currentDescription.trim(),
+        lyrics: currentLyrics.trim(),
+      };
+      setTracks((prev) => [...prev, newItem]);
+      setPageToast({ type: "success", message: `Track #${tracks.length + 1} "${currentTitle.trim()}" added to album!` });
+    }
+
+    // Reset active form ready for next track
+    resetTrackForm();
+    clearError("tracks");
+    requestAnimationFrame(() => {
+      document.getElementById("upload-track-title")?.focus();
+    });
+  };
+
+  // Edit an existing track from the tracklist
+  const handleEditTrack = (index: number) => {
+    const track = tracks[index];
+    setEditingTrackIndex(index);
+    setCurrentAudioFile(track.file);
+    setCurrentTitle(track.title);
+    setCurrentGenreId(track.genreId);
+    setCurrentDurationMs(track.durationMs);
+    setCurrentDescription(track.description);
+    setCurrentLyrics(track.lyrics);
+    setCurrentLyricsFile(null);
+    setShowLyricMaker(false);
+    setTrackFormErrors({});
+    window.scrollTo({ top: 240, behavior: "smooth" });
+    requestAnimationFrame(() => document.getElementById("upload-track-title")?.focus());
+  };
+
+  // Reorder tracks
+  const handleMoveTrack = (index: number, direction: "up" | "down") => {
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= tracks.length) return;
+    const reordered = [...tracks];
+    const temp = reordered[index];
+    reordered[index] = reordered[target];
+    reordered[target] = temp;
+    setTracks(reordered);
+  };
+
+  // Remove track from album
+  const handleRemoveTrack = (index: number) => {
+    if (editingTrackIndex === index) {
+      resetTrackForm();
+    } else if (editingTrackIndex !== null && editingTrackIndex > index) {
+      setEditingTrackIndex(editingTrackIndex - 1);
+    }
+    setTracks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Submission process (Draft or Submit for Review)
+  const processSubmitAlbum = async (submitForReview: boolean) => {
+    // If user has an in-progress track filled with audio and title, automatically commit it
+    let finalTracks = [...tracks];
+    if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
+      const genreIdVal = Number(currentGenreId || genres[0]?.id || 1);
+      const autoTrack: TrackItem = {
+        id: `track-auto-${Date.now()}`,
+        file: currentAudioFile,
+        title: currentTitle.trim(),
+        genreId: genreIdVal,
+        durationMs: currentDurationMs,
+        description: currentDescription.trim(),
+        lyrics: currentLyrics.trim(),
+      };
+      finalTracks.push(autoTrack);
+      setTracks(finalTracks);
+      resetTrackForm();
+    }
+
+    if (finalTracks.length === 0) {
+      setSubmitError("Please add at least one track to your album before saving.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError("");
 
-    const payload = {
-      title: title.trim(),
-      description: description.trim() ? description.trim() : undefined,
-      releaseDate: releaseDate ? releaseDate : undefined,
-      trackIds: selectedTrackIds,
-    };
-
     try {
-      await albumApi.createAlbum(payload, coverFile ?? undefined);
-      setCreatedAlbumTitle(payload.title);
+      const constituentTracksPayload = finalTracks.map((t, idx) => ({
+        title: t.title.trim(),
+        genreId: t.genreId,
+        trackNumber: idx + 1,
+        description: t.description.trim() ? t.description.trim() : undefined,
+        lyrics: t.lyrics.trim() ? t.lyrics.trim() : undefined,
+        durationMs: t.durationMs > 0 ? t.durationMs : undefined,
+        audioIndex: idx,
+      }));
+
+      const payload = {
+        title: title.trim(),
+        description: description.trim() ? description.trim() : undefined,
+        releaseDate: releaseDate ? releaseDate : undefined,
+        submitForReview,
+        tracks: constituentTracksPayload,
+      };
+
+      const audioFiles = finalTracks.map((t) => t.file);
+      const created = await albumApi.createAlbum(payload, coverFile ?? undefined, audioFiles);
+
+      setSuccessInfo({
+        title: created.title,
+        status: created.status,
+        count: created.trackCount || finalTracks.length,
+      });
     } catch (err: unknown) {
       if (err instanceof AlbumApiError) {
         setSubmitError(err.message);
-        if (err.fieldErrors) setFormErrors(err.fieldErrors);
+        if (err.fieldErrors) {
+          setFormErrors(err.fieldErrors);
+        }
       } else if (err instanceof Error) {
         setSubmitError(err.message);
       } else {
         setSubmitError("Failed to create album. Please verify your connection and try again.");
       }
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setReleaseDate(new Date().toISOString().slice(0, 10));
-    setCoverFile(null);
-    setCoverPreview(null);
-    setSelectedTrackIds([]);
-    setFormErrors({});
-    setSubmitError("");
-    setCreatedAlbumTitle("");
-    void loadTracks();
+  const handleStartSubmitReview = () => {
+    let finalCount = tracks.length;
+    if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
+      finalCount++;
+    }
+
+    if (finalCount === 0) {
+      setSubmitError("Please add at least one track to your album before submitting.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setConfirmModalOpen(true);
   };
 
-  // Guard: Unauthorized or non-listener
+  const handleConfirmSubmitReview = async () => {
+    setConfirmModalOpen(false);
+    await processSubmitAlbum(true);
+  };
+
+  const totalDurationMs = tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
+
+  // Access Control Guard
   if (!isAuthenticated || !canCreate) {
     return (
       <div className="upload-track-page">
@@ -194,38 +486,44 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNav
           <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
         </button>
         <section className="upload-track-access-card">
-          <span className="upload-track-access-card__icon"><DiscIcon width={28} height={28} /></span>
-          <h1>{isAuthenticated ? "Listener access required" : "Log in to create an album"}</h1>
-          <p>{isAuthenticated
-            ? "Album creation is available to listener and artist accounts. Staff and administrators can use their moderation dashboards."
-            : "Please sign in to organize your discography and create albums."}</p>
-          <button className="button button-primary" onClick={() => onNavigate(isAuthenticated ? "/" : "/login")}>
-            {isAuthenticated ? "Return to Explore" : "Go to login"}
+          <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
+          <h1>{isAuthenticated ? "Creator access required" : "Log in to create an album"}</h1>
+          <p>
+            {isAuthenticated
+              ? "Album creation is available for active creator accounts. Please return to studio or contact support."
+              : "Your account is required to create albums, save drafts, and submit music for review."}
+          </p>
+          <button className="button button-primary" onClick={() => onNavigate(isAuthenticated ? "/studio" : "/login")}>
+            {isAuthenticated ? "Return to Content Studio" : "Go to login"}
           </button>
         </section>
       </div>
     );
   }
 
-  // Success view
-  if (createdAlbumTitle) {
+  // Success Confirmation Screen
+  if (successInfo) {
+    const isPending = successInfo.status === "PENDING";
     return (
-      <div className="upload-track-page">
+      <div className="upload-track-page" style={{ maxWidth: "760px", margin: "40px auto", padding: "0 24px" }}>
         <section className="upload-track-success" role="status">
           <span className="upload-track-success__icon"><CheckIcon width={34} height={34} /></span>
-          <span className="eyebrow">ALBUM CREATED</span>
-          <h1>Your album is ready!</h1>
+          <span className="eyebrow">{isPending ? "SUBMITTED FOR REVIEW" : "ALBUM SAVED AS DRAFT"}</span>
+          <h1>{isPending ? "Album queued for staff review" : "Your album is ready"}</h1>
           <p>
-            <strong>{createdAlbumTitle}</strong> has been successfully created with{" "}
-            <b>{selectedTrackIds.length} {selectedTrackIds.length === 1 ? "track" : "tracks"}</b>.
-            You can view, edit, or publish it anytime from your Content Studio dashboard.
+            {isPending ? (
+              <>
+                <strong>"{successInfo.title}"</strong> and all {successInfo.count} constituent tracks have been submitted to the moderation queue. Staff will examine the audio and metadata before making it publicly accessible.
+              </>
+            ) : (
+              <>
+                <strong>"{successInfo.title}"</strong> with {successInfo.count} tracks has been saved in your personal library. You can review it in Content Studio before submitting it to staff.
+              </>
+            )}
           </p>
           <div className="upload-track-success__actions">
             <button className="button button-primary" onClick={() => onNavigate("/studio")}>
-              View in Content Studio
-            </button>
-            <button className="button button-secondary" onClick={resetForm}>
-              Create another album
+              Open Content Studio
             </button>
           </div>
         </section>
@@ -233,852 +531,899 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, currentUser, onNav
     );
   }
 
-  // Filter tracks by search query
-  const filteredAvailableTracks = availableTracks.filter((track) => {
-    if (!trackSearchQuery.trim()) return true;
-    const q = trackSearchQuery.trim().toLowerCase();
-    return track.title.toLowerCase().includes(q) || (track.genreName && track.genreName.toLowerCase().includes(q));
-  });
-
-  const selectedTracksList = selectedTrackIds
-    .map((id) => availableTracks.find((t) => t.id === id))
-    .filter((t): t is StudioTrack => Boolean(t));
-
-  const artistDisplayName = currentUser?.displayName || currentUser?.username || "You (Artist)";
-
   return (
-    <div style={{ maxWidth: "1240px", margin: "0 auto", padding: "24px 28px 60px", boxSizing: "border-box" }}>
-      {/* Redesigned Header: Content Studio Hero Banner */}
-      <header
-        style={{
-          background: "linear-gradient(135deg, rgba(2, 132, 199, 0.07) 0%, rgba(212, 163, 115, 0.1) 100%)",
-          border: "1px solid rgba(2, 132, 199, 0.14)",
-          borderRadius: "20px",
-          padding: "26px 30px",
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
-          marginBottom: "28px",
-          boxShadow: "0 10px 28px rgba(16, 24, 40, 0.03)",
-        }}
-      >
-        <div
-          style={{
-            width: "52px",
-            height: "52px",
-            borderRadius: "16px",
-            background: "linear-gradient(135deg, var(--color-ocean-primary, #0284C7), var(--color-sand-primary, #D4A373))",
-            color: "#ffffff",
-            display: "grid",
-            placeItems: "center",
-            boxShadow: "0 8px 20px rgba(2, 132, 199, 0.22)",
-            flexShrink: 0,
-          }}
-        >
-          <DiscIcon width={28} height={28} />
-        </div>
-        <div>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 800,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--color-ocean-primary, #0284C7)",
-              display: "block",
-              marginBottom: "4px",
-            }}
-          >
-            CONTENT STUDIO • NEW RELEASE
-          </span>
-          <h1
-            style={{
-              fontSize: "clamp(24px, 2.5vw, 30px)",
-              fontWeight: 800,
-              color: "var(--color-ocean-dark, #0F172A)",
-              margin: "0 0 6px 0",
-              lineHeight: 1.2,
-            }}
-          >
-            Create a new album
-          </h1>
-          <p
-            style={{
-              fontSize: "14px",
-              color: "var(--sw-text-secondary, #64748B)",
-              margin: 0,
-              lineHeight: 1.5,
-              maxWidth: "760px",
-            }}
-          >
-            Curate your standalone tracks into a cohesive album experience, upload custom artwork, and set the perfect track sequence.
-          </p>
-        </div>
-      </header>
-
-      {/* Alerts */}
-      {tracksError && (
-        <div className="auth-v2-error" role="alert" style={{ marginBottom: "20px" }}>
-          <span><AlertIcon width={17} height={17} /></span>
-          <div><b>Unable to load tracks</b><small>{tracksError}</small></div>
-          <button className="button button-secondary button-small" type="button" onClick={() => void loadTracks()}>
-            Try again
-          </button>
-        </div>
-      )}
-
-      {submitError && (
-        <div className="auth-v2-error" role="alert" style={{ marginBottom: "20px" }}>
-          <span><AlertIcon width={17} height={17} /></span>
-          <div><b>Failed to create album</b><small>{submitError}</small></div>
-        </div>
-      )}
-
-      {/* Main 2-Column Grid: Form in the center & Live Preview on the right */}
+    <div className="upload-track-page" style={{ maxWidth: "1160px", margin: "0 auto", padding: "24px 24px 80px" }}>
+      {/* Stepper Header */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 350px",
-          gap: "28px",
-          alignItems: "start",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "28px",
+          borderBottom: "1px solid var(--sw-border, #E2E8F0)",
+          paddingBottom: "18px",
+          gap: "16px",
+          flexWrap: "wrap",
         }}
       >
-        {/* CENTER COLUMN: The Album Creation Form */}
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          style={{
-            background: "#ffffff",
-            border: "1px solid var(--color-sand-light, #E6D5B8)",
-            borderRadius: "20px",
-            padding: "32px",
-            boxShadow: "0 10px 30px rgba(16, 24, 40, 0.04)",
-          }}
-        >
-          {/* Section 01: Album Information */}
-          <div
+        <div>
+          <span className="eyebrow">CONTENT STUDIO · ALBUM BUILDER</span>
+          <h1 style={{ fontSize: "28px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)", margin: "4px 0" }}>
+            Create An Album
+          </h1>
+          <p style={{ color: "var(--sw-text-secondary, #64748B)", fontSize: "14px", margin: 0 }}>
+            {step === 1
+              ? "Step 1 of 2: Set album title, artwork, and release details."
+              : "Step 2 of 2: Build your album track by track, then submit or save as draft."}
+          </p>
+        </div>
+
+        {/* Step Indicators */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={() => setStep(1)}
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: "24px",
-              paddingBottom: "16px",
-              borderBottom: "1px solid #f1f5f9",
+              gap: "8px",
+              padding: "7px 16px",
+              borderRadius: "20px",
+              background: step === 1 ? "var(--color-ocean-primary, #0284C7)" : "var(--color-sand-light, #F5EFE6)",
+              color: step === 1 ? "#ffffff" : "var(--color-ocean-dark, #0F172A)",
+              border: "none",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: "pointer",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--color-sand-light, #F5EFE6)",
-                  color: "var(--color-ocean-primary, #0284C7)",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                01
-              </span>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--color-ocean-dark, #0F172A)" }}>
-                Album information
-              </h2>
-            </div>
-            <small style={{ color: "var(--sw-text-muted)", fontSize: "12px" }}>
-              <b style={{ color: "#dc2626" }}>*</b> Required fields
-            </small>
-          </div>
+            <span>1. Album Info</span>
+          </button>
 
-          <div className="form-group" style={{ marginBottom: "20px" }}>
-            <label htmlFor="create-album-title" style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "14px" }}>
-              Album title <span style={{ color: "#dc2626" }}>*</span>
-            </label>
-            <input
-              id="create-album-title"
-              type="text"
-              placeholder="e.g. Echoes of the Coastline"
-              value={title}
-              maxLength={200}
-              disabled={submitting}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                clearError("title");
-              }}
-              style={{
-                width: "100%",
-                padding: "11px 14px",
-                borderRadius: "12px",
-                border: formErrors.title ? "1.5px solid #dc2626" : "1px solid var(--sw-border, #CBD5E1)",
-                fontSize: "14px",
-                boxSizing: "border-box",
-                outline: "none",
-                transition: "border-color 0.16s ease",
-              }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
-              {formErrors.title ? (
-                <small style={{ color: "#dc2626", fontSize: "12px" }}>{formErrors.title}</small>
-              ) : <span />}
-              <small style={{ color: "var(--sw-text-muted)", fontSize: "12px" }}>{title.length}/200</small>
-            </div>
-          </div>
+          <ChevronRightIcon width={14} height={14} style={{ color: "var(--sw-text-muted)" }} />
 
-          <div className="form-group" style={{ marginBottom: "20px" }}>
-            <label htmlFor="create-album-description" style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "14px" }}>
-              Description <span style={{ color: "var(--sw-text-muted)", fontWeight: "normal" }}>(optional)</span>
-            </label>
-            <textarea
-              id="create-album-description"
-              rows={3}
-              placeholder="Tell listeners the story behind this album, artistic concepts, or collaborative credits..."
-              value={description}
-              disabled={submitting}
-              onChange={(e) => setDescription(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "11px 14px",
-                borderRadius: "12px",
-                border: "1px solid var(--sw-border, #CBD5E1)",
-                fontSize: "14px",
-                boxSizing: "border-box",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: "28px" }}>
-            <label htmlFor="create-album-release-date" style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "14px" }}>
-              Release date
-            </label>
-            <input
-              id="create-album-release-date"
-              type="date"
-              value={releaseDate}
-              disabled={submitting}
-              onChange={(e) => setReleaseDate(e.target.value)}
-              style={{
-                maxWidth: "260px",
-                padding: "10px 14px",
-                borderRadius: "12px",
-                border: "1px solid var(--sw-border, #CBD5E1)",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          {/* Section 02: Cover Artwork */}
-          <div
+          <button
+            type="button"
+            onClick={() => {
+              if (title.trim()) {
+                setStep(2);
+              } else {
+                handleProceedToTracks();
+              }
+            }}
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: "20px",
-              paddingTop: "20px",
-              paddingBottom: "16px",
-              borderTop: "1px solid #f1f5f9",
-              borderBottom: "1px solid #f1f5f9",
+              gap: "8px",
+              padding: "7px 16px",
+              borderRadius: "20px",
+              background: step === 2 ? "var(--color-ocean-primary, #0284C7)" : "var(--color-sand-light, #F5EFE6)",
+              color: step === 2 ? "#ffffff" : "var(--color-ocean-dark, #0F172A)",
+              border: "none",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: title.trim() ? "pointer" : "not-allowed",
+              opacity: title.trim() ? 1 : 0.6,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--color-sand-light, #F5EFE6)",
-                  color: "var(--color-ocean-primary, #0284C7)",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                02
-              </span>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--color-ocean-dark, #0F172A)" }}>
-                Cover artwork
-              </h2>
-            </div>
-            <small style={{ color: "var(--sw-text-muted)", fontSize: "12px" }}>JPG, PNG up to 5MB</small>
+            <span>2. Add Tracks ({tracks.length})</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Global Error Alert */}
+      {submitError && (
+        <div className="auth-v2-error upload-track-alert" role="alert" style={{ marginBottom: "24px" }}>
+          <span><AlertIcon width={20} height={20} /></span>
+          <div>
+            <b>Notice</b>
+            <small>{submitError}</small>
           </div>
+        </div>
+      )}
 
-          <div className="form-group" style={{ marginBottom: "28px" }}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/png,image/jpeg,image/jpg,image/webp"
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-              disabled={submitting}
-              id="create-album-cover-file"
-            />
+      {/* ========================================================
+          STEP 1: ALBUM INFORMATION (NO GENRE COLUMN)
+      ======================================================== */}
+      {step === 1 && (
+        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+          <div
+            className="upload-track-form-card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "24px",
+            }}
+          >
+            <div className="upload-track-card-heading">
+              <div>
+                <span>01</span>
+                <h2>Album Details</h2>
+              </div>
+              <small><b>*</b> Required fields</small>
+            </div>
 
-            <div style={{ display: "flex", gap: "22px", alignItems: "flex-start", flexWrap: "wrap" }}>
+            {/* Cover Art Box */}
+            <div>
+              <label style={{ display: "block", fontWeight: 700, fontSize: "14px", marginBottom: "8px", color: "var(--color-ocean-dark, #0F172A)" }}>
+                Cover Artwork <span style={{ fontWeight: 400, color: "var(--sw-text-muted)" }}>(Optional)</span>
+              </label>
+
+              <div style={{ display: "flex", gap: "24px", alignItems: "center", flexWrap: "wrap" }}>
+                <div
+                  onClick={() => coverInputRef.current?.click()}
+                  style={{
+                    width: "160px",
+                    height: "160px",
+                    borderRadius: "14px",
+                    border: coverPreview ? "1px solid var(--color-sand-light, #E6D5B8)" : "2px dashed var(--color-sand-primary, #D4B996)",
+                    backgroundColor: coverPreview ? "#000000" : "var(--color-sand-light, #F5EFE6)",
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                  }}
+                >
+                  {coverPreview ? (
+                    <>
+                      <img
+                        src={coverPreview}
+                        alt="Album Cover Preview"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
+                        style={{
+                          position: "absolute",
+                          top: "8px",
+                          right: "8px",
+                          background: "rgba(15, 23, 42, 0.75)",
+                          border: "none",
+                          color: "#ffffff",
+                          borderRadius: "50%",
+                          width: "26px",
+                          height: "26px",
+                          display: "grid",
+                          placeItems: "center",
+                          cursor: "pointer",
+                        }}
+                        title="Remove cover"
+                      >
+                        <CloseIcon width={12} height={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "12px" }}>
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "50%",
+                          backgroundColor: "#ffffff",
+                          color: "var(--color-ocean-primary, #0284C7)",
+                          display: "grid",
+                          placeItems: "center",
+                          margin: "0 auto 8px",
+                        }}
+                      >
+                        <UploadIcon width={18} height={18} />
+                      </div>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ocean-dark, #0F172A)", display: "block" }}>
+                        Upload Cover
+                      </span>
+                    </div>
+                  )}
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleCoverChange}
+                    style={{ display: "none" }}
+                    id="create-album-cover-file"
+                  />
+                </div>
+
+                <div style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", lineHeight: 1.6, flex: 1, minWidth: "220px" }}>
+                  <p style={{ margin: "0 0 6px", fontWeight: 600, color: "var(--color-ocean-dark, #0F172A)" }}>
+                    Recommended album cover image:
+                  </p>
+                  <p style={{ margin: 0 }}>Square aspect ratio (1:1), at least 500x500 pixels. Supports PNG, JPG, or WEBP up to 5MB.</p>
+                  {formErrors.cover && (
+                    <p style={{ color: "#dc2626", fontWeight: 600, marginTop: "6px" }}>{formErrors.cover}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Album Title */}
+            <div className="form-group">
+              <label htmlFor="create-album-title">
+                Album Title <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="create-album-title"
+                type="text"
+                value={title}
+                placeholder="e.g. Ocean Breeze EP"
+                autoFocus
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  clearError("title");
+                }}
+              />
+              {formErrors.title && (
+                <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{formErrors.title}</small>
+              )}
+            </div>
+
+            {/* Intended Release Date */}
+            <div className="form-group">
+              <label htmlFor="create-album-release-date">
+                Intended Release Date
+              </label>
+              <input
+                id="create-album-release-date"
+                type="date"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+              />
+            </div>
+
+            {/* Album Description */}
+            <div className="form-group">
+              <label htmlFor="create-album-description">
+                Album Description <span>(optional)</span>
+              </label>
+              <textarea
+                id="create-album-description"
+                rows={3}
+                value={description}
+                maxLength={2000}
+                placeholder="Describe the story, themes, or background of this album..."
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <div className="upload-track-character-count">
+                <span>{formErrors.description || ""}</span>
+                <small>{description.length}/2000</small>
+              </div>
+            </div>
+
+            {/* Step 1 Actions */}
+            <div className="upload-track-actions" style={{ marginTop: "12px" }}>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => onNavigate("/studio")}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => handleProceedToTracks()}
+                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <span>Next: Add Tracks</span>
+                <ChevronRightIcon width={16} height={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          STEP 2: ADD TRACKS (IDENTICAL TO UPLOAD TRACK PAGE)
+      ======================================================== */}
+      {step === 2 && (
+        <div>
+          {/* Top Album Summary Card */}
+          <div
+            style={{
+              background: "var(--color-sand-light, #F5EFE6)",
+              border: "1px solid var(--color-sand-primary, #D4B996)",
+              borderRadius: "14px",
+              padding: "14px 20px",
+              marginBottom: "28px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <div
                 style={{
-                  width: "170px",
-                  height: "170px",
-                  borderRadius: "16px",
-                  border: "2px dashed var(--color-sand-primary, #D4B996)",
-                  backgroundColor: "var(--color-sand-light, #FAF7F2)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "8px",
+                  backgroundColor: "#ffffff",
                   overflow: "hidden",
-                  position: "relative",
-                  transition: "all 0.18s ease",
+                  display: "grid",
+                  placeItems: "center",
                   flexShrink: 0,
                 }}
-                onClick={() => fileInputRef.current?.click()}
-                title="Click to select album cover"
               >
                 {coverPreview ? (
-                  <>
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveCover}
+                  <img src={coverPreview} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <DiscIcon width={24} height={24} style={{ color: "var(--color-ocean-primary, #0284C7)" }} />
+                )}
+              </div>
+              <div>
+                <h3 style={{ margin: "0 0 2px", fontSize: "16px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)" }}>
+                  {title || "Untitled Album"}
+                </h3>
+                <span style={{ fontSize: "12px", color: "var(--sw-text-secondary, #64748B)" }}>
+                  {releaseDate ? `Release: ${releaseDate}` : "Immediate Release"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="button button-ghost button-small"
+              onClick={() => setStep(1)}
+              style={{ fontSize: "12px" }}
+            >
+              Edit Album Details
+            </button>
+          </div>
+
+          {/* Upload Track Layout matching UploadTrackPage */}
+          <div className="upload-track-layout">
+            
+            {/* Left Column: Track Information & Media Form */}
+            <form
+              className="upload-track-form-card"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveAndNextTrack();
+              }}
+              noValidate
+            >
+              <div className="upload-track-card-heading">
+                <div>
+                  <span>{editingTrackIndex !== null ? editingTrackIndex + 1 : tracks.length + 1}</span>
+                  <h2>{editingTrackIndex !== null ? `Edit Track #${editingTrackIndex + 1}` : `Track #${tracks.length + 1} Information`}</h2>
+                </div>
+                <small><b>*</b> Required fields</small>
+              </div>
+
+              {/* Track Title */}
+              <div className="form-group">
+                <label htmlFor="upload-track-title">
+                  Track title <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="upload-track-title"
+                  value={currentTitle}
+                  maxLength={201}
+                  disabled={submitting}
+                  aria-invalid={Boolean(trackFormErrors.title)}
+                  placeholder="For example: Sunset Memories"
+                  onChange={(event) => {
+                    setCurrentTitle(event.target.value);
+                    clearTrackError("title");
+                  }}
+                />
+                {trackFormErrors.title && (
+                  <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{trackFormErrors.title}</small>
+                )}
+              </div>
+
+              {/* Grid: Genre & Album (Album is fixed to this album) */}
+              <div className="studio-form-grid studio-form-grid--equal">
+                <div className="form-group">
+                  <label htmlFor="upload-track-genre">
+                    Genre <span aria-hidden="true">*</span>
+                  </label>
+                  <select
+                    id="upload-track-genre"
+                    value={currentGenreId}
+                    disabled={submitting || loadingGenres || genres.length === 0}
+                    aria-invalid={Boolean(trackFormErrors.genre)}
+                    onChange={(event) => {
+                      setCurrentGenreId(Number(event.target.value));
+                      clearTrackError("genre");
+                    }}
+                  >
+                    {genres.length === 0 && <option value={0}>{loadingGenres ? "Loading genres..." : "Genres unavailable"}</option>}
+                    {genres.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  {trackFormErrors.genre && (
+                    <small className="auth-v2-field-error"><AlertIcon width={12} height={12} />{trackFormErrors.genre}</small>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="upload-track-album">Album</label>
+                  <input
+                    id="upload-track-album"
+                    value={title ? `${title} (Current Album)` : "Current Album"}
+                    disabled
+                    readOnly
+                    style={{ backgroundColor: "var(--sw-surface-alt, #f8fafc)", cursor: "not-allowed" }}
+                  />
+                </div>
+              </div>
+
+              {/* Track Description */}
+              <div className="form-group">
+                <label htmlFor="upload-track-description">
+                  Description <span>(optional)</span>
+                </label>
+                <textarea
+                  id="upload-track-description"
+                  rows={3}
+                  maxLength={2001}
+                  value={currentDescription}
+                  disabled={submitting}
+                  aria-invalid={Boolean(trackFormErrors.description)}
+                  placeholder="Describe the mood or story behind this track"
+                  onChange={(event) => {
+                    setCurrentDescription(event.target.value);
+                    clearTrackError("description");
+                  }}
+                />
+                <div className="upload-track-character-count">
+                  <span>{trackFormErrors.description || ""}</span>
+                  <small>{currentDescription.length}/2000</small>
+                </div>
+              </div>
+
+              {/* Section 02: Media Files */}
+              <div className="upload-track-card-heading upload-track-card-heading--section">
+                <div><span>02</span><h2>Media files</h2></div>
+              </div>
+
+              <div className="studio-media-grid">
+                <MediaUploadField
+                  id="audio-upload"
+                  label="Audio file"
+                  helperText="MP3, WAV or FLAC · Max 30MB"
+                  accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
+                  file={currentAudioFile}
+                  error={trackFormErrors.audio}
+                  required
+                  disabled={submitting}
+                  onFileChange={(file) => void handleCurrentAudioChange(file)}
+                />
+
+                <MediaUploadField
+                  id="cover-upload"
+                  label="Cover artwork"
+                  helperText="Inherited from album artwork"
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  file={null}
+                  existingFileLabel={coverFile ? `Album cover: ${coverFile.name}` : coverPreview ? "Album cover attached" : "Default album artwork"}
+                  disabled
+                  onFileChange={() => {}}
+                />
+              </div>
+
+              {/* Lyrics Section with LyricSyncTab */}
+              <div className="upload-track-lyrics-section" style={{ marginTop: "24px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "10px",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  <label style={{ fontSize: "13px", fontWeight: 700, color: "#1C1917" }}>
+                    Lyrics <span style={{ fontWeight: 400, color: "#786F65", fontSize: "12px" }}>(optional)</span>
+                  </label>
+                  {currentLyrics && (
+                    <span
                       style={{
-                        position: "absolute",
-                        top: "8px",
-                        right: "8px",
-                        backgroundColor: "rgba(15, 23, 42, 0.75)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "50%",
-                        width: "28px",
-                        height: "28px",
-                        display: "grid",
-                        placeItems: "center",
-                        cursor: "pointer",
+                        fontSize: "12px",
+                        color: "var(--brand, #0284c7)",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        background: "#E0F2FE",
+                        padding: "3px 10px",
+                        borderRadius: "20px",
                       }}
-                      title="Remove artwork"
-                      aria-label="Remove artwork"
                     >
-                      <CloseIcon width={14} height={14} />
+                      <CheckIcon width={14} height={14} />
+                      Lyrics loaded ({currentLyrics.split("\n").filter((l) => l.trim().length > 0).length} lines)
+                    </span>
+                  )}
+                </div>
+
+                <div className="upload-track-lyrics-field">
+                  <MediaUploadField
+                    id="lyrics-upload"
+                    label="Lyrics file"
+                    helperText="LRC · Max 1MB · Optional"
+                    accept=".lrc,text/plain"
+                    file={currentLyricsFile}
+                    existingFileLabel={currentLyrics ? "Lyrics attached" : undefined}
+                    error={trackFormErrors.lyrics}
+                    disabled={submitting}
+                    onFileChange={(file) => void handleCurrentLyricsChange(file)}
+                    extraActions={
+                      <button
+                        type="button"
+                        className={`button button-small ${showLyricMaker ? "button-primary" : "button-secondary"}`}
+                        disabled={submitting || !currentAudioFile}
+                        title={!currentAudioFile ? "Upload audio first to synchronize lyrics" : undefined}
+                        onClick={() => setShowLyricMaker((prev) => !prev)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
+                      >
+                        <EditIcon width={14} height={14} />
+                        <span>{showLyricMaker ? "Close LRC Maker" : currentLyrics ? "Edit lyrics" : "Create lyrics"}</span>
+                      </button>
+                    }
+                  />
+                </div>
+
+                {showLyricMaker && (
+                  <div style={{ marginTop: "14px" }}>
+                    <LyricSyncTab
+                      audioFile={currentAudioFile}
+                      initialLyrics={currentLyrics}
+                      trackTitle={currentTitle}
+                      onApplyLyrics={(lrcString, virtualFile) => {
+                        setCurrentLyrics(lrcString);
+                        setCurrentLyricsFile(virtualFile);
+                        clearTrackError("lyrics");
+                        setShowLyricMaker(false);
+                        setPageToast({ type: "success", message: "Lyrics applied to track successfully!" });
+                      }}
+                      onClearLyrics={() => {
+                        setCurrentLyrics("");
+                        setCurrentLyricsFile(null);
+                        setPageToast({ type: "success", message: "Lyrics cleared." });
+                      }}
+                      onSwitchToUpload={() => setShowLyricMaker(false)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons: Add Next Track */}
+              <div className="upload-track-actions">
+                {editingTrackIndex !== null ? (
+                  <>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={submitting}
+                      onClick={resetTrackForm}
+                    >
+                      Cancel edit
+                    </button>
+                    <button
+                      className="button button-primary"
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleSaveAndNextTrack}
+                      id="btn-save-track-changes"
+                    >
+                      <CheckIcon width={16} height={16} /> Save track changes
                     </button>
                   </>
                 ) : (
-                  <div style={{ textAlign: "center", padding: "16px", color: "var(--sw-text-muted)" }}>
-                    <UploadIcon width={30} height={30} style={{ margin: "0 auto 8px", display: "block", color: "var(--color-ocean-primary, #0284C7)" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 700, display: "block", color: "var(--color-ocean-primary, #0284C7)" }}>
-                      Choose cover
-                    </span>
-                    <small style={{ fontSize: "11px", display: "block", marginTop: "4px" }}>
-                      Square 1:1 ratio
-                    </small>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ flex: 1, minWidth: "220px" }}>
-                <p style={{ margin: "0 0 12px", fontSize: "14px", color: "var(--sw-text-secondary, #64748B)", lineHeight: "1.5" }}>
-                  A high-resolution cover image makes your album stand out on the catalog and explore pages. Recommended size: <b>500x500px</b> or higher.
-                </p>
-                <div style={{ display: "flex", gap: "10px" }}>
                   <button
+                    className="button button-primary"
                     type="button"
-                    className="button button-secondary button-small"
-                    onClick={() => fileInputRef.current?.click()}
                     disabled={submitting}
+                    onClick={handleSaveAndNextTrack}
+                    id="btn-add-next-track"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
                   >
-                    <UploadIcon width={15} height={15} />
-                    <span>{coverPreview ? "Change image" : "Browse file"}</span>
+                    <PlusIcon width={16} height={16} />
+                    <span>Add Next Track</span>
                   </button>
-                  {coverPreview && (
-                    <button
-                      type="button"
-                      className="button button-ghost button-small text-danger"
-                      onClick={handleRemoveCover}
-                      disabled={submitting}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                {formErrors.cover && (
-                  <small style={{ color: "#dc2626", fontSize: "12px", display: "block", marginTop: "8px" }}>
-                    {formErrors.cover}
-                  </small>
                 )}
               </div>
-            </div>
-          </div>
+            </form>
 
-          {/* Section 03: Tracklist Selection */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "16px",
-              paddingTop: "20px",
-              paddingBottom: "16px",
-              borderTop: "1px solid #f1f5f9",
-              borderBottom: "1px solid #f1f5f9",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--color-sand-light, #F5EFE6)",
-                  color: "var(--color-ocean-primary, #0284C7)",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                03
-              </span>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--color-ocean-dark, #0F172A)" }}>
-                Tracklist selection
-              </h2>
-            </div>
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                padding: "3px 10px",
-                borderRadius: "12px",
-                backgroundColor: selectedTrackIds.length > 0 ? "rgba(2, 132, 199, 0.1)" : "#f1f5f9",
-                color: selectedTrackIds.length > 0 ? "var(--color-ocean-primary, #0284C7)" : "var(--sw-text-muted)",
-              }}
-            >
-              {selectedTrackIds.length} selected
-            </span>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: "20px" }}>
-            <p style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", margin: "0 0 14px" }}>
-              Select standalone tracks from your studio to include in this album. You can order tracks by moving them up or down.
-            </p>
-
-            {/* Quick search filter for tracks */}
-            {availableTracks.length > 3 && (
-              <div style={{ position: "relative", marginBottom: "14px" }}>
-                <input
-                  type="text"
-                  placeholder="Filter tracks by title or genre..."
-                  value={trackSearchQuery}
-                  onChange={(e) => setTrackSearchQuery(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px 8px 34px",
-                    borderRadius: "10px",
-                    border: "1px solid var(--sw-border, #CBD5E1)",
-                    fontSize: "13px",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <span
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "var(--sw-text-muted)",
-                    display: "flex",
-                    pointerEvents: "none",
-                  }}
-                >
-                  <SearchIcon width={14} height={14} />
-                </span>
-                {trackSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setTrackSearchQuery("")}
+            {/* Right Column: Album Tracklist Sidebar + Upload Checklist */}
+            <aside className="upload-track-sidebar" aria-label="Album tracklist and guidance">
+              <section>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <span className="eyebrow">ALBUM TRACKLIST</span>
+                  <span
                     style={{
-                      position: "absolute",
-                      right: "10px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--sw-text-muted)",
-                      padding: 0,
+                      padding: "3px 10px",
+                      borderRadius: "12px",
+                      backgroundColor: "#e0f2fe",
+                      color: "var(--sw-primary-dark, #0284c7)",
+                      fontWeight: 700,
+                      fontSize: "12px",
                     }}
                   >
-                    <CloseIcon width={12} height={12} />
-                  </button>
-                )}
-              </div>
-            )}
+                    {tracks.length} track{tracks.length === 1 ? "" : "s"} • {formatDuration(totalDurationMs)}
+                  </span>
+                </div>
 
-            {loadingTracks ? (
-              <div style={{ padding: "30px", textAlign: "center", color: "var(--sw-text-muted)" }}>
-                Loading your tracks...
-              </div>
-            ) : availableTracks.length === 0 ? (
-              <div
-                style={{
-                  background: "var(--color-sand-light, #FAF7F2)",
-                  border: "1px dashed var(--color-sand-primary, #D4B996)",
-                  borderRadius: "14px",
-                  padding: "24px",
-                  textAlign: "center",
-                }}
-              >
-                <HeadphonesIcon width={32} height={32} style={{ color: "var(--color-ocean-primary, #0284C7)", margin: "0 auto 8px" }} />
-                <h4 style={{ margin: "0 0 4px", fontSize: "15px", color: "var(--color-ocean-dark, #0F172A)" }}>
-                  No standalone tracks available
-                </h4>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--sw-text-secondary)" }}>
-                  You can create this album now as an empty collection and assign tracks later from Content Studio.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
-                {filteredAvailableTracks.map((track) => {
-                  const isSelected = selectedTrackIds.includes(track.id);
-                  const selectedIndex = selectedTrackIds.indexOf(track.id);
-
-                  return (
-                    <div
-                      key={track.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "10px 14px",
-                        borderRadius: "12px",
-                        border: isSelected
-                          ? "1.5px solid var(--color-ocean-primary, #0284C7)"
-                          : "1px solid var(--sw-border, #E2E8F0)",
-                        backgroundColor: isSelected ? "rgba(2, 132, 199, 0.04)" : "#ffffff",
-                        transition: "all 0.16s ease",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        id={`track-chk-${track.id}`}
-                        checked={isSelected}
-                        onChange={() => toggleTrackSelection(track.id)}
-                        disabled={submitting}
-                        style={{ cursor: "pointer", width: "17px", height: "17px", accentColor: "var(--color-ocean-primary, #0284C7)" }}
-                      />
-
-                      <div
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          borderRadius: "8px",
-                          backgroundColor: "#f1f5f9",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          display: "grid",
-                          placeItems: "center",
-                        }}
-                      >
-                        {track.coverUrl ? (
-                          <img
-                            src={track.coverUrl}
-                            alt={track.title}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <HeadphonesIcon width={18} height={18} style={{ color: "var(--sw-text-muted)" }} />
-                        )}
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <b style={{ display: "block", fontSize: "14px", color: "var(--color-ocean-dark, #0F172A)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {track.title}
-                        </b>
-                        <small style={{ color: "var(--sw-text-muted)", fontSize: "12px" }}>
-                          {track.genreName || "Music"} • {formatDuration(track.durationMs)}
-                        </small>
-                      </div>
-
-                      {isSelected && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              padding: "2px 8px",
-                              borderRadius: "10px",
-                              backgroundColor: "var(--color-sand-light, #F5EFE6)",
-                              color: "var(--color-sand-dark, #8C6D46)",
-                            }}
-                          >
-                            Track #{selectedIndex + 1}
-                          </span>
-                          <button
-                            type="button"
-                            className="icon-button"
-                            disabled={selectedIndex === 0 || submitting}
-                            onClick={() => moveTrackOrder(selectedIndex, "up")}
-                            title="Move track up"
-                            aria-label="Move track up"
-                            style={{ padding: "4px" }}
-                          >
-                            <ArrowUpIcon width={14} height={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-button"
-                            disabled={selectedIndex === selectedTrackIds.length - 1 || submitting}
-                            onClick={() => moveTrackOrder(selectedIndex, "down")}
-                            title="Move track down"
-                            aria-label="Move track down"
-                            style={{ padding: "4px" }}
-                          >
-                            <ArrowDownIcon width={14} height={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Form Bottom Actions */}
-          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "32px", paddingTop: "20px", borderTop: "1px solid #f1f5f9" }}>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => onNavigate("/studio")}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="button button-primary"
-              disabled={submitting}
-              id="btn-submit-create-album"
-            >
-              <PlusIcon width={16} height={16} />
-              <span>{submitting ? "Creating album..." : "Create Album"}</span>
-            </button>
-          </div>
-        </form>
-
-        {/* RIGHT COLUMN: Polished Sticky Live Preview Card */}
-        <aside
-          style={{
-            position: "sticky",
-            top: "24px",
-            alignSelf: "start",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              border: "1px solid var(--color-sand-light, #E6D5B8)",
-              borderRadius: "20px",
-              padding: "24px",
-              boxShadow: "0 12px 36px rgba(16, 24, 40, 0.06)",
-            }}
-          >
-            {/* Live Preview Label with Pulse Dot */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    backgroundColor: "var(--color-ocean-primary, #0284C7)",
-                    display: "inline-block",
-                    boxShadow: "0 0 0 3px rgba(2, 132, 199, 0.2)",
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    color: "var(--color-ocean-primary, #0284C7)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  LIVE PREVIEW
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: "10px",
-                  backgroundColor: "var(--color-sand-light, #F5EFE6)",
-                  color: "var(--color-sand-dark, #8C6D46)",
-                }}
-              >
-                DRAFT
-              </span>
-            </div>
-
-            {/* Artwork Preview (NO BROKEN IMAGE EVER) */}
-            <div
-              style={{
-                width: "100%",
-                aspectRatio: "1/1",
-                borderRadius: "16px",
-                overflow: "hidden",
-                marginBottom: "16px",
-                boxShadow: "0 8px 24px rgba(16, 24, 40, 0.1)",
-                position: "relative",
-              }}
-            >
-              {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  alt="Album artwork live preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                /* Elegant Vinyl Art Placeholder */
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    background: "linear-gradient(135deg, #0369A1 0%, #0284C7 50%, #D4A373 100%)",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#ffffff",
-                    position: "relative",
-                  }}
-                >
-                  {/* Vinyl Record Center Effect */}
+                {tracks.length === 0 ? (
                   <div
                     style={{
-                      width: "84px",
-                      height: "84px",
-                      borderRadius: "50%",
-                      backgroundColor: "rgba(15, 23, 42, 0.5)",
-                      border: "2px solid rgba(255, 255, 255, 0.25)",
-                      display: "grid",
-                      placeItems: "center",
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-                      marginBottom: "10px",
+                      border: "1px dashed var(--color-sand-primary, #D4B996)",
+                      borderRadius: "12px",
+                      padding: "28px 16px",
+                      textAlign: "center",
+                      color: "var(--sw-text-secondary)",
                     }}
                   >
-                    <DiscIcon width={40} height={40} style={{ opacity: 0.95 }} />
+                    <HeadphonesIcon width={28} height={28} style={{ color: "var(--color-ocean-primary, #0284C7)", margin: "0 auto 10px" }} />
+                    <h4 style={{ margin: "0 0 6px", fontSize: "14px", fontWeight: 700, color: "var(--color-ocean-dark, #0F172A)" }}>
+                      No tracks in album yet
+                    </h4>
+                    <p style={{ margin: 0, fontSize: "12px", color: "var(--sw-text-muted)" }}>
+                      Fill in the track details on the left and click <b>"Add Next Track"</b> to add songs.
+                    </p>
                   </div>
-                  <span style={{ fontSize: "12px", fontWeight: 600, opacity: 0.85, letterSpacing: "0.02em" }}>
-                    Your Artwork Here
-                  </span>
-                  <small style={{ fontSize: "10px", opacity: 0.65, marginTop: "2px" }}>
-                    Square 1:1 format
-                  </small>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "380px", overflowY: "auto", marginBottom: "12px" }}>
+                      {tracks.map((track, idx) => {
+                        const trackGenre = genres.find((g) => g.id === track.genreId);
+                        const isBeingEdited = editingTrackIndex === idx;
 
-            {/* Album Metadata in Preview */}
-            <div style={{ marginBottom: "16px" }}>
-              <h3
-                style={{
-                  margin: "0 0 4px 0",
-                  fontSize: "17px",
-                  fontWeight: 700,
-                  color: "var(--color-ocean-dark, #0F172A)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-                title={title || "Untitled Album"}
-              >
-                {title.trim() ? title.trim() : "Untitled Album"}
-              </h3>
-              <p
-                style={{
-                  margin: "0 0 6px 0",
-                  fontSize: "13px",
-                  color: "var(--sw-text-secondary, #64748B)",
-                }}
-              >
-                by <b>{artistDisplayName}</b>
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--sw-text-muted)" }}>
-                <span>Release: {releaseDate || "Today"}</span>
-                <span>•</span>
-                <span>{selectedTrackIds.length} {selectedTrackIds.length === 1 ? "track" : "tracks"}</span>
-              </div>
-            </div>
+                        return (
+                          <div
+                            key={track.id}
+                            style={{
+                              border: isBeingEdited
+                                ? "2px solid var(--color-ocean-primary, #0284C7)"
+                                : "1px solid var(--sw-border)",
+                              backgroundColor: isBeingEdited ? "#f0f9ff" : "var(--sw-surface, #ffffff)",
+                              borderRadius: "10px",
+                              padding: "10px 12px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                backgroundColor: "#e0f2fe",
+                                color: "var(--sw-primary-dark, #0284c7)",
+                                fontWeight: 700,
+                                fontSize: "11px",
+                                display: "grid",
+                                placeItems: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {idx + 1}
+                            </div>
 
-            {/* Mini Tracklist Sequence Preview */}
-            <div
-              style={{
-                borderTop: "1px solid #f1f5f9",
-                paddingTop: "14px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--sw-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Tracklist Sequence
-                </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ocean-primary, #0284C7)", fontWeight: 600 }}>
-                  {selectedTracksList.length} total
-                </span>
-              </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--sw-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {track.title}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "var(--sw-text-secondary)" }}>
+                                {trackGenre?.name || "Music"} · {track.durationMs > 0 ? formatDuration(track.durationMs) : "Audio"}
+                              </div>
+                            </div>
 
-              {selectedTracksList.length === 0 ? (
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--sw-text-muted)", fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>
-                  Select tracks from the form to arrange track order.
-                </p>
-              ) : (
-                <div style={{ maxHeight: "180px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {selectedTracksList.map((track, idx) => (
-                    <div
-                      key={track.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        padding: "6px 8px",
-                        borderRadius: "8px",
-                        backgroundColor: "#f8fafc",
-                        fontSize: "12px",
-                      }}
-                    >
-                      <span style={{ fontWeight: 700, color: "var(--sw-text-muted)", width: "18px", textAlign: "right" }}>
-                        {idx + 1}.
-                      </span>
-                      <span
-                        style={{
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          fontWeight: 600,
-                          color: "var(--color-ocean-dark, #0F172A)",
-                        }}
-                      >
-                        {track.title}
-                      </span>
-                      <span style={{ color: "var(--sw-text-muted)", fontSize: "11px", flexShrink: 0 }}>
-                        {formatDuration(track.durationMs)}
-                      </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                className="icon-button"
+                                onClick={() => handleEditTrack(idx)}
+                                title="Edit track"
+                                style={{ padding: "4px" }}
+                              >
+                                <EditIcon width={13} height={13} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-button"
+                                onClick={() => handleMoveTrack(idx, "up")}
+                                disabled={idx === 0}
+                                title="Move up"
+                                style={{ padding: "4px" }}
+                              >
+                                <ArrowUpIcon width={13} height={13} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-button"
+                                onClick={() => handleMoveTrack(idx, "down")}
+                                disabled={idx === tracks.length - 1}
+                                title="Move down"
+                                style={{ padding: "4px" }}
+                              >
+                                <ArrowDownIcon width={13} height={13} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-button"
+                                onClick={() => handleRemoveTrack(idx)}
+                                title="Remove track"
+                                style={{ padding: "4px", color: "#dc2626" }}
+                              >
+                                <TrashIcon width={13} height={13} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+
+                    {editingTrackIndex === null && (
+                      <div style={{ paddingTop: "10px", borderTop: "1px solid var(--sw-border)" }}>
+                        <button
+                          type="button"
+                          className="button button-secondary button-small"
+                          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                          onClick={() => {
+                            resetTrackForm();
+                            requestAnimationFrame(() => document.getElementById("upload-track-title")?.focus());
+                          }}
+                        >
+                          <PlusIcon width={14} height={14} />
+                          <span>Add Next Track</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* Upload Checklist */}
+              <section>
+                <span className="eyebrow">BEFORE YOU UPLOAD</span>
+                <h2>Quick checklist</h2>
+                <ul>
+                  <li><CheckIcon width={16} height={16} /><span>You own the audio or have permission to publish it.</span></li>
+                  <li><CheckIcon width={16} height={16} /><span>Each track audio is MP3, WAV or FLAC and under 30MB.</span></li>
+                  <li><CheckIcon width={16} height={16} /><span>The album title and individual track genres are accurate.</span></li>
+                </ul>
+              </section>
+
+              {/* Sidebar Note */}
+              <section className="upload-track-sidebar__note">
+                <FileTextIcon width={20} height={20} />
+                <div>
+                  <b>Save as Draft or Submit for Review</b>
+                  <p>You can keep the album and all tracks as private drafts, or submit directly to staff for moderation review.</p>
                 </div>
-              )}
+              </section>
+            </aside>
+          </div>
+
+          {/* Bottom Action Footer for Step 2 */}
+          <div
+            style={{
+              marginTop: "32px",
+              background: "#ffffff",
+              border: "1px solid var(--sw-border, #E2E8F0)",
+              borderRadius: "16px",
+              padding: "20px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+              flexWrap: "wrap",
+              gap: "16px",
+            }}
+          >
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setStep(1)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              <ChevronLeftIcon width={16} height={16} />
+              <span>Back to Album Info</span>
+            </button>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => void processSubmitAlbum(false)}
+                disabled={submitting || (tracks.length === 0 && !currentAudioFile)}
+                id="btn-save-draft-album"
+                title="Save album and constituent tracks as draft"
+              >
+                Save as Draft
+              </button>
+
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => handleStartSubmitReview()}
+                disabled={submitting || (tracks.length === 0 && !currentAudioFile)}
+                id="btn-submit-review-album"
+                title="Submit album and all constituent tracks for staff moderation"
+                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <UploadIcon width={16} height={16} />
+                <span>{submitting ? "Submitting..." : "Submit Album for Review"}</span>
+              </button>
             </div>
           </div>
-        </aside>
-      </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Review Submission */}
+      {confirmModalOpen && createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => !submitting && setConfirmModalOpen(false)}>
+          <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Submit Album for Staff review</h3>
+              <button className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <p style={{ margin: "12px 0 8px", color: "var(--sw-text-secondary)" }}>
+              You are submitting <b>“{title}”</b> with {tracks.length + (editingTrackIndex === null && currentAudioFile && currentTitle.trim() ? 1 : 0)} track(s) to the moderation queue. Once submitted, editing is locked until staff completes review.
+            </p>
+            <div className="form-group" style={{ marginTop: "12px" }}>
+              <label htmlFor="upload-submitter-note">Note for reviewer (optional)</label>
+              <textarea
+                id="upload-submitter-note"
+                rows={3}
+                placeholder="Mention master source, licenses, or specific credits..."
+                value={submitterNote}
+                onChange={(e) => setSubmitterNote(e.target.value)}
+                style={{ width: "100%", padding: "10px", borderRadius: "10px", border: "1px solid var(--sw-border)" }}
+              />
+            </div>
+            <div style={{ marginTop: "14px", padding: "12px", background: "var(--sw-surface-alt, #f8fafc)", borderRadius: "8px", border: "1px solid var(--sw-border)" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", fontSize: "13px", color: "var(--sw-text-primary)" }}>
+                <input
+                  type="checkbox"
+                  id="chk-copyright-agree"
+                  checked={copyrightAgreed}
+                  onChange={(e) => setCopyrightAgreed(e.target.checked)}
+                  style={{ marginTop: "3px" }}
+                />
+                <span>
+                  I confirm that I own all rights to this album, audio tracks, and artwork, or hold legal authorization to publish them, and agree to SoundWave Community Guidelines.
+                </span>
+              </label>
+            </div>
+            <div className="modal-actions" style={{ marginTop: "18px" }}>
+              <button className="button button-secondary" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>
+                Cancel
+              </button>
+              <button
+                className="button button-primary"
+                disabled={!copyrightAgreed || submitting}
+                onClick={() => void handleConfirmSubmitReview()}
+                id="btn-confirm-agree-submit"
+              >
+                {submitting ? "Submitting..." : "Agree & Submit Album"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Center Toast Notification Popup */}
+      {pageToast && (
+        <CenterNotificationPopup
+          open={Boolean(pageToast)}
+          type={pageToast.type}
+          message={pageToast.message}
+          onClose={() => setPageToast(null)}
+        />
+      )}
     </div>
   );
 }

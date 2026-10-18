@@ -1,5 +1,5 @@
 import { API_BASE_URL, apiFetch } from "./client";
-import type { Genre, LandingTrack } from "../types";
+import type { Genre, LandingTrack, PublicAlbum, PublicAlbumDetails } from "../types";
 
 export type PageResponse<T> = {
   content: T[];
@@ -46,6 +46,26 @@ export const catalogApi = {
 
   getRecommendations: async (idOrSlug: string | number, limit = 5): Promise<LandingTrack[]> => {
     return apiFetch<LandingTrack[]>(`/tracks/${idOrSlug}/recommendations?limit=${limit}`);
+  },
+
+  getAlbums: async (params?: {
+    search?: string;
+    sort?: "newest" | "title" | "tracks" | "oldest";
+    page?: number;
+    size?: number;
+  }): Promise<PageResponse<PublicAlbum>> => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.sort) query.set("sort", params.sort);
+    if (params?.page !== undefined) query.set("page", String(params.page));
+    if (params?.size !== undefined) query.set("size", String(params.size));
+
+    const qs = query.toString();
+    return apiFetch<PageResponse<PublicAlbum>>(`/albums${qs ? `?${qs}` : ""}`);
+  },
+
+  getAlbumByIdOrSlug: async (idOrSlug: string | number): Promise<PublicAlbumDetails> => {
+    return apiFetch<PublicAlbumDetails>(`/albums/${idOrSlug}`);
   },
 
   recordPlay: async (

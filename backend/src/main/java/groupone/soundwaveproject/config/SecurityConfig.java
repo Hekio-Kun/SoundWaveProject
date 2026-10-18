@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/genres/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tracks", "/api/v1/tracks/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/albums", "/api/v1/albums/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/tracks/*/play").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/profile/*").permitAll()
                         .requestMatchers("/api/v1/playlists/me").authenticated()
@@ -63,7 +64,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList());
+        configuration.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));

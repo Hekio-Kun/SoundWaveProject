@@ -21,23 +21,23 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 
 /**
- * Controller xử lý các yêu cầu HTTP cho chức năng Quản lý kiểm duyệt bài hát (UC-24: Manage Track Moderation).
- * Dành riêng cho nhân viên kiểm duyệt (STAFF) và Quản trị viên (ADMIN).
+ * Controller quản lý toàn bộ chức năng kiểm duyệt bài hát và album (UC-24: Manage Content Moderation).
+ * Dành riêng cho nhân viên kiểm duyệt (STAFF).
  */
 @RestController
-@RequestMapping({"/api/v1/moderation/submissions", "/api/v1/admin/moderation/tracks"})
+@RequestMapping({"/api/v1/moderation/submissions", "/api/v1/admin/moderation/tracks", "/api/v1/moderation"})
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-public class TrackModerationController {
+@PreAuthorize("hasRole('STAFF')")
+public class ModerationController {
     private final ModerationService moderationService;
 
     /**
-     * Lấy danh sách hàng đợi các bài hát cần kiểm duyệt theo bộ lọc và phân trang (UC-24.1 View Moderation Queue).
+     * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt (UC-24.1 View Moderation Queue).
      *
      * @param status   Trạng thái kiểm duyệt cần lọc (PENDING, APPROVED, REJECTED)
-     * @param search   Từ khóa tìm kiếm theo tiêu đề bài hát hoặc email người gửi
+     * @param search   Từ khóa tìm kiếm theo tiêu đề bài hát, tên album hoặc email người gửi
      * @param pageable Cấu hình phân trang và sắp xếp (mặc định sắp xếp theo submittedAt tăng dần)
-     * @return Trang danh sách các bài hát trong hàng đợi kiểm duyệt
+     * @return Trang danh sách các mục (Track đơn hoặc Album) trong hàng đợi kiểm duyệt
      */
     @GetMapping
     public ResponseEntity<Page<SubmissionQueueItemResponse>> getQueue(
@@ -48,9 +48,9 @@ public class TrackModerationController {
     }
 
     /**
-     * Lấy số liệu thống kê tổng quan của hàng đợi kiểm duyệt bài hát (UC-24.1 View Moderation Queue Stats).
+     * Lấy số liệu thống kê tổng quan của hàng đợi kiểm duyệt (UC-24.1 View Moderation Queue Stats).
      *
-     * @return DTO thống kê số lượng bài hát chờ duyệt, đã duyệt, bị từ chối và tổng số
+     * @return DTO thống kê số lượng bài hát/album chờ duyệt, đã duyệt, bị từ chối và tổng số
      */
     @GetMapping("/stats")
     public ResponseEntity<SubmissionStatsResponse> getQueueStats() {

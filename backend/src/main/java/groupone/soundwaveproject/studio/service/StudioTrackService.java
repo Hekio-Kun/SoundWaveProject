@@ -25,6 +25,8 @@ import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.entity.NotificationType;
+import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
@@ -60,6 +62,7 @@ public class StudioTrackService {
     private final AppUserRepository appUserRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
+    private final NotificationService notificationService;
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -169,8 +172,10 @@ public class StudioTrackService {
         if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
             throw new ForbiddenOperationException("Tracks currently pending review cannot be modified. Please withdraw the submission first.");
         }
-        if (track.getPublicationStatus() == TrackPublicationStatus.TAKEN_DOWN) {
-            throw new ForbiddenOperationException("Taken down tracks cannot be modified.");
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT
+                && track.getPublicationStatus() != TrackPublicationStatus.REJECTED
+                && track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
+            throw new ForbiddenOperationException("Tracks in " + track.getPublicationStatus() + " status cannot be modified.");
         }
 
         Genre genre = genreRepository.findById(request.genreId())
@@ -253,6 +258,15 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be deleted. Please withdraw the submission first.");
+        }
+        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT
+                && track.getPublicationStatus() != TrackPublicationStatus.REJECTED
+                && track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
+            throw new ForbiddenOperationException("Tracks in " + track.getPublicationStatus() + " status cannot be deleted.");
+        }
+
         Album album = track.getAlbum();
 
         playlistTrackRepository.deleteByTrack_Id(track.getId());
@@ -296,6 +310,23 @@ public class StudioTrackService {
                 .submitterNote(submitterNote)
                 .build();
         TrackSubmission savedSubmission = trackSubmissionRepository.save(submission);
+
+        try {
+            List<AppUser> staffUsers = appUserRepository.findByRole_CodeIn(List.of("STAFF", "ADMIN"));
+            for (AppUser staff : staffUsers) {
+                notificationService.createNotification(
+                        staff.getId(),
+                        user.getId(),
+                        NotificationType.TRACK_SUBMISSION,
+                        "New submission for review",
+                        "Track \"" + track.getTitle() + "\" has been submitted for moderation.",
+                        "SUBMISSION",
+                        String.valueOf(savedSubmission.getId())
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create submission notification for staff: {}", e.getMessage());
+        }
 
         Genre genre = genreRepository.findById(track.getGenreId()).orElse(null);
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;

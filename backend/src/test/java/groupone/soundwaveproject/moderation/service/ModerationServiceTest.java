@@ -21,6 +21,7 @@ import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateExce
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,7 @@ class ModerationServiceTest {
     @Mock private TrackSubmissionMapper mapper;
     @Mock private AppUserRepository userRepository;
     @Mock private UserProfileRepository profileRepository;
+    @Mock private NotificationService notificationService;
 
     private ModerationService moderationService;
     private AppUser staffUser;
@@ -59,7 +61,8 @@ class ModerationServiceTest {
                 mailService,
                 mapper,
                 userRepository,
-                profileRepository
+                profileRepository,
+                notificationService
         );
 
         staffUser = new AppUser(
@@ -224,7 +227,47 @@ class ModerationServiceTest {
                 any(),
                 any(),
                 any(),
-                eq("[00:01.00]Hello world\n[00:05.00]Echoes of summer")
+                eq("[00:01.00]Hello world\n[00:05.00]Echoes of summer"),
+                isNull()
         );
+    }
+
+    @Test
+    void buildAlbumNavigation_WhenTrackHasAlbum_ReturnsOrderedNavigationWithNextTrack() {
+        Album album = Album.builder()
+                .title("Skyward")
+                .slug("skyward")
+                .status("DRAFT")
+                .build();
+        ReflectionTestUtils.setField(album, "id", 50L);
+
+        Track track1 = Track.builder().title("Track 1").trackNumber(1).album(album).build();
+        ReflectionTestUtils.setField(track1, "id", 101L);
+
+        Track track2 = Track.builder().title("Track 2").trackNumber(2).album(album).build();
+        ReflectionTestUtils.setField(track2, "id", 102L);
+
+        TrackSubmission sub1 = TrackSubmission.builder().trackId(101L).status(SubmissionStatus.APPROVED).build();
+        ReflectionTestUtils.setField(sub1, "id", 11L);
+
+        TrackSubmission sub2 = TrackSubmission.builder().trackId(102L).status(SubmissionStatus.PENDING).build();
+        ReflectionTestUtils.setField(sub2, "id", 12L);
+
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(50L)).thenReturn(java.util.List.of(track1, track2));
+        when(submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(java.util.List.of(101L, 102L)))
+                .thenReturn(java.util.List.of(sub1, sub2));
+
+        var nav = moderationService.buildAlbumNavigation(sub1, track1);
+
+        assertNotNull(nav);
+        assertEquals(50L, nav.albumId());
+        assertEquals("Skyward", nav.albumTitle());
+        assertEquals(11L, nav.currentSubmissionId());
+        assertNull(nav.prevSubmissionId());
+        assertEquals(12L, nav.nextSubmissionId());
+        assertEquals(12L, nav.nextPendingSubmissionId());
+        assertEquals(1, nav.currentIndex());
+        assertEquals(2, nav.totalTracks());
+        assertEquals(2, nav.tracks().size());
     }
 }

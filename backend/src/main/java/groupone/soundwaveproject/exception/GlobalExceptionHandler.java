@@ -115,6 +115,79 @@ public class GlobalExceptionHandler {
     }
 
 
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingServletRequestPart(
+            org.springframework.web.multipart.support.MissingServletRequestPartException exception,
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PART",
+                "Required request part '" + exception.getRequestPartName() + "' is missing.", request, Map.of());
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingServletRequestParameter(
+            org.springframework.web.bind.MissingServletRequestParameterException exception,
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAM",
+                "Required parameter '" + exception.getParameterName() + "' is missing.", request, Map.of());
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodArgumentTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        String paramName = exception.getName();
+        String typeName = exception.getRequiredType() != null ? exception.getRequiredType().getSimpleName() : "valid format";
+        return build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER_FORMAT",
+                "Invalid value for parameter '" + paramName + "'. Expected a " + typeName + ".", request, Map.of());
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException exception,
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST_PAYLOAD",
+                "Malformed or unreadable request payload. Please verify JSON format.", request, Map.of());
+    }
+
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(
+            jakarta.validation.ConstraintViolationException exception,
+            HttpServletRequest request
+    ) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        exception.getConstraintViolations().forEach(violation -> {
+            String property = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "param";
+            errors.putIfAbsent(property, violation.getMessage());
+        });
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Please review the submitted parameters.", request, errors);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleHandlerMethodValidation(
+            org.springframework.web.method.annotation.HandlerMethodValidationException exception,
+            HttpServletRequest request
+    ) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        exception.getAllErrors().forEach(err -> {
+            errors.putIfAbsent("parameter", err.getDefaultMessage());
+        });
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Please review the submitted parameters.", request, errors);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<ApiErrorResponse> handleMultipartException(
+            org.springframework.web.multipart.MultipartException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("Multipart processing failure for {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "MULTIPART_ERROR",
+                "Failed to process uploaded multipart files. Please check file sizes and formats.", request, Map.of());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(
             AccessDeniedException exception,
@@ -130,6 +203,21 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return build(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException exception,
+            HttpServletRequest request
+    ) {
+        log.error("Data integrity violation while processing {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+        String message = "Data constraint violation. Please verify unique fields and valid foreign keys.";
+        if (exception.getMessage() != null && exception.getMessage().toLowerCase().contains("duplicate")) {
+            return build(HttpStatus.CONFLICT, "DUPLICATE_RESOURCE",
+                    "A record with this information already exists.", request, Map.of());
+        }
+        return build(HttpStatus.BAD_REQUEST, "DATA_INTEGRITY_VIOLATION",
+                message, request, Map.of());
     }
 
     @ExceptionHandler(Exception.class)

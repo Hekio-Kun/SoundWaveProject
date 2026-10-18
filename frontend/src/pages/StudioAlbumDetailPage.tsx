@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
+import { studioApi } from "../api/track";
 import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
+
 import {
   AlertIcon,
   ArrowDownIcon,
@@ -70,7 +72,8 @@ export function StudioAlbumDetailPage({
 }: Props) {
   const [album, setAlbum] = useState<StudioAlbum | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -81,14 +84,18 @@ export function StudioAlbumDetailPage({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
 
+  // Xóa từng bài hát đơn lẻ (AF02 & UC-21.3)
+  const [trackToDelete, setTrackToDelete] = useState<StudioTrack | null>(null);
+  const [deletingTrack, setDeletingTrack] = useState(false);
+
   const fetchAlbumData = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       const data = await albumApi.getAlbumById(albumId);
       setAlbum(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load album details.");
+      setLoadError(err instanceof Error ? err.message : "Failed to load album details.");
     } finally {
       setLoading(false);
     }
@@ -98,17 +105,49 @@ export function StudioAlbumDetailPage({
     void fetchAlbumData();
   }, [albumId]);
 
+  // Xóa toàn bộ album và toàn bộ bài hát cấu thành (UC-21.4)
   const handleDeleteAlbum = async () => {
     if (!album) return;
     try {
       setDeleting(true);
+      setActionError(null);
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
       onNavigate("/studio");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete album.");
+      setActionError(err instanceof Error ? err.message : "Failed to delete album.");
+      setDeleteConfirmOpen(false);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Yêu cầu xóa một bài hát đơn lẻ trong album
+  const handleRequestDeleteTrack = (track: StudioTrack) => {
+    if (!album || !album.tracks) return;
+    if (album.tracks.length <= 1) {
+      setActionError("An album must contain at least one track. To remove all tracks, please delete the album instead.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setActionError(null);
+    setTrackToDelete(track);
+  };
+
+  // Xác nhận xóa vĩnh viễn 1 bài hát nhưng giữ nguyên Album (UC-21.3 AF02)
+  const handleConfirmDeleteSingleTrack = async () => {
+    if (!trackToDelete) return;
+    try {
+      setDeletingTrack(true);
+      setActionError(null);
+      await studioApi.deleteTrack(trackToDelete.id);
+      setTrackToDelete(null);
+      await fetchAlbumData();
+      setActionSuccess(`Track "${trackToDelete.title}" has been permanently deleted. The album remains intact.`);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete track.");
+    } finally {
+      setDeletingTrack(false);
     }
   };
 
@@ -126,6 +165,7 @@ export function StudioAlbumDetailPage({
     // Optimistic UI update
     setAlbum({ ...album, tracks: newTracks });
     setReordering(true);
+    setActionError(null);
 
     try {
       await albumApi.updateAlbum(album.id, {
@@ -137,35 +177,13 @@ export function StudioAlbumDetailPage({
       await fetchAlbumData();
       setActionSuccess("Track sequence updated successfully.");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to reorder tracks.");
+      setActionError(err instanceof Error ? err.message : "Failed to reorder tracks.");
       await fetchAlbumData();
     } finally {
       setReordering(false);
     }
   };
 
-  // Inline remove track directly from table
-  const handleInlineRemoveTrack = async (trackId: number) => {
-    if (!album || !album.tracks) return;
-    const remainingTracks = album.tracks.filter((t) => t.id !== trackId);
-
-    // Optimistic UI update
-    setAlbum({ ...album, tracks: remainingTracks, trackCount: remainingTracks.length });
-
-    try {
-      await albumApi.updateAlbum(album.id, {
-        title: album.title,
-        description: album.description ? album.description : undefined,
-        releaseDate: album.releaseDate ? album.releaseDate : undefined,
-        trackIds: remainingTracks.map((t) => t.id),
-      });
-      await fetchAlbumData();
-      setActionSuccess("Track removed from album. It remains in your studio library as a standalone track.");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to remove track.");
-      await fetchAlbumData();
-    }
-  };
 
   // Play audio handlers
   const handlePlayTrack = (track: StudioTrack) => {
@@ -193,14 +211,14 @@ export function StudioAlbumDetailPage({
     );
   }
 
-  if (error || !album) {
+  if (loadError || !album) {
     return (
       <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "28px 24px" }}>
         <div className="auth-v2-error" role="alert" style={{ margin: "24px 0" }}>
           <span><AlertIcon width={18} height={18} /></span>
           <div>
             <b>Unable to load album</b>
-            <small>{error || "Album not found."}</small>
+            <small>{loadError || "Album not found or access denied."}</small>
           </div>
           <button className="button button-secondary button-small" onClick={() => void fetchAlbumData()}>
             Retry
@@ -244,6 +262,24 @@ export function StudioAlbumDetailPage({
         <span>/</span>
         <span style={{ color: "var(--color-ocean-dark, #0F172A)", fontWeight: 700 }}>{album.title}</span>
       </div>
+
+      {actionError && (
+        <div className="auth-v2-error upload-track-alert" role="alert" style={{ marginBottom: "20px" }}>
+          <span><AlertIcon width={18} height={18} /></span>
+          <div style={{ flex: 1 }}>
+            <b>Notice</b>
+            <small>{actionError}</small>
+          </div>
+          <button
+            className="icon-button"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss notice"
+            style={{ color: "inherit", background: "none", border: "none", cursor: "pointer" }}
+          >
+            <CloseIcon width={16} height={16} />
+          </button>
+        </div>
+      )}
 
       {actionSuccess && (
         <div className="studio-success-alert" role="status" style={{ marginBottom: "20px" }}>
@@ -749,9 +785,9 @@ export function StudioAlbumDetailPage({
                     <button
                       type="button"
                       className="button button-ghost button-small"
-                      onClick={() => handleInlineRemoveTrack(track.id)}
+                      onClick={() => handleRequestDeleteTrack(track)}
                       style={{ padding: "4px 6px", color: "#DC2626" }}
-                      title="Remove from album"
+                      title="Permanently delete track from album"
                     >
                       <TrashIcon width={13} height={13} />
                     </button>
@@ -784,16 +820,28 @@ export function StudioAlbumDetailPage({
         onTracksUpdated={fetchAlbumData}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Album Confirmation Modal (UC-21.4) */}
       <DeleteConfirmationModal
         open={deleteConfirmOpen}
         title="Delete Album"
-        message={`Are you sure you want to delete "${album.title}"? All tracks in this album will remain in your library as standalone tracks and will not be deleted.`}
-        confirmLabel="Delete album"
+        message={`Deleting this album will permanently remove the album "${album.title}" and all audio tracks contained within it. This action cannot be undone. Are you sure you want to proceed?`}
+        confirmLabel="Delete album & all tracks"
         onConfirm={handleDeleteAlbum}
         onCancel={() => setDeleteConfirmOpen(false)}
         submitting={deleting}
       />
+
+      {/* Delete Single Track Confirmation Modal (UC-21.3 AF02) */}
+      <DeleteConfirmationModal
+        open={Boolean(trackToDelete)}
+        title="Delete Track from Album"
+        message={`Are you sure you want to delete "${trackToDelete?.title}"? This will permanently remove this track and its audio file. The album will remain intact.`}
+        confirmLabel="Delete track"
+        onConfirm={handleConfirmDeleteSingleTrack}
+        onCancel={() => setTrackToDelete(null)}
+        submitting={deletingTrack}
+      />
     </div>
   );
 }
+

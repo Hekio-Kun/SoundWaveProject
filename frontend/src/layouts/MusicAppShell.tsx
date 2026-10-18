@@ -99,6 +99,9 @@ export function MusicAppShell({
           isAuthenticated={isAuthenticated}
           onNavigate={onNavigate}
           onLogout={onLogout}
+          onPlayTrack={onPlayTrack}
+          currentTrack={currentTrack}
+          playing={playing}
         />
 
         <div className="app-scroll-region" id="app-scroll-region">

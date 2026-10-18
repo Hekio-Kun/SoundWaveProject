@@ -261,6 +261,30 @@ class StudioTrackServiceTest {
     }
 
     @Test
+    @DisplayName("deleteTrack throws ForbiddenOperationException when track is PENDING")
+    void deleteTrack_Pending_ThrowsForbiddenException() {
+        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track pendingTrack = Track.builder()
+                .id(302L)
+                .uploaderUserId(10L)
+                .genre(activeGenre)
+                .title("Pending Song")
+                .publicationStatus(TrackPublicationStatus.PENDING)
+                .audioPublicId("audio-pending-id")
+                .build();
+        when(trackRepository.findByIdAndUploaderUserId(302L, 10L))
+                .thenReturn(Optional.of(pendingTrack));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                studioTrackService.deleteTrack(302L, "creator@soundwave.com")
+        ).isInstanceOf(groupone.soundwaveproject.exception.ForbiddenOperationException.class)
+         .hasMessageContaining("pending review");
+    }
+
+
+    @Test
     @DisplayName("submitForReview updates status to PENDING and creates submission record")
     void submitForReview_Success() {
         when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))

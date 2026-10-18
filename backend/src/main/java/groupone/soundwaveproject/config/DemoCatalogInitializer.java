@@ -54,49 +54,7 @@ public class DemoCatalogInitializer implements ApplicationRunner {
         Genre acousticGenre = genreRepository.findBySlug("acoustic").orElseGet(() ->
                 genreRepository.save(new Genre("Acoustic", "acoustic", "Nhạc mộc mạc", adminUser.getId())));
 
-        // 1. Bài hát đã xuất bản (PUBLISHED - thời lượng 60s -> ngưỡng nghe BR.13 là 30s)
-        if (trackRepository.findBySlugAndPublicationStatus("seed-som-mai-diu-dang", TrackPublicationStatus.PUBLISHED).isEmpty()) {
-            Track publishedTrack = new Track(
-                    adminUser.getId(),
-                    acousticGenre,
-                    null,
-                    "Sớm Mai Dịu Dàng (Seed)",
-                    "seed-som-mai-diu-dang",
-                    "Bài hát đã xuất bản để kiểm tra catalog và playback.",
-                    "seed/audio-published",
-                    DEMO_AUDIO_URL,
-                    "mp3",
-                    60000,
-                    "seed/cover-published",
-                    DEMO_COVER_URL,
-                    TrackPublicationStatus.PUBLISHED
-            );
-            publishedTrack.setPlayCountCache(1240L);
-            trackRepository.save(publishedTrack);
-            log.info("Seeded demo published track: Sớm Mai Dịu Dàng (id={})", publishedTrack.getId());
-        }
 
-        // 2. Bài hát ngắn (PUBLISHED - thời lượng 15s -> ngưỡng nghe BR.13 là 90% = 13.5s)
-        if (trackRepository.findBySlugAndPublicationStatus("seed-giai-dieu-ngan-15s", TrackPublicationStatus.PUBLISHED).isEmpty()) {
-            Track shortTrack = new Track(
-                    adminUser.getId(),
-                    popGenre,
-                    null,
-                    "Giai Điệu Ngắn 15s (Seed)",
-                    "seed-giai-dieu-ngan-15s",
-                    "Bài hát ngắn kiểm tra ngưỡng nghe 90% duration.",
-                    "seed/audio-short",
-                    DEMO_AUDIO_URL,
-                    "mp3",
-                    15000,
-                    "seed/cover-short",
-                    DEMO_COVER_URL,
-                    TrackPublicationStatus.PUBLISHED
-            );
-            shortTrack.setPlayCountCache(50L);
-            trackRepository.save(shortTrack);
-            log.info("Seeded demo short track: Giai Điệu Ngắn 15s (id={})", shortTrack.getId());
-        }
 
         // 3. Bài hát bản nháp (DRAFT - dùng để test quy tắc BR-09 trả về 404)
         if (trackRepository.findAll().stream().noneMatch(t -> "seed-draft-song".equals(t.getSlug()))) {
