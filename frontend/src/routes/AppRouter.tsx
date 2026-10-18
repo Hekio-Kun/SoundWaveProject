@@ -7,6 +7,7 @@ import { useRouter } from "../hooks/useRouter";
 import { initialStudioTracks } from "../data";
 
 import { AlbumDetailsPage } from "../pages/AlbumDetailsPage";
+import { AlbumsPage } from "../pages/AlbumsPage";
 import { CreateAlbumPage } from "../pages/CreateAlbumPage";
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../pages/AuthPages";
 import { CreatorProfilePage } from "../pages/CreatorProfilePage";
@@ -145,6 +146,17 @@ export function AppRouter(): React.ReactElement | null {
 
   if (pathname === "/genres") {
     return <GenresPage onNavigate={navigate} />;
+  }
+
+  if (pathname === "/albums") {
+    return (
+      <AlbumsPage
+        currentTrack={currentTrack}
+        playing={playing}
+        onPlayTrack={playTrack}
+        onNavigate={navigate}
+      />
+    );
   }
 
   if (pathname.startsWith("/track/") || pathname.startsWith("/tracks/")) {
