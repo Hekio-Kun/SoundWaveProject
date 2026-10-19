@@ -56,6 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/playlists", "/api/v1/playlists/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/studio/genres").permitAll()
                         .requestMatchers("/api/v1/studio/**").authenticated()
+                        .requestMatchers("/api/v1/favorites/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
