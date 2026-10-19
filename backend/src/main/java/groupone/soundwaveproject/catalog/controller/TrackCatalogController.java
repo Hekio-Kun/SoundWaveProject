@@ -1,7 +1,6 @@
 package groupone.soundwaveproject.catalog.controller;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import groupone.soundwaveproject.catalog.dto.request.RecordPlayRequest;
 import groupone.soundwaveproject.catalog.dto.response.RecordPlayResponse;
@@ -27,9 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/tracks")
-@RequiredArgsConstructor
 public class TrackCatalogController {
     private final TrackCatalogService trackCatalogService;
+
+    public TrackCatalogController(TrackCatalogService trackCatalogService) {
+        this.trackCatalogService = trackCatalogService;
+    }
 
     /**
      * Retrieves a paginated list of published tracks for public browsing, search, and playlist curation.
@@ -51,6 +53,22 @@ public class TrackCatalogController {
         log.info("Fetching public track catalog: genre={}, search={}, sort={}, creatorId={}, page={}",
                 genre, search, sort, creatorId, pageable.getPageNumber());
         return ResponseEntity.ok(trackCatalogService.getFilteredTracks(genre, search, sort, creatorId, pageable));
+    }
+
+    /**
+     * Retrieves the ranked leaderboard of published tracks ordered by total play count (UC-7 View Ranking Board).
+     *
+     * @param genre Optional genre slug filter (AF01).
+     * @param limit Maximum number of tracks to return on the ranking board (default 50).
+     * @return {@link ResponseEntity} containing the ranked list of {@link TrackResponse}.
+     */
+    @GetMapping("/ranking")
+    public ResponseEntity<java.util.List<TrackResponse>> getRankingBoard(
+            @RequestParam(required = false) String genre,
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        log.info("Fetching ranking board: genre={}, limit={}", genre, limit);
+        return ResponseEntity.ok(trackCatalogService.getRankingBoard(genre, limit));
     }
 
     /**

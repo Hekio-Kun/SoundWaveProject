@@ -134,7 +134,7 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
       </section>
 
       <section className="sw-section" id="trending">
-        <SectionHeader title="Trending tracks" description="The most-played tracks in the SoundWave community this week" actionLabel="View all" onAction={() => onNavigate("/browse?sort=trending")} />
+        <SectionHeader title="Trending tracks" description="The most-played tracks in the SoundWave community this week" actionLabel="Top Charts" onAction={() => onNavigate("/ranking")} />
         {tracksLoading ? (
           <div className="sw-track-grid" aria-busy="true" aria-label="Loading trending tracks">
             {[1, 2, 3, 4, 5].map((item) => <div className="explore-track-skeleton" key={item}><span className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div>)}

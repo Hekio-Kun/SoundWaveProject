@@ -28,11 +28,20 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TrackCatalogService {
     private final TrackRepository trackRepository;
     private final UserAccountPublicService userAccountPublicService;
     private final ListeningHistoryPublicService listeningHistoryPublicService;
+
+    public TrackCatalogService(
+            TrackRepository trackRepository,
+            UserAccountPublicService userAccountPublicService,
+            ListeningHistoryPublicService listeningHistoryPublicService
+    ) {
+        this.trackRepository = trackRepository;
+        this.userAccountPublicService = userAccountPublicService;
+        this.listeningHistoryPublicService = listeningHistoryPublicService;
+    }
 
     /**
      * Retrieves published track metadata and CDN streaming audio URL (Stream Music Phase 1).
@@ -110,7 +119,7 @@ public class TrackCatalogService {
         if ("trending".equalsIgnoreCase(sort)) {
             comparator = Comparator.comparing(
                     (Track t) -> t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L
-            ).reversed();
+            ).reversed().thenComparing(Track::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         } else if ("title".equalsIgnoreCase(sort)) {
             comparator = Comparator.comparing(
                     Track::getTitle, String.CASE_INSENSITIVE_ORDER
@@ -133,6 +142,21 @@ public class TrackCatalogService {
                 .toList();
 
         return new PageImpl<>(pagedResponses, pageable, sortedList.size());
+    }
+
+    /**
+     * Retrieves the ranked leaderboard of published tracks ordered by total play count (UC-7 View Ranking Board).
+     * Prioritizes recent releases when play counts are identical (NF01 step 2).
+     *
+     * @param genre Optional genre slug filter (AF01).
+     * @param limit Maximum number of tracks to return in the ranking board (1-100).
+     * @return List of {@link TrackResponse} items representing the ranked leaderboard.
+     */
+    @Transactional(readOnly = true)
+    public List<TrackResponse> getRankingBoard(String genre, int limit) {
+        int maxLimit = Math.max(1, Math.min(limit, 100));
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, maxLimit);
+        return getPublishedTracks(genre, null, "trending", null, pageable).getContent();
     }
 
     /**

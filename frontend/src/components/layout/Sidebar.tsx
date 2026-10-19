@@ -1,4 +1,4 @@
-import { ClockIcon, CompassIcon, DashboardIcon, DiscIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, UploadIcon } from "../../icons";
+import { ClockIcon, CompassIcon, DashboardIcon, DiscIcon, FilterIcon, HeartIcon, LibraryIcon, PlusIcon, SearchIcon, ShieldIcon, TrophyIcon, UploadIcon } from "../../icons";
 import type { CurrentUser } from "../../types";
 
 type Props = {
@@ -56,6 +56,13 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           >
             <CompassIcon />
             <span>Explore</span>
+          </button>
+          <button
+            className={`nav-item ${isCurrent("/ranking") || isCurrent("/charts") ? "nav-item--active" : ""}`}
+            onClick={() => onNavigate("/ranking")}
+          >
+            <TrophyIcon width={18} height={18} />
+            <span>Top Charts</span>
           </button>
           <button
             className={`nav-item ${activeRoute.startsWith("/browse") || activeRoute.includes("genre") ? "nav-item--active" : ""}`}
