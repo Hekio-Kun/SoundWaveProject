@@ -23,6 +23,19 @@ public class FavoriteController {
     private final FavoriteService favoriteService;
 
     /**
+     * Lấy danh sách toàn bộ bài hát yêu thích của người dùng hiện tại (UC-14.2: View Favorite Tracks List).
+     */
+    @GetMapping
+    public ResponseEntity<java.util.List<groupone.soundwaveproject.catalog.dto.response.TrackResponse>> getMyFavorites(
+            Authentication authentication
+    ) {
+        log.info("User {} requested to view favorite tracks list", authentication.getName());
+        java.util.List<groupone.soundwaveproject.catalog.dto.response.TrackResponse> favorites =
+                favoriteService.getFavoriteTracks(authentication.getName());
+        return ResponseEntity.ok(favorites);
+    }
+
+    /**
      * Thêm một bài hát vào danh sách yêu thích của người dùng (UC-14.1: Add Track to Favorites).
      */
     @PostMapping("/{trackId}")
