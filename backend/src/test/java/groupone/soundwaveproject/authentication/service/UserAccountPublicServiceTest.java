@@ -1,10 +1,10 @@
 package groupone.soundwaveproject.authentication.service;
 
 import groupone.soundwaveproject.authentication.dto.response.UserProfileSummary;
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserProfile;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +26,9 @@ import static org.mockito.Mockito.*;
 class UserAccountPublicServiceTest {
 
     @Mock
-    private AppUserRepository userRepository;
+    private UserRepository userRepository;
+    @Mock
+    private StaffRepository staffRepository;
     @Mock
     private UserProfileRepository userProfileRepository;
 
@@ -34,13 +36,12 @@ class UserAccountPublicServiceTest {
 
     @BeforeEach
     void setUp() {
-        userAccountPublicService = new UserAccountPublicService(userRepository, userProfileRepository);
+        userAccountPublicService = new UserAccountPublicService(userRepository, staffRepository, userProfileRepository);
     }
 
     @Test
     void getUserIdByEmail_WhenUserExists_ShouldReturnId() {
-        Role role = new Role("LISTENER", "Listener", "Standard listener");
-        AppUser user = new AppUser(role, "user@soundwave.com", "hash");
+        User user = new User("user@soundwave.com", "hash");
         ReflectionTestUtils.setField(user, "id", 42L);
 
         when(userRepository.findByEmailIgnoreCase("user@soundwave.com")).thenReturn(Optional.of(user));
@@ -52,6 +53,7 @@ class UserAccountPublicServiceTest {
     @Test
     void getUserIdByEmail_WhenNotFound_ShouldThrowException() {
         when(userRepository.findByEmailIgnoreCase("unknown@soundwave.com")).thenReturn(Optional.empty());
+        when(staffRepository.findByEmailIgnoreCase("unknown@soundwave.com")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
                 userAccountPublicService.getUserIdByEmail("unknown@soundwave.com"));
@@ -60,6 +62,7 @@ class UserAccountPublicServiceTest {
     @Test
     void findUserIdByEmail_WhenNotFound_ShouldReturnEmptyOptional() {
         when(userRepository.findByEmailIgnoreCase("unknown@soundwave.com")).thenReturn(Optional.empty());
+        when(staffRepository.findByEmailIgnoreCase("unknown@soundwave.com")).thenReturn(Optional.empty());
 
         Optional<Long> userId = userAccountPublicService.findUserIdByEmail("unknown@soundwave.com");
 
@@ -68,8 +71,7 @@ class UserAccountPublicServiceTest {
 
     @Test
     void getUserSummaryById_ShouldReturnProfileInfo() {
-        Role role = new Role("LISTENER", "Listener", "Standard listener");
-        AppUser user = new AppUser(role, "artist@soundwave.com", "hash");
+        User user = new User("artist@soundwave.com", "hash");
         ReflectionTestUtils.setField(user, "id", 10L);
 
         UserProfile profile = new UserProfile(user, "artist_handle", "Artist Display");
@@ -90,6 +92,7 @@ class UserAccountPublicServiceTest {
     @Test
     void findUserSummaryById_WhenUserDoesNotExist_ShouldReturnEmptyOptional() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
+        when(staffRepository.findById(999L)).thenReturn(Optional.empty());
 
         Optional<UserProfileSummary> summary = userAccountPublicService.findUserSummaryById(999L);
 
@@ -99,11 +102,10 @@ class UserAccountPublicServiceTest {
 
     @Test
     void getUserSummariesByIds_ShouldBatchFetchProfilesWithoutNPlusOne() {
-        Role role = new Role("LISTENER", "Listener", "Standard");
-        AppUser user1 = new AppUser(role, "u1@soundwave.com", "h1");
+        User user1 = new User("u1@soundwave.com", "h1");
         ReflectionTestUtils.setField(user1, "id", 1L);
 
-        AppUser user2 = new AppUser(role, "u2@soundwave.com", "h2");
+        User user2 = new User("u2@soundwave.com", "h2");
         ReflectionTestUtils.setField(user2, "id", 2L);
 
         UserProfile profile1 = new UserProfile(user1, "u1_handle", "User One");

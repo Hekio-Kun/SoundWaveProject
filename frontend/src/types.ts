@@ -121,7 +121,7 @@ export type CurrentUser = {
   username?: string;
   displayName: string;
   avatarUrl: string | null;
-  role: "LISTENER" | "STAFF" | "ADMIN";
+  role: "LISTENER" | "STAFF" | "MODERATOR" | "ADMIN";
   bio?: string;
   dateOfBirth?: string;
   countryCode?: string;
@@ -186,4 +186,3 @@ export type NotificationItem = {
   createdAt: string;
   navigationUrl?: string | null;
 };
-

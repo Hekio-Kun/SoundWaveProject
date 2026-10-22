@@ -6,15 +6,13 @@ import groupone.soundwaveproject.authentication.dto.request.RegisterRequest;
 import groupone.soundwaveproject.authentication.dto.request.LoginRequest;
 import groupone.soundwaveproject.authentication.dto.request.ResetPasswordRequest;
 import groupone.soundwaveproject.authentication.entity.AccountUnlockToken;
-import groupone.soundwaveproject.authentication.entity.AppUser;
 import groupone.soundwaveproject.authentication.entity.PasswordResetToken;
 import groupone.soundwaveproject.authentication.entity.RefreshToken;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserProfile;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.exception.AccountBannedException;
 import groupone.soundwaveproject.authentication.exception.EmailNotVerifiedException;
-import groupone.soundwaveproject.authentication.exception.EmailAlreadyExistsException;
 import groupone.soundwaveproject.authentication.mapper.AuthenticationMapper;
 import groupone.soundwaveproject.authentication.repository.*;
 import groupone.soundwaveproject.security.JwtService;
@@ -35,8 +33,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthenticationServiceTest {
-    @Mock private AppUserRepository userRepository;
-    @Mock private RoleRepository roleRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private StaffRepository staffRepository;
     @Mock private UserProfileRepository profileRepository;
     @Mock private EmailVerificationTokenRepository verificationTokenRepository;
     @Mock private PasswordResetTokenRepository resetTokenRepository;
@@ -54,7 +52,7 @@ class AuthenticationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuthenticationService(userRepository, roleRepository, profileRepository,
+        service = new AuthenticationService(userRepository, staffRepository, profileRepository,
                 verificationTokenRepository, resetTokenRepository, refreshTokenRepository,
                 unlockTokenRepository, passwordEncoder, otpGenerator, tokenHashService,
                 mailService, jwtService, mapper, authRateLimiterService);
@@ -67,12 +65,10 @@ class AuthenticationServiceTest {
     @Test
     void registerCreatesPendingAccountAndSendsOtp() {
         RegisterRequest request = new RegisterRequest("Le Hai", "User@Example.com", "Password1", "Password1");
-        Role role = mock(Role.class);
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(authRateLimiterService.tryAcquireRegistrationAttempt("user@example.com", "127.0.0.1")).thenReturn(true);
-        when(roleRepository.findByCode("LISTENER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode("Password1")).thenReturn("password-hash");
-        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(profileRepository.existsByUsername("user")).thenReturn(false);
         when(otpGenerator.generate()).thenReturn("123456");
         when(passwordEncoder.encode("123456")).thenReturn("otp-hash");
@@ -87,7 +83,7 @@ class AuthenticationServiceTest {
     @Test
     void registerWithExistingVerifiedEmailSendsNoticeWithoutRevealingAccount() {
         RegisterRequest request = new RegisterRequest("Le Hai", "user@example.com", "Password1", "Password1");
-        AppUser existingUser = mock(AppUser.class);
+        User existingUser = mock(User.class);
         when(existingUser.getEmail()).thenReturn("user@example.com");
         when(existingUser.getEmailVerifiedAt()).thenReturn(java.time.LocalDateTime.now());
         when(authRateLimiterService.tryAcquireRegistrationAttempt("user@example.com", "127.0.0.1")).thenReturn(true);
@@ -103,7 +99,7 @@ class AuthenticationServiceTest {
     @Test
     void registerWithExistingUnverifiedEmailResendsOtpWithoutRevealingAccount() {
         RegisterRequest request = new RegisterRequest("Le Hai", "user@example.com", "Password1", "Password1");
-        AppUser existingUser = mock(AppUser.class);
+        User existingUser = mock(User.class);
         when(existingUser.getId()).thenReturn(10L);
         when(existingUser.getEmail()).thenReturn("user@example.com");
         when(existingUser.getEmailVerifiedAt()).thenReturn(null);
@@ -138,7 +134,8 @@ class AuthenticationServiceTest {
 
     @Test
     void loginRejectsAccountWithUnverifiedEmailUsingSpecificCode() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
+        when(staffRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(user.getPasswordHash()).thenReturn("password-hash");
         when(passwordEncoder.matches("Password1", "password-hash")).thenReturn(true);
@@ -153,7 +150,8 @@ class AuthenticationServiceTest {
 
     @Test
     void loginRejectsBannedAccountUsingSpecificCode() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
+        when(staffRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(user.getPasswordHash()).thenReturn("password-hash");
         when(passwordEncoder.matches("Password1", "password-hash")).thenReturn(true);
@@ -168,7 +166,7 @@ class AuthenticationServiceTest {
 
     @Test
     void resetPasswordRevokesAllActiveRefreshTokens() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         PasswordResetToken resetToken = mock(PasswordResetToken.class);
         ResetPasswordRequest request = new ResetPasswordRequest(
                 "user@example.com", "123456", "NewPassword1", "NewPassword1");
@@ -192,7 +190,7 @@ class AuthenticationServiceTest {
     @Test
     void logoutRevokesTheCurrentSession() {
         RefreshToken session = mock(RefreshToken.class);
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(10L);
         when(session.getUser()).thenReturn(user);
         when(tokenHashService.hash("raw-refresh-token")).thenReturn("refresh-token-hash");
@@ -205,7 +203,8 @@ class AuthenticationServiceTest {
 
     @Test
     void loginRejectsWhenAccountIsLockedOut() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
+        when(staffRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(user.isTemporarilyLocked(any())).thenReturn(true);
         when(user.getLockedUntil()).thenReturn(java.time.LocalDateTime.now().plusMinutes(5));
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
@@ -220,7 +219,7 @@ class AuthenticationServiceTest {
     @Test
     void refreshRevokesAllActiveSessionsWhenTokenReuseDetectedOutsideGracePeriod() {
         RefreshToken stored = mock(RefreshToken.class);
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(99L);
         when(stored.getUser()).thenReturn(user);
         when(stored.getRevokedAt()).thenReturn(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(60));
@@ -237,7 +236,7 @@ class AuthenticationServiceTest {
     void refreshReturnsActiveSessionWhenCalledWithinGracePeriod() {
         RefreshToken stored = mock(RefreshToken.class);
         RefreshToken activeSession = mock(RefreshToken.class);
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(99L);
         when(user.getEmail()).thenReturn("user@example.com");
         when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
@@ -260,7 +259,8 @@ class AuthenticationServiceTest {
 
     @Test
     void loginRejectsWithWarningMessageWhenFewAttemptsRemaining() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
+        when(staffRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(user.isTemporarilyLocked(any())).thenReturn(false);
         when(user.getPasswordHash()).thenReturn("hash");
@@ -278,7 +278,8 @@ class AuthenticationServiceTest {
 
     @Test
     void loginLocksAccountInDbWhenReachingMaxFailedAttempts() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
+        when(staffRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(user.isTemporarilyLocked(any())).thenReturn(false);
         when(user.getPasswordHash()).thenReturn("hash");
@@ -296,7 +297,7 @@ class AuthenticationServiceTest {
 
     @Test
     void requestUnlockSendsOtpWhenAccountIsLocked() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(10L);
         when(user.getEmail()).thenReturn("user@example.com");
         when(user.getStatus()).thenReturn(UserStatus.TEMPORARILY_LOCKED);
@@ -317,7 +318,7 @@ class AuthenticationServiceTest {
 
     @Test
     void unlockAccountRestoresActiveStatusAndResetsLockout() {
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         AccountUnlockToken token = mock(AccountUnlockToken.class);
         when(user.getId()).thenReturn(10L);
         when(user.getEmail()).thenReturn("user@example.com");

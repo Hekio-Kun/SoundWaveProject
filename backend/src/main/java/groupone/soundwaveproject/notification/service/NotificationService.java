@@ -1,7 +1,9 @@
 package groupone.soundwaveproject.notification.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.notification.dto.response.NotificationResponse;
 import groupone.soundwaveproject.notification.dto.response.UnreadCountResponse;
@@ -15,9 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Service xử lý toàn bộ nghiệp vụ Thông báo người dùng (UC-17: View My Notification).
+ * Service xử lý toàn bộ nghiệp vụ Thông báo người dùng và nhân viên (UC-17: View My Notification).
  */
 @Service
 @RequiredArgsConstructor
@@ -26,25 +29,39 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
-    private final AppUserRepository userRepository;
+    private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
 
     /**
-     * Lấy danh sách thông báo gần đây nhất của người dùng hiện tại (UC-17 Phase 2).
+     * Lấy danh sách thông báo gần đây nhất của người dùng hoặc nhân viên hiện tại (UC-17 Phase 2).
      */
     @Transactional(readOnly = true)
-    public List<NotificationResponse> getMyNotifications(String userEmail) {
-        AppUser user = getUserByEmail(userEmail);
+    public List<NotificationResponse> getMyNotifications(String email) {
+        Optional<Staff> staffOpt = staffRepository.findByEmailIgnoreCase(email);
+        if (staffOpt.isPresent()) {
+            return notificationRepository.findTop30ByStaffIdOrderByCreatedAtDesc(staffOpt.get().getId()).stream()
+                    .map(notificationMapper::toResponse)
+                    .toList();
+        }
+
+        User user = getUserByEmail(email);
         return notificationRepository.findTop30ByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(notificationMapper::toResponse)
                 .toList();
     }
 
     /**
-     * Lấy số lượng thông báo chưa đọc của người dùng để hiển thị huy hiệu trên Chuông (UC-17 Phase 1).
+     * Lấy số lượng thông báo chưa đọc của người dùng hoặc nhân viên để hiển thị huy hiệu trên Chuông (UC-17 Phase 1).
      */
     @Transactional(readOnly = true)
-    public UnreadCountResponse getMyUnreadCount(String userEmail) {
-        AppUser user = getUserByEmail(userEmail);
+    public UnreadCountResponse getMyUnreadCount(String email) {
+        Optional<Staff> staffOpt = staffRepository.findByEmailIgnoreCase(email);
+        if (staffOpt.isPresent()) {
+            long count = notificationRepository.countByStaffIdAndIsReadFalse(staffOpt.get().getId());
+            return new UnreadCountResponse(count);
+        }
+
+        User user = getUserByEmail(email);
         long unreadCount = notificationRepository.countByUserIdAndIsReadFalse(user.getId());
         return new UnreadCountResponse(unreadCount);
     }
@@ -53,10 +70,18 @@ public class NotificationService {
      * Đánh dấu một thông báo cụ thể là đã đọc khi người dùng click xem (UC-17 Phase 4).
      */
     @Transactional
-    public NotificationResponse markMyNotificationAsRead(Long notificationId, String userEmail) {
-        AppUser user = getUserByEmail(userEmail);
-        Notification notification = notificationRepository.findByIdAndUserId(notificationId, user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found with id: " + notificationId));
+    public NotificationResponse markMyNotificationAsRead(Long notificationId, String email) {
+        Optional<Staff> staffOpt = staffRepository.findByEmailIgnoreCase(email);
+        Notification notification;
+
+        if (staffOpt.isPresent()) {
+            notification = notificationRepository.findByIdAndStaffId(notificationId, staffOpt.get().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found with id: " + notificationId));
+        } else {
+            User user = getUserByEmail(email);
+            notification = notificationRepository.findByIdAndUserId(notificationId, user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_NOT_FOUND", "Notification not found with id: " + notificationId));
+        }
 
         if (!notification.isRead()) {
             notification.markAsRead();
@@ -67,16 +92,21 @@ public class NotificationService {
     }
 
     /**
-     * Đánh dấu toàn bộ thông báo của người dùng là đã đọc (UC-17 Phase 4).
+     * Đánh dấu toàn bộ thông báo của người dùng hoặc nhân viên là đã đọc (UC-17 Phase 4).
      */
     @Transactional
-    public void markAllMyNotificationsAsRead(String userEmail) {
-        AppUser user = getUserByEmail(userEmail);
-        notificationRepository.markAllAsReadByUserId(user.getId());
+    public void markAllMyNotificationsAsRead(String email) {
+        Optional<Staff> staffOpt = staffRepository.findByEmailIgnoreCase(email);
+        if (staffOpt.isPresent()) {
+            notificationRepository.markAllAsReadByStaffId(staffOpt.get().getId());
+        } else {
+            User user = getUserByEmail(email);
+            notificationRepository.markAllAsReadByUserId(user.getId());
+        }
     }
 
     /**
-     * Tạo thông báo mới và lưu vào cơ sở dữ liệu (được gọi từ các sự kiện nghiệp vụ kiểm duyệt, tải bài hát).
+     * Tạo thông báo mới cho User và lưu vào cơ sở dữ liệu.
      */
     @Transactional
     public Notification createNotification(
@@ -104,7 +134,36 @@ public class NotificationService {
         return saved;
     }
 
-    private AppUser getUserByEmail(String email) {
+    /**
+     * Tạo thông báo mới cho Staff và lưu vào cơ sở dữ liệu.
+     */
+    @Transactional
+    public Notification createStaffNotification(
+            Long recipientStaffId,
+            Long actorId,
+            NotificationType type,
+            String title,
+            String message,
+            String referenceType,
+            String referenceId
+    ) {
+        Notification notification = Notification.builder()
+                .staffId(recipientStaffId)
+                .actorId(actorId)
+                .type(type)
+                .title(title)
+                .message(message)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .isRead(false)
+                .build();
+
+        Notification saved = notificationRepository.save(notification);
+        log.info("Created notification id={} type={} for staff={}", saved.getId(), type, recipientStaffId);
+        return saved;
+    }
+
+    private User getUserByEmail(String email) {
         return userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User not found with email: " + email));
     }

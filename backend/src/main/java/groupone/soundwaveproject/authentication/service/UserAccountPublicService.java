@@ -2,9 +2,11 @@ package groupone.soundwaveproject.authentication.service;
 
 import lombok.RequiredArgsConstructor;
 import groupone.soundwaveproject.authentication.dto.response.UserProfileSummary;
-import groupone.soundwaveproject.authentication.entity.AppUser;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserProfile;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserAccountPublicService {
-    private final AppUserRepository userRepository;
+    private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
     private final UserProfileRepository userProfileRepository;
 
     /**
@@ -41,7 +44,9 @@ public class UserAccountPublicService {
      */
     @Transactional(readOnly = true)
     public Optional<Long> findUserIdByEmail(String email) {
-        return userRepository.findByEmailIgnoreCase(email).map(AppUser::getId);
+        Optional<Long> userId = userRepository.findByEmailIgnoreCase(email).map(User::getId);
+        if (userId.isPresent()) return userId;
+        return staffRepository.findByEmailIgnoreCase(email).map(Staff::getId);
     }
 
     /**
@@ -58,7 +63,11 @@ public class UserAccountPublicService {
      */
     @Transactional(readOnly = true)
     public Optional<UserProfileSummary> findUserSummaryByEmail(String email) {
-        return userRepository.findByEmailIgnoreCase(email).map(this::buildUserSummary);
+        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email);
+        if (userOpt.isPresent()) {
+            return Optional.of(buildUserSummary(userOpt.get()));
+        }
+        return staffRepository.findByEmailIgnoreCase(email).map(this::buildStaffSummary);
     }
 
     /**
@@ -75,7 +84,11 @@ public class UserAccountPublicService {
      */
     @Transactional(readOnly = true)
     public Optional<UserProfileSummary> findUserSummaryById(Long userId) {
-        return userRepository.findById(userId).map(this::buildUserSummary);
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isPresent()) {
+            return Optional.of(buildUserSummary(userOpt.get()));
+        }
+        return staffRepository.findById(userId).map(this::buildStaffSummary);
     }
 
     /**
@@ -87,12 +100,12 @@ public class UserAccountPublicService {
             return Collections.emptyMap();
         }
 
-        List<AppUser> users = userRepository.findAllById(userIds);
+        List<User> users = userRepository.findAllById(userIds);
         Map<Long, UserProfile> profileMap = userProfileRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(UserProfile::getUserId, p -> p, (a, b) -> a));
 
         Map<Long, UserProfileSummary> result = new HashMap<>();
-        for (AppUser user : users) {
+        for (User user : users) {
             UserProfile profile = profileMap.get(user.getId());
             String displayName = profile != null ? profile.getDisplayName() : user.getEmail();
             String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
@@ -101,13 +114,25 @@ public class UserAccountPublicService {
                     user.getEmail(),
                     displayName,
                     avatarUrl,
-                    user.getRole().getCode()
+                    "LISTENER"
             ));
         }
+
+        // Với các ID chưa tìm thấy trong users, tìm tiếp trong staffs
+        List<Long> remainingIds = userIds.stream()
+                .filter(id -> !result.containsKey(id))
+                .toList();
+        if (!remainingIds.isEmpty()) {
+            List<Staff> staffs = staffRepository.findAllById(remainingIds);
+            for (Staff staff : staffs) {
+                result.put(staff.getId(), buildStaffSummary(staff));
+            }
+        }
+
         return result;
     }
 
-    private UserProfileSummary buildUserSummary(AppUser user) {
+    private UserProfileSummary buildUserSummary(User user) {
         Optional<UserProfile> profile = userProfileRepository.findByUserId(user.getId());
         String displayName = profile.map(UserProfile::getDisplayName).orElse(user.getEmail());
         String avatarUrl = profile.map(UserProfile::getAvatarUrl).orElse(null);
@@ -116,7 +141,17 @@ public class UserAccountPublicService {
                 user.getEmail(),
                 displayName,
                 avatarUrl,
-                user.getRole().getCode()
+                "LISTENER"
+        );
+    }
+
+    private UserProfileSummary buildStaffSummary(Staff staff) {
+        return new UserProfileSummary(
+                staff.getId(),
+                staff.getEmail(),
+                staff.getFullName(),
+                staff.getAvatarUrl(),
+                staff.getRole() != null ? staff.getRole().getCode() : "STAFF"
         );
     }
 }

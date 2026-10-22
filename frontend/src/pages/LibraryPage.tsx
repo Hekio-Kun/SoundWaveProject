@@ -29,7 +29,7 @@ export function historyItemToTrack(item: ListeningHistoryItem): LandingTrack {
     playCount: 0,
     creator: {
       userId: 0,
-      displayName: item.artistName || "Unknown Artist",
+      displayName: item.artistName || "Unknown Creator",
       avatarUrl: null,
     },
   };
@@ -550,7 +550,7 @@ export function LibraryPage({
                   >
                     <span style={{ textAlign: "center" }}>#</span>
                     <span />
-                    <span>Track & Artist</span>
+                    <span>Track & Creator</span>
                     <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <ClockIcon width={12} height={12} /> Played Time
                     </span>

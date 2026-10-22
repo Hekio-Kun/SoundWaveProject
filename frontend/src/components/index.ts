@@ -29,7 +29,6 @@ export * from "./player/QueueDrawer";
 export * from "./common/MediaUploadField";
 export * from "./common/MusicCards";
 export * from "./common/SortDropdown";
-export * from "./common/LandingPage";
 export * from "./common/LyricSyncTab";
 
 // Moderation

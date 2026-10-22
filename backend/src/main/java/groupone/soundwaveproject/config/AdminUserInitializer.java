@@ -2,12 +2,10 @@ package groupone.soundwaveproject.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
-import groupone.soundwaveproject.authentication.entity.UserProfile;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
-import groupone.soundwaveproject.authentication.repository.RoleRepository;
-import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.StaffRole;
+import groupone.soundwaveproject.authentication.repository.StaffRoleRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -16,21 +14,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Locale;
 
 /**
- * Tự động khởi tạo vai trò và tài khoản hệ thống mặc định khi hệ thống khởi động.
+ * Tự động khởi tạo vai trò và tài khoản nhân viên mặc định (Admin, Staff) khi hệ thống khởi động.
  */
 @Slf4j
 @Component
 @Order(1)
 @RequiredArgsConstructor
 public class AdminUserInitializer implements ApplicationRunner {
-    private final RoleRepository roleRepository;
-    private final AppUserRepository userRepository;
-    private final UserProfileRepository profileRepository;
+    private final StaffRoleRepository staffRoleRepository;
+    private final StaffRepository staffRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.admin.auto-create:true}")
@@ -41,9 +36,6 @@ public class AdminUserInitializer implements ApplicationRunner {
 
     @Value("${app.admin.password:Admin@123456}")
     private String adminPassword;
-
-    @Value("${app.admin.username:admin}")
-    private String adminUsername;
 
     @Value("${app.admin.display-name:System Administrator}")
     private String adminDisplayName;
@@ -57,65 +49,51 @@ public class AdminUserInitializer implements ApplicationRunner {
     @Value("${app.staff.password:Admin@123456}")
     private String staffPassword;
 
-    @Value("${app.staff.username:staff}")
-    private String staffUsername;
-
-    @Value("${app.staff.display-name:Moderation Staff}")
+    @Value("${app.staff.display-name:Content Moderator}")
     private String staffDisplayName;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        initRoles();
+        initStaffRoles();
         if (adminAutoCreate) {
-            initSystemAccount("ADMIN", adminEmail, adminPassword, adminUsername, adminDisplayName);
+            initStaffAccount("ADMIN", adminEmail, adminPassword, adminDisplayName);
         }
         if (staffAutoCreate) {
-            initSystemAccount("STAFF", staffEmail, staffPassword, staffUsername, staffDisplayName);
+            initStaffAccount("STAFF", staffEmail, staffPassword, staffDisplayName);
         }
     }
 
-    private void initRoles() {
-        createRoleIfAbsent("LISTENER", "Listener", "Standard SoundWave listener account");
-        createRoleIfAbsent("STAFF", "Staff", "Content moderation account");
-        createRoleIfAbsent("ADMIN", "Administrator", "System administration account");
+    private void initStaffRoles() {
+        createStaffRoleIfAbsent("ADMIN", "Administrator", "Quản trị viên toàn quyền hệ thống SoundWave");
+        createStaffRoleIfAbsent("STAFF", "Staff", "Nhân viên vận hành và kiểm duyệt nội dung SoundWave");
     }
 
-    private void createRoleIfAbsent(String code, String name, String description) {
-        if (roleRepository.findByCode(code).isEmpty()) {
-            roleRepository.save(new Role(code, name, description));
-            log.info("Initialized default system role: {}", code);
+    private void createStaffRoleIfAbsent(String code, String name, String description) {
+        if (staffRoleRepository.findByCode(code).isEmpty()) {
+            staffRoleRepository.save(new StaffRole(code, name, description));
+            log.info("Initialized default staff role: {}", code);
         }
     }
 
-    private void initSystemAccount(
+    private void initStaffAccount(
             String roleCode,
             String email,
             String password,
-            String configuredUsername,
             String displayName) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
-        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            log.info("{} account already exists with email: {}", roleCode, normalizedEmail);
+        if (staffRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            log.info("Staff {} account already exists with email: {}", roleCode, normalizedEmail);
             return;
         }
 
-        Role role = roleRepository.findByCode(roleCode)
-                .orElseThrow(() -> new IllegalStateException(roleCode + " role could not be found"));
+        StaffRole role = staffRoleRepository.findByCode(roleCode)
+                .orElseThrow(() -> new IllegalStateException(roleCode + " staff role could not be found"));
 
-        AppUser systemUser = new AppUser(role, normalizedEmail, passwordEncoder.encode(password));
-        systemUser.verifyEmail(LocalDateTime.now(ZoneOffset.UTC));
-        AppUser savedUser = userRepository.save(systemUser);
+        Staff staff = new Staff(role, normalizedEmail, passwordEncoder.encode(password), displayName.trim(), null);
+        staffRepository.save(staff);
 
-        String username = configuredUsername.trim().toLowerCase(Locale.ROOT);
-        if (profileRepository.existsByUsername(username)) {
-            username = username + "_" + savedUser.getId();
-        }
-
-        UserProfile profile = new UserProfile(savedUser, username, displayName.trim());
-        profileRepository.save(profile);
-
-        log.info("Successfully created default {} account (Email: {}, Username: {})",
-                roleCode, normalizedEmail, username);
+        log.info("Successfully created default {} staff account (Email: {}, Name: {})",
+                roleCode, normalizedEmail, displayName);
     }
 }

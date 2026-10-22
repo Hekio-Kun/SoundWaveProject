@@ -44,13 +44,13 @@ function formatDuration(ms?: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function studioTrackToLandingTrack(st: StudioTrack, artistName: string): LandingTrack {
+function studioTrackToLandingTrack(st: StudioTrack, creatorName: string): LandingTrack {
   return {
     id: st.id,
     title: st.title,
     creator: {
       userId: 0,
-      displayName: artistName,
+      displayName: creatorName,
       avatarUrl: null,
     },
     audioUrl: st.audioUrl,
@@ -188,7 +188,7 @@ export function StudioAlbumDetailPage({
   // Play audio handlers
   const handlePlayTrack = (track: StudioTrack) => {
     if (!onPlayTrack || !album) return;
-    const artist = currentUser?.displayName || "Artist";
+    const artist = currentUser?.displayName || "Creator";
     const landing = studioTrackToLandingTrack(track, artist);
     const landingList = (album.tracks || []).map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landing, landingList, `Album • ${album.title}`, `album-${album.id}`);
@@ -196,7 +196,7 @@ export function StudioAlbumDetailPage({
 
   const handlePlayAll = () => {
     if (!onPlayTrack || !album || !album.tracks || album.tracks.length === 0) return;
-    const artist = currentUser?.displayName || "Artist";
+    const artist = currentUser?.displayName || "Creator";
     const landingList = album.tracks.map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landingList[0], landingList, `Album • ${album.title}`, `album-${album.id}`);
   };

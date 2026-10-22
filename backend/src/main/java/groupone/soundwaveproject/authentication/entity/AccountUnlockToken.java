@@ -19,7 +19,7 @@ public class AccountUnlockToken {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
-    private AppUser user;
+    private User user;
 
     @Column(name = "token_hash", nullable = false, length = 255)
     private String tokenHash;
@@ -33,7 +33,7 @@ public class AccountUnlockToken {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public AccountUnlockToken(AppUser user, String tokenHash, LocalDateTime expiresAt) {
+    public AccountUnlockToken(User user, String tokenHash, LocalDateTime expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;

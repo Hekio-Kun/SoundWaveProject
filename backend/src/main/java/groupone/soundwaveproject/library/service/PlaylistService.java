@@ -1,12 +1,12 @@
 package groupone.soundwaveproject.library.service;
 
 import groupone.soundwaveproject.authentication.dto.response.UserProfileSummary;
-import groupone.soundwaveproject.authentication.entity.AppUser;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.exception.AccountBannedException;
 import groupone.soundwaveproject.authentication.exception.AccountUnavailableException;
 import groupone.soundwaveproject.authentication.exception.AuthenticationException;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.authentication.service.UserAccountPublicService;
 import groupone.soundwaveproject.catalog.dto.response.TrackResponse;
 import groupone.soundwaveproject.catalog.entity.Track;
@@ -48,7 +48,7 @@ public class PlaylistService {
     private final PlaylistRepository playlistRepository;
     private final PlaylistTrackRepository playlistTrackRepository;
     private final TrackRepository trackRepository;
-    private final AppUserRepository appUserRepository;
+    private final UserRepository userRepository;
     private final UserAccountPublicService userAccountPublicService;
     private final CloudMediaService cloudMediaService;
 
@@ -57,10 +57,19 @@ public class PlaylistService {
 
     /**
      * Lấy danh sách toàn bộ Playlist thuộc quyền sở hữu của người dùng hiện tại (Sequence: View).
+     * Nếu tài khoản là Staff/Admin (không thuộc bảng users), trả về danh sách rỗng an toàn.
      */
     @Transactional(readOnly = true)
     public List<PlaylistResponse> getMyPlaylists(String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        if (currentUserEmail == null || currentUserEmail.isBlank()) {
+            return List.of();
+        }
+        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(currentUserEmail.trim().toLowerCase(Locale.ROOT))
+                .filter(u -> u.getDeletedAt() == null);
+        if (userOpt.isEmpty()) {
+            return List.of();
+        }
+        User user = userOpt.get();
         List<Playlist> playlists = playlistRepository.findByCreatedByUserIdOrderByCreatedAtDesc(user.getId());
         return playlists.stream()
                 .map(p -> mapToPlaylistResponse(p, false))
@@ -69,7 +78,6 @@ public class PlaylistService {
 
     /**
      * Lấy danh sách Playlist công khai (Public Playlists).
-     * Toàn bộ playlist do người dùng tạo đều mặc định và bắt buộc là Private, chỉ tài khoản tạo mới được xem & nghe.
      */
     @Transactional(readOnly = true)
     public List<PlaylistResponse> getPublicPlaylists() {
@@ -84,14 +92,13 @@ public class PlaylistService {
         Playlist playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
-        AppUser currentUser = null;
+        User currentUser = null;
         if (currentUserEmail != null && !currentUserEmail.isBlank()) {
-            currentUser = appUserRepository.findByEmailIgnoreCase(currentUserEmail.trim().toLowerCase(Locale.ROOT))
+            currentUser = userRepository.findByEmailIgnoreCase(currentUserEmail.trim().toLowerCase(Locale.ROOT))
                     .filter(u -> u.getDeletedAt() == null)
                     .orElse(null);
         }
 
-        // Kiểm tra quyền riêng tư: Playlist chỉ chủ sở hữu (người tạo) mới được xem và nghe
         if (currentUser == null || !currentUser.getId().equals(playlist.getCreatedByUserId())) {
             throw new ForbiddenOperationException("FORBIDDEN", "You do not have permission to view this private playlist.");
         }
@@ -101,11 +108,10 @@ public class PlaylistService {
 
     /**
      * Tạo Playlist mới (Sequence: Create).
-     * Mặc định và bắt buộc là Private (chỉ tài khoản tạo mới được xem và nghe).
      */
     @Transactional
     public PlaylistResponse createPlaylist(PlaylistRequest request, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
 
         String trimmedTitle = request.title().trim();
         if (trimmedTitle.isBlank()) {
@@ -140,7 +146,7 @@ public class PlaylistService {
      */
     @Transactional
     public PlaylistResponse updatePlaylist(Long id, PlaylistRequest request, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Playlist playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
@@ -161,7 +167,6 @@ public class PlaylistService {
             playlist.setDescription(request.description().trim());
         }
 
-        // Bắt buộc duy trì playlist ở trạng thái Private
         playlist.setPrivate(true);
         playlist.setVisibility("PRIVATE");
 
@@ -181,16 +186,13 @@ public class PlaylistService {
      */
     @Transactional
     public void deletePlaylist(Long id, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Playlist playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
         validateOwnership(playlist, user);
 
-        // 1. Xóa toàn bộ liên kết bài hát trong playlist_tracks
         playlistTrackRepository.deleteByPlaylist_Id(id);
-
-        // 2. Xóa bản ghi Playlist
         playlistRepository.delete(playlist);
         log.info("Playlist ID {} deleted by user ID {}", id, user.getId());
     }
@@ -199,7 +201,7 @@ public class PlaylistService {
      * Upload ảnh bìa playlist lên Cloud Media Storage (Cloudinary).
      */
     public String uploadCover(MultipartFile file, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         StoredMediaResponse media = cloudMediaService.uploadPlaylistCover(file, user.getId());
         return media.secureUrl();
     }
@@ -209,7 +211,7 @@ public class PlaylistService {
      */
     @Transactional
     public PlaylistResponse addTrackToPlaylist(Long playlistId, Long trackId, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
@@ -238,7 +240,7 @@ public class PlaylistService {
      */
     @Transactional
     public PlaylistResponse removeTrackFromPlaylist(Long playlistId, Long trackId, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
@@ -246,7 +248,6 @@ public class PlaylistService {
 
         playlistTrackRepository.deleteByPlaylist_IdAndTrack_Id(playlistId, trackId);
 
-        // Chuẩn hóa lại thứ tự các bài hát còn lại
         List<PlaylistTrack> remaining = playlistTrackRepository.findByPlaylist_IdOrderByPositionAsc(playlistId);
         int pos = 1;
         for (PlaylistTrack pt : remaining) {
@@ -269,7 +270,7 @@ public class PlaylistService {
      */
     @Transactional
     public PlaylistResponse reorderPlaylistTracks(Long playlistId, ReorderPlaylistTracksRequest request, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new ResourceNotFoundException("PLAYLIST_NOT_FOUND", "Playlist not found."));
 
@@ -281,7 +282,6 @@ public class PlaylistService {
             Map<Long, PlaylistTrack> trackMap = new HashMap<>();
             tracks.forEach(pt -> trackMap.put(pt.getTrack().getId(), pt));
 
-            // Shift to temporary positions first to avoid UQ_playlist_tracks_position violation
             for (int i = 0; i < tracks.size(); i++) {
                 PlaylistTrack pt = tracks.get(i);
                 pt.setPosition(1000000 + i + 1);
@@ -316,15 +316,12 @@ public class PlaylistService {
                     int currentPos = current.getPosition();
                     int targetPos = target.getPosition();
 
-                    // Step 1: Move current to temporary position to avoid duplicate key collision
                     current.setPosition(1000000 + currentPos);
                     playlistTrackRepository.saveAndFlush(current);
 
-                    // Step 2: Set target to current's old position
                     target.setPosition(currentPos);
                     playlistTrackRepository.saveAndFlush(target);
 
-                    // Step 3: Set current to target's old position
                     current.setPosition(targetPos);
                     playlistTrackRepository.saveAndFlush(current);
                 }
@@ -337,17 +334,17 @@ public class PlaylistService {
         return mapToPlaylistResponse(playlist, true);
     }
 
-    private void validateOwnership(Playlist playlist, AppUser user) {
+    private void validateOwnership(Playlist playlist, User user) {
         if (!playlist.getCreatedByUserId().equals(user.getId())) {
             throw new ForbiddenOperationException("FORBIDDEN", "You do not have permission to modify this playlist.");
         }
     }
 
-    private AppUser getAuthenticatedUser(String email) {
+    private User getAuthenticatedUser(String email) {
         if (email == null || email.isBlank()) {
             throw new AuthenticationException("UNAUTHORIZED", "Authentication required.");
         }
-        AppUser user = appUserRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
+        User user = userRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
                 .filter(u -> u.getDeletedAt() == null)
                 .orElseThrow(() -> new AuthenticationException("USER_NOT_FOUND", "Account not found."));
 

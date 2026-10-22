@@ -24,6 +24,15 @@ function formatDuration(ms?: number): string {
 export function AlbumDetailModal({ open, onClose, album, onEdit, onDelete }: Props) {
   useModalScrollLock(open);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const [fullAlbum, setFullAlbum] = useState<StudioAlbum | null>(null);
   const [loading, setLoading] = useState(false);
 

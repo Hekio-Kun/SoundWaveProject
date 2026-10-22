@@ -324,7 +324,7 @@ export function ManageAlbumTracksModal({
           <div className="auth-v2-error" role="alert" style={{ margin: 0 }}>
             <span><AlertIcon width={16} height={16} /></span>
             <div><small>{errorMessage}</small></div>
-            <button className="icon-button" onClick={() => setErrorMessage(null)} style={{ marginLeft: "auto" }}>
+            <button type="button" className="icon-button" onClick={() => setErrorMessage(null)} style={{ marginLeft: "auto" }} aria-label="Dismiss error">
               <CloseIcon width={14} height={14} />
             </button>
           </div>

@@ -1,7 +1,6 @@
 package groupone.soundwaveproject.security;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.User;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,12 +11,10 @@ import static org.mockito.Mockito.when;
 class JwtServiceTest {
     @Test
     void accessTokenContainsItsSessionId() {
-        AppUser user = mock(AppUser.class);
-        Role role = mock(Role.class);
+        User user = mock(User.class);
         when(user.getId()).thenReturn(7L);
         when(user.getEmail()).thenReturn("user@example.com");
-        when(user.getRole()).thenReturn(role);
-        when(role.getCode()).thenReturn("LISTENER");
+
         JwtService jwtService = new JwtService(
                 "soundwave-test-secret-must-have-at-least-thirty-two-bytes", 15);
 
@@ -36,4 +33,3 @@ class JwtServiceTest {
         assertEquals(7L, payload.userId());
     }
 }
-

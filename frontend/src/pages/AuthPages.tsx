@@ -245,10 +245,23 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     setUnlockSuccess("");
     setSubmitting(true);
     try {
-      const session = await authApi.login(email.trim(), password, rememberMe);
+      const session = await authApi.login(email.trim(), password, rememberMe, "LISTENER");
+
+      // Strict role enforcement: Staff and Admin accounts must not log in through the Listener portal
+      if (session.user.role === "ADMIN" || session.user.role === "STAFF" || session.user.role === "MODERATOR") {
+        try {
+          await authApi.logout();
+        } catch {
+          // Ignore transient session cleanup errors
+        }
+        setApiErrorCode("INVALID_CREDENTIALS");
+        setApiError("Email or password is incorrect.");
+        return;
+      }
+
       onLoginSuccess(session, rememberMe);
     } catch (error) {
-      setApiError(getAuthErrorMessage(error, "Login failed. Please try again."));
+      setApiError(getAuthErrorMessage(error, "Email or password is incorrect."));
       setApiErrorCode(error instanceof AuthApiError ? error.code ?? "" : "");
     } finally {
       setSubmitting(false);
@@ -487,6 +500,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
       </form>
 
       <p className="auth-v2-switch">Do not have an account? <button onClick={() => onNavigate("/register")}>Register</button></p>
+      <p className="auth-v2-switch" style={{ marginTop: "0.5rem", fontSize: "0.82rem", opacity: 0.85 }}>Are you a SoundWave staff or admin? <button onClick={() => onNavigate("/staff/login")}>Go to Staff Portal</button></p>
     </AuthExperience>
   );
 }

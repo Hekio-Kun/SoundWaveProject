@@ -10,9 +10,9 @@ import java.time.ZoneOffset;
 
 @Getter
 @Entity
-@Table(name = "roles")
+@Table(name = "staff_roles")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Role {
+public class StaffRole {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Short id;
@@ -29,7 +29,7 @@ public class Role {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public Role(String code, String name, String description) {
+    public StaffRole(String code, String name, String description) {
         this.code = code;
         this.name = name;
         this.description = description;
@@ -43,4 +43,3 @@ public class Role {
         }
     }
 }
-

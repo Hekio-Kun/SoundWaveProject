@@ -23,7 +23,7 @@ type Props = {
 export function DashboardLayout({ children, activeRoute, user, onNavigate, onLogout }: Props) {
   const isStaff = user?.role === "STAFF";
   const isAdmin = user?.role === "ADMIN";
-  const roleLabel = isAdmin ? "Administrator" : isStaff ? "Content Moderator" : "Staff";
+  const roleLabel = isAdmin ? "Administrator" : "Staff";
 
   // Mobile Drawer State
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);

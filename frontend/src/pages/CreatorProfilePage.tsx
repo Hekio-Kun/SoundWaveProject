@@ -272,7 +272,7 @@ export function CreatorProfilePage({ creatorId, currentTrack, playing, onPlayTra
 
                   <div
                     className="row-thumbnail"
-                    onClick={() => onPlayTrack(track, creatorTracks, `Artist • ${profile.displayName}`)}
+                    onClick={() => onPlayTrack(track, creatorTracks, `Creator • ${profile.displayName}`)}
                   >
                     <img
                       src={track.coverUrl ?? covers.dawn}
@@ -286,7 +286,7 @@ export function CreatorProfilePage({ creatorId, currentTrack, playing, onPlayTra
                       aria-label={`Play ${track.title}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onPlayTrack(track, creatorTracks, `Artist • ${profile.displayName}`);
+                        onPlayTrack(track, creatorTracks, `Creator • ${profile.displayName}`);
                       }}
                     >
                       {isPlayingThis ? <PauseIcon width={14} height={14} /> : <PlayIcon width={14} height={14} />}
