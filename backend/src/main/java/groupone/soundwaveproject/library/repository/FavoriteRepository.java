@@ -23,4 +23,15 @@ public interface FavoriteRepository extends JpaRepository<Favorite, FavoriteId> 
     List<Favorite> findByIdUserIdOrderByCreatedAtDesc(Long userId);
 
     long countByIdUserId(Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT f FROM Favorite f " +
+            "JOIN FETCH f.track t " +
+            "LEFT JOIN FETCH t.album " +
+            "LEFT JOIN FETCH t.genre " +
+            "WHERE f.id.userId = :userId AND t.publicationStatus = :status " +
+            "ORDER BY f.createdAt DESC")
+    List<Favorite> findFavoritesByUserIdAndPublicationStatus(
+            @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("status") groupone.soundwaveproject.catalog.entity.TrackPublicationStatus status
+    );
 }

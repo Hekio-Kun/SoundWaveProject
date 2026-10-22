@@ -135,4 +135,52 @@ class FavoriteServiceTest {
 
         verify(favoriteRepository, never()).save(any(Favorite.class));
     }
+
+    @Test
+    @DisplayName("Lấy danh sách bài hát yêu thích thành công kèm thông tin nghệ sĩ và album")
+    void getFavoriteTracks_Success() {
+        when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
+
+        Favorite favorite = Favorite.builder()
+                .id(new FavoriteId(USER_ID, TRACK_ID))
+                .track(publishedTrack)
+                .createdAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))
+                .build();
+
+        when(favoriteRepository.findFavoritesByUserIdAndPublicationStatus(USER_ID, TrackPublicationStatus.PUBLISHED))
+                .thenReturn(java.util.List.of(favorite));
+
+        groupone.soundwaveproject.authentication.dto.response.UserProfileSummary creatorProfile =
+                new groupone.soundwaveproject.authentication.dto.response.UserProfileSummary(
+                        20L, "artist@soundwave.com", "Ocean Artist", "https://cdn.soundwave.com/avatar.jpg", "LISTENER"
+                );
+
+        when(userAccountPublicService.getUserSummariesByIds(java.util.Set.of(20L)))
+                .thenReturn(java.util.Map.of(20L, creatorProfile));
+
+        java.util.List<groupone.soundwaveproject.catalog.dto.response.TrackResponse> results =
+                favoriteService.getFavoriteTracks(USER_EMAIL);
+
+        org.assertj.core.api.Assertions.assertThat(results).hasSize(1);
+        groupone.soundwaveproject.catalog.dto.response.TrackResponse response = results.get(0);
+        org.assertj.core.api.Assertions.assertThat(response.id()).isEqualTo(TRACK_ID);
+        org.assertj.core.api.Assertions.assertThat(response.title()).isEqualTo("Ocean Waves");
+        org.assertj.core.api.Assertions.assertThat(response.publicationStatus()).isEqualTo("PUBLISHED");
+        org.assertj.core.api.Assertions.assertThat(response.creator().displayName()).isEqualTo("Ocean Artist");
+        org.assertj.core.api.Assertions.assertThat(response.creator().avatarUrl()).isEqualTo("https://cdn.soundwave.com/avatar.jpg");
+    }
+
+    @Test
+    @DisplayName("Trả về danh sách rỗng khi người dùng chưa like bài hát nào")
+    void getFavoriteTracks_Empty() {
+        when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
+        when(favoriteRepository.findFavoritesByUserIdAndPublicationStatus(USER_ID, TrackPublicationStatus.PUBLISHED))
+                .thenReturn(java.util.Collections.emptyList());
+
+        java.util.List<groupone.soundwaveproject.catalog.dto.response.TrackResponse> results =
+                favoriteService.getFavoriteTracks(USER_EMAIL);
+
+        org.assertj.core.api.Assertions.assertThat(results).isEmpty();
+        verify(userAccountPublicService, never()).getUserSummariesByIds(any());
+    }
 }

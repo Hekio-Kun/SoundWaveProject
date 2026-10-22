@@ -58,4 +58,80 @@ public class FavoriteService {
         favoriteRepository.save(favorite);
         log.info("Successfully added track ID {} to favorites for user ID {}", trackId, userId);
     }
+
+    /**
+     * Lấy danh sách toàn bộ bài hát yêu thích của người dùng hiện tại (UC-14.2: View Favorite Tracks List).
+     * Chỉ trả về các bài hát đang có trạng thái PUBLISHED (tuân thủ BR-09).
+     *
+     * @param currentUserEmail Email của người dùng hiện tại từ Security Context
+     * @return Danh sách bài hát yêu thích dạng TrackResponse
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<groupone.soundwaveproject.catalog.dto.response.TrackResponse> getFavoriteTracks(String currentUserEmail) {
+        Long userId = userAccountPublicService.getUserIdByEmail(currentUserEmail);
+
+        java.util.List<Favorite> favorites = favoriteRepository.findFavoritesByUserIdAndPublicationStatus(
+                userId, TrackPublicationStatus.PUBLISHED
+        );
+
+        if (favorites.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        // Gom các uploaderUserId để resolve profile theo batch, triệt tiêu lỗi N+1
+        java.util.Set<Long> creatorIds = favorites.stream()
+                .map(Favorite::getTrack)
+                .filter(java.util.Objects::nonNull)
+                .map(Track::getUploaderUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Map<Long, groupone.soundwaveproject.authentication.dto.response.UserProfileSummary> creatorSummaries =
+                userAccountPublicService.getUserSummariesByIds(creatorIds);
+
+        return favorites.stream()
+                .map(Favorite::getTrack)
+                .filter(java.util.Objects::nonNull)
+                .map(track -> mapToTrackResponse(track, creatorSummaries))
+                .toList();
+    }
+
+    private groupone.soundwaveproject.catalog.dto.response.TrackResponse mapToTrackResponse(
+            Track track,
+            java.util.Map<Long, groupone.soundwaveproject.authentication.dto.response.UserProfileSummary> creatorSummaries
+    ) {
+        groupone.soundwaveproject.catalog.dto.response.TrackResponse.TrackAlbumSummary albumSummary = null;
+        if (track.getAlbum() != null) {
+            albumSummary = new groupone.soundwaveproject.catalog.dto.response.TrackResponse.TrackAlbumSummary(
+                    track.getAlbum().getId(),
+                    track.getAlbum().getTitle()
+            );
+        }
+
+        groupone.soundwaveproject.authentication.dto.response.UserProfileSummary creator =
+                creatorSummaries.get(track.getUploaderUserId());
+        groupone.soundwaveproject.catalog.dto.response.TrackResponse.TrackCreatorSummary creatorSummary =
+                new groupone.soundwaveproject.catalog.dto.response.TrackResponse.TrackCreatorSummary(
+                        track.getUploaderUserId(),
+                        creator != null && creator.displayName() != null ? creator.displayName() : "Unknown Artist",
+                        creator != null ? creator.avatarUrl() : null
+                );
+
+        return new groupone.soundwaveproject.catalog.dto.response.TrackResponse(
+                track.getId(),
+                track.getTitle(),
+                track.getSlug(),
+                track.getDescription(),
+                track.getAudioUrl(),
+                track.getCoverUrl(),
+                track.getDurationMs(),
+                track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L,
+                track.getPublicationStatus().name(),
+                track.getGenre() != null ? track.getGenre().getSlug() : null,
+                track.getGenre() != null ? track.getGenre().getName() : null,
+                albumSummary,
+                creatorSummary,
+                track.getCreatedAt()
+        );
+    }
 }
