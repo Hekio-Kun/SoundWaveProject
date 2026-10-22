@@ -8,7 +8,6 @@ import groupone.soundwaveproject.catalog.dto.response.AdminGenreResponse;
 import groupone.soundwaveproject.catalog.dto.response.GenreResponse;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
-import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,16 +33,13 @@ class GenreServiceTest {
     private GenreRepository genreRepository;
 
     @Mock
-    private TrackRepository trackRepository;
-
-    @Mock
     private UserAccountPublicService userAccountPublicService;
 
     private GenreService genreService;
 
     @BeforeEach
     void setUp() {
-        genreService = new GenreService(genreRepository, trackRepository, userAccountPublicService);
+        genreService = new GenreService(genreRepository, userAccountPublicService);
     }
 
     @Test
@@ -159,34 +155,5 @@ class GenreServiceTest {
 
         assertFalse(response.active());
         verify(genreRepository).save(genre);
-        verify(genreRepository, never()).delete(any());
-    }
-
-    @Test
-    void deleteGenre_whenGenreInUseByTracks_throwsConflictOperationException() {
-        Genre genre = new Genre("Metal", "metal", null, 1L);
-        ReflectionTestUtils.setField(genre, "id", 5L);
-        when(genreRepository.findById(5L)).thenReturn(Optional.of(genre));
-        when(trackRepository.existsByGenre_Id(5L)).thenReturn(true);
-
-        ConflictOperationException ex = assertThrows(
-                ConflictOperationException.class,
-                () -> genreService.deleteGenre(5L)
-        );
-
-        assertEquals("GENRE_IN_USE", ex.getCode());
-        verify(genreRepository, never()).delete(any());
-    }
-
-    @Test
-    void deleteGenre_whenGenreNotInUse_deletesSuccessfully() {
-        Genre genre = new Genre("Electronic", "electronic", null, 1L);
-        ReflectionTestUtils.setField(genre, "id", 6L);
-        when(genreRepository.findById(6L)).thenReturn(Optional.of(genre));
-        when(trackRepository.existsByGenre_Id(6L)).thenReturn(false);
-
-        genreService.deleteGenre(6L);
-
-        verify(genreRepository).delete(genre);
     }
 }

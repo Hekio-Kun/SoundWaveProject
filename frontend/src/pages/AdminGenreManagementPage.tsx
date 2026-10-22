@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { adminGenreApi, type AdminGenre, type AdminGenrePage, type GenreInput } from "../api/adminGenres";
 import { ApiError } from "../api/client";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { GenreFormModal } from "../components/modals/GenreFormModal";
-import { AlertIcon, CheckIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
+import { AlertIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
@@ -22,8 +23,15 @@ export function AdminGenreManagementPage() {
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingGenre, setEditingGenre] = useState<AdminGenre | null>(null);
-  const [deactivatingGenre, setDeactivatingGenre] = useState<AdminGenre | null>(null);
-  const [toast, setToast] = useState("");
+  const [statusTarget, setStatusTarget] = useState<{
+    genre: AdminGenre;
+    nextActive: boolean;
+  } | null>(null);
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    type: "success" | "error" | "info" | "warning";
+  }>({ open: false, message: "", type: "success" });
   const requestIdRef = useRef(0);
 
   const loadGenres = async () => {
@@ -59,12 +67,6 @@ export function AdminGenreManagementPage() {
     void loadGenres();
   }, [search, statusFilter, page]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 3500);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
   const openCreateForm = () => {
     setEditingGenre(null);
     setFormOpen(true);
@@ -80,10 +82,18 @@ export function AdminGenreManagementPage() {
     try {
       if (editingGenre) {
         await adminGenreApi.updateGenre(editingGenre.id, input);
-        setToast("Genre updated successfully.");
+        setNotification({
+          open: true,
+          type: "success",
+          message: "Genre updated successfully.",
+        });
       } else {
         await adminGenreApi.createGenre(input);
-        setToast("Genre created successfully.");
+        setNotification({
+          open: true,
+          type: "success",
+          message: "Genre created successfully.",
+        });
       }
       setFormOpen(false);
       setEditingGenre(null);
@@ -93,30 +103,25 @@ export function AdminGenreManagementPage() {
     }
   };
 
-  const handleDeactivate = async () => {
-    if (!deactivatingGenre) return;
+  const handleConfirmStatus = async () => {
+    if (!statusTarget) return;
     setIsSaving(true);
     try {
-      await adminGenreApi.updateGenreStatus(deactivatingGenre.id, false);
-      setToast(`${deactivatingGenre.name} was deactivated.`);
-      setDeactivatingGenre(null);
+      await adminGenreApi.updateGenreStatus(statusTarget.genre.id, statusTarget.nextActive);
+      const actionText = statusTarget.nextActive ? "activated" : "deactivated";
+      setNotification({
+        open: true,
+        type: "success",
+        message: `“${statusTarget.genre.name}” has been ${actionText} successfully.`,
+      });
+      setStatusTarget(null);
       await loadGenres();
     } catch (statusError) {
-      setError(statusError instanceof ApiError ? statusError.message : "Unable to deactivate this genre.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleReactivate = async (genre: AdminGenre) => {
-    setIsSaving(true);
-    setError("");
-    try {
-      await adminGenreApi.updateGenreStatus(genre.id, true);
-      setToast(`${genre.name} is active again.`);
-      await loadGenres();
-    } catch (statusError) {
-      setError(statusError instanceof ApiError ? statusError.message : "Unable to activate this genre.");
+      setNotification({
+        open: true,
+        type: "error",
+        message: statusError instanceof ApiError ? statusError.message : "Unable to update genre status. Please try again.",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -134,8 +139,6 @@ export function AdminGenreManagementPage() {
         </div>
         <button type="button" className="button button-primary" onClick={openCreateForm}><PlusIcon width={17} height={17} />Create genre</button>
       </header>
-
-      {toast ? <div className="admin-genre-toast" role="status" aria-live="polite"><CheckIcon width={17} height={17} />{toast}</div> : null}
 
       <section className="ops-panel admin-genre-panel">
         <div className="admin-genre-toolbar">
@@ -168,7 +171,16 @@ export function AdminGenreManagementPage() {
                     <td><p className="admin-genre-description">{genre.description || "No description provided."}</p></td>
                     <td><span className={`ops-status ${genre.active ? "is-success" : "is-neutral"}`}><i />{genre.active ? "Active" : "Inactive"}</span></td>
                     <td>{formatDate(genre.updatedAt)}</td>
-                    <td><div className="admin-genre-actions"><button type="button" className="button button-secondary button-small" onClick={() => openEditForm(genre)}><EditIcon width={14} height={14} />Edit</button>{genre.active ? <button type="button" className="admin-genre-status-button is-danger" onClick={() => setDeactivatingGenre(genre)}>Deactivate</button> : <button type="button" className="admin-genre-status-button" disabled={isSaving} onClick={() => void handleReactivate(genre)}>Reactivate</button>}</div></td>
+                    <td>
+                      <div className="admin-genre-actions">
+                        <button type="button" className="button button-secondary button-small" onClick={() => openEditForm(genre)}><EditIcon width={14} height={14} />Edit</button>
+                        {genre.active ? (
+                          <button type="button" className="admin-genre-status-button is-danger" onClick={() => setStatusTarget({ genre, nextActive: false })}>Deactivate</button>
+                        ) : (
+                          <button type="button" className="admin-genre-status-button" disabled={isSaving} onClick={() => setStatusTarget({ genre, nextActive: true })}>Activate</button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -179,7 +191,32 @@ export function AdminGenreManagementPage() {
       </section>
 
       <GenreFormModal open={formOpen} genre={editingGenre} submitting={isSaving} onClose={() => { if (!isSaving) setFormOpen(false); }} onSubmit={handleSave} />
-      <DeleteConfirmationModal open={Boolean(deactivatingGenre)} title="Deactivate genre?" message={deactivatingGenre ? `“${deactivatingGenre.name}” will no longer appear in public filters or new uploads. Existing tracks will keep their genre.` : ""} confirmLabel="Deactivate" onConfirm={() => void handleDeactivate()} onCancel={() => setDeactivatingGenre(null)} submitting={isSaving} />
+
+      <DeleteConfirmationModal
+        open={Boolean(statusTarget)}
+        variant={statusTarget?.nextActive ? "primary" : "danger"}
+        title={statusTarget?.nextActive ? "Activate genre?" : "Deactivate genre?"}
+        message={
+          statusTarget?.nextActive
+            ? `“${statusTarget.genre.name}” will become visible in public catalog filters and available for track assignment.`
+            : statusTarget
+              ? `“${statusTarget.genre.name}” will no longer appear in public filters or new track uploads. Existing tracks will keep their genre.`
+              : ""
+        }
+        confirmLabel={statusTarget?.nextActive ? "Activate" : "Deactivate"}
+        submittingLabel={statusTarget?.nextActive ? "Activating..." : "Deactivating..."}
+        onConfirm={() => void handleConfirmStatus()}
+        onCancel={() => setStatusTarget(null)}
+        submitting={isSaving}
+      />
+
+      <CenterNotificationPopup
+        open={notification.open}
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }
+

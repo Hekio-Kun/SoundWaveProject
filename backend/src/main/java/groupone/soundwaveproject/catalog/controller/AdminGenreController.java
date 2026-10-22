@@ -99,16 +99,4 @@ public class AdminGenreController {
             @Valid @RequestBody UpdateGenreStatusRequest request) {
         return ResponseEntity.ok(genreService.updateActiveState(id, request.active()));
     }
-
-    /**
-     * Xóa một thể loại chưa được liên kết với bất kỳ bài hát nào trong hệ thống (UC-26.2 / BR-23 Delete Genre).
-     *
-     * @param id ID của thể loại cần xóa
-     * @return Phản hồi 204 No Content nếu xóa thành công
-     */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteGenre(@PathVariable Long id) {
-        genreService.deleteGenre(id);
-        return ResponseEntity.noContent().build();
-    }
 }
