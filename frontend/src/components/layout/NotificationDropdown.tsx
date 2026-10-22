@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import {
   AlertIcon,
   BellIcon,
@@ -45,6 +46,7 @@ function formatRelativeTime(dateString: string): string {
 export function NotificationDropdown({
   onNavigate,
 }: NotificationDropdownProps) {
+  const { isAuthenticated, authReady } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -52,24 +54,30 @@ export function NotificationDropdown({
   const [error, setError] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Phase 1: Lấy số lượng thông báo chưa đọc ban đầu và tự động đồng bộ định kỳ
+  // Phase 1: Lấy số lượng thông báo chưa đọc ban đầu và tự động đồng bộ định kỳ khi đã đăng nhập
   const loadUnreadCount = async () => {
+    if (!authReady || !isAuthenticated) return;
     try {
       const count = await fetchUnreadCount();
       setUnreadCount(count);
     } catch {
-      // Bỏ qua lỗi 401 khi chưa đăng nhập
+      // Bỏ qua lỗi khi request thông báo
     }
   };
 
   useEffect(() => {
+    if (!authReady || !isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
     loadUnreadCount();
     const interval = setInterval(loadUnreadCount, 20000); // Poll mỗi 20s để nhận thông báo mới
     return () => clearInterval(interval);
-  }, []);
+  }, [authReady, isAuthenticated]);
 
   // Phase 2: Khi người dùng mở xem danh sách thông báo
   const loadNotificationList = async () => {
+    if (!isAuthenticated) return;
     setIsLoading(true);
     setError(null);
     try {

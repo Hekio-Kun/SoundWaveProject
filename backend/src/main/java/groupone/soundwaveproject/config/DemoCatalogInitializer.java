@@ -2,8 +2,8 @@ package groupone.soundwaveproject.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.entity.User;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DemoCatalogInitializer implements ApplicationRunner {
     private final GenreRepository genreRepository;
     private final TrackRepository trackRepository;
-    private final AppUserRepository userRepository;
+    private final UserRepository userRepository;
 
     @Value("${app.seed.demo-enabled:true}")
     private boolean demoEnabled;
@@ -43,23 +43,21 @@ public class DemoCatalogInitializer implements ApplicationRunner {
             return;
         }
 
-        AppUser adminUser = userRepository.findAll().stream().findFirst().orElse(null);
-        if (adminUser == null) {
-            log.warn("Cannot seed demo catalog because no user exists in app_users yet.");
+        User firstUser = userRepository.findAll().stream().findFirst().orElse(null);
+        if (firstUser == null) {
+            log.warn("Cannot seed demo catalog because no user exists in users table yet.");
             return;
         }
 
         Genre popGenre = genreRepository.findBySlug("pop").orElseGet(() ->
-                genreRepository.save(new Genre("Pop", "pop", "Nhạc Pop thịnh hành", adminUser.getId())));
+                genreRepository.save(new Genre("Pop", "pop", "Nhạc Pop thịnh hành", firstUser.getId())));
         Genre acousticGenre = genreRepository.findBySlug("acoustic").orElseGet(() ->
-                genreRepository.save(new Genre("Acoustic", "acoustic", "Nhạc mộc mạc", adminUser.getId())));
-
-
+                genreRepository.save(new Genre("Acoustic", "acoustic", "Nhạc mộc mạc", firstUser.getId())));
 
         // 3. Bài hát bản nháp (DRAFT - dùng để test quy tắc BR-09 trả về 404)
         if (trackRepository.findAll().stream().noneMatch(t -> "seed-draft-song".equals(t.getSlug()))) {
             Track draftTrack = new Track(
-                    adminUser.getId(),
+                    firstUser.getId(),
                     popGenre,
                     null,
                     "Bản Nháp Chưa Duyệt (Seed)",

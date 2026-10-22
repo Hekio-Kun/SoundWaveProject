@@ -21,7 +21,7 @@ public class UserProfile {
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId
     @JoinColumn(name = "user_id")
-    private AppUser user;
+    private User user;
 
     @Column(nullable = false, unique = true, length = 50)
     private String username;
@@ -50,7 +50,7 @@ public class UserProfile {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public UserProfile(AppUser user, String username, String displayName) {
+    public UserProfile(User user, String username, String displayName) {
         this.user = user;
         this.username = username;
         this.displayName = displayName;

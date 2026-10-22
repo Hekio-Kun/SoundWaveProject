@@ -11,11 +11,11 @@ import groupone.soundwaveproject.authentication.dto.response.AuthResponse;
 import groupone.soundwaveproject.authentication.dto.response.LoginResult;
 import groupone.soundwaveproject.authentication.dto.response.MessageResponse;
 import groupone.soundwaveproject.authentication.entity.AccountUnlockToken;
-import groupone.soundwaveproject.authentication.entity.AppUser;
 import groupone.soundwaveproject.authentication.entity.EmailVerificationToken;
 import groupone.soundwaveproject.authentication.entity.PasswordResetToken;
 import groupone.soundwaveproject.authentication.entity.RefreshToken;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserProfile;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.exception.AccountBannedException;
@@ -27,11 +27,11 @@ import groupone.soundwaveproject.authentication.exception.InvalidOtpException;
 import groupone.soundwaveproject.authentication.exception.InvalidRefreshTokenException;
 import groupone.soundwaveproject.authentication.mapper.AuthenticationMapper;
 import groupone.soundwaveproject.authentication.repository.AccountUnlockTokenRepository;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
 import groupone.soundwaveproject.authentication.repository.EmailVerificationTokenRepository;
 import groupone.soundwaveproject.authentication.repository.PasswordResetTokenRepository;
 import groupone.soundwaveproject.authentication.repository.RefreshTokenRepository;
-import groupone.soundwaveproject.authentication.repository.RoleRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
 import groupone.soundwaveproject.security.JwtService;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,11 +52,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AuthenticationService {
     public static final long REFRESH_GRACE_PERIOD_SECONDS = 15;
-    private static final String DEFAULT_ROLE = "LISTENER";
     private static final String RECOVERY_MESSAGE = "If the account exists, an OTP has been sent to the registered email.";
 
-    private final AppUserRepository userRepository;
-    private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
     private final UserProfileRepository profileRepository;
     private final EmailVerificationTokenRepository verificationTokenRepository;
     private final PasswordResetTokenRepository resetTokenRepository;
@@ -94,16 +93,13 @@ public class AuthenticationService {
             throw new AccountUnavailableException("PASSWORD_MISMATCH", "Password confirmation does not match.");
         }
         // SEC-03: Chống Account Enumeration theo chuẩn OWASP.
-        // Luôn trả về phản hồi đồng nhất để kẻ tấn công không thể dò quét danh sách email tồn tại trong hệ thống.
-        Optional<AppUser> existingUserOpt = userRepository.findByEmailIgnoreCase(email);
+        Optional<User> existingUserOpt = userRepository.findByEmailIgnoreCase(email);
         if (existingUserOpt.isPresent()) {
-            AppUser existing = existingUserOpt.get();
+            User existing = existingUserOpt.get();
             if (existing.getEmailVerifiedAt() != null) {
-                // Tài khoản đã kích hoạt: gửi email cảnh báo bảo mật tới chủ tài khoản
                 mailService.sendAccountAlreadyExistsNotice(existing.getEmail());
                 log.info("Registration attempted for already verified email: {}. Sent security notification email.", email);
             } else {
-                // Tài khoản đã đăng ký nhưng chưa xác thực email: gửi lại mã OTP nếu thỏa mãn cooldown
                 EmailVerificationToken current = verificationTokenRepository
                         .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(existing.getId()).orElse(null);
                 if (isResendAllowed(current == null ? null : current.getCreatedAt())) {
@@ -121,9 +117,7 @@ public class AuthenticationService {
             return new MessageResponse("Registration successful. Enter the OTP sent to your email.");
         }
 
-        Role role = roleRepository.findByCode(DEFAULT_ROLE)
-                .orElseThrow(() -> new IllegalStateException("Default LISTENER role is missing"));
-        AppUser user = userRepository.save(new AppUser(role, email, passwordEncoder.encode(request.password())));
+        User user = userRepository.save(new User(email, passwordEncoder.encode(request.password())));
         String username = createUniqueUsername(email, user.getId());
         profileRepository.save(new UserProfile(user, username, request.displayName().trim()));
         createAndSendVerificationOtp(user, request.displayName().trim());
@@ -135,7 +129,7 @@ public class AuthenticationService {
      */
     @Transactional
     public MessageResponse verifyEmail(EmailOtpRequest request) {
-        AppUser user = findUser(request.email());
+        User user = findUser(request.email());
         if (user.getEmailVerifiedAt() != null) {
             return new MessageResponse("Email is already verified.");
         }
@@ -161,7 +155,7 @@ public class AuthenticationService {
      */
     @Transactional
     public MessageResponse resendVerificationOtp(EmailRequest request) {
-        AppUser user = findUser(request.email());
+        User user = findUser(request.email());
         if (user.getStatus() == UserStatus.BANNED) {
             throw new AccountBannedException();
         }
@@ -189,9 +183,40 @@ public class AuthenticationService {
     @Transactional
     public LoginResult login(LoginRequest request) {
         String email = normalizeEmail(request.email());
-        AppUser user = userRepository.findByEmailIgnoreCase(email).orElse(null);
 
-        // 1. Kiểm tra trạng thái khóa trong DB
+        // 1. Kiểm tra nếu là tài khoản Staff (Admin, Moderator)
+        Optional<Staff> staffOpt = staffRepository.findByEmailIgnoreCase(email);
+        if (staffOpt.isPresent()) {
+            if ("LISTENER".equalsIgnoreCase(request.portal())) {
+                log.warn("Blocked staff login attempt on listener portal: email {}", email);
+                throw new InvalidCredentialsException();
+            }
+            Staff staff = staffOpt.get();
+            if (!passwordEncoder.matches(request.password(), staff.getPasswordHash())) {
+                throw new InvalidCredentialsException();
+            }
+            if ("BANNED".equalsIgnoreCase(staff.getStatus())) {
+                throw new AccountBannedException();
+            }
+            if (!"ACTIVE".equalsIgnoreCase(staff.getStatus())) {
+                throw new AccountUnavailableException("ACCOUNT_UNAVAILABLE", "This staff account is unavailable.");
+            }
+            staff.recordLogin(nowUtc());
+            staffRepository.save(staff);
+            log.info("Staff {} logged in successfully with role {}", staff.getEmail(),
+                    staff.getRole() != null ? staff.getRole().getCode() : "STAFF");
+            return createLoginResult(staff, request.rememberMe());
+        }
+
+        // 2. Tài khoản User đại chúng (Listener, Artist)
+        if ("STAFF".equalsIgnoreCase(request.portal())) {
+            log.warn("Blocked listener login attempt on staff portal: email {}", email);
+            throw new AccountUnavailableException("LISTENER_ACCOUNT_NOT_ALLOWED",
+                    "This account has standard listener permissions. Access to the Staff Portal is reserved for Staff and System Administrators.");
+        }
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+
+        // Kiểm tra trạng thái khóa trong DB
         if (user != null) {
             if (user.isTemporarilyLocked(nowUtc())) {
                 long remainingSeconds = ChronoUnit.SECONDS.between(nowUtc(), user.getLockedUntil());
@@ -206,14 +231,14 @@ public class AuthenticationService {
             }
         }
 
-        // 2. Kiểm tra nếu Rate Limiter đang chặn
+        // Kiểm tra nếu Rate Limiter đang chặn
         if (authRateLimiterService.isLoginBlocked(email)) {
             log.warn("Blocked login attempt: email {} is temporarily locked out in RateLimiter", email);
             throw new AccountUnavailableException("LOGIN_LOCKED",
                     "Too many failed login attempts. Your account is temporarily locked for 10 minutes. You can wait or unlock immediately via email.");
         }
 
-        // 3. Kiểm tra thông tin đăng nhập
+        // Kiểm tra thông tin đăng nhập
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             int failed = authRateLimiterService.recordFailedLogin(email);
             int remaining = authRateLimiterService.getRemainingLoginAttempts(email);
@@ -240,7 +265,7 @@ public class AuthenticationService {
         ensureAccountCanLogin(user);
         authRateLimiterService.resetLoginAttempts(email);
         user.recordLogin(nowUtc());
-        log.info("User {} logged in successfully with role {}", user.getEmail(), user.getRole().getCode());
+        log.info("User {} logged in successfully with role LISTENER", user.getEmail());
         return createLoginResult(user, request.rememberMe());
     }
 
@@ -275,7 +300,7 @@ public class AuthenticationService {
      */
     @Transactional
     public MessageResponse unlockAccount(EmailOtpRequest request) {
-        AppUser user = findUser(request.email());
+        User user = findUser(request.email());
         if (user.getStatus() == UserStatus.BANNED) {
             throw new AccountBannedException();
         }
@@ -309,7 +334,7 @@ public class AuthenticationService {
             if ((user.getStatus() == UserStatus.ACTIVE || user.getStatus() == UserStatus.TEMPORARILY_LOCKED)
                     && user.getDeletedAt() == null) {
                 PasswordResetToken current = resetTokenRepository
-                        .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId()).orElse(null);
+                    .findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId()).orElse(null);
                 ensureResendAllowed(current == null ? null : current.getCreatedAt());
                 if (current != null) current.markUsed(nowUtc());
                 String otp = otpGenerator.generate();
@@ -331,7 +356,7 @@ public class AuthenticationService {
         if (!request.newPassword().equals(request.confirmPassword())) {
             throw new AccountUnavailableException("PASSWORD_MISMATCH", "Password confirmation does not match.");
         }
-        AppUser user = findUser(request.email());
+        User user = findUser(request.email());
         if (authRateLimiterService.isOtpBlocked(user.getEmail())) {
             log.warn("Blocked password reset attempt for email {}: maximum failed attempts reached", user.getEmail());
             throw new InvalidOtpException("Too many failed attempts. This OTP code has been deactivated. Please request a new code.");
@@ -361,44 +386,77 @@ public class AuthenticationService {
                 .orElseThrow(InvalidRefreshTokenException::new);
         LocalDateTime now = nowUtc();
 
-        if (stored.getRevokedAt() != null) {
-            long secondsSinceRevocation = ChronoUnit.SECONDS.between(stored.getRevokedAt(), now);
-
-            // SEC-05: Grace Period cho trường hợp nhiều request đồng thời trong React SPA (15s)
-            if (secondsSinceRevocation >= 0 && secondsSinceRevocation <= REFRESH_GRACE_PERIOD_SECONDS) {
-                log.info("Concurrent refresh request within grace period ({}s) for user ID: {}. Returning active session.",
-                        secondsSinceRevocation, stored.getUser().getId());
-                RefreshToken activeSession = refreshTokenRepository
-                        .findFirstByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(stored.getUser().getId(), now)
-                        .orElse(null);
-                if (activeSession != null) {
-                    ensureAccountCanLogin(stored.getUser());
-                    UserProfile profile = profileRepository.findByUserId(stored.getUser().getId()).orElse(null);
-                    String displayName = profile == null ? stored.getUser().getEmail() : profile.getDisplayName();
-                    String avatarUrl = profile == null ? null : profile.getAvatarUrl();
-                    AuthResponse response = new AuthResponse(
-                            jwtService.createAccessToken(stored.getUser(), activeSession.getId()),
-                            "Bearer", jwtService.getAccessTokenSeconds(),
-                            mapper.toUserResponse(stored.getUser(), displayName, avatarUrl));
-                    return new LoginResult(response, rawRefreshToken, refreshTokenDays * 24 * 60 * 60);
+        // 1. Nếu token thuộc về Staff
+        if (stored.getStaff() != null) {
+            Staff staff = stored.getStaff();
+            if (stored.getRevokedAt() != null) {
+                long secondsSinceRevocation = ChronoUnit.SECONDS.between(stored.getRevokedAt(), now);
+                if (secondsSinceRevocation >= 0 && secondsSinceRevocation <= REFRESH_GRACE_PERIOD_SECONDS) {
+                    RefreshToken activeSession = refreshTokenRepository
+                            .findFirstByStaffIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(staff.getId(), now)
+                            .orElse(null);
+                    if (activeSession != null) {
+                        AuthResponse response = new AuthResponse(
+                                jwtService.createAccessToken(staff, activeSession.getId()),
+                                "Bearer", jwtService.getAccessTokenSeconds(),
+                                mapper.toUserResponse(staff));
+                        return new LoginResult(response, rawRefreshToken, refreshTokenDays * 24 * 60 * 60);
+                    }
                 }
+                refreshTokenRepository.revokeAllActiveByStaffId(staff.getId(), now);
+                throw new InvalidRefreshTokenException();
             }
 
-            // SEC-04: Token Reuse Detection (OAuth 2.0 Family Revocation)
-            log.warn("SECURITY ALERT: Refresh token reuse detected for user ID: {} (Email: {}). Revoked {}s ago. Inactivating all active sessions!",
-                    stored.getUser().getId(), stored.getUser().getEmail(), secondsSinceRevocation);
-            refreshTokenRepository.revokeAllActiveByUserId(stored.getUser().getId(), now);
-            throw new InvalidRefreshTokenException();
+            if (stored.getExpiresAt().isBefore(now)) {
+                throw new InvalidRefreshTokenException();
+            }
+
+            stored.revoke(now);
+            return createLoginResult(staff, false);
         }
 
-        if (stored.getExpiresAt().isBefore(now)) {
-            log.warn("Refresh token expired for user ID: {}", stored.getUser().getId());
-            throw new InvalidRefreshTokenException();
+        // 2. Nếu token thuộc về User
+        if (stored.getUser() != null) {
+            User user = stored.getUser();
+            if (stored.getRevokedAt() != null) {
+                long secondsSinceRevocation = ChronoUnit.SECONDS.between(stored.getRevokedAt(), now);
+
+                if (secondsSinceRevocation >= 0 && secondsSinceRevocation <= REFRESH_GRACE_PERIOD_SECONDS) {
+                    log.info("Concurrent refresh request within grace period ({}s) for user ID: {}. Returning active session.",
+                            secondsSinceRevocation, user.getId());
+                    RefreshToken activeSession = refreshTokenRepository
+                            .findFirstByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(user.getId(), now)
+                            .orElse(null);
+                    if (activeSession != null) {
+                        ensureAccountCanLogin(user);
+                        UserProfile profile = profileRepository.findByUserId(user.getId()).orElse(null);
+                        String displayName = profile == null ? user.getEmail() : profile.getDisplayName();
+                        String avatarUrl = profile == null ? null : profile.getAvatarUrl();
+                        AuthResponse response = new AuthResponse(
+                                jwtService.createAccessToken(user, activeSession.getId()),
+                                "Bearer", jwtService.getAccessTokenSeconds(),
+                                mapper.toUserResponse(user, displayName, avatarUrl));
+                        return new LoginResult(response, rawRefreshToken, refreshTokenDays * 24 * 60 * 60);
+                    }
+                }
+
+                log.warn("SECURITY ALERT: Refresh token reuse detected for user ID: {} (Email: {}). Revoked {}s ago. Inactivating all active sessions!",
+                        user.getId(), user.getEmail(), secondsSinceRevocation);
+                refreshTokenRepository.revokeAllActiveByUserId(user.getId(), now);
+                throw new InvalidRefreshTokenException();
+            }
+
+            if (stored.getExpiresAt().isBefore(now)) {
+                log.warn("Refresh token expired for user ID: {}", user.getId());
+                throw new InvalidRefreshTokenException();
+            }
+
+            ensureAccountCanLogin(user);
+            stored.revoke(now);
+            return createLoginResult(user, false);
         }
 
-        ensureAccountCanLogin(stored.getUser());
-        stored.revoke(now);
-        return createLoginResult(stored.getUser(), false);
+        throw new InvalidRefreshTokenException();
     }
 
     /**
@@ -411,12 +469,13 @@ public class AuthenticationService {
                 .filter(token -> token.getRevokedAt() == null)
                 .ifPresent(token -> {
                     token.revoke(nowUtc());
-                    Long userId = token.getUser() == null ? null : token.getUser().getId();
-                    log.info("Session revoked for user ID: {}", userId);
+                    Long id = token.getUser() != null ? token.getUser().getId()
+                            : (token.getStaff() != null ? token.getStaff().getId() : null);
+                    log.info("Session revoked for user/staff ID: {}", id);
                 });
     }
 
-    private LoginResult createLoginResult(AppUser user, boolean rememberMe) {
+    private LoginResult createLoginResult(User user, boolean rememberMe) {
         long days = rememberMe ? rememberRefreshTokenDays : refreshTokenDays;
         String rawRefreshToken = generateRefreshToken();
         RefreshToken session = refreshTokenRepository.save(new RefreshToken(
@@ -430,7 +489,20 @@ public class AuthenticationService {
         return new LoginResult(response, rawRefreshToken, days * 24 * 60 * 60);
     }
 
-    private void createAndSendVerificationOtp(AppUser user, String displayName) {
+    private LoginResult createLoginResult(Staff staff, boolean rememberMe) {
+        long days = rememberMe ? rememberRefreshTokenDays : refreshTokenDays;
+        String rawRefreshToken = generateRefreshToken();
+        RefreshToken session = refreshTokenRepository.save(new RefreshToken(
+                staff, tokenHashService.hash(rawRefreshToken), nowUtc().plusDays(days)));
+        AuthResponse response = new AuthResponse(
+                jwtService.createAccessToken(staff, session.getId()),
+                "Bearer",
+                jwtService.getAccessTokenSeconds(),
+                mapper.toUserResponse(staff));
+        return new LoginResult(response, rawRefreshToken, days * 24 * 60 * 60);
+    }
+
+    private void createAndSendVerificationOtp(User user, String displayName) {
         String otp = otpGenerator.generate();
         verificationTokenRepository.save(new EmailVerificationToken(
                 user, passwordEncoder.encode(otp), nowUtc().plusMinutes(otpExpirationMinutes)));
@@ -453,10 +525,6 @@ public class AuthenticationService {
         }
     }
 
-    private void validateOtp(String otp, String hash, boolean used, boolean expired) {
-        validateOtpWithAttempts(otp, hash, used, expired, "", () -> {});
-    }
-
     private void ensureResendAllowed(LocalDateTime createdAt) {
         if (!isResendAllowed(createdAt)) {
             long remaining = createdAt == null ? otpResendSeconds : Math.max(1, otpResendSeconds - ChronoUnit.SECONDS.between(createdAt, nowUtc()));
@@ -469,7 +537,7 @@ public class AuthenticationService {
         return createdAt == null || ChronoUnit.SECONDS.between(createdAt, nowUtc()) >= otpResendSeconds;
     }
 
-    private void ensureAccountCanLogin(AppUser user) {
+    private void ensureAccountCanLogin(User user) {
         if (user.getStatus() == UserStatus.BANNED) {
             throw new AccountBannedException();
         }
@@ -487,7 +555,7 @@ public class AuthenticationService {
         }
     }
 
-    private AppUser findUser(String email) {
+    private User findUser(String email) {
         return userRepository.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseThrow(() -> new AccountUnavailableException("ACCOUNT_NOT_FOUND", "Account was not found."));
     }
@@ -509,7 +577,7 @@ public class AuthenticationService {
     }
 
     private String normalizeEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private LocalDateTime nowUtc() {

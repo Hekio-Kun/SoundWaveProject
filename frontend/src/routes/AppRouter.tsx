@@ -9,6 +9,7 @@ import { initialStudioTracks } from "../data";
 import { AlbumDetailsPage } from "../pages/AlbumDetailsPage";
 import { CreateAlbumPage } from "../pages/CreateAlbumPage";
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../pages/AuthPages";
+import { StaffLoginPage } from "../pages/StaffLoginPage";
 import { CreatorProfilePage } from "../pages/CreatorProfilePage";
 import { ExplorePage } from "../pages/ExplorePage";
 import { FilteredCatalogPage } from "../pages/FilteredCatalogPage";
@@ -54,14 +55,34 @@ export function AppRouter(): React.ReactElement | null {
   // Điều hướng và bảo vệ tuyến đường theo Role
   useEffect(() => {
     if (!authReady) return;
-    if (!isAuthenticated && pathname.startsWith("/studio")) {
-      window.location.hash = "#/login";
-      return;
+    if (!isAuthenticated) {
+      if (pathname.startsWith("/studio")) {
+        window.location.hash = "#/login";
+        return;
+      }
+      if (
+        (pathname.startsWith("/staff") && pathname !== "/staff/login" && pathname !== "/staff-login") ||
+        pathname.startsWith("/admin")
+      ) {
+        window.location.hash = "#/staff/login";
+        return;
+      }
+    }
+    if (user?.role === "LISTENER") {
+      if (
+        (pathname.startsWith("/staff") && pathname !== "/staff/login" && pathname !== "/staff-login") ||
+        pathname.startsWith("/admin")
+      ) {
+        window.location.hash = "#/";
+        return;
+      }
     }
     if (user?.role === "STAFF") {
       if (
         pathname === "/login" ||
         pathname === "/register" ||
+        pathname === "/staff/login" ||
+        pathname === "/staff-login" ||
         pathname === "/" ||
         pathname === "" ||
         pathname.startsWith("/admin")
@@ -72,6 +93,8 @@ export function AppRouter(): React.ReactElement | null {
       if (
         pathname === "/login" ||
         pathname === "/register" ||
+        pathname === "/staff/login" ||
+        pathname === "/staff-login" ||
         pathname.startsWith("/staff")
       ) {
         window.location.hash = "#/admin/dashboard";
@@ -80,6 +103,9 @@ export function AppRouter(): React.ReactElement | null {
   }, [authReady, isAuthenticated, user, pathname]);
 
   // 1. Marketing / Authentication Routes
+  if (pathname === "/staff/login" || pathname === "/staff-login") {
+    return <StaffLoginPage onLoginSuccess={handleLoginSuccess} onNavigate={navigate} />;
+  }
   if (pathname === "/login") {
     return <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={navigate} />;
   }

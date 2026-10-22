@@ -45,7 +45,7 @@ function AppContent() {
     reorderQueue,
   } = usePlayer();
 
-  const { openCreatePlaylist, toastNotice, showToast } = usePlaylists();
+  const { openCreatePlaylist, toastNotice, toastType, showToast } = usePlaylists();
   const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
 
   const activeTrack = currentTrack || tracks[0];
@@ -143,7 +143,7 @@ function AppContent() {
       {toastNotice ? (
         <CenterNotificationPopup
           open={Boolean(toastNotice)}
-          type="success"
+          type={toastType}
           message={toastNotice}
           onClose={() => showToast("")}
         />

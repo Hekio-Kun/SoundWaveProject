@@ -11,7 +11,8 @@ import type { LandingTrack, Playlist } from "../types";
 export interface PlaylistContextType {
   playlists: Playlist[];
   toastNotice: string;
-  showToast: (msg: string) => void;
+  toastType: "success" | "error" | "warning" | "info";
+  showToast: (msg: string, type?: "success" | "error" | "warning" | "info") => void;
   openCreatePlaylist: () => void;
   openEditPlaylist: (pl: Playlist) => void;
   closePlaylistForm: () => void;
@@ -53,13 +54,15 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [toastNotice, setToastNotice] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error" | "warning" | "info">("success");
   const [playlistFormOpen, setPlaylistFormOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [addTrackPlaylistId, setAddTrackPlaylistId] = useState<number | null>(null);
   const [deletePlaylistId, setDeletePlaylistId] = useState<number | null>(null);
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, type: "success" | "error" | "warning" | "info" = "success") => {
     setToastNotice(msg);
+    setToastType(type);
   }, []);
 
   useEffect(() => {
@@ -71,7 +74,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
-        if (isAuthenticated) {
+        if (isAuthenticated && user?.role === 'LISTENER') {
           const myPlaylists = await playlistApi.getMyPlaylists();
           setPlaylists(myPlaylists ?? []);
         } else {
@@ -90,25 +93,25 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
 
   const openCreatePlaylist = useCallback(() => {
     if (!isAuthenticated) {
-      alert("Please log in to create a playlist.");
+      showToast("Please log in to create a playlist.", "warning");
       window.location.hash = "#/login";
       return;
     }
     setEditingPlaylist(null);
     setPlaylistFormOpen(true);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showToast]);
 
   const openEditPlaylist = useCallback(
     (pl: Playlist) => {
       if (!isAuthenticated) {
-        alert("Please log in to edit the playlist.");
+        showToast("Please log in to edit the playlist.", "warning");
         window.location.hash = "#/login";
         return;
       }
       setEditingPlaylist(pl);
       setPlaylistFormOpen(true);
     },
-    [isAuthenticated]
+    [isAuthenticated, showToast]
   );
 
   const closePlaylistForm = useCallback(() => {
@@ -133,7 +136,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           showToast("Playlist updated successfully!");
           closePlaylistForm();
         } catch (err: any) {
-          alert(err?.message || "Failed to update playlist.");
+          showToast(err?.message || "Failed to update playlist.", "error");
         }
       } else {
         try {
@@ -142,7 +145,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
           showToast("Playlist created successfully!");
           closePlaylistForm();
         } catch (err: any) {
-          alert(err?.message || "Failed to create playlist.");
+          showToast(err?.message || "Failed to create playlist.", "error");
         }
       }
     },
@@ -189,9 +192,9 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         showToast("Track added to playlist.");
       } catch (err: any) {
         if (err?.status === 409 || err?.message?.includes("already in this playlist")) {
-          alert("This track is already in the playlist.");
+          showToast("This track is already in the playlist.", "warning");
         } else {
-          alert(err?.message || "Failed to add track to playlist.");
+          showToast(err?.message || "Failed to add track to playlist.", "error");
         }
       }
     },
@@ -275,6 +278,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       value={{
         playlists,
         toastNotice,
+        toastType,
         showToast,
         openCreatePlaylist,
         openEditPlaylist,

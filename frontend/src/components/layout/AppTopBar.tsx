@@ -55,10 +55,10 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
     window.history.forward();
   };
 
-  const hasDashboardAccess = user?.role === "ADMIN" || user?.role === "STAFF";
+  const hasDashboardAccess = user?.role === "ADMIN" || user?.role === "STAFF" || user?.role === "MODERATOR";
   const workspaceRoute = user?.role === "ADMIN"
     ? "/admin/dashboard"
-    : user?.role === "STAFF"
+    : (user?.role === "STAFF" || user?.role === "MODERATOR")
     ? "/staff/dashboard"
     : "/studio/upload";
   const workspaceLabel = hasDashboardAccess ? "Open dashboard" : "Upload music";
@@ -102,7 +102,7 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
             onClick={() => onNavigate(workspaceRoute)}
             aria-label={workspaceLabel}
           >
-            {user?.role === "ADMIN" ? <ShieldIcon width={16} height={16} /> : user?.role === "STAFF" ? <DashboardIcon width={16} height={16} /> : <UploadIcon width={16} height={16} />}
+            {user?.role === "ADMIN" ? <ShieldIcon width={16} height={16} /> : (user?.role === "STAFF" || user?.role === "MODERATOR") ? <DashboardIcon width={16} height={16} /> : <UploadIcon width={16} height={16} />}
             <span>{workspaceLabel}</span>
           </button>
         )}
@@ -142,7 +142,7 @@ export function AppTopBar({ user, isAuthenticated, onNavigate, onLogout, unreadN
                   <div><span className="user-role-tag">{user.role}</span><p className="dropdown-name">{user.displayName}</p><p className="dropdown-email">{user.email}</p></div>
                 </div>
                 <div className="dropdown-section-label">ACCOUNT</div>
-                {user.role === "ADMIN" || user.role === "STAFF" ? (
+                {user.role === "ADMIN" || user.role === "STAFF" || user.role === "MODERATOR" ? (
                   <button
                     className="dropdown-item"
                     role="menuitem"

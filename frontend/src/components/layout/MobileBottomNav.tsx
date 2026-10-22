@@ -45,7 +45,7 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
         <span>Library</span>
       </button>
 
-      {userRole === "ADMIN" || userRole === "STAFF" ? (
+      {userRole === "ADMIN" || userRole === "STAFF" || userRole === "MODERATOR" ? (
         <button
           className={`mobile-nav-item ${isCurrent(userRole === "ADMIN" ? "/admin" : "/staff") ? "mobile-nav-item--active" : ""}`}
           onClick={() => onNavigate(userRole === "ADMIN" ? "/admin/dashboard" : "/staff/dashboard")}

@@ -1,62 +1,79 @@
 package groupone.soundwaveproject.notification;
 
-import groupone.soundwaveproject.notification.dto.response.NotificationResponse;
-import groupone.soundwaveproject.notification.dto.response.UnreadCountResponse;
-import groupone.soundwaveproject.notification.entity.Notification;
-import groupone.soundwaveproject.notification.entity.NotificationType;
-import groupone.soundwaveproject.notification.repository.NotificationRepository;
+import groupone.soundwaveproject.authentication.dto.request.LoginRequest;
+import groupone.soundwaveproject.authentication.service.AuthenticationService;
+import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.service.ModerationService;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 public class CheckNotificationSchemaTest {
 
     @Autowired
+    private AuthenticationService authenticationService;
+
+    @Autowired
     private NotificationService notificationService;
 
     @Autowired
-    private NotificationRepository notificationRepository;
+    private ModerationService moderationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void testNotificationLifecycle() {
-        Long adminId = jdbcTemplate.queryForObject("SELECT id FROM app_users WHERE email = 'admin@soundwave.com'", Long.class);
-        assertNotNull(adminId);
+    void inspectDatabaseAndLogin() {
+        System.out.println("=== 1. CHECK TABLES IN NEON DB ===");
+        var tables = jdbcTemplate.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name");
+        tables.forEach(System.out::println);
 
-        // 1. Tạo notification
-        Notification notif = notificationService.createNotification(
-                adminId,
-                null,
-                NotificationType.SYSTEM_NOTICE,
-                "Welcome to SoundWave",
-                "Your account is set up.",
-                "USER",
-                String.valueOf(adminId)
-        );
-        assertNotNull(notif.getId());
+        System.out.println("=== 2. CHECK STAFFS ===");
+        var staffs = jdbcTemplate.queryForList("SELECT id, email, status, role_id FROM staffs");
+        staffs.forEach(System.out::println);
 
-        // 2. Kiểm tra get unread count
-        UnreadCountResponse unreadCount = notificationService.getMyUnreadCount("admin@soundwave.com");
-        assertTrue(unreadCount.unreadCount() >= 1);
+        System.out.println("=== 3. CHECK STAFF ROLES ===");
+        var roles = jdbcTemplate.queryForList("SELECT * FROM staff_roles");
+        roles.forEach(System.out::println);
 
-        // 3. Lấy danh sách notifications
-        List<NotificationResponse> list = notificationService.getMyNotifications("admin@soundwave.com");
-        assertFalse(list.isEmpty());
+        System.out.println("=== 4. TEST STAFF LOGIN IN SERVICE ===");
+        try {
+            var res = authenticationService.login(new LoginRequest("staff@soundwave.com", "Staff@123456", false));
+            System.out.println("STAFF LOGIN SUCCESS: " + res.response().user());
+        } catch (Throwable t) {
+            System.out.println("STAFF LOGIN FAILED:");
+            t.printStackTrace(System.out);
+        }
 
-        // 4. Mark as read
-        NotificationResponse read = notificationService.markMyNotificationAsRead(notif.getId(), "admin@soundwave.com");
-        assertTrue(read.isRead());
+        System.out.println("=== 5. TEST NOTIFICATION UNREAD COUNT ===");
+        try {
+            var unread = notificationService.getMyUnreadCount("staff@soundwave.com");
+            System.out.println("UNREAD COUNT SUCCESS: " + unread.unreadCount());
+        } catch (Throwable t) {
+            System.out.println("UNREAD COUNT FAILED:");
+            t.printStackTrace(System.out);
+        }
 
-        // 5. Cleanup
-        notificationRepository.deleteById(notif.getId());
+        System.out.println("=== 6. TEST MODERATION QUEUE STATS ===");
+        try {
+            var stats = moderationService.getQueueStats();
+            System.out.println("QUEUE STATS SUCCESS: " + stats);
+        } catch (Throwable t) {
+            System.out.println("QUEUE STATS FAILED:");
+            t.printStackTrace(System.out);
+        }
+
+        System.out.println("=== 7. TEST MODERATION GET QUEUE PENDING ===");
+        try {
+            var queue = moderationService.getQueue(SubmissionStatus.PENDING, null, PageRequest.of(0, 10));
+            System.out.println("GET QUEUE SUCCESS: totalElements=" + queue.getTotalElements());
+        } catch (Throwable t) {
+            System.out.println("GET QUEUE FAILED:");
+            t.printStackTrace(System.out);
+        }
     }
 }

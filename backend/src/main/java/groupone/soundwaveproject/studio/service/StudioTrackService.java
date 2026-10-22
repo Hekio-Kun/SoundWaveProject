@@ -1,11 +1,13 @@
 package groupone.soundwaveproject.studio.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.exception.AccountBannedException;
 import groupone.soundwaveproject.authentication.exception.AccountUnavailableException;
 import groupone.soundwaveproject.authentication.exception.AuthenticationException;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
@@ -59,7 +61,8 @@ public class StudioTrackService {
     private final TrackSubmissionRepository trackSubmissionRepository;
     private final PlaylistTrackRepository playlistTrackRepository;
     private final ListeningHistoryRepository listeningHistoryRepository;
-    private final AppUserRepository appUserRepository;
+    private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
     private final NotificationService notificationService;
@@ -69,7 +72,7 @@ public class StudioTrackService {
 
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getMyTracks(String currentUserEmail, String statusFilter) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
 
         List<Track> tracks;
         if (statusFilter == null || statusFilter.isBlank() || "ALL".equalsIgnoreCase(statusFilter)) {
@@ -97,7 +100,7 @@ public class StudioTrackService {
 
     @Transactional(readOnly = true)
     public StudioTrackResponse getTrackById(Long id, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -110,7 +113,7 @@ public class StudioTrackService {
 
     @Transactional
     public StudioTrackResponse createDraft(CreateTrackRequest request, MultipartFile audio, MultipartFile cover, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
 
         if (audio == null || audio.isEmpty()) {
             throw new BadRequestOperationException("Audio file is required to upload a track.");
@@ -165,7 +168,7 @@ public class StudioTrackService {
 
     @Transactional
     public StudioTrackResponse updateTrack(Long id, UpdateTrackRequest request, MultipartFile audio, MultipartFile cover, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -252,7 +255,7 @@ public class StudioTrackService {
 
     @Transactional
     public void deleteTrack(Long id, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -281,7 +284,7 @@ public class StudioTrackService {
 
     @Transactional
     public StudioTrackResponse submitForReview(Long id, String submitterNote, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -301,9 +304,9 @@ public class StudioTrackService {
         TrackSubmission savedSubmission = trackSubmissionRepository.save(submission);
 
         try {
-            List<AppUser> staffUsers = appUserRepository.findByRole_CodeIn(List.of("STAFF", "ADMIN"));
-            for (AppUser staff : staffUsers) {
-                notificationService.createNotification(
+            List<Staff> staffMembers = staffRepository.findAll();
+            for (Staff staff : staffMembers) {
+                notificationService.createStaffNotification(
                         staff.getId(),
                         user.getId(),
                         NotificationType.TRACK_SUBMISSION,
@@ -325,7 +328,7 @@ public class StudioTrackService {
 
     @Transactional
     public StudioTrackResponse withdrawSubmission(Long id, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -349,26 +352,9 @@ public class StudioTrackService {
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, null);
     }
 
-    /**
-     * Lấy thông tin chi tiết lý do từ chối kiểm duyệt của bài hát.
-     *
-     * Đáp ứng đặc tả RDS:
-     * - Use Case: UC-20 (View Rejection Reason)
-     * - Actor: Listener (Chủ sở hữu bản nhạc đã tải lên)
-     * - Precondition PRE-1: Người dùng đã đăng nhập (currentUserEmail).
-     * - Precondition PRE-2: Bài hát thuộc quyền sở hữu của người dùng (Uploader).
-     * - Exception EX02: Nếu bài hát không tồn tại hoặc không thuộc quyền sở hữu, từ chối truy cập.
-     * - Normal Flow: Trả về lý do từ chối (BR-20), ghi chú của kiểm duyệt viên và thời gian duyệt.
-     * - Alternative Flow AF01: Trả về toàn bộ lịch sử các đợt nộp duyệt và phản hồi trước đó.
-     * - Business Rule BR-24: Dữ liệu này chỉ đọc (read-only), làm cơ sở để nghệ sĩ chỉnh sửa và nộp lại.
-     *
-     * @param id               ID của bài hát cần xem lý do từ chối
-     * @param currentUserEmail Email của người dùng đang đăng nhập
-     * @return RejectionDetailsResponse chi tiết lý do từ chối và lịch sử
-     */
     @Transactional(readOnly = true)
     public RejectionDetailsResponse getRejectionDetails(Long id, String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
@@ -378,7 +364,7 @@ public class StudioTrackService {
 
     @Transactional(readOnly = true)
     public StudioStatsResponse getStats(String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         long total = trackRepository.countByUploaderUserId(user.getId());
         long draft = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.DRAFT);
         long pending = trackRepository.countByUploaderUserIdAndPublicationStatus(user.getId(), TrackPublicationStatus.PENDING);
@@ -398,18 +384,18 @@ public class StudioTrackService {
 
     @Transactional(readOnly = true)
     public List<AlbumOptionResponse> getMyAlbums(String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         return albumRepository.findByCreatedByUserIdOrderByCreatedAtDesc(user.getId())
                 .stream()
                 .map(studioTrackMapper::toAlbumOption)
                 .toList();
     }
 
-    private AppUser getAuthenticatedUser(String email) {
+    private User getAuthenticatedUser(String email) {
         if (email == null || email.isBlank()) {
             throw new AuthenticationException("UNAUTHORIZED", "Authentication required.");
         }
-        AppUser user = appUserRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
+        User user = userRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
                 .filter(u -> u.getDeletedAt() == null)
                 .orElseThrow(() -> new AuthenticationException("USER_NOT_FOUND", "Account not found."));
 
@@ -436,4 +422,3 @@ public class StudioTrackService {
         return slug.toLowerCase(Locale.ENGLISH);
     }
 }
-

@@ -100,7 +100,7 @@ export type CurrentUser = {
   username?: string;
   displayName: string;
   avatarUrl: string | null;
-  role: "LISTENER" | "STAFF" | "ADMIN";
+  role: "LISTENER" | "STAFF" | "MODERATOR" | "ADMIN";
   bio?: string;
   dateOfBirth?: string;
   countryCode?: string;
@@ -154,3 +154,16 @@ export type ListeningHistoryItem = {
   completed: boolean;
 };
 
+
+
+export type NotificationItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  navigationUrl?: string | null;
+};

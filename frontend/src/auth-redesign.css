@@ -428,3 +428,350 @@
   .auth-v2-verification--verifying .auth-v2-verification-visual::before { animation: none; }
 }
 
+
+/* ==========================================================================
+   SoundWave Staff & Operations Authentication Portal (Light-First & Ocean/Sand)
+   ========================================================================== */
+
+.ops-auth-env-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border: 1px solid rgba(212, 163, 115, 0.45);
+  border-radius: 999px;
+  background: rgba(212, 163, 115, 0.2);
+  color: #f5ead8;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ops-auth-telemetry {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 50px rgba(3, 25, 39, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.ops-telemetry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ops-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #6ee7b7;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.ops-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: ops-pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes ops-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.ops-telemetry-top small {
+  color: #a5f3fc;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ops-telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ops-telemetry-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ops-telemetry-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ops-telemetry-icon--blue {
+  background: rgba(2, 132, 199, 0.3);
+  color: #7dd3fc;
+  border: 1px solid rgba(2, 132, 199, 0.4);
+}
+
+.ops-telemetry-icon--sand {
+  background: rgba(212, 163, 115, 0.3);
+  color: #fde68a;
+  border: 1px solid rgba(212, 163, 115, 0.4);
+}
+
+.ops-telemetry-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ops-telemetry-item strong {
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-telemetry-item small {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 7.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Switch Portal Button on Workspace Header */
+.auth-v2-switch-portal {
+  position: absolute;
+  top: 26px;
+  right: clamp(34px, 4vw, 62px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #0284c7;
+  font-size: 9.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.auth-v2-switch-portal:hover {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  color: #0369a1;
+  transform: translateY(-1px);
+}
+
+/* Listener warning card */
+.ops-listener-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e8dccb;
+  border-left: 4px solid #d4a373;
+  border-radius: 12px;
+  background: #fbf6ef;
+  color: #1c1917;
+  box-shadow: 0 2px 8px rgba(212, 163, 115, 0.08);
+}
+
+.ops-listener-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8c5828;
+}
+
+.ops-listener-alert-header strong {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.ops-listener-alert p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.5;
+  color: #57534e;
+}
+
+.ops-listener-alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.ops-listener-alert-actions .button {
+  padding: 6px 12px;
+  font-size: 9px;
+  border-radius: 8px;
+}
+
+/* Demo Credentials Quick-Fill */
+.ops-demo-card {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 13px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ops-demo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ops-demo-header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #0369a1;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.ops-demo-header small {
+  color: #64748b;
+  font-size: 8px;
+}
+
+.ops-demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ops-demo-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+  position: relative;
+}
+
+.ops-demo-btn:hover {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);
+  transform: translateY(-1px);
+}
+
+.ops-demo-btn.is-active {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.ops-demo-role-badge {
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.ops-demo-btn--admin .ops-demo-role-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.ops-demo-btn--staff .ops-demo-role-badge {
+  background: #f5ead8;
+  color: #8c5828;
+  border: 1px solid #e8dccb;
+}
+
+.ops-demo-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ops-demo-details strong {
+  font-size: 9px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-demo-details small {
+  font-size: 7.5px;
+  color: #64748b;
+}
+
+/* Submit Spinner */
+.ops-submit-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: ops-spin 0.8s linear infinite;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+@keyframes ops-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 680px) {
+  .auth-v2-switch-portal {
+    top: 20px;
+    right: 12px;
+    padding: 6px 10px;
+    font-size: 8.5px;
+  }
+  .ops-demo-grid {
+    grid-template-columns: 1fr;
+  }
+}

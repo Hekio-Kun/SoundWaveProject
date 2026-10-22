@@ -1,9 +1,11 @@
 package groupone.soundwaveproject.moderation.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.StaffRole;
+import groupone.soundwaveproject.authentication.entity.User;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
 import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
@@ -14,7 +16,6 @@ import groupone.soundwaveproject.moderation.dto.request.ApproveTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailResponse;
-import groupone.soundwaveproject.moderation.dto.response.TrackDetailResponse;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateException;
@@ -34,6 +35,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,12 +46,13 @@ class ModerationServiceTest {
     @Mock private AlbumRepository albumRepository;
     @Mock private ModerationMailService mailService;
     @Mock private TrackSubmissionMapper mapper;
-    @Mock private AppUserRepository userRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private StaffRepository staffRepository;
     @Mock private UserProfileRepository profileRepository;
     @Mock private NotificationService notificationService;
 
     private ModerationService moderationService;
-    private AppUser staffUser;
+    private Staff staffUser;
     private Track testTrack;
 
     @BeforeEach
@@ -61,15 +64,13 @@ class ModerationServiceTest {
                 mailService,
                 mapper,
                 userRepository,
+                staffRepository,
                 profileRepository,
                 notificationService
         );
 
-        staffUser = new AppUser(
-                new Role("STAFF", "Staff", "Staff role"),
-                "staff@soundwave.com",
-                "hashedpwd"
-        );
+        StaffRole staffRole = new StaffRole("STAFF", "Staff", "Staff role");
+        staffUser = new Staff(staffRole, "staff@soundwave.com", "hashedpwd", "Moderator Staff");
         ReflectionTestUtils.setField(staffUser, "id", 99L);
 
         Genre genre = Genre.builder().name("Rock").slug("rock").build();
@@ -106,7 +107,7 @@ class ModerationServiceTest {
         ReflectionTestUtils.setField(submission, "id", 1L);
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
-        when(userRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
@@ -154,7 +155,7 @@ class ModerationServiceTest {
         ReflectionTestUtils.setField(submission, "id", 1L);
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
-        when(userRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
@@ -181,7 +182,7 @@ class ModerationServiceTest {
         ReflectionTestUtils.setField(submission, "id", 1L);
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
-        when(userRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
@@ -223,7 +224,6 @@ class ModerationServiceTest {
         verify(mapper).toDetailResponse(
                 eq(submission),
                 eq(testTrack),
-                any(),
                 any(),
                 any(),
                 any(),

@@ -16,7 +16,7 @@ public class ProfileMapper {
                 profile.getAvatarUrl(),
                 profile.getDateOfBirth(),
                 profile.getCountryCode(),
-                profile.getUser().getRole().getCode(),
+                "LISTENER",
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );

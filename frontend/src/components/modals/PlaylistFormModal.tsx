@@ -208,7 +208,7 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="modal-form" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <form onSubmit={handleSubmit} noValidate className="modal-form" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Privacy Notice Banner */}
           <div
             style={{

@@ -41,7 +41,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
               <span>Content moderation</span>
             </button>
           </div>
-        ) : userRole === "STAFF" ? (
+        ) : userRole === "STAFF" || userRole === "MODERATOR" ? (
           <div className="nav-group">
             <span className="nav-group-title">STAFF WORKSPACE</span>
             <button

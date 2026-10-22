@@ -1365,7 +1365,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
           <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Submit Album for Staff review</h3>
-              <button className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>
+              <button type="button" className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting} aria-label="Close dialog">
                 <CloseIcon width={18} height={18} />
               </button>
             </div>

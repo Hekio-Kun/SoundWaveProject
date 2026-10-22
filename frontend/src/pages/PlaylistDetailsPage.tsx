@@ -22,6 +22,7 @@ import {
 } from "../icons";
 import { ManagePlaylistTracksModal } from "../components/modals/ManagePlaylistTracksModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { usePlaylists } from "../context/PlaylistContext";
 import type { CurrentUser, LandingTrack, Playlist } from "../types";
 
 type Props = {
@@ -67,6 +68,7 @@ export function PlaylistDetailsPage({
   audio,
   onPlayingChange,
 }: Props) {
+  const { showToast } = usePlaylists();
   // Fetch detailed playlist from backend (UC-15: Manage Playlist Tracks)
   const [detailPlaylist, setDetailPlaylist] = useState<Playlist | null>(() => {
     return playlists.find((p) => p.id === playlistId) ?? null;
@@ -164,7 +166,7 @@ export function PlaylistDetailsPage({
 
   const handleRemoveTrack = async (plId: number, trId: number) => {
     if (!currentUser) {
-      alert("Please log in to remove tracks from the playlist.");
+      showToast("Please log in to remove tracks from the playlist.", "warning");
       onNavigate("/login");
       return;
     }
@@ -183,14 +185,14 @@ export function PlaylistDetailsPage({
       await onRemoveTrack(plId, trId);
       await fetchPlaylist();
     } catch (err: any) {
-      alert(err.message || "Failed to remove track from playlist.");
+      showToast(err.message || "Failed to remove track from playlist.", "error");
       await fetchPlaylist();
     }
   };
 
   const handleReorderTracks = async (plId: number, trId: number, direction: "up" | "down") => {
     if (!currentUser) {
-      alert("Please log in to reorder tracks in the playlist.");
+      showToast("Please log in to reorder tracks in the playlist.", "warning");
       onNavigate("/login");
       return;
     }
@@ -221,7 +223,7 @@ export function PlaylistDetailsPage({
       await onReorderTracks(plId, trId, direction);
       await fetchPlaylist();
     } catch (err: any) {
-      alert(err.message || "Failed to reorder tracks.");
+      showToast(err.message || "Failed to reorder tracks.", "error");
       await fetchPlaylist();
     }
   };
@@ -398,7 +400,7 @@ export function PlaylistDetailsPage({
                   className="button button-ghost"
                   onClick={() => {
                     if (!currentUser) {
-                      alert("Please log in to edit the playlist.");
+                      showToast("Please log in to edit the playlist.", "warning");
                       onNavigate("/login");
                       return;
                     }
@@ -422,7 +424,7 @@ export function PlaylistDetailsPage({
                   className="button button-ghost"
                   onClick={() => {
                     if (!currentUser) {
-                      alert("Please log in to delete the playlist.");
+                      showToast("Please log in to delete the playlist.", "warning");
                       onNavigate("/login");
                       return;
                     }
@@ -1010,7 +1012,7 @@ export function PlaylistDetailsPage({
               >
                 <div>
                   <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--sw-text-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Artist
+                    Creator
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--sw-text, #1e293b)", marginTop: "2px" }}>
                     {selectedDetailTrack.creator.displayName}

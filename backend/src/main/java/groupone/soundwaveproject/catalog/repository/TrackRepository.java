@@ -39,6 +39,8 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
     List<Track> findByAlbum_IdOrderByTrackNumberAsc(Long albumId);
 
+    List<Track> findByTitleContainingIgnoreCase(String title);
+
     long countByAlbum_Id(Long albumId);
 
     boolean existsByAlbum_IdAndPublicationStatus(Long albumId, TrackPublicationStatus publicationStatus);

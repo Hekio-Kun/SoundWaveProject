@@ -3,7 +3,8 @@ package groupone.soundwaveproject.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import groupone.soundwaveproject.authentication.entity.AppUser;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -24,12 +25,21 @@ public class JwtService {
         this.accessTokenMinutes = accessTokenMinutes;
     }
 
-    public String createAccessToken(AppUser user, Long sessionId) {
+    public String createAccessToken(User user, Long sessionId) {
+        return createAccessToken(user.getId(), user.getEmail(), "LISTENER", sessionId);
+    }
+
+    public String createAccessToken(Staff staff, Long sessionId) {
+        String roleCode = staff.getRole() != null ? staff.getRole().getCode() : "STAFF";
+        return createAccessToken(staff.getId(), staff.getEmail(), roleCode, sessionId);
+    }
+
+    public String createAccessToken(Long userId, String email, String role, Long sessionId) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.getEmail())
-                .claim("uid", user.getId())
-                .claim("role", user.getRole().getCode())
+                .subject(email)
+                .claim("uid", userId)
+                .claim("role", role)
                 .claim("sid", sessionId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessTokenMinutes, ChronoUnit.MINUTES)))

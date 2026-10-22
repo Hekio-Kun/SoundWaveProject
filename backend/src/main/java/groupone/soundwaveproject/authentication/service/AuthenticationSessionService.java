@@ -1,6 +1,8 @@
 package groupone.soundwaveproject.authentication.service;
 
 import lombok.RequiredArgsConstructor;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.repository.RefreshTokenRepository;
 import org.springframework.stereotype.Service;
@@ -15,7 +17,7 @@ public class AuthenticationSessionService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     /**
-     * Kiểm tra phiên được liên kết với access token còn hợp lệ cho đúng tài khoản.
+     * Kiểm tra phiên được liên kết với access token còn hợp lệ cho đúng tài khoản (User hoặc Staff).
      */
     @Transactional(readOnly = true)
     public boolean isSessionActive(Long sessionId, String email) {
@@ -23,11 +25,21 @@ public class AuthenticationSessionService {
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         return refreshTokenRepository.findById(sessionId)
                 .filter(token -> token.isUsable(now))
-                .map(token -> token.getUser())
-                .filter(user -> user.getDeletedAt() == null)
-                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
-                .filter(user -> user.getEmailVerifiedAt() != null)
-                .filter(user -> user.getEmail().equalsIgnoreCase(email))
+                .filter(token -> {
+                    if (token.getStaff() != null) {
+                        Staff staff = token.getStaff();
+                        return "ACTIVE".equalsIgnoreCase(staff.getStatus()) &&
+                                staff.getEmail().equalsIgnoreCase(email);
+                    }
+                    if (token.getUser() != null) {
+                        User user = token.getUser();
+                        return user.getDeletedAt() == null &&
+                                user.getStatus() == UserStatus.ACTIVE &&
+                                user.getEmailVerifiedAt() != null &&
+                                user.getEmail().equalsIgnoreCase(email);
+                    }
+                    return false;
+                })
                 .isPresent();
     }
 }
