@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import type { RejectionDetails } from "../../api/track";
@@ -44,6 +44,16 @@ export function RejectionDetailsModal({
 }: RejectionDetailsModalProps) {
   // Khoá scroll chuột khi mở modal
   useModalScrollLock(isOpen);
+
+  // Close on Escape key (Rule 4.7)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Trạng thái mở rộng xem lịch sử nộp duyệt (AF01)
   const [showHistory, setShowHistory] = useState(false);

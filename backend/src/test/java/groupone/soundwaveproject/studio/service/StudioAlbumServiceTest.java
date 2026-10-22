@@ -1,9 +1,8 @@
 package groupone.soundwaveproject.studio.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
@@ -31,9 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -45,8 +42,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -72,7 +67,7 @@ class StudioAlbumServiceTest {
     private TrackSubmissionRepository trackSubmissionRepository;
 
     @Mock
-    private AppUserRepository appUserRepository;
+    private UserRepository userRepository;
 
     @Mock
     private CloudMediaService cloudMediaService;
@@ -82,7 +77,7 @@ class StudioAlbumServiceTest {
 
     private StudioAlbumService studioAlbumService;
 
-    private AppUser mockUser;
+    private User mockUser;
     private Album mockAlbum;
     private Track mockTrack;
 
@@ -97,14 +92,13 @@ class StudioAlbumServiceTest {
                 playlistTrackRepository,
                 listeningHistoryRepository,
                 trackSubmissionRepository,
-                appUserRepository,
+                userRepository,
                 cloudMediaService,
                 studioAlbumMapper,
                 studioTrackMapper
         );
 
-        Role role = new Role("LISTENER", "Listener", "Listener account");
-        mockUser = new AppUser(role, "creator@soundwave.com", "hashed");
+        mockUser = new User("creator@soundwave.com", "hashed");
         mockUser.verifyEmail(java.time.LocalDateTime.now());
         org.springframework.test.util.ReflectionTestUtils.setField(mockUser, "id", 10L);
 
@@ -135,7 +129,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1: Tạo album mới thành công ở trạng thái DRAFT")
     void createAlbum_Success_WithDraftStatus() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Summer Sunset")).thenReturn(false);
         when(albumRepository.save(any(Album.class))).thenAnswer(invocation -> {
             Album a = invocation.getArgument(0);
@@ -162,7 +156,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1: Tạo album trọn gói kèm upload nhiều bài hát thành công")
     void createAlbum_WithConstituentTracks_Success() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "New Package Album")).thenReturn(false);
         when(albumRepository.save(any(Album.class))).thenAnswer(inv -> {
             Album a = inv.getArgument(0);
@@ -203,7 +197,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1 EX01: Báo lỗi khi tạo album trùng tiêu đề trong cùng tài khoản")
     void createAlbum_DuplicateTitle_ThrowsConflict() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Ocean Waves EP")).thenReturn(true);
 
         CreateAlbumRequest request = CreateAlbumRequest.builder()
@@ -220,7 +214,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1 BR-18/BR-22: Tự động chuyển sang PUBLISHED nếu album chứa bài hát đã duyệt")
     void createAlbum_WithPublishedTrack_AutoSetsPublishedStatus() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Golden Sand")).thenReturn(false);
         when(albumRepository.save(any(Album.class))).thenAnswer(invocation -> {
             Album a = invocation.getArgument(0);
@@ -255,7 +249,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.2: Lấy danh sách album của người dùng thành công")
     void getMyAlbums_Success() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByCreatedByUserIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(mockAlbum));
         when(trackRepository.countByAlbum_Id(mockAlbum.getId())).thenReturn(3L);
 
@@ -269,7 +263,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.2: Xem chi tiết album kèm bài hát")
     void getAlbumById_Success() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
         when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(List.of(mockTrack));
 
@@ -284,7 +278,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.2 EX01: Xem album không tồn tại hoặc không thuộc sở hữu ném lỗi 404")
     void getAlbumById_NotFound_ThrowsException() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(999L, 10L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> studioAlbumService.getAlbumById(999L, mockUser.getEmail()))
@@ -295,7 +289,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.3: Cập nhật album và thay đổi danh sách bài hát")
     void updateAlbum_Success_UpdatesMetadataAndTracks() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(10L, "New Album Title", 100L))
                 .thenReturn(false);
@@ -322,22 +316,19 @@ class StudioAlbumServiceTest {
     @DisplayName("UC-21.4: Xóa album xóa toàn bộ các bài hát cấu thành và xóa ảnh Cloudinary")
     void deleteAlbum_Success_DeletesAllConstituentTracksAndMedia() {
         mockAlbum.setCoverPublicId("album-cover-pub-id");
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
         when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(List.of(mockTrack));
 
         studioAlbumService.deleteAlbum(100L, mockUser.getEmail());
 
-        // Phải xóa các liên kết của track và media của track
         verify(playlistTrackRepository).deleteByTrack_Id(mockTrack.getId());
         verify(listeningHistoryRepository).deleteByTrackId(mockTrack.getId());
         verify(trackSubmissionRepository).deleteByTrackId(mockTrack.getId());
         verify(cloudMediaService).deleteTrackAudioQuietly(mockTrack.getAudioPublicId());
         verify(trackRepository).delete(mockTrack);
 
-        // Phải dọn dẹp ảnh album trên Cloudinary
         verify(cloudMediaService).deleteImageQuietly("album-cover-pub-id");
-        // Xóa entity album
         verify(albumRepository).delete(mockAlbum);
     }
 
@@ -363,7 +354,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1 EX: Báo lỗi khi gửi kiểm duyệt album trống không có bài hát nào")
     void createAlbum_SubmitForReviewWithNoTracks_ThrowsBadRequest() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Empty Album")).thenReturn(false);
 
         CreateAlbumRequest request = CreateAlbumRequest.builder()
@@ -380,7 +371,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.1 EX: Tự động dọn dẹp (compensating rollback) media đã tải lên Cloudinary khi xảy ra lỗi")
     void createAlbum_CloudinaryFailure_RollsBackUploadedMediaAndThrows() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Crash Album")).thenReturn(false);
 
         MockMultipartFile coverFile = new MockMultipartFile("cover", "cover.png", "image/png", new byte[]{1, 2});
@@ -428,7 +419,7 @@ class StudioAlbumServiceTest {
     @Test
     @DisplayName("UC-21.3 EX: Báo lỗi khi cập nhật gán bài hát đã thuộc album khác")
     void updateAlbum_TrackBelongsToAnotherAlbum_ThrowsBadRequest() {
-        when(appUserRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
         when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
         when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(10L, "New Album Title", 100L)).thenReturn(false);
 

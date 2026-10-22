@@ -1,7 +1,7 @@
 package groupone.soundwaveproject.authentication.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
 import groupone.soundwaveproject.authentication.entity.RefreshToken;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ class AuthenticationSessionServiceTest {
     @Test
     void activeSessionAcceptsAccessTokenForItsOwner() {
         RefreshToken session = mock(RefreshToken.class);
-        AppUser user = mock(AppUser.class);
+        User user = mock(User.class);
         when(refreshTokenRepository.findById(12L)).thenReturn(Optional.of(session));
         when(session.isUsable(any(LocalDateTime.class))).thenReturn(true);
         when(session.getUser()).thenReturn(user);

@@ -46,8 +46,8 @@ export const authApi = {
     request<MessageResponse>("/auth/verify-email", { email, otp }),
   resendVerificationOtp: (email: string) =>
     request<MessageResponse>("/auth/verification-otp", { email }),
-  login: async (email: string, password: string, rememberMe: boolean) => {
-    const session = await request<AuthSession>("/auth/login", { email, password, rememberMe });
+  login: async (email: string, password: string, rememberMe: boolean, portal?: "LISTENER" | "STAFF") => {
+    const session = await request<AuthSession>("/auth/login", { email, password, rememberMe, portal });
     setAccessToken(session.accessToken);
     return session;
   },

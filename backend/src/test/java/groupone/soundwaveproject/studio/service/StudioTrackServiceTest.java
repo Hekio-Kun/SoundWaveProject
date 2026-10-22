@@ -1,9 +1,10 @@
 package groupone.soundwaveproject.studio.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.Staff;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.StaffRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
@@ -18,6 +19,7 @@ import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
@@ -58,22 +60,25 @@ class StudioTrackServiceTest {
     @Mock
     private ListeningHistoryRepository listeningHistoryRepository;
     @Mock
-    private AppUserRepository appUserRepository;
+    private UserRepository userRepository;
+    @Mock
+    private StaffRepository staffRepository;
     @Mock
     private CloudMediaService cloudMediaService;
+    @Mock
+    private NotificationService notificationService;
     @Spy
     private StudioTrackMapper studioTrackMapper;
 
     @InjectMocks
     private StudioTrackService studioTrackService;
 
-    private AppUser activeUser;
+    private User activeUser;
     private Genre activeGenre;
 
     @BeforeEach
     void setUp() {
-        Role role = new Role("LISTENER", "Listener", "Listener account");
-        activeUser = new AppUser(role, "creator@soundwave.com", "hashed");
+        activeUser = new User("creator@soundwave.com", "hashed");
         activeUser.verifyEmail(java.time.LocalDateTime.now());
         org.springframework.test.util.ReflectionTestUtils.setField(activeUser, "id", 10L);
 
@@ -88,7 +93,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("getMyTracks returns list of tracks belonging to active user")
     void getMyTracks_Success() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track track = Track.builder()
@@ -120,7 +125,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("createDraft uploads media and persists track in DRAFT status")
     void createDraft_Success() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
         when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
 
@@ -151,7 +156,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("updateTrack throws ForbiddenOperationException when track is PENDING")
     void updateTrack_ThrowsWhenPending() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track pendingTrack = Track.builder()
@@ -176,7 +181,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("updateTrack allows editing when track is PUBLISHED (approved)")
     void updateTrack_SuccessWhenPublished() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track publishedTrack = Track.builder()
@@ -209,7 +214,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("deleteTrack successfully removes draft and purges Cloudinary media")
     void deleteTrack_Success() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track draftTrack = Track.builder()
@@ -235,7 +240,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("deleteTrack successfully removes published track and related associations")
     void deleteTrack_PublishedSuccess() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track publishedTrack = Track.builder()
@@ -263,7 +268,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("deleteTrack throws ForbiddenOperationException when track is PENDING")
     void deleteTrack_Pending_ThrowsForbiddenException() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track pendingTrack = Track.builder()
@@ -287,7 +292,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("submitForReview updates status to PENDING and creates submission record")
     void submitForReview_Success() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         Track draftTrack = Track.builder()
@@ -317,7 +322,7 @@ class StudioTrackServiceTest {
     @Test
     @DisplayName("getStats calculates correct count breakdown")
     void getStats_Success() {
-        when(appUserRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
         when(trackRepository.countByUploaderUserId(10L)).thenReturn(5L);

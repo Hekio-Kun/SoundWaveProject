@@ -7,12 +7,13 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 
 /**
- * Thực thể lưu trữ các thông báo hệ thống gửi tới người dùng (UC-17 / UC-33: View My Notification).
+ * Thực thể lưu trữ các thông báo hệ thống gửi tới người dùng hoặc nhân viên (UC-17 / UC-33: View My Notification).
  * Ánh xạ với bảng cơ sở dữ liệu: notifications
  */
 @Entity
 @Table(name = "notifications", indexes = {
-        @Index(name = "idx_notifications_user_created", columnList = "user_id, created_at DESC")
+        @Index(name = "idx_notifications_user_created", columnList = "user_id, created_at DESC"),
+        @Index(name = "idx_notifications_staff_created", columnList = "staff_id, created_at DESC")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -28,10 +29,16 @@ public class Notification {
     private Long id;
 
     /**
-     * ID của người dùng nhận thông báo (Khóa ngoại logic trỏ tới app_users.id).
+     * ID của người dùng nhận thông báo (Khóa ngoại logic trỏ tới users.id, null nếu gửi tới Staff).
      */
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
+
+    /**
+     * ID của nhân viên nhận thông báo (Khóa ngoại logic trỏ tới staffs.id, null nếu gửi tới User).
+     */
+    @Column(name = "staff_id")
+    private Long staffId;
 
     /**
      * ID của người thực hiện hành động tạo thông báo (Ví dụ: Staff duyệt, có thể null nếu do hệ thống).

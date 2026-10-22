@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage(), request, Map.of());
     }
 
-    @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
+    @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class, AuthenticationException.class})
     public ResponseEntity<ApiErrorResponse> handleUnauthorized(AuthenticationException exception, HttpServletRequest request) {
         return build(HttpStatus.UNAUTHORIZED, exception.getCode(), exception.getMessage(), request, Map.of());
     }
@@ -227,7 +227,7 @@ public class GlobalExceptionHandler {
     ) {
         log.error("Unhandled exception while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
-                "An unexpected error occurred. Please try again later.", request, Map.of());
+                exception.getClass().getSimpleName() + ": " + exception.getMessage(), request, Map.of());
     }
 
     private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String code, String message,

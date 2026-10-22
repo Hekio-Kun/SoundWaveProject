@@ -16,7 +16,7 @@ public class PasswordResetToken {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false)
-    private AppUser user;
+    private User user;
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
     private String tokenHash;
     @Column(name = "expires_at", nullable = false)
@@ -26,7 +26,7 @@ public class PasswordResetToken {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public PasswordResetToken(AppUser user, String tokenHash, LocalDateTime expiresAt) {
+    public PasswordResetToken(User user, String tokenHash, LocalDateTime expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;

@@ -122,7 +122,7 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
             <span className="discover-feature-info">
               <small>RECOMMENDED SONG</small>
               <strong>{heroTrack.title}</strong>
-              <em>{heroTrack.creator?.displayName ?? "Unknown Artist"}{heroTrack.album?.title ? ` · ${heroTrack.album.title}` : ""}</em>
+              <em>{heroTrack.creator?.displayName ?? "Unknown Creator"}{heroTrack.album?.title ? ` · ${heroTrack.album.title}` : ""}</em>
             </span>
             <span className="discover-feature-play">{heroPlaying ? <PauseIcon /> : <PlayIcon />}</span>
           </button>
@@ -178,7 +178,7 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
                     <img src={track.coverUrl ?? undefined} alt="" />
                     <span className="sw-release-copy">
                       <strong>{track.title}</strong>
-                      <small>{track.creator?.displayName ?? "Unknown Artist"} · {track.genreName || track.genreSlug}</small>
+                      <small>{track.creator?.displayName ?? "Unknown Creator"} · {track.genreName || track.genreSlug}</small>
                     </span>
                     <span className="sw-release-duration">{formatDuration(track.durationMs)}</span>
                     <span className="sw-release-icon">

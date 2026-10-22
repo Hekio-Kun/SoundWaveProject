@@ -1,11 +1,11 @@
 package groupone.soundwaveproject.studio.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
 import groupone.soundwaveproject.authentication.exception.AccountBannedException;
 import groupone.soundwaveproject.authentication.exception.AccountUnavailableException;
 import groupone.soundwaveproject.authentication.exception.AuthenticationException;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
@@ -57,7 +57,7 @@ public class StudioAlbumService {
     private final PlaylistTrackRepository playlistTrackRepository;
     private final ListeningHistoryRepository listeningHistoryRepository;
     private final TrackSubmissionRepository trackSubmissionRepository;
-    private final AppUserRepository appUserRepository;
+    private final UserRepository userRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioAlbumMapper studioAlbumMapper;
     private final StudioTrackMapper studioTrackMapper;
@@ -67,13 +67,10 @@ public class StudioAlbumService {
 
     /**
      * Lấy danh sách toàn bộ Album do người dùng hiện tại tạo ra (UC-21.2 View Albums).
-     *
-     * @param currentUserEmail Email của tài khoản đang đăng nhập
-     * @return Danh sách DTO Album kèm số lượng bài hát và thông tin tóm tắt
      */
     @Transactional(readOnly = true)
     public List<StudioAlbumResponse> getMyAlbums(String currentUserEmail) {
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         List<Album> albums = albumRepository.findByCreatedByUserIdOrderByCreatedAtDesc(user.getId());
 
         return albums.stream()
@@ -86,17 +83,13 @@ public class StudioAlbumService {
 
     /**
      * Xem thông tin chi tiết một Album cụ thể cùng danh sách bài hát bên trong (UC-21.2 View Albums).
-     *
-     * @param id               ID của Album cần xem
-     * @param currentUserEmail Email của tài khoản đang đăng nhập
-     * @return DTO chi tiết Album kèm danh sách bài hát theo thứ tự trackNumber
      */
     @Transactional(readOnly = true)
     public StudioAlbumResponse getAlbumById(Long id, String currentUserEmail) {
         if (id == null || id <= 0) {
             throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
         }
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
@@ -106,13 +99,6 @@ public class StudioAlbumService {
 
     /**
      * Tạo mới một Album và upload toàn bộ bài hát cấu thành cùng lúc (UC-21.1 Create Album).
-     * Hỗ trợ lưu DRAFT (AF01) hoặc gửi phê duyệt PENDING (NF01).
-     *
-     * @param request          Dữ liệu tạo album kèm danh sách metadata các bài hát
-     * @param cover            File ảnh bìa album (tùy chọn)
-     * @param audioFiles       Danh sách file âm thanh tương ứng với từng bài hát
-     * @param currentUserEmail Email của tài khoản đang đăng nhập
-     * @return DTO Album vừa được tạo
      */
     @Transactional
     public StudioAlbumResponse createAlbum(
@@ -135,9 +121,8 @@ public class StudioAlbumService {
             throw new BadRequestOperationException("DESCRIPTION_TOO_LONG", "Album description must not exceed 2000 characters.");
         }
 
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
 
-        // 1. Kiểm tra tính duy nhất của tên Album theo từng tài khoản (EX01)
         if (albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(user.getId(), cleanTitle)) {
             throw new ConflictOperationException("An album with the title '" + cleanTitle + "' already exists in your library.");
         }
@@ -288,23 +273,11 @@ public class StudioAlbumService {
         }
     }
 
-    /**
-     * Phương thức quá tải hỗ trợ gọi createAlbum không kèm danh sách file âm thanh (tương thích backward).
-     */
     @Transactional
     public StudioAlbumResponse createAlbum(CreateAlbumRequest request, MultipartFile cover, String currentUserEmail) {
         return createAlbum(request, cover, null, currentUserEmail);
     }
 
-    /**
-     * Cập nhật thông tin Album, thay thế ảnh bìa và sắp xếp lại danh sách bài hát (UC-21.3 Update Album).
-     *
-     * @param id               ID của Album cần cập nhật
-     * @param request          Dữ liệu cập nhật album
-     * @param cover            File ảnh bìa mới (tùy chọn)
-     * @param currentUserEmail Email của tài khoản đang đăng nhập
-     * @return DTO Album sau khi cập nhật
-     */
     @Transactional
     public StudioAlbumResponse updateAlbum(Long id, UpdateAlbumRequest request, MultipartFile cover, String currentUserEmail) {
         if (id == null || id <= 0) {
@@ -324,7 +297,7 @@ public class StudioAlbumService {
             throw new BadRequestOperationException("DESCRIPTION_TOO_LONG", "Album description must not exceed 2000 characters.");
         }
 
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
@@ -380,23 +353,15 @@ public class StudioAlbumService {
         }
     }
 
-    /**
-     * Xóa Album cá nhân và toàn bộ bài hát cấu thành bên trong album (UC-21.4 Delete Album).
-     * Bám sát đặc tả mới: khi xóa 1 album sẽ xóa tất cả các bài nhạc trong album đó.
-     *
-     * @param id               ID của Album cần xóa
-     * @param currentUserEmail Email của tài khoản đang đăng nhập
-     */
     @Transactional
     public void deleteAlbum(Long id, String currentUserEmail) {
         if (id == null || id <= 0) {
             throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
         }
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
-        // 1. Xóa tất cả các bài hát cấu thành bên trong album khỏi CSDL và Cloudinary (UC-21.4 POST-1 & POST-2)
         List<Track> constituentTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
         for (Track track : constituentTracks) {
             try {
@@ -414,30 +379,21 @@ public class StudioAlbumService {
             }
         }
 
-        // 2. Dọn dẹp ảnh bìa album trên Cloudinary nếu có (POST-2 của UC-21.4)
         if (album.getCoverPublicId() != null && !album.getCoverPublicId().isBlank()) {
             cloudMediaService.deleteImageQuietly(album.getCoverPublicId());
         }
 
-        // 3. Xóa bản ghi Album khỏi database
         albumRepository.delete(album);
         log.info("Album ID {} and all its {} constituent tracks permanently deleted by user ID {}.",
                 id, constituentTracks.size(), user.getId());
     }
 
-    /**
-     * Lấy danh sách các bài hát khả dụng của người dùng để chọn đưa vào Album.
-     *
-     * @param currentAlbumId   ID album hiện tại (nếu đang ở màn hình Edit), có thể null
-     * @param currentUserEmail Email người dùng
-     * @return Danh sách bài hát khả dụng
-     */
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getAvailableTracksForAlbum(Long currentAlbumId, String currentUserEmail) {
         if (currentAlbumId != null && currentAlbumId <= 0) {
             throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
         }
-        AppUser user = getAuthenticatedUser(currentUserEmail);
+        User user = getAuthenticatedUser(currentUserEmail);
         List<Track> allUserTracks = trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(user.getId());
 
         return allUserTracks.stream()
@@ -446,13 +402,6 @@ public class StudioAlbumService {
                 .toList();
     }
 
-    // ==========================================
-    // CÁC HÀM TIỆN ÍCH NỘI BỘ (PRIVATE HELPERS)
-    // ==========================================
-
-    /**
-     * Gán danh sách bài hát vào Album và đánh số thứ tự track_number.
-     */
     private List<Track> assignTracksToAlbum(Album album, List<Long> trackIds, Long currentUserId) {
         List<Track> assigned = new ArrayList<>();
         int trackNumber = 1;
@@ -474,9 +423,6 @@ public class StudioAlbumService {
         return assigned;
     }
 
-    /**
-     * Đồng bộ bài hát trong Album: xóa vĩnh viễn những bài bị loại bỏ và cập nhật thứ tự các bài được giữ lại (UC-21.3).
-     */
     private List<Track> syncAlbumTracks(Album album, List<Long> trackIds, Long currentUserId) {
         List<Track> currentAlbumTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
 
@@ -492,7 +438,6 @@ public class StudioAlbumService {
 
         Set<Long> newTrackIdSet = new HashSet<>(distinctTrackIds);
 
-        // Xóa vĩnh viễn những bài bị loại bỏ khỏi album (UC-21.3 POST-3)
         for (Track t : currentAlbumTracks) {
             if (!newTrackIdSet.contains(t.getId())) {
                 try {
@@ -511,7 +456,6 @@ public class StudioAlbumService {
             }
         }
 
-        // Cập nhật album và thứ tự bài hát mới cho các bài giữ lại
         List<Track> resultTracks = new ArrayList<>();
         int order = 1;
         for (Long trackId : distinctTrackIds) {
@@ -530,13 +474,6 @@ public class StudioAlbumService {
         return resultTracks;
     }
 
-    /**
-    /**
-     * Tự động tính toán lại và cập nhật trạng thái Album theo ràng buộc CK_albums_status ('DRAFT', 'PUBLISHED')
-     * và quy tắc nghiệp vụ BR-18:
-     * - Nếu có ít nhất 1 bài hát PUBLISHED: Album có trạng thái PUBLISHED.
-     * - Ngược lại: Album duy trì trạng thái DRAFT.
-     */
     private void recalculateAndSaveAlbumStatus(Album album) {
         boolean hasPublishedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                 album.getId(), TrackPublicationStatus.PUBLISHED
@@ -553,14 +490,11 @@ public class StudioAlbumService {
         albumRepository.save(album);
     }
 
-    /**
-     * Lấy thông tin tài khoản đã xác thực và kiểm tra tính hợp lệ.
-     */
-    private AppUser getAuthenticatedUser(String email) {
+    private User getAuthenticatedUser(String email) {
         if (email == null || email.isBlank()) {
             throw new AuthenticationException("UNAUTHORIZED", "Authentication required.");
         }
-        AppUser user = appUserRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
+        User user = userRepository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
                 .filter(u -> u.getDeletedAt() == null)
                 .orElseThrow(() -> new AuthenticationException("USER_NOT_FOUND", "Account not found."));
 
@@ -573,9 +507,6 @@ public class StudioAlbumService {
         return user;
     }
 
-    /**
-     * Tạo slug thân thiện với URL cho album.
-     */
     private String generateUniqueSlug(String input) {
         String baseSlug = toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "album";
@@ -583,9 +514,6 @@ public class StudioAlbumService {
         return candidate.length() > 220 ? candidate.substring(0, 220) : candidate;
     }
 
-    /**
-     * Tạo slug thân thiện với URL cho từng bài hát trong album.
-     */
     private String generateUniqueTrackSlug(String input) {
         String baseSlug = toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "track";

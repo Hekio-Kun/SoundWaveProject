@@ -1,13 +1,10 @@
 package groupone.soundwaveproject.library.service;
 
-import groupone.soundwaveproject.authentication.entity.AppUser;
-import groupone.soundwaveproject.authentication.entity.Role;
+import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.entity.UserStatus;
-import groupone.soundwaveproject.authentication.repository.AppUserRepository;
+import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.authentication.service.UserAccountPublicService;
-import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
-import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
@@ -15,7 +12,6 @@ import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.library.dto.request.PlaylistRequest;
 import groupone.soundwaveproject.library.dto.response.PlaylistResponse;
 import groupone.soundwaveproject.library.entity.Playlist;
-import groupone.soundwaveproject.library.entity.PlaylistTrack;
 import groupone.soundwaveproject.library.repository.PlaylistRepository;
 import groupone.soundwaveproject.library.repository.PlaylistTrackRepository;
 import groupone.soundwaveproject.media.service.CloudMediaService;
@@ -53,7 +49,7 @@ class PlaylistServiceTest {
     private TrackRepository trackRepository;
 
     @Mock
-    private AppUserRepository appUserRepository;
+    private UserRepository userRepository;
 
     @Mock
     private UserAccountPublicService userAccountPublicService;
@@ -64,13 +60,12 @@ class PlaylistServiceTest {
     @InjectMocks
     private PlaylistService playlistService;
 
-    private AppUser mockUser;
+    private User mockUser;
     private Playlist mockPlaylist;
 
     @BeforeEach
     void setUp() {
-        Role role = new Role("LISTENER", "Listener", "Regular listener");
-        mockUser = new AppUser(role, "listener@soundwave.com", "hashed_pwd");
+        mockUser = new User("listener@soundwave.com", "hashed_pwd");
         ReflectionTestUtils.setField(mockUser, "id", 10L);
         ReflectionTestUtils.setField(mockUser, "status", UserStatus.ACTIVE);
 
@@ -91,7 +86,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Tạo Playlist thành công và luôn mặc định là Private")
     void createPlaylist_success() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.existsBySlug(anyString())).thenReturn(false);
         when(playlistRepository.save(any(Playlist.class))).thenAnswer(invocation -> {
             Playlist p = invocation.getArgument(0);
@@ -120,7 +115,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Ném BadRequestOperationException khi tạo Playlist với tiêu đề rỗng")
     void createPlaylist_blankTitle() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
 
         PlaylistRequest request = new PlaylistRequest("   ", "Description", false, null);
 
@@ -131,7 +126,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Lấy danh sách Playlist của người dùng hiện tại")
     void getMyPlaylists_success() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.findByCreatedByUserIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(mockPlaylist));
         when(playlistTrackRepository.findByPlaylist_IdOrderByPositionAsc(100L)).thenReturn(List.of());
 
@@ -147,10 +142,10 @@ class PlaylistServiceTest {
         mockPlaylist.setPrivate(true);
         when(playlistRepository.findById(100L)).thenReturn(Optional.of(mockPlaylist));
 
-        AppUser otherUser = new AppUser(new Role("LISTENER", "Listener", "Regular listener"), "other@soundwave.com", "pwd");
+        User otherUser = new User("other@soundwave.com", "pwd");
         ReflectionTestUtils.setField(otherUser, "id", 99L);
         ReflectionTestUtils.setField(otherUser, "status", UserStatus.ACTIVE);
-        when(appUserRepository.findByEmailIgnoreCase("other@soundwave.com")).thenReturn(Optional.of(otherUser));
+        when(userRepository.findByEmailIgnoreCase("other@soundwave.com")).thenReturn(Optional.of(otherUser));
 
         assertThatThrownBy(() -> playlistService.getPlaylistById(100L, "other@soundwave.com"))
                 .isInstanceOf(ForbiddenOperationException.class);
@@ -159,7 +154,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Cập nhật Playlist thành công")
     void updatePlaylist_success() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.findById(100L)).thenReturn(Optional.of(mockPlaylist));
         when(playlistRepository.save(any(Playlist.class))).thenReturn(mockPlaylist);
         when(playlistTrackRepository.findByPlaylist_IdOrderByPositionAsc(100L)).thenReturn(List.of());
@@ -175,7 +170,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Xóa Playlist và toàn bộ liên kết playlist_tracks thành công")
     void deletePlaylist_success() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.findById(100L)).thenReturn(Optional.of(mockPlaylist));
 
         playlistService.deletePlaylist(100L, "listener@soundwave.com");
@@ -187,7 +182,7 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Thêm bài hát vào playlist thất bại nếu bài hát đã tồn tại trong playlist")
     void addTrackToPlaylist_alreadyExists() {
-        when(appUserRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailIgnoreCase("listener@soundwave.com")).thenReturn(Optional.of(mockUser));
         when(playlistRepository.findById(100L)).thenReturn(Optional.of(mockPlaylist));
 
         Track track = Track.builder().id(50L).title("Song").build();

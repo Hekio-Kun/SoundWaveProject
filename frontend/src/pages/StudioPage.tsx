@@ -396,7 +396,7 @@ export function StudioPage({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete track.";
       setActionError(msg);
-      alert(msg);
+
     } finally {
       setIsSaving(false);
     }
@@ -910,7 +910,7 @@ export function StudioPage({
                           type="button"
                           className="status-badge status-badge--rejected"
                           onClick={() => handleViewRejection(t)}
-                          title="Click to view rejection reason & moderator feedback"
+                          title="Click to view rejection reason & staff feedback"
                           style={{ cursor: "pointer" }}
                         >
                           Rejected
@@ -931,7 +931,7 @@ export function StudioPage({
                             type="button"
                             className="button button-small"
                             onClick={() => handleViewRejection(t)}
-                            title="View moderator rejection reason & feedback"
+                            title="View staff rejection reason & feedback"
                             style={{
                               backgroundColor: "#fee4e2",
                               color: "#b42318",
@@ -1126,7 +1126,7 @@ export function StudioPage({
               <p style={{ color: "var(--sw-text-secondary)", fontSize: "14px", margin: "0 0 20px" }}>
                 {albumSearchQuery
                   ? "Try adjusting your search terms or filter."
-                  : "Group your tracks into albums to showcase your artist discography."}
+                  : "Group your tracks into albums to showcase your creator discography."}
               </p>
               {!albumSearchQuery && (
                 <button

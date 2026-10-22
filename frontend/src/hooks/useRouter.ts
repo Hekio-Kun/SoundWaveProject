@@ -40,9 +40,11 @@ export function useRouter(): AppRouterState {
     pathname === "/register" ||
     pathname === "/verify-email" ||
     pathname === "/forgot-password" ||
-    pathname === "/reset-password";
+    pathname === "/reset-password" ||
+    pathname === "/staff/login" ||
+    pathname === "/staff-login";
 
-  const isDashboardRoute = pathname.startsWith("/admin") || pathname.startsWith("/staff");
+  const isDashboardRoute = (pathname.startsWith("/admin") || pathname.startsWith("/staff")) && !isAuthRoute;
   const isMusicRoute = !isAuthRoute && !isDashboardRoute;
   const isExploreRoute =
     pathname === "/" ||

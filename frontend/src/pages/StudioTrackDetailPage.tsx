@@ -86,7 +86,7 @@ function studioApiTrackToLanding(track: ApiTrack, currentUser: CurrentUser | nul
     lyrics: track.lyrics,
     creator: {
       userId: currentUser?.id || 0,
-      displayName: currentUser?.displayName || currentUser?.email || "Artist",
+      displayName: currentUser?.displayName || currentUser?.email || "Creator",
       avatarUrl: currentUser?.avatarUrl || null,
     },
     album: track.albumId
@@ -284,6 +284,22 @@ export function StudioTrackDetailPage({
     };
   }, [activeAudio, isCurrentTrack, track?.durationMs]);
 
+  // Close modals on Escape key (Rule 4.7)
+  useEffect(() => {
+    const hasAnyModal = deleteConfirmOpen || submitModalOpen || withdrawModalOpen || editModalOpen;
+    if (!hasAnyModal || isProcessing) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDeleteConfirmOpen(false);
+        setSubmitModalOpen(false);
+        setWithdrawModalOpen(false);
+        setEditModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deleteConfirmOpen, submitModalOpen, withdrawModalOpen, editModalOpen, isProcessing]);
+
   // Player controls
   const togglePlay = () => {
     if (!track) return;
@@ -347,9 +363,9 @@ export function StudioTrackDetailPage({
     ? "is-rejected"
     : "is-pending";
 
-  const submitterName = currentUser?.displayName || currentUser?.username || "Artist";
-  const submitterEmail = currentUser?.email || "artist@soundwave.io";
-  const submitterUsername = currentUser?.username || currentUser?.email?.split("@")[0] || "artist";
+  const submitterName = currentUser?.displayName || currentUser?.username || "Creator";
+  const submitterEmail = currentUser?.email || "creator@soundwave.io";
+  const submitterUsername = currentUser?.username || currentUser?.email?.split("@")[0] || "creator";
 
   // Actions
   const openEditModal = () => {
@@ -590,7 +606,7 @@ export function StudioTrackDetailPage({
                   type="button"
                   className="studio-crud-btn"
                   onClick={handleOpenRejectionModal}
-                  title="View moderator rejection reason & feedback"
+                  title="View staff rejection reason & feedback"
                   style={{
                     backgroundColor: "#fee4e2",
                     color: "#b42318",
@@ -833,7 +849,7 @@ export function StudioTrackDetailPage({
             {/* Technical Specifications Matrix Grid */}
             <div className="staff-specs-matrix">
               <div className="staff-matrix-cell">
-                <small>ARTIST / SUBMITTER</small>
+                <small>CREATOR / SUBMITTER</small>
                 <strong>{submitterName}</strong>
               </div>
               <div className="staff-matrix-cell">
@@ -841,7 +857,7 @@ export function StudioTrackDetailPage({
                 <strong>{submitterEmail}</strong>
               </div>
               <div className="staff-matrix-cell">
-                <small>ARTIST USERNAME</small>
+                <small>CREATOR USERNAME</small>
                 <strong>@{submitterUsername}</strong>
               </div>
               <div className="staff-matrix-cell">
@@ -919,7 +935,7 @@ export function StudioTrackDetailPage({
                   <span>Track approved and published to catalog</span>
                 </div>
                 <small className="staff-decision-meta">
-                  Reviewed by <b>Content Moderator</b> on {formatDate(track.reviewedAt || track.createdAt)}
+                  Reviewed by <b>Staff</b> on {formatDate(track.reviewedAt || track.createdAt)}
                 </small>
               </div>
             )}
@@ -931,7 +947,7 @@ export function StudioTrackDetailPage({
                   <span>Track is currently pending moderation review</span>
                 </div>
                 <p className="staff-decision-note" style={{ color: "#a16207" }}>
-                  Your submission is in the moderation queue. Content moderators will evaluate audio fidelity and copyright status before public release.
+                  Your submission is in the moderation queue. Staff members will evaluate audio fidelity and copyright status before public release.
                 </p>
               </div>
             )}
@@ -1310,14 +1326,14 @@ export function StudioTrackDetailPage({
                 <h3>{isRejected ? "Resubmit Track for Moderation Review" : "Submit Track for Moderation Review"}</h3>
                 <p className="modal-subtitle">Track: <b>{track.title}</b></p>
               </div>
-              <button className="icon-button" onClick={() => setSubmitModalOpen(false)} disabled={isProcessing}>
+              <button type="button" className="icon-button" onClick={() => setSubmitModalOpen(false)} disabled={isProcessing} aria-label="Close dialog">
                 <CloseIcon width={18} height={18} />
               </button>
             </div>
-            <form onSubmit={handleSubmitForReview}>
+            <form onSubmit={handleSubmitForReview} noValidate>
               <div className="modal-body">
                 <div className="form-group">
-                  <label htmlFor="submitter-note-input">Creator Note to Moderator (Optional)</label>
+                  <label htmlFor="submitter-note-input">Creator Note to Staff (Optional)</label>
                   <textarea
                     id="submitter-note-input"
                     rows={3}
@@ -1362,7 +1378,7 @@ export function StudioTrackDetailPage({
           <div className="modal-card modal-card--narrow" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Withdraw Submission</h3>
-              <button className="icon-button" onClick={() => setWithdrawModalOpen(false)} disabled={isProcessing}>
+              <button type="button" className="icon-button" onClick={() => setWithdrawModalOpen(false)} disabled={isProcessing} aria-label="Close dialog">
                 <CloseIcon width={18} height={18} />
               </button>
             </div>

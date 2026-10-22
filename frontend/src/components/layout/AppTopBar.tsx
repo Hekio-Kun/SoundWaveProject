@@ -66,13 +66,12 @@ export function AppTopBar({
     window.history.forward();
   };
 
-  const hasDashboardAccess = user?.role === "ADMIN" || user?.role === "STAFF";
-  const workspaceRoute =
-    user?.role === "ADMIN"
-      ? "/admin/dashboard"
-      : user?.role === "STAFF"
-      ? "/staff/dashboard"
-      : "/studio/upload";
+  const hasDashboardAccess = user?.role === "ADMIN" || user?.role === "STAFF" || user?.role === "MODERATOR";
+  const workspaceRoute = user?.role === "ADMIN"
+    ? "/admin/dashboard"
+    : (user?.role === "STAFF" || user?.role === "MODERATOR")
+    ? "/staff/dashboard"
+    : "/studio/upload";
   const workspaceLabel = hasDashboardAccess ? "Open dashboard" : "Upload music";
 
   return (
@@ -107,7 +106,7 @@ export function AppTopBar({
           >
             {user?.role === "ADMIN" ? (
               <ShieldIcon width={16} height={16} />
-            ) : user?.role === "STAFF" ? (
+            ) : (user?.role === "STAFF" || user?.role === "MODERATOR") ? (
               <DashboardIcon width={16} height={16} />
             ) : (
               <UploadIcon width={16} height={16} />
@@ -163,7 +162,7 @@ export function AppTopBar({
                   </div>
                 </div>
                 <div className="dropdown-section-label">ACCOUNT</div>
-                {user.role === "ADMIN" || user.role === "STAFF" ? (
+                {user.role === "ADMIN" || user.role === "STAFF" || user.role === "MODERATOR" ? (
                   <button
                     className="dropdown-item"
                     role="menuitem"
