@@ -8,7 +8,6 @@ import groupone.soundwaveproject.catalog.dto.response.AdminGenreResponse;
 import groupone.soundwaveproject.catalog.dto.response.GenreResponse;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
-import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -37,7 +36,6 @@ import java.util.Optional;
 public class GenreService {
 
     private final GenreRepository genreRepository;
-    private final TrackRepository trackRepository;
     private final UserAccountPublicService userAccountPublicService;
 
     /**
@@ -169,29 +167,6 @@ public class GenreService {
         return toAdminGenreResponse(genre);
     }
 
-    /**
-     * Xóa vĩnh viễn thể loại âm nhạc nếu thể loại đó chưa từng được liên kết với bài hát nào (UC-26.2 / BR-23 Delete Genre).
-     * Áp dụng quy tắc BR-23: Nếu thể loại đã có bài hát sử dụng, cấm xóa và yêu cầu chuyển sang vô hiệu hóa.
-     *
-     * @param id ID của thể loại cần xóa
-     * @throws ResourceNotFoundException  nếu không tìm thấy thể loại
-     * @throws ConflictOperationException nếu thể loại đang được tham chiếu bởi dữ liệu bài hát (BR-23 / 26.0.E2)
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @Transactional
-    public void deleteGenre(Long id) {
-        // 1. Tìm thể loại theo ID
-        Genre genre = findGenre(id);
-
-        // 2. Kiểm tra ràng buộc BR-23: Không được xóa vật lý nếu đang được bài hát tham chiếu
-        if (trackRepository.existsByGenre_Id(id)) {
-            throw new ConflictOperationException("GENRE_IN_USE",
-                    "Thể loại này đang được bài hát sử dụng, không thể xóa theo quy tắc toàn vẹn BR-23. Vui lòng vô hiệu hóa thể loại thay thế.");
-        }
-
-        // 3. Xóa thể loại khỏi cơ sở dữ liệu
-        genreRepository.delete(genre);
-    }
 
     /**
      * Chuyển đổi thực thể Genre sang DTO AdminGenreResponse.

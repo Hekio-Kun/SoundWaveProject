@@ -1005,24 +1005,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
-.admin-genre-toast {
-  position: fixed;
-  top: 20px;
-  right: 24px;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 12px 16px;
-  border: 1px solid #a7f3d0;
-  border-radius: 12px;
-  color: #047857;
-  background: #ecfdf3;
-  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.12);
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .genre-form-modal {
   max-width: 520px;
 }
@@ -1082,12 +1064,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
   .admin-genre-filters button {
     flex: 1;
-  }
-
-  .admin-genre-toast {
-    top: 12px;
-    right: 12px;
-    left: 12px;
   }
 }
 

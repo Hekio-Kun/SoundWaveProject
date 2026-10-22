@@ -1,13 +1,16 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
-import { AlertIcon, CloseIcon } from "../../icons";
+import { AlertIcon, CheckIcon, CloseIcon } from "../../icons";
 
 type Props = {
   open: boolean;
   title: string;
   message: string;
   confirmLabel?: string;
+  submittingLabel?: string;
+  variant?: "danger" | "primary";
+  icon?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   submitting?: boolean;
@@ -18,6 +21,9 @@ export function DeleteConfirmationModal({
   title,
   message,
   confirmLabel = "Delete",
+  submittingLabel,
+  variant = "danger",
+  icon,
   onConfirm,
   onCancel,
   submitting = false,
@@ -48,13 +54,19 @@ export function DeleteConfirmationModal({
               width: "44px",
               height: "44px",
               borderRadius: "50%",
-              background: "#FEE2E2",
+              background: variant === "primary" ? "#E0F2FE" : "#FEE2E2",
               display: "grid",
               placeItems: "center",
-              color: "#DC2626",
+              color: variant === "primary" ? "var(--sw-brand, #0284C7)" : "#DC2626",
             }}
           >
-            <AlertIcon width={22} height={22} />
+            {icon ? (
+              icon
+            ) : variant === "primary" ? (
+              <CheckIcon width={22} height={22} strokeWidth={2.5} />
+            ) : (
+              <AlertIcon width={22} height={22} />
+            )}
           </div>
           <button
             className="icon-button"
@@ -85,21 +97,21 @@ export function DeleteConfirmationModal({
           </button>
           <button
             type="button"
-            className="button"
+            className={`button ${variant === "primary" ? "button-primary" : ""}`}
             onClick={onConfirm}
             disabled={submitting}
             style={{
               height: "40px",
               padding: "0 20px",
               borderRadius: "10px",
-              background: "#DC2626",
+              background: variant === "primary" ? "var(--sw-brand, #0284C7)" : "#DC2626",
               color: "#fff",
               fontWeight: 700,
               border: "none",
               cursor: submitting ? "not-allowed" : "pointer",
             }}
           >
-            {submitting ? "Deleting..." : confirmLabel}
+            {submitting ? (submittingLabel ?? (confirmLabel === "Deactivate" ? "Deactivating..." : confirmLabel === "Activate" ? "Activating..." : "Processing...")) : confirmLabel}
           </button>
         </div>
       </div>
