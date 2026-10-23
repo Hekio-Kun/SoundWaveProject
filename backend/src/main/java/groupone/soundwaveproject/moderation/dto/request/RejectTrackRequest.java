@@ -16,4 +16,8 @@ public record RejectTrackRequest(
 
         @Size(max = 2000, message = "Reviewer note cannot exceed 2000 characters")
         String reviewerNote
-) {}
+) {
+    public RejectTrackRequest(String rejectionReason) {
+        this(rejectionReason, null);
+    }
+}

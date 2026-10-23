@@ -201,6 +201,9 @@ public class ModerationService {
 
                     SubmissionQueueItemResponse albumItem = mapper.createAlbumQueueItem(album, mappedAlbumTracks, albumCreator, albumCreatorProfile);
                     if (albumItem != null) {
+                        if (status != null && mappedAlbumTracks.stream().anyMatch(t -> t.status() == status)) {
+                            albumItem = albumItem.withStatus(status);
+                        }
                         queueItems.add(albumItem);
                     }
                 }
@@ -341,11 +344,8 @@ public class ModerationService {
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
-        String submitterDisplayName = submitterProfile != null && submitterProfile.getDisplayName() != null && !submitterProfile.getDisplayName().isBlank()
-                ? submitterProfile.getDisplayName() : (submitter != null ? submitter.getEmail() : "Creator");
 
         if (submitter != null) {
-            mailService.sendTrackRejectedEmail(submitter.getEmail(), submitterDisplayName, track.getTitle(), rejectionReason);
             notificationService.createNotification(
                     submitter.getId(),
                     reviewer.getId(),
