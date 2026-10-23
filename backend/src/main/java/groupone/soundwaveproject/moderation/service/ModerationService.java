@@ -201,6 +201,9 @@ public class ModerationService {
 
                     SubmissionQueueItemResponse albumItem = mapper.createAlbumQueueItem(album, mappedAlbumTracks, albumCreator, albumCreatorProfile);
                     if (albumItem != null) {
+                        if (status != null && mappedAlbumTracks.stream().anyMatch(t -> t.status() == status)) {
+                            albumItem = albumItem.withStatus(status);
+                        }
                         queueItems.add(albumItem);
                     }
                 }

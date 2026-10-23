@@ -3820,6 +3820,13 @@ body.modal-open .app-scroll-region {
   flex-shrink: 0;
 }
 
+.staff-album-chips-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* --------------------------------------------------------------------------
    Staff Continuous Album Moderation & Navigation Ribbon
    -------------------------------------------------------------------------- */

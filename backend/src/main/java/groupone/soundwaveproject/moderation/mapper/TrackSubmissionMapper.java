@@ -80,11 +80,20 @@ public class TrackSubmissionMapper {
             return null;
         }
 
-        SubmissionStatus overallStatus = tracks.stream().anyMatch(t -> t.status() == SubmissionStatus.PENDING)
-                ? SubmissionStatus.PENDING
-                : (tracks.stream().allMatch(t -> t.status() == SubmissionStatus.APPROVED)
-                    ? SubmissionStatus.APPROVED
-                    : SubmissionStatus.REJECTED);
+        long pendingCount = tracks.stream().filter(t -> t.status() == SubmissionStatus.PENDING).count();
+        long approvedCount = tracks.stream().filter(t -> t.status() == SubmissionStatus.APPROVED).count();
+        long rejectedCount = tracks.stream().filter(t -> t.status() == SubmissionStatus.REJECTED).count();
+
+        SubmissionStatus overallStatus;
+        if (pendingCount > 0) {
+            overallStatus = SubmissionStatus.PENDING;
+        } else if (rejectedCount == 0 && approvedCount > 0) {
+            overallStatus = SubmissionStatus.APPROVED;
+        } else if (approvedCount == 0 && rejectedCount > 0) {
+            overallStatus = SubmissionStatus.REJECTED;
+        } else {
+            overallStatus = approvedCount >= rejectedCount ? SubmissionStatus.APPROVED : SubmissionStatus.REJECTED;
+        }
 
         java.time.Instant latestSubmittedAt = tracks.stream()
                 .map(SubmissionQueueItemResponse::submittedAt)

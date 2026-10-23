@@ -91,4 +91,31 @@ public record SubmissionQueueItemResponse(
                 null
         );
     }
+
+    /**
+     * Creates a copy of this queue item response with an updated status.
+     */
+    public SubmissionQueueItemResponse withStatus(SubmissionStatus newStatus) {
+        return new SubmissionQueueItemResponse(
+                id,
+                itemType,
+                trackId,
+                trackTitle,
+                trackNumber,
+                albumId,
+                albumTitle,
+                genreName,
+                coverUrl,
+                durationMs,
+                submitterId,
+                submitterDisplayName,
+                submitterEmail,
+                newStatus,
+                submittedAt,
+                reviewedAt,
+                reviewerDisplayName,
+                trackCount,
+                albumTracks
+        );
+    }
 }

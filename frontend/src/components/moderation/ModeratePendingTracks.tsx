@@ -248,6 +248,16 @@ export function ModeratePendingTracks({
     );
   }
 
+  const hasVisibleItems = Boolean(
+    queuePage?.content.some((item) => {
+      if (item.itemType === "ALBUM") {
+        const tracks = item.albumTracks || [];
+        return statusFilter === "ALL" || tracks.some((t) => t.status === statusFilter);
+      }
+      return statusFilter === "ALL" || item.status === statusFilter;
+    })
+  );
+
   return (
     <div className="mod-track-view">
       {/* Toast Notification with aria-live */}
@@ -529,7 +539,7 @@ export function ModeratePendingTracks({
               Retry Loading
             </button>
           </div>
-        ) : !queuePage || queuePage.content.length === 0 ? (
+        ) : !queuePage || queuePage.content.length === 0 || !hasVisibleItems ? (
           <div className="staff-empty-box" role="status" aria-live="polite">
             <div className="staff-empty-circle">
               <CheckIcon width={36} height={36} />
@@ -574,9 +584,26 @@ export function ModeratePendingTracks({
 
               if (isAlbum) {
                 const albumTrackList = item.albumTracks || [];
+                const totalTracksCount = item.trackCount || albumTrackList.length;
+
+                // Child item filtering based on statusFilter (Direction 2: Filter child items)
+                const visibleTracks = statusFilter === "ALL"
+                  ? albumTrackList
+                  : albumTrackList.filter((t) => t.status === statusFilter);
+
+                // If filtering by a specific status and this album has no matching tracks, don't show the album
+                if (statusFilter !== "ALL" && visibleTracks.length === 0) {
+                  return null;
+                }
+
+                const pendingTracks = albumTrackList.filter((t) => t.status === "PENDING");
+                const approvedTracks = albumTrackList.filter((t) => t.status === "APPROVED");
+                const rejectedTracks = albumTrackList.filter((t) => t.status === "REJECTED");
+                const isPendingAlbum = statusFilter === "PENDING" || (statusFilter === "ALL" && pendingTracks.length > 0);
+
                 return (
                   <div
-                    className={`staff-album-card-wrap ${item.status === "PENDING" ? "is-pending-track" : ""}`}
+                    className={`staff-album-card-wrap ${isPendingAlbum ? "is-pending-track" : ""}`}
                     key={`album-${item.id}`}
                   >
                     <div className="staff-album-main-row">
@@ -626,7 +653,9 @@ export function ModeratePendingTracks({
                           </span>
 
                           <span className="staff-meta-pill is-duration">
-                            {item.trackCount || albumTrackList.length} tracks
+                            {statusFilter === "ALL"
+                              ? `${totalTracksCount} tracks`
+                              : `${visibleTracks.length}/${totalTracksCount} tracks`}
                           </span>
 
                           {item.durationMs ? (
@@ -649,26 +678,66 @@ export function ModeratePendingTracks({
                         </div>
                       </div>
 
-                      {/* Moderation status */}
-                      <div className="staff-track-status-col">
-                        <span
-                          className={`staff-status-chip ${
-                            item.status === "APPROVED"
-                              ? "is-approved"
-                              : item.status === "REJECTED"
-                              ? "is-rejected"
-                              : "is-pending"
-                          }`}
-                        >
-                          <i />
-                          <span>
-                            {item.status === "APPROVED"
-                              ? "Approved"
-                              : item.status === "REJECTED"
-                              ? "Rejected"
-                              : "Pending"}
+                      {/* Moderation status tag */}
+                      <div className="staff-track-status-col staff-album-status-col">
+                        {statusFilter === "APPROVED" ? (
+                          <span className="staff-status-chip is-approved">
+                            <i />
+                            <span>{approvedTracks.length}/{totalTracksCount} Approved</span>
                           </span>
-                        </span>
+                        ) : statusFilter === "REJECTED" ? (
+                          <span className="staff-status-chip is-rejected">
+                            <i />
+                            <span>{rejectedTracks.length}/{totalTracksCount} Rejected</span>
+                          </span>
+                        ) : statusFilter === "PENDING" ? (
+                          <span className="staff-status-chip is-pending">
+                            <i />
+                            <span>{pendingTracks.length}/{totalTracksCount} Pending</span>
+                          </span>
+                        ) : (
+                          /* When statusFilter === "ALL" */
+                          <>
+                            {approvedTracks.length === totalTracksCount && totalTracksCount > 0 ? (
+                              <span className="staff-status-chip is-approved">
+                                <i />
+                                <span>Approved</span>
+                              </span>
+                            ) : rejectedTracks.length === totalTracksCount && totalTracksCount > 0 ? (
+                              <span className="staff-status-chip is-rejected">
+                                <i />
+                                <span>Rejected</span>
+                              </span>
+                            ) : pendingTracks.length === totalTracksCount && totalTracksCount > 0 ? (
+                              <span className="staff-status-chip is-pending">
+                                <i />
+                                <span>Pending</span>
+                              </span>
+                            ) : (
+                              /* Mixed statuses in Album under ALL filter */
+                              <div className="staff-album-chips-group">
+                                {approvedTracks.length > 0 && (
+                                  <span className="staff-status-chip is-approved" title={`${approvedTracks.length} approved track(s)`}>
+                                    <i />
+                                    <span>{approvedTracks.length}/{totalTracksCount} Approved</span>
+                                  </span>
+                                )}
+                                {rejectedTracks.length > 0 && (
+                                  <span className="staff-status-chip is-rejected" title={`${rejectedTracks.length} rejected track(s)`}>
+                                    <i />
+                                    <span>{rejectedTracks.length}/{totalTracksCount} Rejected</span>
+                                  </span>
+                                )}
+                                {pendingTracks.length > 0 && (
+                                  <span className="staff-status-chip is-pending" title={`${pendingTracks.length} pending track(s)`}>
+                                    <i />
+                                    <span>{pendingTracks.length}/{totalTracksCount} Pending</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       {/* Action button to expand / collapse track list in album */}
@@ -682,7 +751,9 @@ export function ModeratePendingTracks({
                           <span>
                             {isExpanded
                               ? "Collapse"
-                              : `View tracks (${item.trackCount || albumTrackList.length})`}
+                              : statusFilter === "ALL"
+                              ? `View tracks (${totalTracksCount})`
+                              : `View tracks (${visibleTracks.length}/${totalTracksCount})`}
                           </span>
                           {isExpanded ? (
                             <ArrowUpIcon width={14} height={14} />
@@ -694,13 +765,17 @@ export function ModeratePendingTracks({
                     </div>
 
                     {/* Expanded album constituent tracks list */}
-                    {isExpanded && albumTrackList.length > 0 && (
+                    {isExpanded && visibleTracks.length > 0 && (
                       <div className="staff-album-tracks-panel">
                         <div className="staff-album-tracks-header">
-                          Tracks in album ({albumTrackList.length} tracks)
+                          Tracks in album (
+                          {statusFilter === "ALL"
+                            ? `${totalTracksCount} tracks`
+                            : `${visibleTracks.length} of ${totalTracksCount} tracks`}
+                          )
                         </div>
                         <div className="staff-album-tracks-table">
-                          {albumTrackList.map((subTrack, idx) => (
+                          {visibleTracks.map((subTrack, idx) => (
                             <div key={subTrack.id} className="staff-album-track-row">
                               <div className="staff-album-track-left">
                                 <span className="staff-track-idx">#{subTrack.trackNumber || (idx + 1)}</span>
