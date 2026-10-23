@@ -27,8 +27,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Service xử lý các nghiệp vụ liên quan đến Thể loại âm nhạc (Genre).
- * Bao gồm danh mục công khai cho người nghe (UC-8) và quản lý thể loại của Quản trị viên (UC-26: Manage Genres).
+ * Service for handling business logic related to music genres (Genre).
+ * Covers public catalog queries for listeners (UC-8) and administrator management (UC-26: Manage Genres).
  */
 @Slf4j
 @Service
@@ -39,7 +39,7 @@ public class GenreService {
     private final UserAccountPublicService userAccountPublicService;
 
     /**
-     * Lấy danh sách thể loại đang hoạt động (is_active = true) sắp xếp theo tên tăng dần (UC-8 Phase 1).
+     * Retrieves active genres (is_active = true) ordered alphabetically by name (UC-8 Phase 1).
      */
     @Transactional(readOnly = true)
     public List<GenreResponse> getActiveGenres() {
@@ -50,7 +50,7 @@ public class GenreService {
     }
 
     /**
-     * Tìm kiếm thể loại theo slug nếu đang hoạt động (UC-8 Phase 1).
+     * Looks up an active genre by its slug (UC-8 Phase 1).
      */
     @Transactional(readOnly = true)
     public Optional<Genre> findActiveGenreBySlug(String slug) {
@@ -62,12 +62,12 @@ public class GenreService {
     }
 
     /**
-     * Tìm kiếm và lọc danh sách thể loại phục vụ màn hình quản trị của Admin (UC-26: Manage Genres).
+     * Searches and filters genres for the administrator management dashboard (UC-26: Manage Genres).
      *
-     * @param search   Từ khóa tìm kiếm theo tên hoặc slug
-     * @param active   Bộ lọc trạng thái kích hoạt (null để lấy tất cả)
-     * @param pageable Cấu hình phân trang và sắp xếp
-     * @return DTO trang danh sách thể loại quản trị
+     * @param search   Search keyword by name or slug
+     * @param active   Active status filter (null to retrieve all)
+     * @param pageable Pagination and sorting configuration
+     * @return Administrator genre page response DTO
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
@@ -79,11 +79,11 @@ public class GenreService {
     }
 
     /**
-     * Xem thông tin chi tiết một thể loại theo ID dành cho Admin (UC-26 View Genre Detail).
+     * Retrieves detailed information of a genre by its ID for admins (UC-26 View Genre Detail).
      *
-     * @param id ID của thể loại cần tra cứu
-     * @return DTO chi tiết thể loại quản trị
-     * @throws ResourceNotFoundException nếu không tìm thấy thể loại
+     * @param id ID of the genre to look up
+     * @return Administrator genre response DTO
+     * @throws ResourceNotFoundException if the genre is not found
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
@@ -92,74 +92,74 @@ public class GenreService {
     }
 
     /**
-     * Tạo mới thể loại âm nhạc và ghi nhận ID của Admin tạo (UC-26.1 Create Genre).
-     * Kiểm tra tính duy nhất của tên và slug theo ngoại lệ 26.0.E1.
+     * Creates a new music genre and tracks the creator's admin ID (UC-26.1 Create Genre).
+     * Validates name and slug uniqueness according to rule 26.0.E1.
      *
-     * @param request          Dữ liệu tạo thể loại (tên, slug, mô tả)
-     * @param currentUserEmail Email của Admin đang thực hiện tạo
-     * @return DTO thể loại vừa được tạo
-     * @throws ConflictOperationException nếu tên hoặc slug đã tồn tại trong hệ thống
+     * @param request          Genre creation data (name, slug, description)
+     * @param currentUserEmail Email of the admin creating the genre
+     * @return Created genre response DTO
+     * @throws ConflictOperationException if name or slug already exists
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public AdminGenreResponse createGenre(CreateGenreRequest request, String currentUserEmail) {
-        // 1. Chuẩn hóa tên và tạo slug tự động nếu chưa có
+        // 1. Normalize name and auto-generate slug if absent
         String name = request.name().trim();
         String slug = resolveSlug(request.slug(), name);
 
-        // 2. Kiểm tra trùng lặp tên và slug theo quy tắc duy nhất (26.0.E1)
+        // 2. Validate uniqueness of name and slug (26.0.E1)
         validateUniqueValues(name, slug, null);
 
-        // 3. Lấy ID của Admin thực hiện từ email đăng nhập
+        // 3. Resolve admin creator ID from authenticated email
         Long creatorId = userAccountPublicService.getUserIdByEmail(currentUserEmail);
 
-        // 4. Khởi tạo và lưu thực thể thể loại mới vào cơ sở dữ liệu
+        // 4. Initialize and persist the new genre entity
         Genre genre = new Genre(name, slug, normalizeDescription(request.description()), creatorId);
         return toAdminGenreResponse(genreRepository.save(genre));
     }
 
     /**
-     * Cập nhật thông tin tên, slug và mô tả của thể loại (UC-26.3 Update Genre).
+     * Updates name, slug, and description of an existing genre (UC-26.3 Update Genre).
      *
-     * @param id      ID của thể loại cần cập nhật
-     * @param request Dữ liệu cập nhật mới
-     * @return DTO thể loại sau khi cập nhật
-     * @throws ResourceNotFoundException  nếu không tìm thấy thể loại
-     * @throws ConflictOperationException nếu tên hoặc slug bị trùng với thể loại khác
+     * @param id      ID of the genre to update
+     * @param request New genre data
+     * @return Updated genre response DTO
+     * @throws ResourceNotFoundException  if genre is not found
+     * @throws ConflictOperationException if name or slug conflicts with another genre
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public AdminGenreResponse updateGenre(Long id, UpdateGenreRequest request) {
-        // 1. Tìm thể loại theo ID
+        // 1. Find genre by ID
         Genre genre = findGenre(id);
 
-        // 2. Chuẩn hóa dữ liệu cập nhật
+        // 2. Normalize updated data
         String name = request.name().trim();
         String slug = resolveSlug(request.slug(), name);
 
-        // 3. Kiểm tra tính duy nhất không trùng với các thể loại khác
+        // 3. Validate uniqueness against other genres
         validateUniqueValues(name, slug, id);
 
-        // 4. Cập nhật và lưu thay đổi
+        // 4. Update and persist changes
         genre.update(name, slug, normalizeDescription(request.description()), LocalDateTime.now(ZoneOffset.UTC));
         return toAdminGenreResponse(genreRepository.save(genre));
     }
 
     /**
-     * Kích hoạt hoặc vô hiệu hóa thể loại âm nhạc theo quy tắc bảo toàn toàn vẹn dữ liệu (UC-26.4 / BR-23 Update Genre Status).
+     * Activates or deactivates a music genre according to data integrity rules (UC-26.4 / BR-23 Update Genre Status).
      *
-     * @param id     ID của thể loại cần thay đổi trạng thái
-     * @param active Trạng thái mới (true: kích hoạt, false: vô hiệu hóa)
-     * @return DTO thể loại sau khi cập nhật trạng thái
-     * @throws ResourceNotFoundException nếu không tìm thấy thể loại
+     * @param id     ID of the genre to toggle
+     * @param active New active state (true: activate, false: deactivate)
+     * @return Updated genre response DTO
+     * @throws ResourceNotFoundException if genre is not found
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public AdminGenreResponse updateActiveState(Long id, boolean active) {
-        // 1. Tìm thể loại cần thay đổi trạng thái
+        // 1. Find genre to update
         Genre genre = findGenre(id);
 
-        // 2. Cập nhật trạng thái nếu có sự thay đổi
+        // 2. Update status if changed
         if (genre.isActive() != active) {
             genre.changeActiveState(active, LocalDateTime.now(ZoneOffset.UTC));
             genreRepository.save(genre);
@@ -167,12 +167,11 @@ public class GenreService {
         return toAdminGenreResponse(genre);
     }
 
-
     /**
-     * Chuyển đổi thực thể Genre sang DTO AdminGenreResponse.
+     * Converts a Genre entity to AdminGenreResponse DTO.
      *
-     * @param genre Thực thể Genre
-     * @return DTO AdminGenreResponse
+     * @param genre Genre entity
+     * @return AdminGenreResponse DTO
      */
     public AdminGenreResponse toAdminGenreResponse(Genre genre) {
         if (genre == null) {

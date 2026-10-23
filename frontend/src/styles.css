@@ -861,31 +861,67 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 }
 
 .admin-genre-search {
-  min-width: 250px;
+  min-width: 260px;
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 13px;
-  min-height: 42px;
+  gap: 8px;
+  padding: 4px 5px 4px 13px;
+  min-height: 44px;
   border: 1px solid var(--sw-border);
   border-radius: 11px;
   color: var(--sw-muted);
   background: #fff;
+  transition: border-color var(--sw-transition), box-shadow var(--sw-transition);
 }
 
 .admin-genre-search:focus-within {
   border-color: var(--sw-primary);
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
 }
 
 .admin-genre-search input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: 0;
   outline: 0;
   font: inherit;
+  font-size: 14px;
   color: var(--sw-text);
   background: transparent;
+}
+
+.admin-genre-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sw-muted);
+  cursor: pointer;
+  transition: color var(--sw-transition), background var(--sw-transition);
+}
+
+.admin-genre-search-clear:hover {
+  color: var(--sw-text);
+  background: var(--sw-sand-warm);
+}
+
+.admin-genre-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 8px;
+  box-shadow: none;
 }
 
 .admin-genre-filters {
@@ -1064,6 +1100,15 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
   .admin-genre-filters button {
     flex: 1;
+  }
+
+  .admin-genre-search {
+    padding: 4px 4px 4px 10px;
+    gap: 6px;
+  }
+
+  .admin-genre-search-btn {
+    padding: 0 10px;
   }
 }
 

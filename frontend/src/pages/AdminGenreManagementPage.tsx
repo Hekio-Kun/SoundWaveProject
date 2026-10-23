@@ -4,7 +4,7 @@ import { ApiError } from "../api/client";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { GenreFormModal } from "../components/modals/GenreFormModal";
-import { AlertIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
+import { AlertIcon, CloseIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
@@ -55,13 +55,26 @@ export function AdminGenreManagementPage() {
     }
   };
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim());
+  const handleSearchSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const trimmed = searchInput.trim();
+    if (trimmed === search && page === 0) {
+      void loadGenres();
+    } else {
+      setSearch(trimmed);
       setPage(0);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [searchInput]);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    if (search === "" && page === 0) {
+      void loadGenres();
+    } else {
+      setSearch("");
+      setPage(0);
+    }
+  };
 
   useEffect(() => {
     void loadGenres();
@@ -142,10 +155,34 @@ export function AdminGenreManagementPage() {
 
       <section className="ops-panel admin-genre-panel">
         <div className="admin-genre-toolbar">
-          <div className="admin-genre-search">
+          <form className="admin-genre-search" onSubmit={handleSearchSubmit} role="search">
             <SearchIcon width={17} height={17} />
-            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search by name or slug..." aria-label="Search genres" />
-          </div>
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search by name or slug..."
+              aria-label="Search genres"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="admin-genre-search-clear"
+                onClick={handleClearSearch}
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                <CloseIcon width={14} height={14} />
+              </button>
+            )}
+            <button
+              type="submit"
+              className="button button-primary button-small admin-genre-search-btn"
+              aria-label="Search genres"
+            >
+              <SearchIcon width={14} height={14} />
+              <span>Search</span>
+            </button>
+          </form>
           <div className="admin-genre-filters" role="group" aria-label="Filter genres by status">
             {(["ALL", "ACTIVE", "INACTIVE"] as StatusFilter[]).map((status) => (
               <button key={status} type="button" className={statusFilter === status ? "is-active" : ""} aria-pressed={statusFilter === status} onClick={() => { setStatusFilter(status); setPage(0); }}>{status.charAt(0) + status.slice(1).toLowerCase()}</button>
