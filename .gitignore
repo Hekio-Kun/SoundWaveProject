@@ -53,9 +53,14 @@ build/
 nhạc dự án/
 
 ### Documentation / Working Files ###
-docs/backlog_corrected.csv
-docs/backlog_corrected.tsv
-docs/UC-21_Manage_Album_Specification.md
+doc/
+docs/
+**/doc/
+**/docs/
+*.doc
+*.docx
+google_doc_*.txt
+
 ### Diagrams & Design Assets ###
 diagram/
 **/diagram/
