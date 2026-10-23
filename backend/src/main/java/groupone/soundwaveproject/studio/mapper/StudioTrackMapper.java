@@ -16,6 +16,25 @@ import java.util.List;
 @Component
 public class StudioTrackMapper {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StudioTrackMapper.class);
+    public static final String FALLBACK_REJECTION_REASON = "Audio content violates community standards.";
+
+    /**
+     * Gán lý do từ chối kiểm duyệt tiêu chuẩn khi lý do trống hoặc null (Bước 24 trong Sequence Diagram).
+     * Phục vụ Exception EX01: Gán fallback reason và ghi log cảnh báo (data warning).
+     *
+     * @param rawReason Lý do thô nhận từ bản ghi bài hát hoặc kiểm duyệt
+     * @param trackId   ID bài hát để ghi log theo dõi
+     * @return Lý do kiểm duyệt hợp lệ, đảm bảo không bị trống hoặc null
+     */
+    public String assignFallbackReason(String rawReason, Long trackId) {
+        if (rawReason == null || rawReason.isBlank()) {
+            log.warn("Rejection reason is missing for track ID {}. Assigning fallback standard moderation notice [EX01].", trackId);
+            return FALLBACK_REJECTION_REASON;
+        }
+        return rawReason.trim();
+    }
+
     public StudioTrackResponse toStudioTrackResponse(Track track, Genre genre, Album album, TrackSubmission latestSubmission) {
         String genreName = genre != null ? genre.getName() : (track.getGenre() != null ? track.getGenre().getName() : "Unknown");
         String genreSlug = genre != null ? genre.getSlug() : (track.getGenre() != null ? track.getGenre().getSlug() : "");

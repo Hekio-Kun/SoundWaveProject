@@ -327,7 +327,7 @@ export function RejectionDetailsModal({
               }}
             >
               <span>
-                {showHistory ? "Hide submission history" : `View prior submission history (${historyItems.length})`}
+                {showHistory ? "Hide submission history" : `Submission History (${historyItems.length})`}
               </span>
               <span style={{ fontSize: "10px" }}>{showHistory ? "▲" : "▼"}</span>
             </button>

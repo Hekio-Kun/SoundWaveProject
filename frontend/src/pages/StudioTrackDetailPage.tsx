@@ -155,21 +155,18 @@ export function StudioTrackDetailPage({
   const handleOpenRejectionModal = async () => {
     if (!track) return;
     try {
+      setActionError(null);
       const details = await studioApi.getRejectionDetails(track.id);
       setRejectionModalDetails(details);
-    } catch {
-      setRejectionModalDetails({
-        trackId: track.id,
-        trackTitle: track.title,
-        status: "REJECTED",
-        rejectionReason:
-          track.latestRejectionReason ||
-          "Audio content violates community standards.",
-        reviewerNote: track.reviewerNote,
-        reviewedAt: track.reviewedAt || track.createdAt,
-      });
+      setRejectionModalOpen(true);
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Track not found or access denied."
+      );
+      setRejectionModalOpen(false);
     }
-    setRejectionModalOpen(true);
   };
 
   // Edit form state
@@ -614,7 +611,7 @@ export function StudioTrackDetailPage({
                   }}
                 >
                   <AlertIcon width={13} height={13} />
-                  <span>View Rejection</span>
+                  <span>Rejection feedback</span>
                 </button>
               )}
 

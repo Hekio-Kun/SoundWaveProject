@@ -20,7 +20,11 @@ import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.notification.service.NotificationService;
+import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
+import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
+import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
@@ -338,5 +342,126 @@ class StudioTrackServiceTest {
         assertThat(stats.pending()).isEqualTo(1);
         assertThat(stats.approved()).isEqualTo(1);
         assertThat(stats.rejected()).isEqualTo(1);
+    }
+    @Test
+    @DisplayName("UC-20 NF01 & AF01: getRejectionDetails successfully returns rejection details with submission history")
+    void getRejectionDetails_Success_ReturnsRejectionDetailsWithHistory() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track rejectedTrack = Track.builder()
+                .id(501L)
+                .uploaderUserId(10L)
+                .title("My Rejected Song")
+                .slug("my-rejected-song-501")
+                .publicationStatus(TrackPublicationStatus.REJECTED)
+                .latestRejectionReason("Explicit lyrics not labeled")
+                .audioUrl("https://cloudinary.com/audio.mp3")
+                .durationMs(210000)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(501L, 10L))
+                .thenReturn(Optional.of(rejectedTrack));
+
+        TrackSubmission subLatest = TrackSubmission.builder()
+                .id(1002L)
+                .trackId(501L)
+                .status(SubmissionStatus.REJECTED)
+                .rejectionReason("Explicit lyrics not labeled")
+                .reviewerNote("Please add an explicit tag or upload a clean version.")
+                .submittedAt(java.time.Instant.now().minusSeconds(3600))
+                .reviewedAt(java.time.Instant.now())
+                .build();
+
+        TrackSubmission subOld = TrackSubmission.builder()
+                .id(1001L)
+                .trackId(501L)
+                .status(SubmissionStatus.REJECTED)
+                .rejectionReason("Audio distorted")
+                .reviewerNote("High distortion detected.")
+                .submittedAt(java.time.Instant.now().minusSeconds(86400))
+                .reviewedAt(java.time.Instant.now().minusSeconds(80000))
+                .build();
+
+        when(trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(501L))
+                .thenReturn(List.of(subLatest, subOld));
+
+        RejectionDetailsResponse response = studioTrackService.getRejectionDetails(501L, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.trackId()).isEqualTo(501L);
+        assertThat(response.trackTitle()).isEqualTo("My Rejected Song");
+        assertThat(response.status()).isEqualTo("REJECTED");
+        assertThat(response.rejectionReason()).isEqualTo("Explicit lyrics not labeled");
+        assertThat(response.reviewerNote()).isEqualTo("Please add an explicit tag or upload a clean version.");
+        assertThat(response.history()).hasSize(2);
+        assertThat(response.history().get(0).submissionId()).isEqualTo(1002L);
+        assertThat(response.history().get(1).submissionId()).isEqualTo(1001L);
+    }
+
+    @Test
+    @DisplayName("UC-20 Sequence Diagram: getRejectionDetails using GetRejectionDetailsRequest DTO")
+    void getRejectionDetails_UsingRequestDto_Success() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track rejectedTrack = Track.builder()
+                .id(501L)
+                .uploaderUserId(10L)
+                .title("My Rejected Song")
+                .publicationStatus(TrackPublicationStatus.REJECTED)
+                .latestRejectionReason("Audio copyright conflict")
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(501L, 10L))
+                .thenReturn(Optional.of(rejectedTrack));
+        when(trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(501L))
+                .thenReturn(List.of());
+
+        GetRejectionDetailsRequest request = new GetRejectionDetailsRequest(501L);
+        RejectionDetailsResponse response = studioTrackService.getRejectionDetails(request, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.trackId()).isEqualTo(501L);
+        assertThat(response.rejectionReason()).isEqualTo("Audio copyright conflict");
+    }
+
+    @Test
+    @DisplayName("UC-20 EX01: getRejectionDetails assigns fallback reason when rejection reason is null or blank")
+    void getRejectionDetails_FallbackReason_WhenBlankOrNull() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track trackWithoutReason = Track.builder()
+                .id(502L)
+                .uploaderUserId(10L)
+                .title("Song Without Reason")
+                .publicationStatus(TrackPublicationStatus.REJECTED)
+                .latestRejectionReason(null)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(502L, 10L))
+                .thenReturn(Optional.of(trackWithoutReason));
+        when(trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(502L))
+                .thenReturn(List.of());
+
+        RejectionDetailsResponse response = studioTrackService.getRejectionDetails(502L, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.rejectionReason()).isEqualTo(StudioTrackMapper.FALLBACK_REJECTION_REASON);
+    }
+
+    @Test
+    @DisplayName("UC-20 EX02: getRejectionDetails throws ResourceNotFoundException when track not found or access denied")
+    void getRejectionDetails_TrackNotFoundOrNotOwned_ThrowsResourceNotFoundException() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        when(trackRepository.findByIdAndUploaderUserId(999L, 10L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> studioTrackService.getRejectionDetails(999L, "creator@soundwave.com"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Track not found or access denied");
     }
 }
