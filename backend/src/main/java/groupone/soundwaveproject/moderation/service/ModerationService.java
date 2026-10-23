@@ -56,7 +56,6 @@ public class ModerationService {
     private final TrackSubmissionRepository submissionRepository;
     private final TrackRepository trackRepository;
     private final AlbumRepository albumRepository;
-    private final ModerationMailService mailService;
     private final TrackSubmissionMapper mapper;
     private final UserRepository userRepository;
     private final StaffRepository staffRepository;
@@ -288,11 +287,8 @@ public class ModerationService {
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
-        String submitterDisplayName = submitterProfile != null && submitterProfile.getDisplayName() != null && !submitterProfile.getDisplayName().isBlank()
-                ? submitterProfile.getDisplayName() : (submitter != null ? submitter.getEmail() : "Creator");
 
         if (submitter != null) {
-            mailService.sendTrackApprovedEmail(submitter.getEmail(), submitterDisplayName, track.getTitle());
             notificationService.createNotification(
                     submitter.getId(),
                     reviewer.getId(),
@@ -397,11 +393,8 @@ public class ModerationService {
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
-        String submitterDisplayName = submitterProfile != null && submitterProfile.getDisplayName() != null && !submitterProfile.getDisplayName().isBlank()
-                ? submitterProfile.getDisplayName() : (submitter != null ? submitter.getEmail() : "Creator");
 
         if (submitter != null) {
-            mailService.sendTrackTakenDownEmail(submitter.getEmail(), submitterDisplayName, track.getTitle(), reason);
             notificationService.createNotification(
                     submitter.getId(),
                     reviewer.getId(),
