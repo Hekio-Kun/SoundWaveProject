@@ -123,6 +123,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.load();
       if (autoplay) setAudioPlaying(true);
       else setPlaying(false);
+
+      // UC-10: Gửi request GET /api/v1/tracks/{trackId} lấy stream info, tự động tăng play count và ghi history
+      if (track.id) {
+        catalogApi.getTrackById(track.id)
+          .then((freshTrack) => {
+            if (freshTrack) {
+              setCurrentTrack((prev) => (prev && Number(prev.id) === Number(track.id) ? { ...prev, ...freshTrack } : prev));
+              setQueue((prevQueue) =>
+                prevQueue.map((item) => (Number(item.id) === Number(track.id) ? { ...item, ...freshTrack } : item))
+              );
+            }
+          })
+          .catch((err) => {
+            console.warn("Could not sync live track stream info:", err);
+          });
+      }
     },
     [audio, currentTrack?.id, playing, setAudioPlaying]
   );

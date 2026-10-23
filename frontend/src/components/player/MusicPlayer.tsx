@@ -210,14 +210,6 @@ export function MusicPlayer({
    * respects repeat mode, or advances to the next track.
    */
   const handleEnded = () => {
-    const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000;
-    const threshold = dur <= 30 ? dur * 0.9 : 30;
-
-    // BR.13: Only count as valid play if actual accumulated listening time met the threshold
-    if (!recordedRef.current && actualListenedSecondsRef.current >= threshold) {
-      recordedRef.current = true;
-      onRecordPlay?.(track.id, Math.round(actualListenedSecondsRef.current * 1000), true);
-    }
     if (repeat) {
       audio.currentTime = 0;
       recordedRef.current = false;
@@ -304,17 +296,6 @@ export function MusicPlayer({
       }
       lastPlayheadTimeRef.current = cur;
 
-      // BR.13: Listening event is counted when valid listening threshold is reached
-      // Duration <= 30s: Threshold = 90% duration; Duration > 30s: Threshold = 30 seconds
-      if (!recordedRef.current && playing) {
-        const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000;
-        const threshold = dur <= 30 ? dur * 0.9 : 30;
-        if (actualListenedSecondsRef.current >= threshold) {
-          recordedRef.current = true;
-          const completed = cur >= dur * 0.9 || actualListenedSecondsRef.current >= dur * 0.9;
-          onRecordPlay?.(track.id, Math.round(actualListenedSecondsRef.current * 1000), completed);
-        }
-      }
     };
 
     const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : track.durationMs / 1000);
