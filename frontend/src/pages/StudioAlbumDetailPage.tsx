@@ -113,7 +113,7 @@ export function StudioAlbumDetailPage({
       setActionError(null);
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
-      onNavigate("/studio");
+      onNavigate("/album");
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to delete album.");
       setDeleteConfirmOpen(false);
@@ -247,17 +247,10 @@ export function StudioAlbumDetailPage({
         }}
       >
         <button
-          onClick={() => onNavigate("/studio")}
+          onClick={() => onNavigate("/album")}
           style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0 }}
         >
-          Content Studio
-        </button>
-        <span>/</span>
-        <button
-          onClick={() => onNavigate("/studio")}
-          style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0 }}
-        >
-          Albums
+          My Albums
         </button>
         <span>/</span>
         <span style={{ color: "var(--color-ocean-dark, #0F172A)", fontWeight: 700 }}>{album.title}</span>

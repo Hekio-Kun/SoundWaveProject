@@ -21,6 +21,7 @@ public record CreateTrackRequest(
 
         Integer durationMs,
 
+        @Size(max = 1048576, message = "Lyrics content exceeds 1MB limit")
         String lyrics
 ) {
 }

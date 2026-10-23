@@ -482,9 +482,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
   if (!isAuthenticated || !canCreate) {
     return (
       <div className="upload-track-page">
-        <button className="upload-track-back" type="button" onClick={() => onNavigate("/studio")}>
-          <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
-        </button>
         <section className="upload-track-access-card">
           <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
           <h1>{isAuthenticated ? "Creator access required" : "Log in to create an album"}</h1>
@@ -522,8 +519,8 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
             )}
           </p>
           <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate("/studio")}>
-              Open Content Studio
+            <button className="button button-primary" onClick={() => onNavigate("/album")}>
+              Open My Albums
             </button>
           </div>
         </section>

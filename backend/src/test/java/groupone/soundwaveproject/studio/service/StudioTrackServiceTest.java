@@ -146,7 +146,7 @@ class StudioTrackServiceTest {
         });
 
         CreateTrackRequest request = new CreateTrackRequest(
-                "My New Track", 1L, null, null, "Description", 185000, null);
+                "My New Track", 1L, null, null, "Description", 185000, "[00:10.00]Hello world");
 
         StudioTrackResponse response = studioTrackService.createDraft(request, audioFile, null, "creator@soundwave.com");
 
@@ -154,7 +154,102 @@ class StudioTrackServiceTest {
         assertThat(response.id()).isEqualTo(101L);
         assertThat(response.title()).isEqualTo("My New Track");
         assertThat(response.status()).isEqualTo("DRAFT");
+        assertThat(response.lyrics()).isEqualTo("[00:10.00]Hello world");
         verify(trackRepository).save(any(Track.class));
+    }
+
+    @Test
+    @DisplayName("createDraft links album and calculates sequential trackNumber (AF01)")
+    void createDraft_WithAlbum_Success() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+
+        groupone.soundwaveproject.catalog.entity.Album album = groupone.soundwaveproject.catalog.entity.Album.builder()
+                .id(50L)
+                .createdByUserId(10L)
+                .title("Summer Album")
+                .slug("summer-album")
+                .status("DRAFT")
+                .build();
+        when(albumRepository.findByIdAndCreatedByUserId(50L, 10L)).thenReturn(Optional.of(album));
+        when(trackRepository.countByAlbum_Id(50L)).thenReturn(3L);
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+                "audio", "song.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+        StoredAudioResponse audioResponse = new StoredAudioResponse(
+                "audio-50", "https://cloud.com/album-song.mp3", "mp3", 200000);
+        when(cloudMediaService.uploadTrackAudio(audioFile, 10L)).thenReturn(audioResponse);
+
+        when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> {
+            Track t = invocation.getArgument(0);
+            t.setId(102L);
+            return t;
+        });
+
+        CreateTrackRequest request = new CreateTrackRequest(
+                "Album Track", 1L, 50L, null, "Desc", 200000, null);
+
+        StudioTrackResponse response = studioTrackService.createDraft(request, audioFile, null, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.albumId()).isEqualTo(50L);
+        verify(trackRepository).save(argThat(t -> t.getTrackNumber() == 4));
+    }
+
+    @Test
+    @DisplayName("createDraft purges uploaded Cloudinary media when database persistence fails (EX05)")
+    void createDraft_DatabaseFailure_PurgesCloudinaryMedia() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+                "audio", "song.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+        StoredAudioResponse audioResponse = new StoredAudioResponse(
+                "orphan-audio-id", "https://cloud.com/orphan.mp3", "mp3", 150000);
+        when(cloudMediaService.uploadTrackAudio(audioFile, 10L)).thenReturn(audioResponse);
+
+        MockMultipartFile coverFile = new MockMultipartFile(
+                "cover", "art.jpg", "image/jpeg", new byte[]{4, 5, 6});
+        groupone.soundwaveproject.media.dto.response.StoredMediaResponse coverResponse =
+                new groupone.soundwaveproject.media.dto.response.StoredMediaResponse(
+                        "orphan-cover-id", "https://cloud.com/cover.jpg");
+        when(cloudMediaService.uploadTrackCover(coverFile, 10L)).thenReturn(coverResponse);
+
+        when(trackRepository.save(any(Track.class))).thenThrow(new RuntimeException("DB Connection Timeout"));
+
+        CreateTrackRequest request = new CreateTrackRequest(
+                "Orphan Track", 1L, null, null, null, 150000, null);
+
+        assertThatThrownBy(() -> studioTrackService.createDraft(request, audioFile, coverFile, "creator@soundwave.com"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("DB Connection Timeout");
+
+        verify(cloudMediaService).deleteTrackAudioQuietly("orphan-audio-id");
+        verify(cloudMediaService).deleteImageQuietly("orphan-cover-id");
+    }
+
+    @Test
+    @DisplayName("createDraft fails and prevents database persistence when Cloudinary is unavailable (EX04)")
+    void createDraft_CloudStorageFailure_ThrowsException() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+                "audio", "song.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+        when(cloudMediaService.uploadTrackAudio(audioFile, 10L))
+                .thenThrow(new groupone.soundwaveproject.media.exception.CloudStorageUnavailableException());
+
+        CreateTrackRequest request = new CreateTrackRequest(
+                "Failing Track", 1L, null, null, null, 150000, null);
+
+        assertThatThrownBy(() -> studioTrackService.createDraft(request, audioFile, null, "creator@soundwave.com"))
+                .isInstanceOf(groupone.soundwaveproject.media.exception.CloudStorageUnavailableException.class)
+                .hasMessageContaining("Failed to upload media to cloud storage");
+
+        verify(trackRepository, never()).save(any(Track.class));
     }
 
     @Test

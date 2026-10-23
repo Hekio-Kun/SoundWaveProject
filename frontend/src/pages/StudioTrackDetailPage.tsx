@@ -225,6 +225,21 @@ export function StudioTrackDetailPage({
     };
   }, [trackId]);
 
+  useEffect(() => {
+    try {
+      const flash = sessionStorage.getItem("soundwave_flash_toast");
+      if (flash) {
+        sessionStorage.removeItem("soundwave_flash_toast");
+        const parsed = JSON.parse(flash);
+        if (parsed?.message) {
+          setActionSuccess(parsed.message);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Synchronize duration when track metadata is loaded
   useEffect(() => {
     if (track?.durationMs) {
@@ -447,7 +462,7 @@ export function StudioTrackDetailPage({
       setActionError(null);
       await studioApi.deleteTrack(track.id);
       setDeleteConfirmOpen(false);
-      onNavigate("/studio");
+      onNavigate("/track");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete track.";
       setModalError(msg);
@@ -575,8 +590,8 @@ export function StudioTrackDetailPage({
               <span
                 className="staff-crumb-muted"
                 style={{ cursor: "pointer" }}
-                onClick={() => onNavigate("/studio")}
-                title="Back to Content Studio"
+                onClick={() => onNavigate("/track")}
+                title="Back to My Tracks"
               >
                 My Tracks
               </span>
@@ -620,7 +635,7 @@ export function StudioTrackDetailPage({
                 <button
                   type="button"
                   className="studio-crud-btn studio-crud-btn-edit"
-                  onClick={() => onNavigate(`/studio/tracks/${track.id}/edit`)}
+                  onClick={() => onNavigate(`/track/submission/${track.id}/edit`)}
                   title="Edit track information & synchronized lyrics"
                 >
                   <EditIcon width={13} height={13} />
@@ -1407,6 +1422,24 @@ export function StudioTrackDetailPage({
           }
         }}
       />
+
+      {actionSuccess && (
+        <CenterNotificationPopup
+          open={Boolean(actionSuccess)}
+          type="success"
+          message={actionSuccess}
+          onClose={() => setActionSuccess(null)}
+        />
+      )}
+
+      {actionError && (
+        <CenterNotificationPopup
+          open={Boolean(actionError)}
+          type="error"
+          message={actionError}
+          onClose={() => setActionError(null)}
+        />
+      )}
     </div>
   );
 }

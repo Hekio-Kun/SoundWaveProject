@@ -58,7 +58,22 @@ export function AppRouter(): React.ReactElement | null {
   useEffect(() => {
     if (!authReady) return;
     if (!isAuthenticated) {
-      if (pathname.startsWith("/studio")) {
+      if (
+        pathname.startsWith("/studio") ||
+        pathname === "/tracks" ||
+        pathname === "/track" ||
+        pathname.startsWith("/track/submission") ||
+        pathname.startsWith("/track/create") ||
+        pathname.startsWith("/track/upload") ||
+        pathname.startsWith("/track/edit") ||
+        pathname === "/album" ||
+        pathname.startsWith("/album/submission") ||
+        pathname.startsWith("/album/manage") ||
+        pathname.startsWith("/album/create") ||
+        pathname === "/create-track" ||
+        pathname === "/create-album" ||
+        pathname === "/albums/create"
+      ) {
         window.location.hash = "#/login";
         return;
       }
@@ -215,7 +230,15 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname.startsWith("/track/") || pathname.startsWith("/tracks/")) {
+  if (
+    (pathname.startsWith("/track/") || pathname.startsWith("/tracks/")) &&
+    !pathname.startsWith("/track/submission") &&
+    !pathname.startsWith("/track/details") &&
+    !pathname.startsWith("/track/manage") &&
+    !pathname.startsWith("/track/create") &&
+    !pathname.startsWith("/track/upload") &&
+    !pathname.startsWith("/track/edit")
+  ) {
     const parsedId = Number(pathname.split("/")[2]);
     const trackId = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : 1;
     return (
@@ -234,7 +257,13 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname.startsWith("/album/")) {
+  if (
+    pathname.startsWith("/album/") &&
+    !pathname.startsWith("/album/submission") &&
+    !pathname.startsWith("/album/manage") &&
+    !pathname.startsWith("/album/details") &&
+    !pathname.startsWith("/album/create")
+  ) {
     const albumId = Number(pathname.split("/")[2]) || 1;
     return (
       <AlbumDetailsPage
@@ -362,13 +391,19 @@ export function AppRouter(): React.ReactElement | null {
   // 4. Creator Studio Routes
   if (
     (pathname.startsWith("/studio/tracks/") && pathname.endsWith("/edit")) ||
-    (pathname.startsWith("/studio/track/") && pathname.endsWith("/edit"))
+    (pathname.startsWith("/studio/track/") && pathname.endsWith("/edit")) ||
+    (pathname.startsWith("/track/submission/") && pathname.endsWith("/edit")) ||
+    (pathname.startsWith("/track/details/") && pathname.endsWith("/edit")) ||
+    pathname.startsWith("/track/edit/")
   ) {
     if (!authReady || !isAuthenticated) return null;
     const parts = pathname.split("/");
-    const trackId = Number(parts[3]) || Number(parts[2]) || null;
+    const trackId =
+      parts[2] === "edit"
+        ? Number(parts[3]) || null
+        : Number(parts[3]) || Number(parts[2]) || null;
     if (!trackId) {
-      navigate("/studio");
+      navigate("/track");
       return null;
     }
     return (
@@ -381,7 +416,13 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname === "/studio/upload") {
+  if (
+    pathname === "/track/create" ||
+    pathname === "/track/upload" ||
+    pathname === "/studio/tracks" ||
+    pathname === "/studio/upload" ||
+    pathname === "/create-track"
+  ) {
     if (!authReady || !isAuthenticated) return null;
     const editParam = queryParams.get("edit") || queryParams.get("trackId");
     const editTrackId = editParam ? Number(editParam) : undefined;
@@ -395,12 +436,21 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname.startsWith("/studio/tracks/") || pathname.startsWith("/studio/track/")) {
+  if (
+    pathname.startsWith("/track/submission/") ||
+    pathname.startsWith("/track/submissions/") ||
+    pathname.startsWith("/track/details/") ||
+    pathname.startsWith("/studio/tracks/") ||
+    pathname.startsWith("/studio/track/")
+  ) {
     if (!authReady || !isAuthenticated) return null;
     const parts = pathname.split("/");
-    const trackId = Number(parts[3]) || Number(parts[2]) || null;
+    const trackId =
+      pathname.startsWith("/track/submission/") || pathname.startsWith("/track/submissions/") || pathname.startsWith("/track/details/")
+        ? Number(parts[3]) || null
+        : Number(parts[3]) || Number(parts[2]) || null;
     if (!trackId) {
-      navigate("/studio");
+      navigate("/track");
       return null;
     }
     return (
@@ -416,7 +466,12 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname === "/studio/albums/create") {
+  if (
+    pathname === "/album/create" ||
+    pathname === "/create-album" ||
+    pathname === "/albums/create" ||
+    pathname === "/studio/albums/create"
+  ) {
     if (!authReady || !isAuthenticated) return null;
     return (
       <CreateAlbumPage
@@ -428,12 +483,17 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname.startsWith("/studio/albums/")) {
+  if (
+    pathname.startsWith("/album/submission/") ||
+    pathname.startsWith("/album/manage/") ||
+    pathname.startsWith("/album/details/") ||
+    pathname.startsWith("/studio/albums/")
+  ) {
     if (!authReady || !isAuthenticated) return null;
     const parts = pathname.split("/");
     const albumId = Number(parts[3]) || null;
     if (!albumId) {
-      navigate("/studio");
+      navigate("/album");
       return null;
     }
     return (
@@ -448,9 +508,14 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname === "/studio") {
+  if (pathname === "/track" || pathname === "/tracks" || pathname === "/studio") {
     if (!authReady || !isAuthenticated) return null;
-    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} />;
+    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="TRACKS" />;
+  }
+
+  if (pathname === "/album" || pathname === "/studio/albums") {
+    if (!authReady || !isAuthenticated) return null;
+    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="ALBUMS" />;
   }
 
 
