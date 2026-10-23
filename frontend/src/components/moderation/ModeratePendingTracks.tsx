@@ -197,14 +197,26 @@ export function ModeratePendingTracks({
     void loadQueue();
   }, [statusFilter, searchQuery, page]);
 
-  // Debounced search input handler
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearchQuery(searchInput);
+  const handleSearchSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const trimmed = searchInput.trim();
+    if (trimmed === searchQuery && page === 0) {
+      void loadQueue(true);
+    } else {
+      setSearchQuery(trimmed);
       setPage(0);
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [searchInput]);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    if (searchQuery === "" && page === 0) {
+      void loadQueue(true);
+    } else {
+      setSearchQuery("");
+      setPage(0);
+    }
+  };
 
   const handleManualRefresh = () => {
     void loadStats();
@@ -443,27 +455,46 @@ export function ModeratePendingTracks({
           </div>
 
           {/* Search Box */}
-          <div className="staff-search-wrapper">
-            <SearchIcon width={16} height={16} className="staff-search-icon" />
-            <input
-              type="text"
-              placeholder="Search by track title, creator, genre or album..."
-              value={searchInput}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
-              className="staff-search-input"
-              aria-label="Search track submissions"
-            />
-            {searchInput ? (
+          <form className="staff-search-wrapper" onSubmit={handleSearchSubmit} role="search">
+            <div className="staff-search-input-box">
               <button
-                type="button"
-                className="staff-search-clear-btn"
-                onClick={() => setSearchInput("")}
-                aria-label="Clear search query"
+                type="submit"
+                className="staff-search-icon-btn"
+                aria-label="Execute search"
+                title="Search"
               >
-                <CloseIcon width={14} height={14} />
+                <SearchIcon width={16} height={16} className="staff-search-icon" />
               </button>
-            ) : null}
-          </div>
+              <input
+                type="text"
+                placeholder="Search by track title, creator, genre or album..."
+                value={searchInput}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
+                className="staff-search-input"
+                aria-label="Search track submissions"
+              />
+              {searchInput ? (
+                <button
+                  type="button"
+                  className="staff-search-clear-btn"
+                  onClick={handleClearSearch}
+                  aria-label="Clear search query"
+                  title="Clear search"
+                >
+                  <CloseIcon width={14} height={14} />
+                </button>
+              ) : null}
+            </div>
+            <button
+              type="submit"
+              className="button button-primary staff-search-submit-btn"
+              aria-label="Search moderation tracks"
+              title="Search"
+            >
+              <SearchIcon width={15} height={15} />
+              <span>Search</span>
+            </button>
+          </form>
         </div>
 
         {/* Content: Loading Skeleton / Error / Empty State / Queue Cards */}
@@ -504,26 +535,26 @@ export function ModeratePendingTracks({
               <CheckIcon width={36} height={36} />
             </div>
             <h3 className="staff-empty-title">
-              {searchInput
-                ? "No matching submissions found"
+              {searchQuery
+                ? "No matching submissions found."
                 : statusFilter === "PENDING"
                 ? "Moderation Queue Is Clear!"
                 : "No submissions recorded"}
             </h3>
             <p className="staff-empty-description">
-              {searchInput
-                ? `No submissions matched "${searchInput}". Try adjusting keywords or clear the filter.`
+              {searchQuery
+                ? `No submissions matched "${searchQuery}". Try adjusting keywords or clear the filter.`
                 : statusFilter === "PENDING"
                 ? "All track submissions have been reviewed and processed. Excellent work!"
                 : `There are currently no items under the ${statusFilter.toLowerCase()} tab.`}
             </p>
-            {searchInput ? (
+            {searchQuery ? (
               <button
                 type="button"
                 className="button button-secondary button-small"
-                onClick={() => setSearchInput("")}
+                onClick={handleClearSearch}
               >
-                Clear Search Filter
+                Reset / Clear
               </button>
             ) : (
               <button

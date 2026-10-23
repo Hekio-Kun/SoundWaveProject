@@ -86,14 +86,22 @@ public class ModerationService {
                         if (t.getAlbum() != null && t.getAlbum().getTitle() != null && t.getAlbum().getTitle().toLowerCase(Locale.ROOT).contains(trimmedSearch)) {
                             return true;
                         }
+                        if (t.getGenre() != null && t.getGenre().getName() != null && t.getGenre().getName().toLowerCase(Locale.ROOT).contains(trimmedSearch)) {
+                            return true;
+                        }
                         return false;
                     })
                     .map(Track::getId)
                     .toList();
 
-            List<Long> matchingUserIds = userRepository.findByEmailContainingIgnoreCase(trimmedSearch).stream()
+            Set<Long> matchingUserIds = new HashSet<>(userRepository.findByEmailContainingIgnoreCase(trimmedSearch).stream()
                     .map(User::getId)
-                    .toList();
+                    .toList());
+
+            profileRepository.findAll().stream()
+                    .filter(p -> (p.getDisplayName() != null && p.getDisplayName().toLowerCase(Locale.ROOT).contains(trimmedSearch))
+                            || (p.getUsername() != null && p.getUsername().toLowerCase(Locale.ROOT).contains(trimmedSearch)))
+                    .forEach(p -> matchingUserIds.add(p.getUserId()));
 
             if (matchingTrackIds.isEmpty() && matchingUserIds.isEmpty()) {
                 return Page.empty(pageable);
