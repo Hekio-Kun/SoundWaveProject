@@ -801,7 +801,7 @@ export function PendingTrackDetailView({
                     Approve & Publish “{detail.track.title}”
                   </h4>
                   <p className="staff-decision-panel-desc">
-                    The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave. An automated email notification will be delivered to the artist.
+                    The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave.
                   </p>
 
                   <label className="staff-input-group" htmlFor="detail-approve-note">

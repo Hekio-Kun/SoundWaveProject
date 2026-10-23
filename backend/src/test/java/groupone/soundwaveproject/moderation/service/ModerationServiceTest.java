@@ -44,7 +44,6 @@ class ModerationServiceTest {
     @Mock private TrackSubmissionRepository submissionRepository;
     @Mock private TrackRepository trackRepository;
     @Mock private AlbumRepository albumRepository;
-    @Mock private ModerationMailService mailService;
     @Mock private TrackSubmissionMapper mapper;
     @Mock private UserRepository userRepository;
     @Mock private StaffRepository staffRepository;
@@ -61,7 +60,6 @@ class ModerationServiceTest {
                 submissionRepository,
                 trackRepository,
                 albumRepository,
-                mailService,
                 mapper,
                 userRepository,
                 staffRepository,
@@ -170,7 +168,6 @@ class ModerationServiceTest {
 
         verify(trackRepository).save(testTrack);
         verify(submissionRepository).save(submission);
-        verifyNoInteractions(mailService);
     }
 
     @Test
