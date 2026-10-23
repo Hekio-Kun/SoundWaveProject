@@ -112,6 +112,44 @@ class TrackCatalogServiceTest {
     }
 
     @Test
+    void getTrackStream_authenticated_incrementsPlayCountAndRecordsHistory() {
+        Track track = createMockTrack(10L, "hit-song", TrackPublicationStatus.PUBLISHED);
+        when(trackRepository.findByIdAndPublicationStatus(10L, TrackPublicationStatus.PUBLISHED))
+                .thenReturn(Optional.of(track));
+        when(userAccountPublicService.findUserSummaryById(100L))
+                .thenReturn(Optional.of(new UserProfileSummary(100L, "creator@test.com", "Minh An", "avatar.jpg", "LISTENER")));
+        when(userAccountPublicService.findUserIdByEmail("listener@test.com"))
+                .thenReturn(Optional.of(77L));
+
+        TrackResponse response = trackCatalogService.getTrackStream("10", "listener@test.com");
+
+        assertNotNull(response);
+        assertEquals(10L, response.id());
+        assertEquals(16L, response.playCount()); // 15 + 1
+
+        verify(trackRepository).incrementPlayCount(10L);
+        verify(listeningHistoryPublicService).recordListeningHistory(77L, 10L, 0, false);
+    }
+
+    @Test
+    void getTrackStream_guest_doesNotIncrementPlayCountNorRecordHistory() {
+        Track track = createMockTrack(10L, "hit-song", TrackPublicationStatus.PUBLISHED);
+        when(trackRepository.findByIdAndPublicationStatus(10L, TrackPublicationStatus.PUBLISHED))
+                .thenReturn(Optional.of(track));
+        when(userAccountPublicService.findUserSummaryById(100L))
+                .thenReturn(Optional.of(new UserProfileSummary(100L, "creator@test.com", "Minh An", "avatar.jpg", "LISTENER")));
+
+        TrackResponse response = trackCatalogService.getTrackStream("10", null);
+
+        assertNotNull(response);
+        assertEquals(10L, response.id());
+        assertEquals(15L, response.playCount()); // Unchanged
+
+        verify(trackRepository, never()).incrementPlayCount(anyLong());
+        verifyNoInteractions(listeningHistoryPublicService);
+    }
+
+    @Test
     void recordTrackPlay_guest_incrementsPlayCount_withoutListeningHistory() {
         Track track = createMockTrack(1L, "test-song", TrackPublicationStatus.PUBLISHED);
         when(trackRepository.findById(1L)).thenReturn(Optional.of(track));

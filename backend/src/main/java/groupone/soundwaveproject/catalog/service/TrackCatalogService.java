@@ -44,6 +44,52 @@ public class TrackCatalogService {
     }
 
     /**
+     * Lấy dữ liệu phát bài hát và URL stream CDN (UC-10: Play Music).
+     * <p>
+     * Tuân thủ quy tắc:
+     * - Chỉ phát bài hát có trạng thái PUBLISHED (ném ResourceNotFoundException nếu không hợp lệ).
+     * - Nếu người nghe đã đăng nhập (userEmail != null): tự động tăng play count và ghi nhận lịch sử nghe nhạc ngay khi bắt đầu phát.
+     * - Nếu là khách vãng lai (Guest): cho phép nghe nhạc nhưng không tăng play count và không lưu lịch sử.
+     *
+     * @param idOrSlug Numeric ID or unique URL slug of the track.
+     * @param userEmail Email of authenticated listener, or null if guest.
+     * @return {@link TrackResponse} containing playback details and metadata.
+     * @throws ResourceNotFoundException if the track does not exist or is not published.
+     */
+    @Transactional
+    public TrackResponse getTrackStream(String idOrSlug, String userEmail) {
+        if (idOrSlug == null || idOrSlug.isBlank()) {
+            throw new ResourceNotFoundException("TRACK_UNAVAILABLE", "Track unavailable");
+        }
+
+        Track track;
+        if (idOrSlug.matches("\\d+")) {
+            Long trackId = Long.valueOf(idOrSlug);
+            track = trackRepository.findByIdAndPublicationStatus(trackId, TrackPublicationStatus.PUBLISHED)
+                    .orElseThrow(() -> new ResourceNotFoundException("TRACK_UNAVAILABLE", "Track unavailable"));
+        } else {
+            track = trackRepository.findBySlugAndPublicationStatus(idOrSlug, TrackPublicationStatus.PUBLISHED)
+                    .orElseThrow(() -> new ResourceNotFoundException("TRACK_UNAVAILABLE", "Track unavailable"));
+        }
+
+        long currentPlayCount = track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L;
+        long responsePlayCount = currentPlayCount;
+
+        // opt [User is Authenticated Listener (userId != null)]
+        if (userEmail != null && !userEmail.isBlank()) {
+            trackRepository.incrementPlayCount(track.getId());
+            responsePlayCount = currentPlayCount + 1L;
+
+            Optional<Long> userIdOpt = userAccountPublicService.findUserIdByEmail(userEmail);
+            if (userIdOpt.isPresent()) {
+                listeningHistoryPublicService.recordListeningHistory(userIdOpt.get(), track.getId(), 0, false);
+            }
+        }
+
+        return mapToTrackResponse(track, responsePlayCount);
+    }
+
+    /**
      * Retrieves published track metadata and CDN streaming audio URL (Stream Music Phase 1).
      * <p>
      * Enforces business rule BR-09: Only tracks with publication status 'PUBLISHED'
@@ -271,6 +317,11 @@ public class TrackCatalogService {
      * @return Populated {@link TrackResponse} containing audio URL, genre, album, and creator summaries.
      */
     private TrackResponse mapToTrackResponse(Track track) {
+        long playCount = track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L;
+        return mapToTrackResponse(track, playCount);
+    }
+
+    private TrackResponse mapToTrackResponse(Track track, long playCount) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
             albumSummary = new TrackResponse.TrackAlbumSummary(
@@ -300,7 +351,7 @@ public class TrackCatalogService {
                 track.getAudioUrl(),
                 track.getCoverUrl(),
                 track.getDurationMs(),
-                track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L,
+                playCount,
                 track.getPublicationStatus().name(),
                 track.getGenre() != null ? track.getGenre().getSlug() : null,
                 track.getGenre() != null ? track.getGenre().getName() : null,
