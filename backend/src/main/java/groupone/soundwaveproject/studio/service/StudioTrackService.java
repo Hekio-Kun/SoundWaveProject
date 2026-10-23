@@ -30,6 +30,7 @@ import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository
 import groupone.soundwaveproject.notification.entity.NotificationType;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
+import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
@@ -363,14 +364,42 @@ public class StudioTrackService {
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, null);
     }
 
+        /**
+     * Tra cứu chi tiết lý do từ chối kiểm duyệt của bài hát theo request DTO (UC-20 theo Sequence Diagram).
+     * Bước 5: getRejectionDetails(rejectionRequestDTO, currentUserEmail)
+     */
+    @Transactional(readOnly = true)
+    public RejectionDetailsResponse getRejectionDetails(GetRejectionDetailsRequest request, String currentUserEmail) {
+        if (request == null || request.trackId() == null) {
+            throw new ResourceNotFoundException("Track not found or access denied.");
+        }
+        return getRejectionDetails(request.trackId(), currentUserEmail);
+    }
+
+    /**
+     * Tra cứu chi tiết lý do từ chối kiểm duyệt bài hát theo trackId (UC-20: View Rejection Reason).
+     * Bước 6: uploader = validateAndGetUploader(currentUserEmail)
+     * Bước 7: optionalTrack = trackRepository.findByIdAndUploaderUserId(trackId, uploader.getId())
+     * Bước 13 (Alt: Track not found / access denied): throw ResourceNotFoundException("Track not found or access denied.")
+     * Bước 16 (Alt: Track exists and owned by listener): track = optionalTrack.get()
+     * Bước 17: submissionsList = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(trackId)
+     * Bước 23: rejectionDetailsResponse = studioTrackMapper.toRejectionDetails(track, submissionsList)
+     */
     @Transactional(readOnly = true)
     public RejectionDetailsResponse getRejectionDetails(Long id, String currentUserEmail) {
-        User user = getAuthenticatedUser(currentUserEmail);
-        Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
+        User uploader = validateAndGetUploader(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(id, uploader.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        List<TrackSubmission> submissions = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(track.getId());
-        return studioTrackMapper.toRejectionDetails(track, submissions);
+        List<TrackSubmission> submissionsList = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(track.getId());
+        return studioTrackMapper.toRejectionDetails(track, submissionsList);
+    }
+
+    /**
+     * Xác thực và lấy đối tượng người dùng sở hữu (uploader) theo email (Bước 6 trong Sequence Diagram).
+     */
+    private User validateAndGetUploader(String email) {
+        return getAuthenticatedUser(email);
     }
 
     @Transactional(readOnly = true)

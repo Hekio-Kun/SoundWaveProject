@@ -1,6 +1,7 @@
 package groupone.soundwaveproject.studio.controller;
 
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
+import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.request.SubmitTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;

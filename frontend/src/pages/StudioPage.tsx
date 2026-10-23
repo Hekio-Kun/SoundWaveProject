@@ -470,32 +470,23 @@ export function StudioPage({
   }, [playing, previewAudioPlaying]);
 
   // View Rejection Reason (UC-20)
+  // View Rejection Reason (UC-20 theo đúng Sequence Diagram & Đặc tả RDS)
   const handleViewRejection = async (track: StudioTrack) => {
     try {
-      const details = await studioApi.getRejectionDetails(track.id).catch(() => null);
-      if (details) {
-        setRejectionModalTrack(details);
-      } else {
-        setRejectionModalTrack({
-          trackId: track.id,
-          trackTitle: track.title,
-          status: "REJECTED",
-          rejectionReason:
-            track.latestRejectionReason ||
-            "The audio file or metadata does not satisfy SoundWave community standards.",
-          reviewerNote: track.reviewerNote,
-          reviewedAt: track.createdAt,
-        });
-      }
-    } catch {
-      setRejectionModalTrack({
-        trackId: track.id,
-        trackTitle: track.title,
-        status: "REJECTED",
-        rejectionReason:
-          track.latestRejectionReason || "Audio content violates policy.",
-        reviewedAt: track.createdAt,
-      });
+      setActionError(null);
+      // Bước 2: getRejectionDetails(trackId) -> Gọi API backend
+      const details = await studioApi.getRejectionDetails(track.id);
+      // Bước 30: openModal(rejectionDetailsResponse)
+      setRejectionModalTrack(details);
+    } catch (err: unknown) {
+      // Bước 15 & Exception EX02: displayErrorNotification("Track not found or access denied.")
+      const errorMessage =
+        err instanceof Error && err.message
+          ? err.message
+          : "Track not found or access denied.";
+      setActionError(errorMessage);
+      setRejectionModalTrack(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -945,7 +936,7 @@ export function StudioPage({
                             }}
                           >
                             <AlertIcon width={13} height={13} />
-                            <span>View Rejection</span>
+                            <span>Rejection feedback</span>
                           </button>
                         )}
                         <button
