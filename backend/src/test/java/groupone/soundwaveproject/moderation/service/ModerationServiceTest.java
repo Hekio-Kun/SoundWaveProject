@@ -160,7 +160,7 @@ class ModerationServiceTest {
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
 
-        RejectTrackRequest request = new RejectTrackRequest("Audio clipping detected", "Please re-export in WAV");
+        RejectTrackRequest request = new RejectTrackRequest("Audio clipping detected");
         moderationService.rejectSubmission(1L, request, "staff@soundwave.com");
 
         assertEquals(SubmissionStatus.REJECTED, submission.getStatus());
@@ -170,6 +170,7 @@ class ModerationServiceTest {
 
         verify(trackRepository).save(testTrack);
         verify(submissionRepository).save(submission);
+        verifyNoInteractions(mailService);
     }
 
     @Test

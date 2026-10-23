@@ -89,7 +89,6 @@ export function PendingTrackDetailView({
   const [actionType, setActionType] = useState<"APPROVE" | "REJECT" | null>(null);
   const [approveNote, setApproveNote] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
-  const [rejectNote, setRejectNote] = useState("");
   const [submittingAction, setSubmittingAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -127,7 +126,6 @@ export function PendingTrackDetailView({
     setActionType(null);
     setApproveNote("");
     setRejectionReason("");
-    setRejectNote("");
     setActionError(null);
     setIsPlaying(false);
     setCurrentTime(0);
@@ -263,8 +261,7 @@ export function PendingTrackDetailView({
     try {
       const updated = await moderationApi.rejectSubmission(
         detail.id,
-        rejectionReason.trim(),
-        rejectNote.trim() || undefined
+        rejectionReason.trim()
       );
       if (audioRef.current) audioRef.current.pause();
       setDetail(updated);
@@ -900,19 +897,6 @@ export function PendingTrackDetailView({
                     >
                       {rejectionReason.trim().length} / 10 minimum characters
                     </span>
-                  </label>
-
-                  <label className="staff-input-group" htmlFor="detail-reject-internal-note">
-                    <span className="staff-input-label">Internal Operations Note (Optional)</span>
-                    <input
-                      id="detail-reject-internal-note"
-                      type="text"
-                      className="staff-text-input"
-                      placeholder="Internal audit notes for moderation records..."
-                      value={rejectNote}
-                      onChange={(e) => setRejectNote(e.target.value)}
-                      disabled={submittingAction}
-                    />
                   </label>
 
                   {actionError ? (

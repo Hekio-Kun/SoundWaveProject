@@ -45,32 +45,6 @@ public class ModerationMailService {
     }
 
     /**
-     * Gửi email thông báo bài hát bị từ chối phê duyệt kèm lý do cụ thể (UC-24.2 Reject Track).
-     *
-     * @param recipient       Địa chỉ email người nhận (nghệ sĩ/tác giả)
-     * @param displayName     Tên hiển thị của nghệ sĩ
-     * @param trackTitle      Tiêu đề bài hát bị từ chối
-     * @param rejectionReason Lý do từ chối cụ thể từ kiểm duyệt viên
-     */
-    public void sendTrackRejectedEmail(String recipient, String displayName, String trackTitle, String rejectionReason) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromAddress);
-            message.setTo(recipient);
-            message.setSubject("Your track \"" + trackTitle + "\" submission update");
-            message.setText("Hello " + displayName + ",\n\n"
-                    + "Thank you for submitting your track \"" + trackTitle + "\" to SoundWave.\n\n"
-                    + "After careful review, we regret to inform you that your track has not been approved for publication.\n\n"
-                    + "Reason for rejection:\n" + rejectionReason + "\n\n"
-                    + "You can review our community guidelines, update your track, and submit again.\n\n"
-                    + "Best regards,\nSoundWave Team");
-            mailSender.send(message);
-        } catch (Exception ex) {
-            log.warn("Failed to send track rejection email to {}: {}", recipient, ex.getMessage());
-        }
-    }
-
-    /**
      * Gửi email thông báo bài hát đã bị gỡ bỏ khỏi hệ thống do vi phạm chính sách hoặc bản quyền (UC-24.2 Take Down Track).
      *
      * @param recipient      Địa chỉ email người nhận (nghệ sĩ/tác giả)
