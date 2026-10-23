@@ -4,7 +4,7 @@ export const MAX_LYRICS_SIZE = 1024 * 1024;
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "flac"];
 const COVER_EXTENSIONS = ["jpg", "jpeg", "png"];
-const LYRICS_EXTENSIONS = ["lrc", "txt"];
+const LYRICS_EXTENSIONS = ["lrc"];
 
 function hasAllowedExtension(file: File, allowedExtensions: string[]) {
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -25,7 +25,7 @@ export function validateCoverFile(file: File) {
 
 export function validateLyricsFile(file: File) {
   if (file.size > MAX_LYRICS_SIZE) return "Lyrics file must be smaller than 1MB.";
-  if (!hasAllowedExtension(file, LYRICS_EXTENSIONS)) return "Choose an LRC lyrics file.";
+  if (!hasAllowedExtension(file, LYRICS_EXTENSIONS)) return "Please select a valid .lrc lyrics file or create lyrics manually.";
   return "";
 }
 

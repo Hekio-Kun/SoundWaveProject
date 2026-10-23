@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
@@ -12,7 +12,6 @@ import { MediaUploadField } from "../components/common/MediaUploadField";
 import {
   AlertIcon,
   CheckIcon,
-  ChevronLeftIcon,
   CloseIcon,
   EditIcon,
   FileTextIcon,
@@ -64,24 +63,26 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [uploadedTrackTitle, setUploadedTrackTitle] = useState("");
-  const [uploadedStatus, setUploadedStatus] = useState<"DRAFT" | "PENDING">("DRAFT");
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [unsavedModalOpen, setUnsavedModalOpen] = useState(false);
   const [showLyricMaker, setShowLyricMaker] = useState(false);
   const [copyrightAgreed, setCopyrightAgreed] = useState(false);
   const [submitterNote, setSubmitterNote] = useState("");
   const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
-  useModalScrollLock(confirmModalOpen);
+  useModalScrollLock(confirmModalOpen || unsavedModalOpen);
 
   useEffect(() => {
-    if (!confirmModalOpen) return;
+    if (!confirmModalOpen && !unsavedModalOpen) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) setConfirmModalOpen(false);
+      if (e.key === "Escape" && !submitting) {
+        setConfirmModalOpen(false);
+        setUnsavedModalOpen(false);
+      }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [confirmModalOpen, submitting]);
+  }, [confirmModalOpen, unsavedModalOpen, submitting]);
 
   const loadOptions = async () => {
     if (!isAuthenticated || !canUpload) return;
@@ -252,12 +253,12 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
     requestAnimationFrame(() => document.getElementById(targetId)?.focus());
   };
 
-  const processUpload = async (submitForReview: boolean, note?: string) => {
+  const processUpload = async (submitForReview: boolean, note?: string, redirectToStudio = false) => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       focusFirstError(errors);
-      return;
+      return false;
     }
 
     setSubmitting(true);
@@ -294,22 +295,28 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
       if (submitForReview && targetTrackId) {
         await studioApi.submitForReview(targetTrackId, note);
-        setUploadedStatus("PENDING");
-      } else {
-        setUploadedStatus("DRAFT");
+        sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
+          message: isEditMode
+            ? "Track resubmitted for review successfully!"
+            : "Track submitted for review successfully!",
+          type: "success",
+        }));
+        onNavigate(`/track/submission/${targetTrackId}`);
+        return true;
       }
-      setUploadedTrackTitle(title.trim());
-      setPageToast({
+
+      const successMsg = isEditMode ? "Draft updated successfully!" : "Draft saved successfully!";
+      sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
+        message: successMsg,
         type: "success",
-        message: isEditMode
-          ? submitForReview
-            ? "Track submitted for review successfully!"
-            : "Draft updated successfully!"
-          : submitForReview
-          ? "Track submitted for review successfully!"
-          : "Draft saved successfully!",
-      });
-      document.getElementById("app-scroll-region")?.scrollTo({ top: 0, behavior: "smooth" });
+      }));
+
+      if (redirectToStudio) {
+        onNavigate("/track");
+      } else {
+        onNavigate(`/track/submission/${targetTrackId}`);
+      }
+      return true;
     } catch (error: unknown) {
       if (error instanceof TrackApiError && Object.keys(error.fieldErrors).length > 0) {
         const errors = { ...error.fieldErrors };
@@ -317,7 +324,13 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
         setFormErrors((current) => ({ ...current, ...errors }));
         focusFirstError(errors);
       }
-      setSubmitError(error instanceof Error ? error.message : "The track could not be saved.");
+      const rawMsg = error instanceof Error ? error.message : "The track could not be saved.";
+      if (rawMsg.toLowerCase().includes("cloud") || rawMsg.toLowerCase().includes("failed to upload media")) {
+        setSubmitError("Failed to upload media to cloud storage. Please check your connection and retry.");
+      } else {
+        setSubmitError(rawMsg);
+      }
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -345,10 +358,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
   };
 
   const resetForm = () => {
-    if (isEditMode) {
-      onNavigate("/studio");
-      return;
-    }
     setTitle("");
     setGenreId(genres[0]?.id ?? 0);
     setAlbumId("");
@@ -360,9 +369,8 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
     setDurationMs(undefined);
     setFormErrors({});
     setSubmitError("");
-    setUploadedTrackTitle("");
-    setUploadedStatus("DRAFT");
     setConfirmModalOpen(false);
+    setUnsavedModalOpen(false);
     setShowLyricMaker(false);
     setCopyrightAgreed(false);
     setSubmitterNote("");
@@ -370,12 +378,83 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
     setExistingCoverUrl(null);
   };
 
+  const hasUnsavedChanges = () => {
+    if (isEditMode) {
+      if (!existingTrack) return false;
+      return (
+        title.trim() !== (existingTrack.title || "").trim() ||
+        genreId !== (existingTrack.genreId || 0) ||
+        albumId !== (existingTrack.albumId ?? "") ||
+        description.trim() !== (existingTrack.description || "").trim() ||
+        lyrics.trim() !== (existingTrack.lyrics || "").trim() ||
+        audioFile !== null ||
+        coverFile !== null
+      );
+    }
+    const initialGenreId = genres[0]?.id || 0;
+    return Boolean(
+      title.trim() !== "" ||
+      (genreId !== 0 && genreId !== initialGenreId) ||
+      albumId !== "" ||
+      description.trim() !== "" ||
+      audioFile !== null ||
+      coverFile !== null ||
+      lyricsFile !== null ||
+      lyrics.trim() !== ""
+    );
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges()) {
+      setUnsavedModalOpen(true);
+    } else {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+      }
+    }
+  };
+
+  const handleBackRef = useRef(handleBack);
+  handleBackRef.current = handleBack;
+
+  useEffect(() => {
+    const handleSoundWaveBack = (e: Event) => {
+      e.preventDefault();
+      handleBackRef.current();
+    };
+    window.addEventListener("soundwave:back", handleSoundWaveBack);
+    return () => {
+      window.removeEventListener("soundwave:back", handleSoundWaveBack);
+    };
+  }, []);
+
+  const handleCancel = () => {
+    if (hasUnsavedChanges()) {
+      setUnsavedModalOpen(true);
+    } else {
+      resetForm();
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+      }
+    }
+  };
+
+  const handleSaveAndExit = async () => {
+    const success = await processUpload(false, undefined, true);
+    if (success) {
+      setUnsavedModalOpen(false);
+    } else {
+      setUnsavedModalOpen(false);
+    }
+  };
+
   if (!isAuthenticated || !canUpload) {
     return (
       <div className="upload-track-page">
-        <button className="upload-track-back" type="button" onClick={() => onNavigate("/studio")}>
-          <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
-        </button>
         <section className="upload-track-access-card">
           <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
           <h1>{isAuthenticated ? "Listener access required" : "Log in to upload music"}</h1>
@@ -404,13 +483,10 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
   if (trackFetchError) {
     return (
       <div className="upload-track-page">
-        <button className="upload-track-back" type="button" onClick={() => onNavigate("/studio")}>
-          <ChevronLeftIcon width={17} height={17} /> Back to Content Studio
-        </button>
         <div className="auth-v2-error upload-track-alert" role="alert" style={{ margin: "24px 0" }}>
           <span><AlertIcon width={17} height={17} /></span>
           <div><b>Unable to load track</b><small>{trackFetchError}</small></div>
-          <button className="button button-secondary button-small" type="button" onClick={() => onNavigate("/studio")}>Back to Studio</button>
+          <button className="button button-secondary button-small" type="button" onClick={() => onNavigate("/track")}>Back to My Tracks</button>
         </div>
       </div>
     );
@@ -419,9 +495,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
   if (existingTrack && existingTrack.status === "PENDING") {
     return (
       <div className="upload-track-page">
-        <button className="upload-track-back" type="button" onClick={() => onNavigate(`/studio/tracks/${existingTrack.id}`)}>
-          <ChevronLeftIcon width={17} height={17} /> Back to Track Details
-        </button>
         <section className="upload-track-success" role="status" style={{ borderTop: "4px solid #EAB308" }}>
           <span className="upload-track-success__icon" style={{ background: "#FEF9C3", color: "#CA8A04" }}>
             <AlertIcon width={34} height={34} />
@@ -433,40 +506,11 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
             If you need to make changes, please withdraw the submission first from the track details page.
           </p>
           <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate(`/studio/tracks/${existingTrack.id}`)}>
+            <button className="button button-primary" onClick={() => onNavigate(`/track/submission/${existingTrack.id}`)}>
               Go to Track Details
             </button>
-            <button className="button button-secondary" onClick={() => onNavigate("/studio")}>
-              Return to Content Studio
-            </button>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  if (uploadedTrackTitle) {
-    return (
-      <div className="upload-track-page">
-        <section className="upload-track-success" role="status">
-          <span className="upload-track-success__icon"><CheckIcon width={34} height={34} /></span>
-          <span className="eyebrow">{uploadedStatus === "PENDING" ? "SUBMITTED FOR REVIEW" : isEditMode ? "DRAFT UPDATED" : "UPLOAD COMPLETE"}</span>
-          <h1>{uploadedStatus === "PENDING" ? "Track queued for staff review" : isEditMode ? "Draft updated successfully" : "Your draft is ready"}</h1>
-          <p>
-            {uploadedStatus === "PENDING" ? (
-              <><strong>{uploadedTrackTitle}</strong> has been submitted to the moderation queue. Staff will examine the audio and metadata before making it publicly accessible.</>
-            ) : isEditMode ? (
-              <><strong>{uploadedTrackTitle}</strong> has been updated and saved in your drafts. You can review it in Content Studio before submitting it to staff.</>
-            ) : (
-              <><strong>{uploadedTrackTitle}</strong> has been uploaded and saved as a private draft. Review it in Content Studio before submitting it to staff.</>
-            )}
-          </p>
-          <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate(isEditMode && editTrackId ? `/studio/tracks/${editTrackId}` : "/studio")}>
-              {isEditMode ? "View track details" : "Open Content Studio"}
-            </button>
-            <button className="button button-secondary" onClick={() => onNavigate("/studio")}>
-              Return to Content Studio
+            <button className="button button-secondary" onClick={() => onNavigate("/track")}>
+              Return to My Tracks
             </button>
           </div>
         </section>
@@ -476,14 +520,6 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   return (
     <div className="upload-track-page">
-      <button
-        className="upload-track-back"
-        type="button"
-        onClick={() => onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/studio/tracks/${editTrackId}` : "/studio")}
-      >
-        <ChevronLeftIcon width={17} height={17} /> {isEditMode && existingTrack?.status !== "DRAFT" ? "Back to Track Details" : "Back to Content Studio"}
-      </button>
-
       <header className="upload-track-hero">
         <span className="upload-track-hero__icon">
           {isEditMode ? <EditIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
@@ -654,7 +690,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
                 id="lyrics-upload"
                 label="Lyrics file"
                 helperText="LRC · Max 1MB · Optional"
-                accept=".lrc,text/plain"
+                accept=".lrc"
                 file={lyricsFile}
                 existingFileLabel={lyrics ? "Existing lyrics attached" : undefined}
                 error={formErrors.lyrics}
@@ -706,31 +742,35 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
           )}
 
           <div className="upload-track-actions">
-            <button className="button button-secondary" type="button" disabled={submitting} onClick={() => onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/studio/tracks/${editTrackId}` : "/studio")}>Cancel</button>
             <button
               className="button button-secondary"
+              type="button"
+              disabled={submitting}
+              id="btn-upload-cancel"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              className="button button-primary"
               type="submit"
               disabled={submitting || loadingOptions || Boolean(optionsError)}
               id="btn-upload-save-draft"
             >
-              {isEditMode ? "Save draft changes" : "Save draft"}
+              {isEditMode ? "Save draft changes" : "Save as draft"}
             </button>
-            <button
-              className="button button-primary"
-              type="button"
-              disabled={submitting || loadingOptions || Boolean(optionsError)}
-              onClick={handleStartSubmitReview}
-              id="btn-upload-submit-review"
-            >
-              <UploadIcon width={17} height={17} />{" "}
-              {submitting
-                ? "Saving..."
-                : existingTrack?.status === "REJECTED"
-                ? "Resubmit for review"
-                : isEditMode
-                ? "Save & submit for review"
-                : "Submit for review"}
-            </button>
+            {(isEditMode && existingTrack?.status === "REJECTED") && (
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={submitting || loadingOptions || Boolean(optionsError)}
+                onClick={handleStartSubmitReview}
+                id="btn-upload-submit-review"
+              >
+                <UploadIcon width={17} height={17} />{" "}
+                {submitting ? "Saving..." : "Resubmit for review"}
+              </button>
+            )}
           </div>
         </form>
 
@@ -801,6 +841,74 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
                 {submitting
                   ? (existingTrack?.status === "REJECTED" ? "Resubmitting..." : "Submitting...")
                   : (existingTrack?.status === "REJECTED" ? "Agree & Resubmit" : "Agree & Submit")}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Unsaved Changes Confirmation Modal (AF03) */}
+      {unsavedModalOpen && createPortal(
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => !submitting && setUnsavedModalOpen(false)}
+        >
+          <div
+            className="modal-card modal-card--narrow"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsaved-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 id="unsaved-modal-title">Unsaved changes</h3>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setUnsavedModalOpen(false)}
+                disabled={submitting}
+                aria-label="Close dialog"
+              >
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <p style={{ margin: "14px 0 20px", color: "var(--sw-text-secondary, #57534E)", lineHeight: 1.5 }}>
+              You have unsaved changes in your track draft. What would you like to do before leaving?
+            </p>
+            <div className="modal-actions" style={{ display: "flex", gap: "10px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => setUnsavedModalOpen(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={submitting}
+                onClick={() => {
+                  setUnsavedModalOpen(false);
+                  resetForm();
+                  if (window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+                  }
+                }}
+              >
+                Don't Save
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={submitting}
+                onClick={() => void handleSaveAndExit()}
+              >
+                {submitting ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

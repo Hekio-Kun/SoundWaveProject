@@ -15,6 +15,7 @@ import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import {
   AlertIcon,
   CheckIcon,
@@ -27,7 +28,6 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
-  SearchIcon,
   TrashIcon,
   UploadIcon,
 } from "../icons";
@@ -54,6 +54,7 @@ type Props = {
   audio?: HTMLAudioElement;
   playing?: boolean;
   onPlayingChange?: (playing: boolean) => void;
+  initialTab?: "TRACKS" | "ALBUMS";
 };
 
 export function StudioPage({
@@ -62,6 +63,7 @@ export function StudioPage({
   audio,
   playing = false,
   onPlayingChange,
+  initialTab = "TRACKS",
 }: Props) {
   const [filterStatus, setFilterStatus] = useState<
     "ALL" | "DRAFT" | "PENDING" | "APPROVED" | "REJECTED"
@@ -113,7 +115,13 @@ export function StudioPage({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Navigation: Tracks vs Albums
-  const [activeStudioTab, setActiveStudioTab] = useState<"TRACKS" | "ALBUMS">("TRACKS");
+  const [activeStudioTab, setActiveStudioTab] = useState<"TRACKS" | "ALBUMS">(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveStudioTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Albums state (UC-21: Manage My Album)
   const [albumList, setAlbumList] = useState<StudioAlbum[]>([]);
@@ -220,6 +228,21 @@ export function StudioPage({
     void loadStudioData();
   }, [filterStatus]);
 
+  useEffect(() => {
+    try {
+      const flash = sessionStorage.getItem("soundwave_flash_toast");
+      if (flash) {
+        sessionStorage.removeItem("soundwave_flash_toast");
+        const parsed = JSON.parse(flash);
+        if (parsed?.message) {
+          setActionSuccess(parsed.message);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Rule 4.7: Modal background scroll lock
   useModalScrollLock(
     Boolean(
@@ -244,7 +267,7 @@ export function StudioPage({
 
   // View Detail (Navigate to dedicated Track Details page)
   const handleOpenDetail = (track: StudioTrack) => {
-    onNavigate(`/studio/tracks/${track.id}`);
+    onNavigate(`/track/submission/${track.id}`);
   };
 
   // Open Edit Modal (UC-19.3)
@@ -544,16 +567,16 @@ export function StudioPage({
           {activeStudioTab === "TRACKS" ? (
             <button
               className="button button-primary"
-              onClick={() => onNavigate("/studio/upload")}
+              onClick={() => onNavigate("/track/create")}
               id="btn-open-create-track"
             >
               <UploadIcon width={18} height={18} />
-              <span>Upload track</span>
+              <span>Create track</span>
             </button>
           ) : (
             <button
               className="button button-primary"
-              onClick={() => onNavigate("/studio/albums/create")}
+              onClick={() => onNavigate("/album/create")}
               id="btn-open-create-album"
             >
               <PlusIcon width={18} height={18} />
@@ -598,173 +621,69 @@ export function StudioPage({
         </div>
       )}
 
-      {/* Studio Navigation Tabs (Tracks vs Albums) */}
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          borderBottom: "2px solid var(--color-sand-light, #F5EFE6)",
-          paddingBottom: "12px",
-          marginBottom: "24px",
-        }}
-      >
-        <button
-          type="button"
-          className={`filter-pill ${activeStudioTab === "TRACKS" ? "filter-pill--active" : ""}`}
-          onClick={() => setActiveStudioTab("TRACKS")}
-          style={{
-            fontSize: "14px",
-            fontWeight: 700,
-            padding: "8px 20px",
-            borderRadius: "20px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            cursor: "pointer",
-          }}
-          id="tab-studio-tracks"
-        >
-          <HeadphonesIcon width={16} height={16} />
-          <span>My Tracks ({stats.total})</span>
-        </button>
-        <button
-          type="button"
-          className={`filter-pill ${activeStudioTab === "ALBUMS" ? "filter-pill--active" : ""}`}
-          onClick={() => setActiveStudioTab("ALBUMS")}
-          style={{
-            fontSize: "14px",
-            fontWeight: 700,
-            padding: "8px 20px",
-            borderRadius: "20px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            cursor: "pointer",
-          }}
-          id="tab-studio-albums"
-        >
-          <EyeIcon width={16} height={16} />
-          <span>My Albums ({albumList.length})</span>
-        </button>
+      {/* Studio Navigation Tabs (Tracks vs Albums) styled like Your Library */}
+      <div className="library-tabs-bar" style={{ marginBottom: "20px" }}>
+        <div className="library-nav-tabs">
+          <button
+            type="button"
+            className={`library-tab ${activeStudioTab === "TRACKS" ? "library-tab--active" : ""}`}
+            onClick={() => {
+              setActiveStudioTab("TRACKS");
+              onNavigate("/track");
+            }}
+            id="tab-studio-tracks"
+          >
+            My Tracks ({stats.total})
+          </button>
+          <button
+            type="button"
+            className={`library-tab ${activeStudioTab === "ALBUMS" ? "library-tab--active" : ""}`}
+            onClick={() => {
+              setActiveStudioTab("ALBUMS");
+              onNavigate("/album");
+            }}
+            id="tab-studio-albums"
+          >
+            My Albums ({albumList.length})
+          </button>
+        </div>
       </div>
 
       {activeStudioTab === "TRACKS" ? (
         <>
-      {/* Metrics Row */}
-      <div className="studio-metrics-grid">
-        <div
-          className={`metric-card ${filterStatus === "ALL" ? "metric-card--active" : ""}`}
-          onClick={() => setFilterStatus("ALL")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="metric-label">Total tracks</span>
-          <b className="metric-value">{stats.total}</b>
-        </div>
-        <div
-          className={`metric-card ${filterStatus === "APPROVED" ? "metric-card--active" : ""}`}
-          onClick={() => setFilterStatus("APPROVED")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="metric-label metric-label--approved">Published</span>
-          <b className="metric-value text-success">{stats.approved}</b>
-        </div>
-        <div
-          className={`metric-card ${filterStatus === "PENDING" ? "metric-card--active" : ""}`}
-          onClick={() => setFilterStatus("PENDING")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="metric-label metric-label--pending">Pending</span>
-          <b className="metric-value text-warning">{stats.pending}</b>
-        </div>
-        <div
-          className={`metric-card ${filterStatus === "REJECTED" ? "metric-card--active" : ""}`}
-          onClick={() => setFilterStatus("REJECTED")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="metric-label metric-label--rejected">Rejected</span>
-          <b className="metric-value text-danger">{stats.rejected}</b>
-        </div>
-        <div
-          className={`metric-card ${filterStatus === "DRAFT" ? "metric-card--active" : ""}`}
-          onClick={() => setFilterStatus("DRAFT")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="metric-label">Draft</span>
-          <b className="metric-value">{stats.draft}</b>
-        </div>
-      </div>
-
-      {/* Status Filter Bar and Search */}
-      <div className="studio-tabs-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button
-            className={`filter-pill ${filterStatus === "ALL" ? "filter-pill--active" : ""}`}
-            onClick={() => setFilterStatus("ALL")}
-          >
-            All ({stats.total})
-          </button>
-          <button
-            className={`filter-pill ${filterStatus === "APPROVED" ? "filter-pill--active" : ""}`}
-            onClick={() => setFilterStatus("APPROVED")}
-          >
-            Published ({stats.approved})
-          </button>
-          <button
-            className={`filter-pill ${filterStatus === "PENDING" ? "filter-pill--active" : ""}`}
-            onClick={() => setFilterStatus("PENDING")}
-          >
-            Pending ({stats.pending})
-          </button>
-          <button
-            className={`filter-pill ${filterStatus === "REJECTED" ? "filter-pill--active" : ""}`}
-            onClick={() => setFilterStatus("REJECTED")}
-          >
-            Rejected ({stats.rejected})
-          </button>
-          <button
-            className={`filter-pill ${filterStatus === "DRAFT" ? "filter-pill--active" : ""}`}
-            onClick={() => setFilterStatus("DRAFT")}
-          >
-            Draft ({stats.draft})
-          </button>
-        </div>
-
-        <div style={{ position: "relative", minWidth: "220px" }}>
-          <input
-            type="text"
-            placeholder="Search tracks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "7px 12px 7px 32px",
-              borderRadius: "20px",
-              border: "1px solid var(--sw-border)",
-              background: "var(--sw-surface)",
-              color: "var(--sw-text-primary)",
-              fontSize: "13px",
-              boxSizing: "border-box",
-            }}
-          />
-          <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--sw-text-muted)", pointerEvents: "none", display: "flex" }}>
-            <SearchIcon width={14} height={14} />
-          </span>
-          {searchQuery && (
+          {/* Status Filter Bar without Search & Overview */}
+          <div className="studio-tabs-bar" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "18px" }}>
             <button
-              onClick={() => setSearchQuery("")}
-              style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--sw-text-muted)", padding: "2px", display: "flex" }}
-              aria-label="Clear search"
+              className={`filter-pill ${filterStatus === "ALL" ? "filter-pill--active" : ""}`}
+              onClick={() => setFilterStatus("ALL")}
             >
-              <CloseIcon width={12} height={12} />
+              All ({stats.total})
             </button>
-          )}
-        </div>
-      </div>
+            <button
+              className={`filter-pill ${filterStatus === "APPROVED" ? "filter-pill--active" : ""}`}
+              onClick={() => setFilterStatus("APPROVED")}
+            >
+              Published ({stats.approved})
+            </button>
+            <button
+              className={`filter-pill ${filterStatus === "PENDING" ? "filter-pill--active" : ""}`}
+              onClick={() => setFilterStatus("PENDING")}
+            >
+              Pending ({stats.pending})
+            </button>
+            <button
+              className={`filter-pill ${filterStatus === "REJECTED" ? "filter-pill--active" : ""}`}
+              onClick={() => setFilterStatus("REJECTED")}
+            >
+              Rejected ({stats.rejected})
+            </button>
+            <button
+              className={`filter-pill ${filterStatus === "DRAFT" ? "filter-pill--active" : ""}`}
+              onClick={() => setFilterStatus("DRAFT")}
+            >
+              Draft ({stats.draft})
+            </button>
+          </div>
 
       <audio
         ref={previewAudioRef}
@@ -969,126 +888,37 @@ export function StudioPage({
         </>
       ) : (
         <>
-          {/* ALBUMS TAB (UC-21: Manage My Album) */}
-          {/* Album Metrics Row */}
-          <div className="studio-metrics-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-            <div
-              className={`metric-card ${albumFilter === "ALL" ? "metric-card--active" : ""}`}
-              onClick={() => setAlbumFilter("ALL")}
-              role="button"
-              tabIndex={0}
-            >
-              <span className="metric-label">Total albums</span>
-              <b className="metric-value">{albumStats.total}</b>
-            </div>
-            <div
-              className={`metric-card ${albumFilter === "PUBLISHED" ? "metric-card--active" : ""}`}
-              onClick={() => setAlbumFilter("PUBLISHED")}
-              role="button"
-              tabIndex={0}
-            >
-              <span className="metric-label metric-label--approved">Published</span>
-              <b className="metric-value text-success">{albumStats.published}</b>
-            </div>
-            <div
-              className={`metric-card ${albumFilter === "DRAFT" ? "metric-card--active" : ""}`}
-              onClick={() => setAlbumFilter("DRAFT")}
-              role="button"
-              tabIndex={0}
-            >
-              <span className="metric-label">Draft</span>
-              <b className="metric-value">{albumStats.draft}</b>
-            </div>
-          </div>
-
-          {/* Album Filter & Search Bar */}
+          {/* ALBUMS TAB (UC-21: Manage My Album) without Search & Overview */}
           <div
             className="studio-tabs-bar"
             style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              gap: "8px",
               flexWrap: "wrap",
-              gap: "12px",
-              margin: "20px 0",
+              margin: "0 0 18px",
             }}
           >
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`filter-pill ${albumFilter === "ALL" ? "filter-pill--active" : ""}`}
-                onClick={() => setAlbumFilter("ALL")}
-              >
-                All ({albumStats.total})
-              </button>
-              <button
-                type="button"
-                className={`filter-pill ${albumFilter === "PUBLISHED" ? "filter-pill--active" : ""}`}
-                onClick={() => setAlbumFilter("PUBLISHED")}
-              >
-                Published ({albumStats.published})
-              </button>
-              <button
-                type="button"
-                className={`filter-pill ${albumFilter === "DRAFT" ? "filter-pill--active" : ""}`}
-                onClick={() => setAlbumFilter("DRAFT")}
-              >
-                Draft ({albumStats.draft})
-              </button>
-            </div>
-
-            <div style={{ position: "relative", minWidth: "240px" }}>
-              <input
-                type="text"
-                placeholder="Search albums..."
-                value={albumSearchQuery}
-                onChange={(e) => setAlbumSearchQuery(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "7px 12px 7px 32px",
-                  borderRadius: "20px",
-                  border: "1px solid var(--sw-border)",
-                  background: "var(--sw-surface)",
-                  color: "var(--sw-text-primary)",
-                  fontSize: "13px",
-                  boxSizing: "border-box",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  left: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--sw-text-muted)",
-                  pointerEvents: "none",
-                  display: "flex",
-                }}
-              >
-                <SearchIcon width={14} height={14} />
-              </span>
-              {albumSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setAlbumSearchQuery("")}
-                  style={{
-                    position: "absolute",
-                    right: "8px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--sw-text-muted)",
-                    padding: "2px",
-                    display: "flex",
-                  }}
-                  aria-label="Clear album search"
-                >
-                  <CloseIcon width={12} height={12} />
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              className={`filter-pill ${albumFilter === "ALL" ? "filter-pill--active" : ""}`}
+              onClick={() => setAlbumFilter("ALL")}
+            >
+              All ({albumStats.total})
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${albumFilter === "PUBLISHED" ? "filter-pill--active" : ""}`}
+              onClick={() => setAlbumFilter("PUBLISHED")}
+            >
+              Published ({albumStats.published})
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${albumFilter === "DRAFT" ? "filter-pill--active" : ""}`}
+              onClick={() => setAlbumFilter("DRAFT")}
+            >
+              Draft ({albumStats.draft})
+            </button>
           </div>
 
           {/* Albums Grid */}
@@ -1132,7 +962,7 @@ export function StudioPage({
                 <button
                   type="button"
                   className="button button-primary"
-                  onClick={() => onNavigate("/studio/albums/create")}
+                  onClick={() => onNavigate("/album/create")}
                   id="btn-empty-create-album"
                 >
                   <PlusIcon width={16} height={16} />
@@ -1153,7 +983,7 @@ export function StudioPage({
                 return (
                   <div
                     key={album.id}
-                    onClick={() => onNavigate(`/studio/albums/${album.id}`)}
+                    onClick={() => onNavigate(`/album/submission/${album.id}`)}
                     style={{
                       background: "#ffffff",
                       border: "1px solid var(--color-sand-light, #E6D5B8)",
@@ -1813,6 +1643,14 @@ export function StudioPage({
         submitting={deletingAlbum}
       />
 
+      {actionSuccess && (
+        <CenterNotificationPopup
+          open={Boolean(actionSuccess)}
+          type="success"
+          message={actionSuccess}
+          onClose={() => setActionSuccess(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { CompassIcon, DashboardIcon, FilterIcon, LibraryIcon, SearchIcon, UploadIcon } from "../../icons";
+import { CompassIcon, DashboardIcon, FilterIcon, LibraryIcon, UploadIcon } from "../../icons";
 import type { CurrentUser } from "../../types";
 
 type Props = {
@@ -30,16 +30,8 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
       </button>
 
       <button
-        className={`mobile-nav-item ${isCurrent("/search") ? "mobile-nav-item--active" : ""}`}
-        onClick={() => onNavigate("/search")}
-      >
-        <SearchIcon width={20} height={20} />
-        <span>Search</span>
-      </button>
-
-      <button
         className={`mobile-nav-item ${isCurrent("/favorites") || isCurrent("/playlists") || activeRoute === "/library" ? "mobile-nav-item--active" : ""}`}
-        onClick={() => onNavigate("/library")}
+        onClick={() => onNavigate("/favorites")}
       >
         <LibraryIcon width={20} height={20} />
         <span>Library</span>
@@ -55,11 +47,11 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
         </button>
       ) : isAuthenticated ? (
         <button
-          className={`mobile-nav-item ${isCurrent("/studio") ? "mobile-nav-item--active" : ""}`}
-          onClick={() => onNavigate("/studio")}
+          className={`mobile-nav-item ${isCurrent("/track") || isCurrent("/tracks") || isCurrent("/studio/tracks") || isCurrent("/studio") ? "mobile-nav-item--active" : ""}`}
+          onClick={() => onNavigate("/studio/tracks")}
         >
           <UploadIcon width={20} height={20} />
-          <span>Studio</span>
+          <span>Create</span>
         </button>
       ) : null}
     </nav>

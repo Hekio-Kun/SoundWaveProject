@@ -111,6 +111,11 @@ public class StudioTrackService {
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
     }
 
+    /**
+     * Tạo bản nháp bài hát mới (UC-19.1 Create Track Draft) cho tác giả (Listener).
+     * Tải media lên Cloudinary, khởi tạo bài hát ở trạng thái DRAFT và tự động dọn dẹp
+     * media trên Cloudinary nếu quá trình lưu cơ sở dữ liệu gặp lỗi (EX05).
+     */
     @Transactional
     public StudioTrackResponse createDraft(CreateTrackRequest request, MultipartFile audio, MultipartFile cover, String currentUserEmail) {
         User user = getAuthenticatedUser(currentUserEmail);
@@ -138,32 +143,46 @@ public class StudioTrackService {
             coverResponse = cloudMediaService.uploadTrackCover(cover, user.getId());
         }
 
-        String slug = generateUniqueSlug(request.title());
-        int finalDurationMs = request.durationMs() != null && request.durationMs() > 0
-                ? request.durationMs()
-                : (audioResponse.durationMs() != null ? audioResponse.durationMs() : 0);
+        try {
+            String slug = generateUniqueSlug(request.title());
+            int finalDurationMs = request.durationMs() != null && request.durationMs() > 0
+                    ? request.durationMs()
+                    : (audioResponse.durationMs() != null ? audioResponse.durationMs() : 0);
 
-        Track track = Track.builder()
-                .uploaderUserId(user.getId())
-                .genre(genre)
-                .album(album)
-                .title(request.title().trim())
-                .slug(slug)
-                .description(request.description() != null ? request.description().trim() : null)
-                .trackNumber(request.trackNumber())
-                .publicationStatus(TrackPublicationStatus.DRAFT)
-                .audioPublicId(audioResponse.publicId())
-                .audioUrl(audioResponse.secureUrl())
-                .audioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3")
-                .durationMs(finalDurationMs)
-                .coverPublicId(coverResponse != null ? coverResponse.publicId() : null)
-                .coverUrl(coverResponse != null ? coverResponse.secureUrl() : null)
-                .playCountCache(0L)
-                .lyrics(request.lyrics() != null && !request.lyrics().isBlank() ? request.lyrics().trim() : null)
-                .build();
+            Integer finalTrackNumber = request.trackNumber();
+            if (finalTrackNumber == null && album != null) {
+                finalTrackNumber = (int) trackRepository.countByAlbum_Id(album.getId()) + 1;
+            }
 
-        Track savedTrack = trackRepository.save(track);
-        return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null);
+            Track track = Track.builder()
+                    .uploaderUserId(user.getId())
+                    .genre(genre)
+                    .album(album)
+                    .title(request.title().trim())
+                    .slug(slug)
+                    .description(request.description() != null ? request.description().trim() : null)
+                    .trackNumber(finalTrackNumber)
+                    .publicationStatus(TrackPublicationStatus.DRAFT)
+                    .audioPublicId(audioResponse.publicId())
+                    .audioUrl(audioResponse.secureUrl())
+                    .audioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3")
+                    .durationMs(finalDurationMs)
+                    .coverPublicId(coverResponse != null ? coverResponse.publicId() : null)
+                    .coverUrl(coverResponse != null ? coverResponse.secureUrl() : null)
+                    .playCountCache(0L)
+                    .lyrics(request.lyrics() != null && !request.lyrics().isBlank() ? request.lyrics().trim() : null)
+                    .build();
+
+            Track savedTrack = trackRepository.save(track);
+            return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null);
+        } catch (Exception ex) {
+            log.error("Failed to persist track into database for user ID {}. Purging uploaded Cloudinary media...", user.getId(), ex);
+            cloudMediaService.deleteTrackAudioQuietly(audioResponse.publicId());
+            if (coverResponse != null) {
+                cloudMediaService.deleteImageQuietly(coverResponse.publicId());
+            }
+            throw ex;
+        }
     }
 
     @Transactional

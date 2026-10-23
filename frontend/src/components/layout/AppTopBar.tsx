@@ -4,7 +4,6 @@ import {
   ChevronRightIcon,
   DashboardIcon,
   LogoutIcon,
-  SearchIcon,
   ShieldIcon,
   UploadIcon,
   UserIcon,
@@ -59,7 +58,15 @@ export function AppTopBar({
   }, [userMenuOpen]);
 
   const handleBack = () => {
-    window.history.back();
+    const event = new CustomEvent("soundwave:back", { cancelable: true });
+    const notCancelled = window.dispatchEvent(event);
+    if (notCancelled) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        onNavigate("/");
+      }
+    }
   };
 
   const handleForward = () => {
@@ -71,7 +78,7 @@ export function AppTopBar({
     ? "/admin/dashboard"
     : (user?.role === "STAFF" || user?.role === "MODERATOR")
     ? "/staff/dashboard"
-    : "/studio/upload";
+    : "/track/create";
   const workspaceLabel = hasDashboardAccess ? "Open dashboard" : "Upload music";
 
   return (
@@ -85,17 +92,7 @@ export function AppTopBar({
         </button>
       </div>
 
-      <div className="topbar-search-container" style={{ position: "relative", flex: 1, maxWidth: 520 }}>
-        <div className="topbar-search" role="search">
-          <SearchIcon width={18} height={18} />
-          <input
-            type="search"
-            readOnly
-            placeholder="Search tracks, albums, creators..."
-            aria-label="Search music"
-          />
-        </div>
-      </div>
+      <div style={{ flex: 1 }} />
 
       <div className="topbar-actions" ref={actionsRef}>
         {isAuthenticated && (
@@ -203,7 +200,7 @@ export function AppTopBar({
                   role="menuitem"
                   onClick={() => {
                     setUserMenuOpen(false);
-                    onNavigate("/studio");
+                    onNavigate("/track");
                   }}
                 >
                   <span className="dropdown-item-icon">

@@ -104,6 +104,13 @@ export function LibraryPage({
   allTracks,
 }: Props) {
   const [tab, setTab] = useState<"favorites" | "playlists" | "history">(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [historyItems, setHistoryItems] = useState<ListeningHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -227,19 +234,28 @@ export function LibraryPage({
         <div className="library-nav-tabs">
           <button
             className={`library-tab ${tab === "favorites" ? "library-tab--active" : ""}`}
-            onClick={() => setTab("favorites")}
+            onClick={() => {
+              setTab("favorites");
+              onNavigate("/favorites");
+            }}
           >
             Favorite tracks ({favoriteTracks.length})
           </button>
           <button
             className={`library-tab ${tab === "playlists" ? "library-tab--active" : ""}`}
-            onClick={() => setTab("playlists")}
+            onClick={() => {
+              setTab("playlists");
+              onNavigate("/playlists");
+            }}
           >
             Playlists ({playlists.length})
           </button>
           <button
             className={`library-tab ${tab === "history" ? "library-tab--active" : ""}`}
-            onClick={() => setTab("history")}
+            onClick={() => {
+              setTab("history");
+              onNavigate("/history");
+            }}
           >
             Listening history ({historyTotalElements})
           </button>
