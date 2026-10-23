@@ -12,8 +12,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Repository truy vấn dữ liệu cho bảng thể loại nhạc (genres).
- * Phục vụ danh mục công khai [UC-8] và chức năng Quản lý thể loại của Admin [UC-26: Manage Genres].
+ * Repository interface for music genres (genres table).
+ * Serves public catalog browsing [UC-8] and Admin genre management [UC-26: Manage Genres].
  */
 public interface GenreRepository extends JpaRepository<Genre, Long> {
     Optional<Genre> findBySlug(String slug);
@@ -21,101 +21,100 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     List<Genre> findByIsActiveTrueOrderByNameAsc();
 
     /**
-     * Tìm thể loại theo ID nếu thể loại đang ở trạng thái hoạt động.
+     * Finds a genre by its ID if it is currently active.
      *
-     * @param id ID của thể loại
-     * @return Optional chứa thể loại nếu tìm thấy và đang hoạt động
+     * @param id Genre ID
+     * @return Optional containing the genre if found and active
      */
     Optional<Genre> findByIdAndIsActiveTrue(Long id);
 
     /**
-     * Tìm thể loại theo slug không phân biệt hoa thường.
+     * Finds a genre by its slug case-insensitively.
      *
-     * @param slug Slug của thể loại
-     * @return Optional chứa thể loại nếu tồn tại
+     * @param slug Genre slug
+     * @return Optional containing the genre if found
      */
     Optional<Genre> findBySlugIgnoreCase(String slug);
 
     /**
-     * Tìm thể loại theo slug không phân biệt hoa thường và đang kích hoạt.
+     * Finds a genre by its slug case-insensitively and if active.
      *
-     * @param slug Slug của thể loại
-     * @return Optional chứa thể loại nếu tồn tại và đang hoạt động
+     * @param slug Genre slug
+     * @return Optional containing the genre if found and active
      */
     Optional<Genre> findBySlugIgnoreCaseAndIsActiveTrue(String slug);
 
     /**
-     * Kiểm tra sự tồn tại của tên thể loại (không phân biệt hoa thường) để chống trùng lặp (EX01).
+     * Checks if a genre name exists case-insensitively (EX01).
      *
-     * @param name Tên thể loại cần kiểm tra
-     * @return true nếu tên đã tồn tại trong hệ thống
+     * @param name Genre name to check
+     * @return true if the name already exists
      */
     boolean existsByNameIgnoreCase(String name);
 
     /**
-     * Kiểm tra sự tồn tại của slug thể loại (không phân biệt hoa thường) để chống trùng lặp (EX01).
+     * Checks if a genre slug exists case-insensitively (EX01).
      *
-     * @param slug Slug thể loại cần kiểm tra
-     * @return true nếu slug đã tồn tại trong hệ thống
+     * @param slug Genre slug to check
+     * @return true if the slug already exists
      */
     boolean existsBySlugIgnoreCase(String slug);
 
     /**
-     * Kiểm tra tên thể loại đã tồn tại ở bản ghi khác (ngoại trừ ID hiện tại khi cập nhật) (EX01).
+     * Checks if a genre name exists for another record excluding the given ID (EX01).
      *
-     * @param name Tên thể loại cần kiểm tra
-     * @param id   ID của thể loại đang được cập nhật
-     * @return true nếu tên bị trùng với thể loại khác
+     * @param name Genre name to check
+     * @param id   ID of the genre being updated
+     * @return true if the name conflicts with another genre
      */
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
     /**
-     * Kiểm tra slug thể loại đã tồn tại ở bản ghi khác (ngoại trừ ID hiện tại khi cập nhật) (EX01).
+     * Checks if a genre slug exists for another record excluding the given ID (EX01).
      *
-     * @param slug Slug thể loại cần kiểm tra
-     * @param id   ID của thể loại đang được cập nhật
-     * @return true nếu slug bị trùng với thể loại khác
+     * @param slug Genre slug to check
+     * @param id   ID of the genre being updated
+     * @return true if the slug conflicts with another genre
      */
     boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id);
 
     /**
-     * Lọc danh sách thể loại theo trạng thái kích hoạt có phân trang (UC-26).
+     * Filters genres by active status with pagination (UC-26).
      *
-     * @param active   Trạng thái kích hoạt (true hoặc false)
-     * @param pageable Cấu hình phân trang và sắp xếp
-     * @return Trang danh sách thể loại tương ứng
+     * @param active   Active status (true or false)
+     * @param pageable Pagination and sorting configuration
+     * @return Page of matching genres
      */
     Page<Genre> findByIsActive(Boolean active, Pageable pageable);
 
     /**
-     * Tìm kiếm thể loại theo từ khóa trong tên hoặc slug có phân trang (UC-26).
+     * Searches genres matching keyword in name or slug with pagination (UC-26).
      *
-     * @param search   Từ khóa tìm kiếm
-     * @param pageable Cấu hình phân trang và sắp xếp
-     * @return Trang danh sách thể loại khớp từ khóa
+     * @param search   Search keyword
+     * @param pageable Pagination and sorting configuration
+     * @return Page of matching genres
      */
     @Query("SELECT g FROM Genre g WHERE LOWER(g.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(g.slug) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<Genre> searchByKeyword(@Param("search") String search, Pageable pageable);
 
     /**
-     * Tìm kiếm thể loại kết hợp từ khóa và trạng thái kích hoạt có phân trang (UC-26).
+     * Searches genres matching both active status and keyword with pagination (UC-26).
      *
-     * @param active   Trạng thái kích hoạt
-     * @param search   Từ khóa tìm kiếm
-     * @param pageable Cấu hình phân trang và sắp xếp
-     * @return Trang danh sách thể loại khớp điều kiện
+     * @param active   Active status
+     * @param search   Search keyword
+     * @param pageable Pagination and sorting configuration
+     * @return Page of matching genres
      */
     @Query("SELECT g FROM Genre g WHERE g.isActive = :active AND (LOWER(g.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(g.slug) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Genre> searchByActiveAndKeyword(@Param("active") Boolean active, @Param("search") String search, Pageable pageable);
 
     /**
-     * Điều phối tìm kiếm và phân trang thể loại tối ưu cho PostgreSQL (UC-26: Manage Genres).
-     * Tránh lỗi `function lower(bytea) does not exist` khi tham số null trên PostgreSQL.
+     * Dispatches search and pagination queries optimized for database execution (UC-26: Manage Genres).
      *
-     * @param search   Từ khóa tìm kiếm (có thể null hoặc rỗng)
-     * @param active   Trạng thái kích hoạt (có thể null nếu chọn ALL)
-     * @param pageable Cấu hình phân trang và sắp xếp
-     * @return Trang danh sách thể loại quản trị
+     * @param search   Search keyword (nullable)
+     * @param active   Active status filter (nullable for ALL)
+     * @param pageable Pagination and sorting configuration
+     * @return Page of administrator genres
      */
     default Page<Genre> searchForAdmin(String search, Boolean active, Pageable pageable) {
         boolean hasSearch = search != null && !search.trim().isBlank();
