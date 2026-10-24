@@ -105,6 +105,7 @@ export function LibraryPage({
 }: Props) {
   const [tab, setTab] = useState<"favorites" | "playlists" | "history">(initialTab);
 
+  // [FEATURE]: Đồng bộ hóa tab nội bộ khi prop initialTab thay đổi từ URL router (#/favorites, #/playlists, #/history)
   useEffect(() => {
     if (initialTab) {
       setTab(initialTab);
@@ -230,6 +231,7 @@ export function LibraryPage({
         </div>
       </div>
 
+      {/* [FEATURE]: Thanh chuyển tab thư viện - Tự động cập nhật URL và đồng bộ trạng thái active của Sidebar */}
       <div className="library-tabs-bar">
         <div className="library-nav-tabs">
           <button

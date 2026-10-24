@@ -25,6 +25,8 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
     List<Track> findByUploaderUserIdAndPublicationStatusOrderByCreatedAtDesc(Long uploaderUserId, TrackPublicationStatus publicationStatus);
 
+    List<Track> findByUploaderUserIdAndPublicationStatusNotOrderByCreatedAtDesc(Long uploaderUserId, TrackPublicationStatus publicationStatus);
+
     Optional<Track> findByIdAndUploaderUserId(Long id, Long uploaderUserId);
 
     long countByUploaderUserId(Long uploaderUserId);

@@ -89,6 +89,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
             <HeartIcon />
             <span>Favorite tracks</span>
           </button>
+          {/* [FEATURE]: Đồng bộ active highlight khi xem Playlists hoặc chi tiết Playlist */}
           <button
             className={`nav-item ${activeRoute === "/playlists" || activeRoute.startsWith("/playlist") ? "nav-item--active" : ""}`}
             onClick={() => onNavigate("/playlists")}
@@ -107,6 +108,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           )}
         </div>
 
+        {/* [FEATURE]: CONTENT STUDIO - Thay nút Studio bằng My Tracks (/track) & My Albums (/album), duy trì active highlight */}
         {isAuthenticated && (
           <div className="nav-group">
             <span className="nav-group-title">CONTENT STUDIO</span>

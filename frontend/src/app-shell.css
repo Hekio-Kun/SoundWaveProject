@@ -4086,6 +4086,7 @@ body.modal-open .ops-shell-main {
 }
 
 /* Standalone track upload */
+.createmytrack,
 .upload-track-page {
   width: min(1180px, 100%);
   margin: 0 auto;
@@ -4411,6 +4412,7 @@ body.modal-open .ops-shell-main {
 }
 
 @media (max-width: 768px) {
+  .createmytrack,
   .upload-track-page {
     padding: 22px 18px 42px;
   }

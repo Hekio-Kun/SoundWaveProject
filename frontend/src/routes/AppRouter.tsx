@@ -26,7 +26,7 @@ import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
 
 import { TrackDetailsPage } from "../pages/TrackDetailsPage";
-import { UploadTrackPage } from "../pages/UploadTrackPage";
+import { CreateMyTrack } from "../pages/UploadTrackPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
 import { SearchIcon } from "../icons";
 
@@ -55,6 +55,7 @@ export function AppRouter(): React.ReactElement | null {
   }, [isDashboardRoute, pause]);
 
   // Điều hướng và bảo vệ tuyến đường theo Role
+  // [FEATURE]: Bảo vệ các tuyến đường Creator Studio (My Tracks / My Albums) - Yêu cầu đăng nhập tài khoản LISTENER
   useEffect(() => {
     if (!authReady) return;
     if (!isAuthenticated) {
@@ -230,6 +231,8 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Định tuyến trang chi tiết bài hát công khai (Public Catalog) cho Listener
+  // Loại trừ các tiền tố Creator Studio (/track/submission, /track/create, /track/edit,...) để tránh xung đột
   if (
     (pathname.startsWith("/track/") || pathname.startsWith("/tracks/")) &&
     !pathname.startsWith("/track/submission") &&
@@ -257,6 +260,8 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Định tuyến trang chi tiết album công khai cho Listener (/album/:id)
+  // Loại trừ các tuyến đường quản lý album của Creator (/album/submission, /album/create,...)
   if (
     pathname.startsWith("/album/") &&
     !pathname.startsWith("/album/submission") &&
@@ -389,6 +394,7 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   // 4. Creator Studio Routes
+  // [FEATURE]: Trang chỉnh sửa bài hát (/track/submission/:id/edit hoặc /track/edit/:id) sử dụng CreateMyTrack component
   if (
     (pathname.startsWith("/studio/tracks/") && pathname.endsWith("/edit")) ||
     (pathname.startsWith("/studio/track/") && pathname.endsWith("/edit")) ||
@@ -407,7 +413,7 @@ export function AppRouter(): React.ReactElement | null {
       return null;
     }
     return (
-      <UploadTrackPage
+      <CreateMyTrack
         isAuthenticated={isAuthenticated}
         canUpload={user?.role === "LISTENER"}
         onNavigate={navigate}
@@ -416,6 +422,7 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Trang tải lên bài hát mới (/track/create hoặc /track/upload) sử dụng CreateMyTrack component
   if (
     pathname === "/track/create" ||
     pathname === "/track/upload" ||
@@ -427,7 +434,7 @@ export function AppRouter(): React.ReactElement | null {
     const editParam = queryParams.get("edit") || queryParams.get("trackId");
     const editTrackId = editParam ? Number(editParam) : undefined;
     return (
-      <UploadTrackPage
+      <CreateMyTrack
         isAuthenticated={isAuthenticated}
         canUpload={user?.role === "LISTENER"}
         onNavigate={navigate}
@@ -436,6 +443,8 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Trang chi tiết bài hát nộp duyệt của Creator (/track/submission/:id)
+  // Hiển thị trạng thái kiểm duyệt (Approved, Pending, Rejected, Draft), lý do từ chối, nút sửa/xóa
   if (
     pathname.startsWith("/track/submission/") ||
     pathname.startsWith("/track/submissions/") ||
@@ -466,6 +475,7 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Trang tạo Album mới của Creator (/album/create)
   if (
     pathname === "/album/create" ||
     pathname === "/create-album" ||
@@ -483,6 +493,7 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Trang quản lý chi tiết album của Creator (/album/submission/:id)
   if (
     pathname.startsWith("/album/submission/") ||
     pathname.startsWith("/album/manage/") ||
@@ -508,11 +519,13 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Trang danh sách bài hát của Creator - My Tracks (/track hoặc /tracks)
   if (pathname === "/track" || pathname === "/tracks" || pathname === "/studio") {
     if (!authReady || !isAuthenticated) return null;
     return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="TRACKS" />;
   }
 
+  // [FEATURE]: Trang danh sách album của Creator - My Albums (/album)
   if (pathname === "/album" || pathname === "/studio/albums") {
     if (!authReady || !isAuthenticated) return null;
     return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="ALBUMS" />;

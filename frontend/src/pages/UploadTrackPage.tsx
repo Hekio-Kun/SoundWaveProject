@@ -36,7 +36,14 @@ type Props = {
 
 type FormErrors = Record<string, string>;
 
-export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTrackId }: Props) {
+/**
+ * [FEATURE]: CreateMyTrack Component (Trang tạo / chỉnh sửa bài hát cho Creator)
+ * - Đã đổi tên lớp/component từ UploadTrackPage thành CreateMyTrack
+ * - Class CSS: .createmytrack (kèm .upload-track-page)
+ * - Hỗ trợ tạo bài hát mới hoặc chỉnh sửa bản nháp/bài bị từ chối duyệt
+ * - Điều hướng sau khi hoàn tất về /track/submission/:id hoặc /track
+ */
+export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrackId }: Props) {
   const isEditMode = Boolean(editTrackId && editTrackId > 0);
   const [existingTrack, setExistingTrack] = useState<ApiTrack | null>(null);
   const [loadingTrack, setLoadingTrack] = useState(false);
@@ -265,8 +272,13 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
     setSubmitError("");
     try {
       let targetTrackId: number;
+      let resultingStatus: string | undefined;
 
       if (isEditMode && editTrackId) {
+        // [FEATURE]: UC-19.3 Update A Track
+        // Gửi yêu cầu cập nhật bài hát. Nếu bài hát gốc là PUBLISHED, backend sẽ tự động thu hồi quyền nghe công khai
+        // và chuyển trạng thái sang PENDING để Staff kiểm duyệt lại, đồng thời tạo TrackSubmission và thông báo cho Staff.
+        // Nếu bài hát là REJECTED kèm cờ submitForReview (AF02), backend chuyển sang PENDING và nộp duyệt lại.
         const updated = await studioApi.updateTrack(
           editTrackId,
           {
@@ -276,11 +288,14 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
             description: description.trim() || undefined,
             durationMs,
             lyrics: lyrics.trim() || undefined,
+            resubmitForReview: submitForReview || undefined,
+            submitterNote: note || undefined,
           },
           audioFile ?? undefined,
           coverFile ?? undefined
         );
         targetTrackId = updated.id;
+        resultingStatus = updated.status;
       } else {
         const created = await studioApi.createDraft({
           title: title.trim(),
@@ -291,10 +306,13 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
           lyrics: lyrics.trim() || undefined,
         }, audioFile!, coverFile ?? undefined);
         targetTrackId = created.id;
+        resultingStatus = created.status;
       }
 
       if (submitForReview && targetTrackId) {
-        await studioApi.submitForReview(targetTrackId, note);
+        if (!isEditMode) {
+          await studioApi.submitForReview(targetTrackId, note);
+        }
         sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
           message: isEditMode
             ? "Track resubmitted for review successfully!"
@@ -305,7 +323,17 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
         return true;
       }
 
-      const successMsg = isEditMode ? "Draft updated successfully!" : "Draft saved successfully!";
+      // [FEATURE]: UC-19.3 POST-4 & POST-5
+      // Thông báo rõ ràng cho creator khi bài hát PUBLISHED được chỉnh sửa và chuyển sang PENDING để Staff kiểm duyệt lại
+      let successMsg: string;
+      if (isEditMode && existingTrack?.status === "PUBLISHED" && resultingStatus === "PENDING") {
+        successMsg = "Track updated and submitted to Staff for re-moderation. Public listening visibility has been temporarily paused.";
+      } else if (isEditMode) {
+        successMsg = "Draft updated successfully!";
+      } else {
+        successMsg = "Draft saved successfully!";
+      }
+
       sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
         message: successMsg,
         type: "success",
@@ -454,7 +482,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   if (!isAuthenticated || !canUpload) {
     return (
-      <div className="upload-track-page">
+      <div className="createmytrack upload-track-page">
         <section className="upload-track-access-card">
           <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
           <h1>{isAuthenticated ? "Listener access required" : "Log in to upload music"}</h1>
@@ -471,7 +499,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   if (loadingTrack) {
     return (
-      <div className="upload-track-page">
+      <div className="createmytrack upload-track-page">
         <div style={{ textAlign: "center", padding: "80px 20px" }}>
           <div className="studio-spinner" style={{ margin: "0 auto 16px" }} />
           <p style={{ color: "#786F65", fontWeight: 600 }}>Loading draft details...</p>
@@ -482,7 +510,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   if (trackFetchError) {
     return (
-      <div className="upload-track-page">
+      <div className="createmytrack upload-track-page">
         <div className="auth-v2-error upload-track-alert" role="alert" style={{ margin: "24px 0" }}>
           <span><AlertIcon width={17} height={17} /></span>
           <div><b>Unable to load track</b><small>{trackFetchError}</small></div>
@@ -494,7 +522,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
 
   if (existingTrack && existingTrack.status === "PENDING") {
     return (
-      <div className="upload-track-page">
+      <div className="createmytrack upload-track-page">
         <section className="upload-track-success" role="status" style={{ borderTop: "4px solid #EAB308" }}>
           <span className="upload-track-success__icon" style={{ background: "#FEF9C3", color: "#CA8A04" }}>
             <AlertIcon width={34} height={34} />
@@ -519,7 +547,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
   }
 
   return (
-    <div className="upload-track-page">
+    <div className="createmytrack upload-track-page">
       <header className="upload-track-hero">
         <span className="upload-track-hero__icon">
           {isEditMode ? <EditIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
@@ -527,12 +555,20 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
         <div>
           <span className="eyebrow">
             {isEditMode
-              ? (existingTrack?.status === "REJECTED" ? "CONTENT STUDIO · RESUBMIT TRACK" : "CONTENT STUDIO · EDIT DRAFT")
+              ? (existingTrack?.status === "PUBLISHED"
+                  ? "CONTENT STUDIO · EDIT PUBLISHED TRACK"
+                  : existingTrack?.status === "REJECTED"
+                  ? "CONTENT STUDIO · RESUBMIT TRACK"
+                  : "CONTENT STUDIO · EDIT DRAFT")
               : "CONTENT STUDIO"}
           </span>
           <h1>
             {isEditMode
-              ? (existingTrack?.status === "REJECTED" ? `Edit & resubmit: ${existingTrack?.title || title || "Track"}` : `Edit draft: ${existingTrack?.title || title || "Track"}`)
+              ? (existingTrack?.status === "PUBLISHED"
+                  ? `Edit published track: ${existingTrack?.title || title || "Track"}`
+                  : existingTrack?.status === "REJECTED"
+                  ? `Edit & resubmit: ${existingTrack?.title || title || "Track"}`
+                  : `Edit draft: ${existingTrack?.title || title || "Track"}`)
               : "Upload a new track"}
           </h1>
           <p>
@@ -629,7 +665,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
             <MediaUploadField
               id="audio-upload"
               label="Audio file"
-              helperText={isEditMode && existingAudioName ? "MP3, WAV, FLAC · Optional (existing file kept if empty)" : "MP3, WAV or FLAC · Max 30MB"}
+              helperText="MP3, WAV or FLAC · Max 30MB"
               accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
               file={audioFile}
               existingFileLabel={existingAudioName}
@@ -641,7 +677,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
             <MediaUploadField
               id="cover-upload"
               label="Cover artwork"
-              helperText={isEditMode && existingCoverName ? "JPG, PNG · Optional (existing cover kept if empty)" : "JPG or PNG · Max 5MB"}
+              helperText="JPG or PNG · Max 5MB"
               accept=".jpg,.jpeg,.png,image/jpeg,image/png"
               file={coverFile}
               existingFileLabel={existingCoverName}
@@ -757,7 +793,11 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
               disabled={submitting || loadingOptions || Boolean(optionsError)}
               id="btn-upload-save-draft"
             >
-              {isEditMode ? "Save draft changes" : "Save as draft"}
+              {isEditMode
+                ? existingTrack?.status === "PUBLISHED"
+                  ? "Save changes & submit for re-moderation"
+                  : "Save draft changes"
+                : "Save as draft"}
             </button>
             {(isEditMode && existingTrack?.status === "REJECTED") && (
               <button
@@ -927,3 +967,7 @@ export function UploadTrackPage({ isAuthenticated, canUpload, onNavigate, editTr
     </div>
   );
 }
+
+export const UploadTrackPage = CreateMyTrack;
+export const CreateMyTrackPage = CreateMyTrack;
+export default CreateMyTrack;

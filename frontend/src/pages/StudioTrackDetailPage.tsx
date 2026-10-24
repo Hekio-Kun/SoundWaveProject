@@ -430,6 +430,7 @@ export function StudioTrackDetailPage({
     try {
       setIsProcessing(true);
       setActionError(null);
+      const previousStatus = track.status;
       const updated = await studioApi.updateTrack(
         track.id,
         {
@@ -445,8 +446,17 @@ export function StudioTrackDetailPage({
 
       setTrack(updated);
       setEditModalOpen(false);
-      setActionSuccess("Track updated successfully.");
-      setTimeout(() => setActionSuccess(null), 4000);
+
+      // [FEATURE]: UC-19.3 Update A Track - Phản hồi thành công cho creator (POST-5)
+      // Nếu bài hát trước đó là PUBLISHED và nay chuyển sang PENDING để Staff kiểm duyệt lại:
+      if (previousStatus === "PUBLISHED" && updated.status === "PENDING") {
+        setActionSuccess(
+          "Track updated and submitted to Staff for re-moderation. Public listening visibility has been temporarily paused."
+        );
+      } else {
+        setActionSuccess("Track updated successfully.");
+      }
+      setTimeout(() => setActionSuccess(null), 5000);
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to update track.");
     } finally {
@@ -460,8 +470,20 @@ export function StudioTrackDetailPage({
       setIsProcessing(true);
       setModalError(null);
       setActionError(null);
+      const isPublished = track.status === "PUBLISHED" || track.status === "APPROVED";
       await studioApi.deleteTrack(track.id);
       setDeleteConfirmOpen(false);
+      // [FEATURE]: UC-19: Delete An Owned Track (POST-5)
+      // Lưu flash message vào sessionStorage để hiển thị khi điều hướng về danh sách bài hát
+      sessionStorage.setItem(
+        "soundwave_flash_toast",
+        JSON.stringify({
+          message: isPublished
+            ? "Track taken down and removed from your active library successfully."
+            : "Track deleted successfully.",
+          type: "success",
+        })
+      );
       onNavigate("/track");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete track.";
@@ -587,6 +609,7 @@ export function StudioTrackDetailPage({
           {/* Left: Back button + Breadcrumb */}
           <div className="studio-top-nav-single-left">
             <div className="staff-detail-breadcrumbs" style={{ fontSize: "13px" }}>
+              {/* [FEATURE]: Breadcrumb điều hướng quay về trang danh sách bài hát cá nhân (/track) */}
               <span
                 className="staff-crumb-muted"
                 style={{ cursor: "pointer" }}
@@ -630,7 +653,7 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {/* 1. Edit track button - only allowed for DRAFT, REJECTED, PUBLISHED */}
+              {/* 1. Edit track button - [FEATURE]: Điều hướng sang /track/submission/:id/edit */}
               {canEditOrDelete && (
                 <button
                   type="button"
@@ -1252,7 +1275,11 @@ export function StudioTrackDetailPage({
                   className="button button-primary"
                   disabled={isProcessing}
                 >
-                  {isProcessing ? "Saving changes..." : "Save changes"}
+                  {isProcessing
+                    ? "Saving changes..."
+                    : (track.status === "PUBLISHED" || track.status === "APPROVED")
+                    ? "Save & Submit for review"
+                    : "Save changes"}
                 </button>
               </div>
             </form>
@@ -1300,7 +1327,15 @@ export function StudioTrackDetailPage({
             )}
 
             <p style={{ margin: "16px 0", color: "var(--sw-text-secondary)" }}>
-              Are you sure you want to permanently delete &quot;<b>{track.title}</b>&quot;? All uploaded audio files, covers, and play stats will be removed and cannot be recovered.
+              {track.status === "PUBLISHED" || track.status === "APPROVED" ? (
+                <>
+                  Are you sure you want to take down &quot;<b>{track.title}</b>&quot;? Public playback will be revoked and media assets purged from cloud storage, while historical play analytics will be preserved.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to permanently delete &quot;<b>{track.title}</b>&quot;? This track and its media files will be permanently removed and cannot be recovered.
+                </>
+              )}
             </p>
             <div className="modal-actions">
               <button
@@ -1321,7 +1356,11 @@ export function StudioTrackDetailPage({
                 onClick={handleDeleteConfirm}
                 disabled={isProcessing}
               >
-                {isProcessing ? "Deleting..." : "Confirm delete"}
+                {isProcessing
+                  ? "Processing..."
+                  : track.status === "PUBLISHED" || track.status === "APPROVED"
+                  ? "Confirm take down"
+                  : "Confirm delete"}
               </button>
             </div>
           </div>

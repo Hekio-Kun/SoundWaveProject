@@ -265,7 +265,7 @@ export function StudioPage({
     };
   }, [trackModalOpen, isSaving]);
 
-  // View Detail (Navigate to dedicated Track Details page)
+  // [FEATURE]: Điều hướng xem chi tiết nộp duyệt bài hát (/track/submission/:id) - Loại bỏ tiền tố /studio
   const handleOpenDetail = (track: StudioTrack) => {
     onNavigate(`/track/submission/${track.id}`);
   };
@@ -554,6 +554,7 @@ export function StudioPage({
             Upload tracks, curate albums, save drafts, manage submissions, and review staff feedback.
           </p>
         </div>
+        {/* [FEATURE]: Nút tạo bài hát / tạo album mới điều hướng trực tiếp đến /track/create hoặc /album/create */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           {activeStudioTab === "TRACKS" ? (
             <button
@@ -612,7 +613,7 @@ export function StudioPage({
         </div>
       )}
 
-      {/* Studio Navigation Tabs (Tracks vs Albums) styled like Your Library */}
+      {/* [FEATURE]: Thanh tab Content Studio (My Tracks vs My Albums) - Tự động cập nhật URL /track hoặc /album */}
       <div className="library-tabs-bar" style={{ marginBottom: "20px" }}>
         <div className="library-nav-tabs">
           <button
@@ -972,6 +973,7 @@ export function StudioPage({
               {filteredAlbums.map((album) => {
                 const isPublished = album.status === "PUBLISHED";
                 return (
+                  // [FEATURE]: Nhấn vào thẻ album điều hướng đến trang quản lý album (/album/submission/:id)
                   <div
                     key={album.id}
                     onClick={() => onNavigate(`/album/submission/${album.id}`)}
