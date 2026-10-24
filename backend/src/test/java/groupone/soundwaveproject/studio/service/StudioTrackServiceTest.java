@@ -19,6 +19,7 @@ import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.notification.entity.NotificationType;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
@@ -114,7 +115,7 @@ class StudioTrackServiceTest {
                 .playCountCache(0L)
                 .build();
 
-        when(trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(10L))
+        when(trackRepository.findByUploaderUserIdAndPublicationStatusNotOrderByCreatedAtDesc(10L, TrackPublicationStatus.TAKEN_DOWN))
                 .thenReturn(List.of(track));
         when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
         when(trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(100L)).thenReturn(Optional.empty());
@@ -278,7 +279,7 @@ class StudioTrackServiceTest {
     }
 
     @Test
-    @DisplayName("updateTrack allows editing when track is PUBLISHED (approved)")
+    @DisplayName("updateTrack transitions PUBLISHED track to PENDING, creates submission, and notifies staff (UC-19.3 POST-4)")
     void updateTrack_SuccessWhenPublished() {
         when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
@@ -297,18 +298,89 @@ class StudioTrackServiceTest {
                 .thenReturn(Optional.of(publishedTrack));
         when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
         when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(trackSubmissionRepository.save(any(TrackSubmission.class))).thenAnswer(invocation -> {
+            TrackSubmission sub = invocation.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(sub, "id", 999L);
+            return sub;
+        });
+        Staff mockStaff = org.mockito.Mockito.mock(Staff.class);
+        when(mockStaff.getId()).thenReturn(1L);
+        when(staffRepository.findAll()).thenReturn(List.of(mockStaff));
 
         UpdateTrackRequest request = new UpdateTrackRequest(
-                "Updated Published Title", 1L, null, null, "Updated description", null, null);
+                "Updated Published Title", 1L, null, null, "Updated description", null, null, false, "Updated artwork and lyrics");
 
         StudioTrackResponse response = studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com");
 
         assertThat(response).isNotNull();
         assertThat(response.id()).isEqualTo(200L);
         assertThat(response.title()).isEqualTo("Updated Published Title");
-        assertThat(response.status()).isEqualTo("PUBLISHED");
+        // [FEATURE]: UC-19.3 POST-4 - Bài hát PUBLISHED chuyển sang PENDING để kiểm duyệt lại
+        assertThat(response.status()).isEqualTo("PENDING");
+        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
         verify(trackRepository).save(publishedTrack);
+        verify(trackSubmissionRepository).save(any(TrackSubmission.class));
+        verify(notificationService).createStaffNotification(
+                eq(1L),
+                eq(10L),
+                eq(NotificationType.TRACK_SUBMISSION),
+                eq("Track re-moderation required"),
+                contains("Updated Published Title"),
+                eq("SUBMISSION"),
+                eq("999")
+        );
     }
+
+    @Test
+    @DisplayName("updateTrack with resubmit on REJECTED track transitions to PENDING and notifies staff (UC-19.3 AF02)")
+    void updateTrack_SuccessWhenRejectedAndResubmitted() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track rejectedTrack = Track.builder()
+                .id(205L)
+                .uploaderUserId(10L)
+                .genre(activeGenre)
+                .title("Rejected Song")
+                .slug("rejected-song-old")
+                .publicationStatus(TrackPublicationStatus.REJECTED)
+                .audioPublicId("audio-rej")
+                .audioUrl("https://cloudinary.com/audio-rej.mp3")
+                .build();
+        when(trackRepository.findByIdAndUploaderUserId(205L, 10L))
+                .thenReturn(Optional.of(rejectedTrack));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+        when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(trackSubmissionRepository.save(any(TrackSubmission.class))).thenAnswer(invocation -> {
+            TrackSubmission sub = invocation.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(sub, "id", 1000L);
+            return sub;
+        });
+        Staff mockStaff = org.mockito.Mockito.mock(Staff.class);
+        when(mockStaff.getId()).thenReturn(2L);
+        when(staffRepository.findAll()).thenReturn(List.of(mockStaff));
+
+        UpdateTrackRequest request = new UpdateTrackRequest(
+                "Fixed Rejected Song", 1L, null, null, "Fixed issues", null, null, true, "Fixed copyright notice");
+
+        StudioTrackResponse response = studioTrackService.updateTrack(205L, request, null, null, "creator@soundwave.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.status()).isEqualTo("PENDING");
+        assertThat(rejectedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
+        verify(trackRepository).save(rejectedTrack);
+        verify(trackSubmissionRepository).save(any(TrackSubmission.class));
+        verify(notificationService).createStaffNotification(
+                eq(2L),
+                eq(10L),
+                eq(NotificationType.TRACK_SUBMISSION),
+                eq("New submission for review"),
+                contains("Fixed Rejected Song"),
+                eq("SUBMISSION"),
+                eq("1000")
+        );
+    }
+
 
     @Test
     @DisplayName("deleteTrack successfully removes draft and purges Cloudinary media")
@@ -337,8 +409,8 @@ class StudioTrackServiceTest {
     }
 
     @Test
-    @DisplayName("deleteTrack successfully removes published track and related associations")
-    void deleteTrack_PublishedSuccess() {
+    @DisplayName("deleteTrack applies soft delete (TAKEN_DOWN) to PUBLISHED tracks, purges Cloudinary media, and preserves history (POST-1, POST-3)")
+    void deleteTrack_PublishedSoftDeleteSuccess() {
         when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
@@ -349,19 +421,63 @@ class StudioTrackServiceTest {
                 .title("Published Song")
                 .publicationStatus(TrackPublicationStatus.PUBLISHED)
                 .audioPublicId("audio-pub-id")
+                .audioUrl("https://cloudinary.com/audio-pub.mp3")
                 .coverPublicId("cover-pub-id")
+                .coverUrl("https://cloudinary.com/cover-pub.jpg")
                 .build();
         when(trackRepository.findByIdAndUploaderUserId(301L, 10L))
                 .thenReturn(Optional.of(publishedTrack));
 
         studioTrackService.deleteTrack(301L, "creator@soundwave.com");
 
-        verify(playlistTrackRepository).deleteByTrack_Id(301L);
-        verify(listeningHistoryRepository).deleteByTrackId(301L);
-        verify(trackSubmissionRepository).deleteByTrackId(301L);
+        // [FEATURE]: POST-1 & EX03 - Xóa media trên Cloudinary
         verify(cloudMediaService).deleteTrackAudioQuietly("audio-pub-id");
         verify(cloudMediaService).deleteImageQuietly("cover-pub-id");
-        verify(trackRepository).delete(publishedTrack);
+
+        // [FEATURE]: POST-3 - Cập nhật trạng thái sang TAKEN_DOWN, xóa URLs, bảo toàn lịch sử nghe & analytics
+        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.TAKEN_DOWN);
+        assertThat(publishedTrack.getAudioUrl()).isNull();
+        assertThat(publishedTrack.getAudioPublicId()).isNull();
+        assertThat(publishedTrack.getCoverUrl()).isNull();
+        assertThat(publishedTrack.getCoverPublicId()).isNull();
+        verify(trackRepository).save(publishedTrack);
+        verify(trackRepository, org.mockito.Mockito.never()).delete(any(Track.class));
+        verify(playlistTrackRepository, org.mockito.Mockito.never()).deleteByTrack_Id(anyLong());
+        verify(listeningHistoryRepository, org.mockito.Mockito.never()).deleteByTrackId(anyLong());
+        verify(trackSubmissionRepository, org.mockito.Mockito.never()).deleteByTrackId(anyLong());
+    }
+
+    @Test
+    @DisplayName("deleteTrack downgrades parent album to DRAFT if no other published tracks remain (POST-4, AF02)")
+    void deleteTrack_DowngradesAlbumToDraftWhenNoPublishedTracksRemain() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        groupone.soundwaveproject.catalog.entity.Album album = groupone.soundwaveproject.catalog.entity.Album.builder()
+                .id(50L)
+                .title("Single Track Album")
+                .status("PUBLISHED")
+                .build();
+
+        Track publishedTrack = Track.builder()
+                .id(305L)
+                .uploaderUserId(10L)
+                .album(album)
+                .genre(activeGenre)
+                .title("Sole Published Song")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .audioPublicId("audio-sole-id")
+                .build();
+        when(trackRepository.findByIdAndUploaderUserId(305L, 10L))
+                .thenReturn(Optional.of(publishedTrack));
+        when(trackRepository.existsByAlbum_IdAndPublicationStatus(50L, TrackPublicationStatus.PUBLISHED))
+                .thenReturn(false);
+
+        studioTrackService.deleteTrack(305L, "creator@soundwave.com");
+
+        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.TAKEN_DOWN);
+        assertThat(album.getStatus()).isEqualTo("DRAFT");
+        verify(albumRepository).save(album);
     }
 
     @Test
@@ -424,7 +540,6 @@ class StudioTrackServiceTest {
         when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
-        when(trackRepository.countByUploaderUserId(10L)).thenReturn(5L);
         when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.DRAFT)).thenReturn(2L);
         when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.PENDING)).thenReturn(1L);
         when(trackRepository.countByUploaderUserIdAndPublicationStatus(10L, TrackPublicationStatus.PUBLISHED)).thenReturn(1L);

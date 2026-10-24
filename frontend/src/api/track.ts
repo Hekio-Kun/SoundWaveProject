@@ -77,6 +77,7 @@ export type CreateTrackPayload = {
   lyrics?: string;
 };
 
+// [FEATURE]: UC-19.3 Update A Track - Payload gửi lên backend để cập nhật thông tin bài hát
 export type UpdateTrackPayload = {
   title: string;
   genreId: number;
@@ -85,6 +86,8 @@ export type UpdateTrackPayload = {
   description?: string;
   durationMs?: number;
   lyrics?: string;
+  resubmitForReview?: boolean; // AF02: Nộp duyệt lại bài hát REJECTED
+  submitterNote?: string;      // Ghi chú gửi cho Staff khi kiểm duyệt lại
 };
 
 type TrackApiErrorPayload = {

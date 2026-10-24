@@ -57,10 +57,10 @@ public class Track {
     @Column(name = "latest_rejection_reason", length = 1000)
     private String latestRejectionReason;
 
-    @Column(name = "audio_public_id", nullable = false, length = 255)
+    @Column(name = "audio_public_id", length = 255)
     private String audioPublicId;
 
-    @Column(name = "audio_url", nullable = false, length = 2048)
+    @Column(name = "audio_url", length = 2048)
     private String audioUrl;
 
     @Column(name = "audio_format", nullable = false, length = 20)
