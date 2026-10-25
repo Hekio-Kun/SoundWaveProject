@@ -4,7 +4,7 @@ import groupone.soundwaveproject.authentication.service.UserAccountPublicService
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
-import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.service.TrackCatalogPublicService;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.library.entity.Favorite;
@@ -32,7 +32,7 @@ class FavoriteServiceTest {
     private FavoriteRepository favoriteRepository;
 
     @Mock
-    private TrackRepository trackRepository;
+    private TrackCatalogPublicService trackCatalogPublicService;
 
     @Mock
     private UserAccountPublicService userAccountPublicService;
@@ -70,7 +70,7 @@ class FavoriteServiceTest {
     @DisplayName("Thêm bài hát vào danh sách yêu thích thành công khi bài hát đã PUBLISHED và chưa được like")
     void addFavorite_Success() {
         when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
-        when(trackRepository.findById(TRACK_ID)).thenReturn(Optional.of(publishedTrack));
+        when(trackCatalogPublicService.validatePublishedTrack(TRACK_ID)).thenReturn(publishedTrack);
         when(favoriteRepository.existsById(new FavoriteId(USER_ID, TRACK_ID))).thenReturn(false);
 
         assertThatNoException().isThrownBy(() -> favoriteService.addFavorite(USER_EMAIL, TRACK_ID));
@@ -100,7 +100,8 @@ class FavoriteServiceTest {
     @DisplayName("Ném ResourceNotFoundException khi bài hát không tồn tại")
     void addFavorite_TrackNotFound() {
         when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
-        when(trackRepository.findById(TRACK_ID)).thenReturn(Optional.empty());
+        when(trackCatalogPublicService.validatePublishedTrack(TRACK_ID))
+                .thenThrow(new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with ID: " + TRACK_ID));
 
         assertThatThrownBy(() -> favoriteService.addFavorite(USER_EMAIL, TRACK_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -112,10 +113,9 @@ class FavoriteServiceTest {
     @Test
     @DisplayName("Ném BadRequestOperationException khi bài hát chưa ở trạng thái PUBLISHED (tuân thủ BR-09)")
     void addFavorite_TrackNotPublished() {
-        publishedTrack.setPublicationStatus(TrackPublicationStatus.PENDING);
-
         when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
-        when(trackRepository.findById(TRACK_ID)).thenReturn(Optional.of(publishedTrack));
+        when(trackCatalogPublicService.validatePublishedTrack(TRACK_ID))
+                .thenThrow(new BadRequestOperationException("TRACK_NOT_PUBLISHED", "Only published tracks can be added to favorites."));
 
         assertThatThrownBy(() -> favoriteService.addFavorite(USER_EMAIL, TRACK_ID))
                 .isInstanceOf(BadRequestOperationException.class)
@@ -128,7 +128,7 @@ class FavoriteServiceTest {
     @DisplayName("Xử lý idempotent không lưu trùng khi bài hát đã có trong favorites")
     void addFavorite_AlreadyExists_Idempotent() {
         when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
-        when(trackRepository.findById(TRACK_ID)).thenReturn(Optional.of(publishedTrack));
+        when(trackCatalogPublicService.validatePublishedTrack(TRACK_ID)).thenReturn(publishedTrack);
         when(favoriteRepository.existsById(new FavoriteId(USER_ID, TRACK_ID))).thenReturn(true);
 
         assertThatNoException().isThrownBy(() -> favoriteService.addFavorite(USER_EMAIL, TRACK_ID));
