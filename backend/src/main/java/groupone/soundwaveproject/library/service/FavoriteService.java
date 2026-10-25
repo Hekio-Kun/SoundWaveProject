@@ -54,6 +54,31 @@ public class FavoriteService {
     }
 
     /**
+     * Xóa một bài hát khỏi danh sách yêu thích của người dùng (UC-14.3: Remove Song from Favorites List).
+     * Áp dụng cơ chế Idempotent (AF01): nếu bài hát không còn trong favorites thì hoàn tất thành công mà không ném lỗi.
+     *
+     * @param currentUserEmail Email của người dùng hiện tại từ Security Context
+     * @param trackId ID của bài hát muốn xóa khỏi yêu thích
+     */
+    @Transactional
+    public void removeFavorite(String currentUserEmail, Long trackId) {
+        if (trackId == null || trackId <= 0) {
+            throw new BadRequestOperationException("INVALID_TRACK_ID", "Track ID must be a valid positive number.");
+        }
+
+        Long userId = userAccountPublicService.getUserIdByEmail(currentUserEmail);
+
+        FavoriteId favoriteId = new FavoriteId(userId, trackId);
+        if (!favoriteRepository.existsById(favoriteId)) {
+            log.info("Track ID {} is already absent from favorites for user ID {}", trackId, userId);
+            return;
+        }
+
+        favoriteRepository.deleteById(favoriteId);
+        log.info("Successfully removed track ID {} from favorites for user ID {}", trackId, userId);
+    }
+
+    /**
      * Lấy danh sách toàn bộ bài hát yêu thích của người dùng hiện tại (UC-14.2: View Favorite Tracks List).
      * Chỉ trả về các bài hát đang có trạng thái PUBLISHED (tuân thủ BR-09).
      *

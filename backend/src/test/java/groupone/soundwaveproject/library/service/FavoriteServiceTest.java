@@ -183,4 +183,44 @@ class FavoriteServiceTest {
         org.assertj.core.api.Assertions.assertThat(results).isEmpty();
         verify(userAccountPublicService, never()).getUserSummariesByIds(any());
     }
+
+    @Test
+    @DisplayName("Xóa bài hát khỏi danh sách yêu thích thành công khi bài hát đang có trong favorites (UC-14.3 NF01)")
+    void removeFavorite_Success() {
+        when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
+        when(favoriteRepository.existsById(new FavoriteId(USER_ID, TRACK_ID))).thenReturn(true);
+
+        assertThatNoException().isThrownBy(() -> favoriteService.removeFavorite(USER_EMAIL, TRACK_ID));
+
+        verify(favoriteRepository, times(1)).deleteById(new FavoriteId(USER_ID, TRACK_ID));
+    }
+
+    @Test
+    @DisplayName("Ném BadRequestOperationException khi xóa favorite với trackId là null hoặc nhỏ hơn hoặc bằng 0")
+    void removeFavorite_InvalidTrackId() {
+        assertThatThrownBy(() -> favoriteService.removeFavorite(USER_EMAIL, null))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Track ID must be a valid positive number.");
+
+        assertThatThrownBy(() -> favoriteService.removeFavorite(USER_EMAIL, 0L))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Track ID must be a valid positive number.");
+
+        assertThatThrownBy(() -> favoriteService.removeFavorite(USER_EMAIL, -1L))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Track ID must be a valid positive number.");
+
+        verifyNoInteractions(favoriteRepository);
+    }
+
+    @Test
+    @DisplayName("Xử lý idempotent khi bài hát không còn trong favorites thì không ném lỗi (UC-14.3 AF01)")
+    void removeFavorite_AlreadyAbsent_Idempotent() {
+        when(userAccountPublicService.getUserIdByEmail(USER_EMAIL)).thenReturn(USER_ID);
+        when(favoriteRepository.existsById(new FavoriteId(USER_ID, TRACK_ID))).thenReturn(false);
+
+        assertThatNoException().isThrownBy(() -> favoriteService.removeFavorite(USER_EMAIL, TRACK_ID));
+
+        verify(favoriteRepository, never()).deleteById(any(FavoriteId.class));
+    }
 }

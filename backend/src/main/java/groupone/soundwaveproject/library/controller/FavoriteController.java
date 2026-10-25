@@ -50,4 +50,20 @@ public class FavoriteController {
                 "trackId", trackId
         ));
     }
+
+    /**
+     * Xóa một bài hát khỏi danh sách yêu thích của người dùng (UC-14.3: Remove Song from Favorites List).
+     */
+    @DeleteMapping("/{trackId}")
+    public ResponseEntity<Map<String, Object>> removeFavorite(
+            @PathVariable Long trackId,
+            Authentication authentication
+    ) {
+        log.info("User {} requested to remove track ID {} from favorites", authentication.getName(), trackId);
+        favoriteService.removeFavorite(authentication.getName(), trackId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Track removed from favorites successfully.",
+                "trackId", trackId
+        ));
+    }
 }
