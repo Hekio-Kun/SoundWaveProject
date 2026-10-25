@@ -3,9 +3,8 @@ package groupone.soundwaveproject.library.service;
 import groupone.soundwaveproject.authentication.service.UserAccountPublicService;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
-import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.service.TrackCatalogPublicService;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
-import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.library.entity.Favorite;
 import groupone.soundwaveproject.library.entity.FavoriteId;
 import groupone.soundwaveproject.library.repository.FavoriteRepository;
@@ -23,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FavoriteService {
 
     private final FavoriteRepository favoriteRepository;
-    private final TrackRepository trackRepository;
+    private final TrackCatalogPublicService trackCatalogPublicService;
     private final UserAccountPublicService userAccountPublicService;
 
     /**
@@ -40,13 +39,8 @@ public class FavoriteService {
 
         Long userId = userAccountPublicService.getUserIdByEmail(currentUserEmail);
 
-        Track track = trackRepository.findById(trackId)
-                .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with ID: " + trackId));
-
-        // Business Rule BR-09: Chỉ bài hát có trạng thái PUBLISHED mới được hiển thị và tương tác công khai / yêu thích
-        if (track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
-            throw new BadRequestOperationException("TRACK_NOT_PUBLISHED", "Only published tracks can be added to favorites.");
-        }
+        // Xác thực bài hát tồn tại và có trạng thái PUBLISHED qua Public Service của catalog (tuân thủ Modular Monolith & BR-09)
+        trackCatalogPublicService.validatePublishedTrack(trackId);
 
         FavoriteId favoriteId = new FavoriteId(userId, trackId);
         if (favoriteRepository.existsById(favoriteId)) {
