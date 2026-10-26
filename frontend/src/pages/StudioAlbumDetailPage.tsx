@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
-import { studioApi } from "../api/track";
+import { studioApi, type RejectionDetails } from "../api/track";
 import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
+import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 
 import {
   AlertIcon,
@@ -86,6 +87,17 @@ export function StudioAlbumDetailPage({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [submitReviewModalOpen, setSubmitReviewModalOpen] = useState(false);
+  const [rejectionModalTrack, setRejectionModalTrack] = useState<RejectionDetails | null>(null);
+
+  // Xem lý do từ chối kiểm duyệt của bài hát trong album (UC-21.3 AF02 & UC-20)
+  const handleOpenRejectionModal = async (track: StudioTrack) => {
+    try {
+      const details = await studioApi.getRejectionDetails(track.id);
+      setRejectionModalTrack(details);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to load rejection details.");
+    }
+  };
 
   // Trigger Submit Album for Review (UC-21.2 Sequence 1, 1.1, 1.2.1.1, 1.2.2.1)
   const handleStartSubmitAlbum = () => {
@@ -237,15 +249,49 @@ export function StudioAlbumDetailPage({
   if (loadError || !album) {
     return (
       <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "28px 24px" }}>
-        <div className="auth-v2-error" role="alert" style={{ margin: "24px 0" }}>
-          <span><AlertIcon width={18} height={18} /></span>
-          <div>
-            <b>Unable to load album</b>
-            <small>{loadError || "Album not found or access denied."}</small>
+        <div
+          className="auth-v2-error"
+          role="alert"
+          style={{
+            margin: "24px 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "16px",
+            padding: "16px 20px",
+            borderRadius: "16px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ color: "#DC2626" }}><AlertIcon width={22} height={22} /></span>
+            <div>
+              <b style={{ fontSize: "15px", display: "block", color: "var(--color-ocean-dark, #0F172A)" }}>
+                Album unavailable or access denied
+              </b>
+              <small style={{ color: "var(--sw-muted, #64748B)" }}>
+                {loadError && loadError !== "Failed to load album details."
+                  ? loadError
+                  : "Album unavailable or access denied."}
+              </small>
+            </div>
           </div>
-          <button className="button button-secondary button-small" onClick={() => void fetchAlbumData()}>
-            Retry
-          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              className="button button-secondary button-small"
+              onClick={() => onNavigate("/album")}
+              id="btn-error-back-albums"
+            >
+              Back to My Albums
+            </button>
+            <button
+              className="button button-ghost button-small"
+              onClick={() => void fetchAlbumData()}
+              id="btn-error-retry"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -739,6 +785,7 @@ export function StudioAlbumDetailPage({
 
                       return (
                         <span
+                          onClick={isRejected ? () => void handleOpenRejectionModal(track) : undefined}
                           style={{
                             fontSize: "11px",
                             fontWeight: 700,
@@ -766,10 +813,15 @@ export function StudioAlbumDetailPage({
                               ? "1px solid #FCA5A5"
                               : "1px solid #E4E7EC",
                             textTransform: "uppercase",
-                            display: "inline-block",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            cursor: isRejected ? "pointer" : "default",
                           }}
+                          title={isRejected ? "Click to view staff rejection feedback (AF02)" : undefined}
                         >
                           {isPublished ? "PUBLISHED" : track.status}
+                          {isRejected && <span style={{ fontSize: "10px", textDecoration: "underline" }}>(Feedback)</span>}
                         </span>
                       );
                     })()}
@@ -876,6 +928,17 @@ export function StudioAlbumDetailPage({
         album={album}
         onClose={() => setSubmitReviewModalOpen(false)}
         onSuccess={handleAlbumSubmittedSuccess}
+      />
+
+      {/* Rejection Details Modal (UC-21.3 AF02 & UC-20) */}
+      <RejectionDetailsModal
+        isOpen={Boolean(rejectionModalTrack)}
+        details={rejectionModalTrack}
+        onClose={() => setRejectionModalTrack(null)}
+        onEditTrack={(trackId) => {
+          setRejectionModalTrack(null);
+          onNavigate(`/studio/tracks/${trackId}/edit`);
+        }}
       />
     </div>
   );
