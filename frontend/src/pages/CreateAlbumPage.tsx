@@ -99,7 +99,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
   const [trackFormErrors, setTrackFormErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [successInfo, setSuccessInfo] = useState<{ title: string; status: string; count: number } | null>(null);
   const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
   // Submit for Review confirmation modal
@@ -383,9 +382,9 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
     setTracks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Submission process (Draft or Submit for Review)
+  // Submission process (Draft or Submit for Review - Sequence UC-21.1)
   const processSubmitAlbum = async (submitForReview: boolean) => {
-    // If user has an in-progress track filled with audio and title, automatically commit it
+    // 1.1: validateAlbumAndTracks()
     let finalTracks = [...tracks];
     if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
       const genreIdVal = Number(currentGenreId || genres[0]?.id || 1);
@@ -403,8 +402,21 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       resetTrackForm();
     }
 
+    const errors: FormErrors = {};
+    if (!title.trim()) {
+      errors.title = "Album title is required.";
+    } else if (title.trim().length > 200) {
+      errors.title = "Album title cannot exceed 200 characters.";
+    }
+
     if (finalTracks.length === 0) {
-      setSubmitError("Please add at least one track to your album before saving.");
+      errors.tracks = "Please add at least one track to your album.";
+    }
+
+    // Sequence 1.2.1.1: displayInlineValidationErrors("Please complete all required fields")
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setSubmitError("Please complete all required fields.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -413,6 +425,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
     setSubmitError("");
 
     try {
+      // Sequence 1.2.2.1: POST /api/v1/studio/albums (request: CreateAlbumRequest, coverFile, audioFiles[])
       const constituentTracksPayload = finalTracks.map((t, idx) => ({
         title: t.title.trim(),
         genreId: t.genreId,
@@ -432,13 +445,17 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       };
 
       const audioFiles = finalTracks.map((t) => t.file);
-      const created = await albumApi.createAlbum(payload, coverFile ?? undefined, audioFiles);
+      await albumApi.createAlbum(payload, coverFile ?? undefined, audioFiles);
 
-      setSuccessInfo({
-        title: created.title,
-        status: created.status,
-        count: created.trackCount || finalTracks.length,
-      });
+      // Sequence 1.2.2.16: displaySuccessToast("Album draft saved successfully") and redirect("/albums")
+      const toastMessage = submitForReview
+        ? "Album submitted for review successfully."
+        : "Album draft saved successfully.";
+      sessionStorage.setItem(
+        "soundwave_flash_toast",
+        JSON.stringify({ message: toastMessage, type: "success" })
+      );
+      onNavigate("/album");
     } catch (err: unknown) {
       if (err instanceof AlbumApiError) {
         setSubmitError(err.message);
@@ -493,36 +510,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
           <button className="button button-primary" onClick={() => onNavigate(isAuthenticated ? "/studio" : "/login")}>
             {isAuthenticated ? "Return to Content Studio" : "Go to login"}
           </button>
-        </section>
-      </div>
-    );
-  }
-
-  // Success Confirmation Screen
-  if (successInfo) {
-    const isPending = successInfo.status === "PENDING";
-    return (
-      <div className="upload-track-page" style={{ maxWidth: "760px", margin: "40px auto", padding: "0 24px" }}>
-        <section className="upload-track-success" role="status">
-          <span className="upload-track-success__icon"><CheckIcon width={34} height={34} /></span>
-          <span className="eyebrow">{isPending ? "SUBMITTED FOR REVIEW" : "ALBUM SAVED AS DRAFT"}</span>
-          <h1>{isPending ? "Album queued for staff review" : "Your album is ready"}</h1>
-          <p>
-            {isPending ? (
-              <>
-                <strong>"{successInfo.title}"</strong> and all {successInfo.count} constituent tracks have been submitted to the moderation queue. Staff will examine the audio and metadata before making it publicly accessible.
-              </>
-            ) : (
-              <>
-                <strong>"{successInfo.title}"</strong> with {successInfo.count} tracks has been saved in your personal library. You can review it in Content Studio before submitting it to staff.
-              </>
-            )}
-          </p>
-          <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate("/album")}>
-              Open My Albums
-            </button>
-          </div>
         </section>
       </div>
     );
@@ -756,17 +743,23 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
               )}
             </div>
 
-            {/* Intended Release Date */}
+            {/* Intended Release Date - Fixed automatically by system time per RDS UC-21.1 lines 3518 & 3577 */}
             <div className="form-group">
               <label htmlFor="create-album-release-date">
-                Intended Release Date
+                Creation & Release Date <span style={{ color: "var(--color-secondary-text, #64748B)", fontSize: "12px" }}>(Automatic)</span>
               </label>
               <input
                 id="create-album-release-date"
                 type="date"
                 value={releaseDate}
-                onChange={(e) => setReleaseDate(e.target.value)}
+                readOnly
+                disabled
+                style={{ backgroundColor: "var(--sw-surface-muted, #F8FAFC)", cursor: "not-allowed" }}
+                title="Creation date is generated automatically by system time and locked from modification."
               />
+              <span style={{ fontSize: "12px", color: "var(--color-secondary-text, #64748B)", marginTop: "4px", display: "block" }}>
+                Creation date is generated automatically by system time and locked from modification.
+              </span>
             </div>
 
             {/* Album Description */}
@@ -1333,10 +1326,10 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                 className="button button-secondary"
                 onClick={() => void processSubmitAlbum(false)}
                 disabled={submitting || (tracks.length === 0 && !currentAudioFile)}
-                id="btn-save-draft-album"
-                title="Save album and constituent tracks as draft"
+                id="btn-create-album"
+                title="Create album and constituent tracks as draft"
               >
-                Save as Draft
+                Create Album (Save Draft)
               </button>
 
               <button

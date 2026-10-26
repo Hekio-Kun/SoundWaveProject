@@ -166,15 +166,25 @@ public class StudioAlbumService {
         String uploadedCoverPublicId = null;
 
         try {
-            // 2. Upload ảnh bìa album lên Cloudinary nếu có (UC-30)
+            // 1. Upload ảnh bìa album lên Cloudinary nếu có (Sequence 1.2.2.4 & 1.2.2.5: uploadAlbumCover)
             StoredMediaResponse storedCover = null;
             if (cover != null && !cover.isEmpty()) {
                 storedCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
                 uploadedCoverPublicId = storedCover.publicId();
             }
 
+            // 2. Loop upload toàn bộ tệp âm thanh audioFiles lên Cloudinary trước khi ghi nhận CSDL (Sequence 1.2.2.6.1 & 1.2.2.6.2)
+            List<StoredAudioResponse> uploadedAudios = new ArrayList<>();
+            if (hasTracks) {
+                for (MultipartFile audioFile : audioFiles) {
+                    StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audioFile, user.getId());
+                    uploadedAudios.add(audioResponse);
+                    uploadedAudioPublicIds.add(audioResponse.publicId());
+                }
+            }
+
+            // 3. Khởi tạo Album entity với trạng thái DRAFT và lưu vào CSDL (Sequence 1.2.2.7 đến 1.2.2.12: new Album -> save -> persistAlbum)
             String initialAlbumStatus = "DRAFT";
-            TrackPublicationStatus initialTrackStatus = isSubmit ? TrackPublicationStatus.PENDING : TrackPublicationStatus.DRAFT;
             String uniqueSlug = generateUniqueSlug(cleanTitle);
 
             Album album = Album.builder()
@@ -182,7 +192,7 @@ public class StudioAlbumService {
                     .title(cleanTitle)
                     .slug(uniqueSlug)
                     .description(request.getDescription() != null ? request.getDescription().trim() : null)
-                    .releaseDate(request.getReleaseDate())
+                    .releaseDate(request.getReleaseDate() != null ? request.getReleaseDate() : java.time.LocalDate.now(ZoneOffset.UTC))
                     .status(initialAlbumStatus)
                     .coverPublicId(storedCover != null ? storedCover.publicId() : null)
                     .coverUrl(storedCover != null ? storedCover.secureUrl() : null)
@@ -191,22 +201,19 @@ public class StudioAlbumService {
             Album savedAlbum = albumRepository.save(album);
             List<Track> constituentTracks = new ArrayList<>();
 
-            // 3. Quy trình tải lên toàn bộ bài hát cấu thành album cùng một lượt (UC-21.1)
+            // 4. Loop khởi tạo và lưu từng bài hát Track entity vào CSDL (Sequence 1.2.2.13.1 đến 1.2.2.13.6: new Track -> save -> persistTrack)
             if (hasTracks) {
+                TrackPublicationStatus initialTrackStatus = isSubmit ? TrackPublicationStatus.PENDING : TrackPublicationStatus.DRAFT;
                 for (int i = 0; i < request.getTracks().size(); i++) {
                     AlbumTrackItemRequest item = request.getTracks().get(i);
                     int fileIndex = item.getAudioIndex() != null ? item.getAudioIndex() : i;
-                    MultipartFile audioFile = audioFiles.get(fileIndex);
+                    StoredAudioResponse audioResponse = uploadedAudios.get(fileIndex);
 
                     Genre genre = genreRepository.findById(item.getGenreId())
                             .orElseThrow(() -> new BadRequestOperationException("Selected genre for track '" + item.getTitle() + "' is invalid."));
                     if (!Boolean.TRUE.equals(genre.getIsActive())) {
                         throw new BadRequestOperationException("Selected genre '" + genre.getName() + "' is currently inactive.");
                     }
-
-                    // Upload tệp âm thanh lên Cloudinary
-                    StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audioFile, user.getId());
-                    uploadedAudioPublicIds.add(audioResponse.publicId());
 
                     int trackOrder = item.getTrackNumber() != null ? item.getTrackNumber() : (i + 1);
                     int duration = (item.getDurationMs() != null && item.getDurationMs() > 0)
@@ -253,7 +260,7 @@ public class StudioAlbumService {
                 constituentTracks = assignTracksToAlbum(savedAlbum, request.getTrackIds(), user.getId());
             }
 
-            // 4. Đánh giá lại trạng thái xuất bản của Album theo BR-18 và quy chuẩn
+            // 5. Đánh giá lại trạng thái xuất bản của Album theo BR-18 và quy chuẩn
             recalculateAndSaveAlbumStatus(savedAlbum);
 
             log.info("Album '{}' (ID: {}) created with {} constituent tracks by user ID {}",
