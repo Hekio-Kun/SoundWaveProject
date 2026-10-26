@@ -23,7 +23,7 @@ export const catalogApi = {
   getTracks: async (params?: {
     genre?: string;
     search?: string;
-    sort?: "newest" | "trending" | "title";
+    sort?: "newest" | "trending" | "title" | "title_desc";
     creatorId?: number;
     page?: number;
     size?: number;

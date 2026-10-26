@@ -8,6 +8,7 @@ import groupone.soundwaveproject.catalog.dto.response.TrackResponse;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
+import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.library.service.ListeningHistoryPublicService;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -26,6 +29,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TrackCatalogServiceTest {
     @Mock private TrackRepository trackRepository;
+    @Mock private GenreRepository genreRepository;
     @Mock private UserAccountPublicService userAccountPublicService;
     @Mock private ListeningHistoryPublicService listeningHistoryPublicService;
 
@@ -35,6 +39,7 @@ class TrackCatalogServiceTest {
     void setUp() {
         trackCatalogService = new TrackCatalogService(
                 trackRepository,
+                genreRepository,
                 userAccountPublicService,
                 listeningHistoryPublicService
         );
@@ -192,6 +197,7 @@ class TrackCatalogServiceTest {
         Track t2 = createMockTrack(2L, "track-2", TrackPublicationStatus.PUBLISHED);
         ReflectionTestUtils.setField(t2, "genre", rock);
 
+        when(genreRepository.findBySlugIgnoreCaseAndIsActiveTrue("rock")).thenReturn(Optional.of(rock));
         when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2));
         when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
 
@@ -199,6 +205,78 @@ class TrackCatalogServiceTest {
 
         assertEquals(1, ranking.size());
         assertEquals(2L, ranking.get(0).id());
+    }
+
+    @Test
+    void getPublishedTracks_sortByTitleAsc_andDesc() {
+        Track t1 = createMockTrack(1L, "track-a", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t1, "title", "Alpha Song");
+
+        Track t2 = createMockTrack(2L, "track-z", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t2, "title", "Zeta Song");
+
+        Track t3 = createMockTrack(3L, "track-m", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t3, "title", "Moonlight");
+
+        when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2, t3));
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        // A - Z
+        Page<TrackResponse> ascPage = trackCatalogService.getPublishedTracks(null, null, "title", PageRequest.of(0, 20));
+        assertEquals(3, ascPage.getContent().size());
+        assertEquals("Alpha Song", ascPage.getContent().get(0).title());
+        assertEquals("Moonlight", ascPage.getContent().get(1).title());
+        assertEquals("Zeta Song", ascPage.getContent().get(2).title());
+
+        // Z - A (User request: thêm option từ Z đến A)
+        Page<TrackResponse> descPage = trackCatalogService.getPublishedTracks(null, null, "title_desc", PageRequest.of(0, 20));
+        assertEquals(3, descPage.getContent().size());
+        assertEquals("Zeta Song", descPage.getContent().get(0).title());
+        assertEquals("Moonlight", descPage.getContent().get(1).title());
+        assertEquals("Alpha Song", descPage.getContent().get(2).title());
+    }
+
+    @Test
+    void getPublishedTracks_pagination_20PerPage() {
+        java.util.List<Track> mockList = new java.util.ArrayList<>();
+        for (int i = 1; i <= 25; i++) {
+            Track t = createMockTrack((long) i, "track-" + i, TrackPublicationStatus.PUBLISHED);
+            ReflectionTestUtils.setField(t, "title", "Song " + String.format("%02d", i));
+            mockList.add(t);
+        }
+
+        when(trackRepository.findAll()).thenReturn(mockList);
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        // Page 0 (First page, size 20)
+        Page<TrackResponse> page1 = trackCatalogService.getPublishedTracks(null, null, "newest", PageRequest.of(0, 20));
+        assertEquals(20, page1.getContent().size());
+        assertEquals(25, page1.getTotalElements());
+        assertEquals(2, page1.getTotalPages());
+        assertEquals(0, page1.getNumber());
+
+        // Page 1 (Second page, size 20 -> 5 items remaining)
+        Page<TrackResponse> page2 = trackCatalogService.getPublishedTracks(null, null, "newest", PageRequest.of(1, 20));
+        assertEquals(5, page2.getContent().size());
+        assertEquals(1, page2.getNumber());
+    }
+
+    @Test
+    void getPublishedTracks_invalidOrInactiveGenre_resetsToAllGenres_EX01() {
+        Track t1 = createMockTrack(1L, "track-1", TrackPublicationStatus.PUBLISHED);
+        Track t2 = createMockTrack(2L, "track-2", TrackPublicationStatus.PUBLISHED);
+
+        // Given stale or inactive genre slug 'deleted-genre'
+        when(genreRepository.findBySlugIgnoreCaseAndIsActiveTrue("deleted-genre")).thenReturn(Optional.empty());
+        when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2));
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        // When requesting tracks with stale genre
+        Page<TrackResponse> result = trackCatalogService.getPublishedTracks("deleted-genre", null, "newest", PageRequest.of(0, 20));
+
+        // Then fallback to all active tracks (EX01)
+        assertEquals(2, result.getTotalElements());
+        assertEquals(2, result.getContent().size());
     }
 }
 

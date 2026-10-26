@@ -20,7 +20,7 @@ type Props = {
   onNavigate: (route: string) => void;
 };
 
-const ALBUM_SORT_OPTIONS: SortOption[] = [
+const ALBUM_SORT_OPTIONS: SortOption<"newest" | "trending" | "title">[] = [
   {
     value: "newest",
     label: "Newest",

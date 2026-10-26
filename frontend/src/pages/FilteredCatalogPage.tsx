@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { catalogApi } from "../api/catalog";
 import { TrackCard } from "../components/common/MusicCards";
-import { SortDropdown } from "../components/common/SortDropdown";
-import { HeadphonesIcon } from "../icons";
+import { SortDropdown, type SortOptionValue } from "../components/common/SortDropdown";
+import { HeadphonesIcon, SearchIcon } from "../icons";
 import type { Genre, LandingTrack } from "../types";
 
 type Props = {
@@ -11,7 +11,9 @@ type Props = {
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string) => void;
   onNavigate: (route: string) => void;
   initialGenre?: string;
-  initialSort?: "newest" | "trending" | "title";
+  initialSort?: SortOptionValue;
+  initialSearch?: string;
+  initialPage?: number;
 };
 
 export function FilteredCatalogPage({
@@ -21,9 +23,17 @@ export function FilteredCatalogPage({
   onNavigate,
   initialGenre,
   initialSort,
+  initialSearch,
+  initialPage = 0,
 }: Props) {
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre ?? "all");
-  const [sortBy, setSortBy] = useState<"newest" | "trending" | "title">(initialSort ?? "newest");
+  const [sortBy, setSortBy] = useState<SortOptionValue>(initialSort ?? "newest");
+  const [searchQuery, setSearchQuery] = useState<string>(initialSearch ?? "");
+  const [searchInput, setSearchInput] = useState<string>(initialSearch ?? "");
+  const [currentPage, setCurrentPage] = useState<number>(initialPage);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const [totalElements, setTotalElements] = useState<number>(0);
+
   const [genresList, setGenresList] = useState<Genre[]>([]);
   const [genresLoading, setGenresLoading] = useState(true);
   const [genresError, setGenresError] = useState(false);
@@ -31,6 +41,10 @@ export function FilteredCatalogPage({
   const [tracks, setTracks] = useState<LandingTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(true);
   const [tracksError, setTracksError] = useState<string | null>(null);
+
+  // Exception notices (EX01 & EX03)
+  const [genreNotice, setGenreNotice] = useState<string | null>(null);
+  const [pageNotice, setPageNotice] = useState<string | null>(null);
 
   // Keep state in sync with URL query params
   useEffect(() => {
@@ -41,7 +55,18 @@ export function FilteredCatalogPage({
     setSortBy(initialSort ?? "newest");
   }, [initialSort]);
 
-  // Phase 1: Load available genres from backend
+  useEffect(() => {
+    setSearchQuery(initialSearch ?? "");
+    setSearchInput(initialSearch ?? "");
+  }, [initialSearch]);
+
+  useEffect(() => {
+    if (initialPage !== undefined) {
+      setCurrentPage(initialPage);
+    }
+  }, [initialPage]);
+
+  // Phase 1: Load available genres from backend and validate selected genre (EX01)
   useEffect(() => {
     let active = true;
     setGenresLoading(true);
@@ -54,6 +79,28 @@ export function FilteredCatalogPage({
         if (data && data.length > 0) {
           setGenresList(data);
           setGenresError(false);
+
+          // EX01: Stale URL references an unavailable or disabled genre slug.
+          // The system ignores the invalid value, resets to all genres, and informs the user.
+          if (initialGenre && initialGenre !== "all") {
+            const exists = data.some(
+              (g) => g.slug.toLowerCase() === initialGenre.toLowerCase()
+            );
+            if (!exists) {
+              setSelectedGenre("all");
+              setGenreNotice(
+                `The genre "${initialGenre}" is unavailable or disabled. Showing all genres.`
+              );
+
+              // Update URL removing the invalid genre slug
+              const params = new URLSearchParams();
+              if (sortBy !== "newest") params.set("sort", sortBy);
+              if (searchQuery.trim()) params.set("search", searchQuery.trim());
+              if (currentPage > 0) params.set("page", String(currentPage + 1));
+              const qs = params.toString();
+              onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+            }
+          }
         } else {
           setGenresList([]);
           setGenresError(true);
@@ -71,10 +118,10 @@ export function FilteredCatalogPage({
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialGenre]);
 
-  // Phase 2 & 3: Query matching published tracks whenever genre or sort changes
-  useEffect(() => {
+  // Phase 2 & 3: Query matching published tracks whenever genre, sort, search, or page changes
+  const fetchTracks = useCallback(() => {
     let active = true;
     setTracksLoading(true);
     setTracksError(null);
@@ -82,17 +129,41 @@ export function FilteredCatalogPage({
     catalogApi
       .getTracks({
         genre: selectedGenre !== "all" ? selectedGenre : undefined,
+        search: searchQuery.trim() || undefined,
         sort: sortBy,
-        page: 0,
-        size: 20,
+        page: currentPage,
+        size: 20, // Standard page size fixed at 20 tracks per page
       })
       .then((res) => {
         if (!active) return;
-        setTracks(res?.content ?? []);
+        const totalP = res?.totalPages ?? 0;
+        const totalE = res?.totalElements ?? 0;
+        const fetchedTracks = res?.content ?? [];
+
+        // EX03: A manual URL parameter references an out-of-bounds page number.
+        // If totalPages is known (> 0) and the requested currentPage >= totalPages, reset to page 1 (index 0).
+        if (totalP > 0 && currentPage >= totalP) {
+          setPageNotice(`Page ${currentPage + 1} exceeds total pages (${totalP}). Resetting to page 1.`);
+          setCurrentPage(0);
+
+          const params = new URLSearchParams();
+          if (selectedGenre && selectedGenre !== "all") params.set("genre", selectedGenre);
+          if (sortBy && sortBy !== "newest") params.set("sort", sortBy);
+          if (searchQuery.trim()) params.set("search", searchQuery.trim());
+          const qs = params.toString();
+          onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+          return;
+        }
+
+        setTracks(fetchedTracks);
+        setTotalPages(totalP);
+        setTotalElements(totalE);
       })
       .catch((err: unknown) => {
         if (!active) return;
         setTracks([]);
+        setTotalPages(0);
+        setTotalElements(0);
         setTracksError(err instanceof Error ? err.message : "Failed to load public catalog.");
       })
       .finally(() => {
@@ -102,44 +173,101 @@ export function FilteredCatalogPage({
     return () => {
       active = false;
     };
-  }, [selectedGenre, sortBy]);
+  }, [selectedGenre, sortBy, searchQuery, currentPage, onNavigate]);
+
+  useEffect(() => {
+    const cleanup = fetchTracks();
+    return cleanup;
+  }, [fetchTracks]);
 
   const activeGenreObj = useMemo(
     () => genresList.find((g) => g.slug.toLowerCase() === selectedGenre.toLowerCase()),
     [genresList, selectedGenre]
   );
 
-  // Phase 2: Select genre filter & trigger query with unselect reset to 'all'
-  const updateFilters = (newGenre: string, newSort: "newest" | "trending" | "title") => {
+  // Update filters & URL state (NF01, AF01)
+  const updateFilters = (
+    newGenre: string,
+    newSort: SortOptionValue,
+    newSearch: string,
+    newPage = 0
+  ) => {
     setSelectedGenre(newGenre);
     setSortBy(newSort);
+    setSearchQuery(newSearch);
+    setSearchInput(newSearch);
+    setCurrentPage(newPage);
 
     const params = new URLSearchParams();
     if (newGenre && newGenre !== "all") params.set("genre", newGenre);
     if (newSort && newSort !== "newest") params.set("sort", newSort);
+    if (newSearch && newSearch.trim()) params.set("search", newSearch.trim());
+    if (newPage > 0) params.set("page", String(newPage + 1));
     const qs = params.toString();
 
     // Update browser URL hash without full page reload
     onNavigate(`/browse${qs ? `?${qs}` : ""}`);
   };
 
+  // AF03: Navigate catalog pages
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 0 || (totalPages > 0 && newPage >= totalPages) || newPage === currentPage) return;
+    setPageNotice(null);
+    setCurrentPage(newPage);
+
+    const params = new URLSearchParams();
+    if (selectedGenre && selectedGenre !== "all") params.set("genre", selectedGenre);
+    if (sortBy && sortBy !== "newest") params.set("sort", sortBy);
+    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    if (newPage > 0) params.set("page", String(newPage + 1));
+    const qs = params.toString();
+
+    onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const getVisiblePages = () => {
+    const delta = 1;
+    const range = [];
+    for (let i = 0; i < totalPages; i++) {
+      if (i === 0 || i === totalPages - 1 || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      } else if (range[range.length - 1] !== "...") {
+        range.push("...");
+      }
+    }
+    return range;
+  };
+
   const handleGenreTagClick = (slug: string) => {
-    // Sequence diagram Phase 2: If user clicks "All" or unselects the currently active genre -> resets to "all"
+    // If user clicks "All" or unselects the currently active genre -> resets to "all"
+    setGenreNotice(null);
     if (slug === "all" || selectedGenre.toLowerCase() === slug.toLowerCase()) {
-      updateFilters("all", sortBy);
+      updateFilters("all", sortBy, searchQuery, 0);
     } else {
-      updateFilters(slug, sortBy);
+      updateFilters(slug, sortBy, searchQuery, 0);
     }
   };
 
-  const handleClearFilters = () => {
-    updateFilters("all", "newest");
+  const handleSearchSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    updateFilters(selectedGenre, sortBy, searchInput.trim(), 0);
   };
+
+  // AF01: Clear filters
+  const handleClearFilters = () => {
+    setGenreNotice(null);
+    setPageNotice(null);
+    updateFilters("all", "newest", "", 0);
+  };
+
+  const hasActiveFilters =
+    selectedGenre !== "all" || sortBy !== "newest" || searchQuery.trim() !== "";
 
   return (
     <div className="catalog-browse-page" style={{ padding: "0 0 60px 0" }}>
       {/* Page Title & Breadcrumb Banner */}
-      <div className="page-title-banner" style={{ marginBottom: "24px" }}>
+      <div className="page-title-banner" style={{ marginBottom: "20px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
             <span className="eyebrow">
@@ -152,12 +280,94 @@ export function FilteredCatalogPage({
           <p className="page-subtext" style={{ color: "var(--sw-muted)", marginTop: "4px", fontSize: "14px" }}>
             {activeGenreObj
               ? activeGenreObj.description || `Discover trending and fresh ${activeGenreObj.name} tracks on SoundWave.`
-              : "Filter tracks by genre, sort by newest releases or trending plays, and stream songs."}
+              : "Filter tracks by genre, sort by newest releases, trending plays, or alphabetical title, and stream published music."}
           </p>
         </div>
       </div>
 
-      {/* Filter Toolbar: Sort dropdown, Clear filters, Result summary */}
+      {/* EX01: Stale / Inactive Genre Alert Banner */}
+      {genreNotice && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            borderRadius: "12px",
+            background: "#FFFBEB",
+            border: "1px solid #FCD34D",
+            color: "#92400E",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>⚠️</span>
+            <span>{genreNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGenreNotice(null)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#92400E",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "14px",
+              padding: "0 4px",
+            }}
+            aria-label="Dismiss warning"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* EX03: Out-of-bounds Page Alert Banner */}
+      {pageNotice && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            borderRadius: "12px",
+            background: "#EFF6FF",
+            border: "1px solid #93C5FD",
+            color: "#1E40AF",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>ℹ️</span>
+            <span>{pageNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPageNotice(null)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#1E40AF",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "14px",
+              padding: "0 4px",
+            }}
+            aria-label="Dismiss notice"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Filter Toolbar: Sort dropdown, Search input, Clear filters, Result summary */}
       <div
         className="sw-catalog-toolbar"
         style={{
@@ -170,16 +380,95 @@ export function FilteredCatalogPage({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          {/* Custom Modern Sort Dropdown */}
+          {/* Custom Modern Sort Dropdown (supports Newest, Most played, Title A-Z, Title Z-A) */}
           <SortDropdown
             value={sortBy}
-            onChange={(newSort) => updateFilters(selectedGenre, newSort)}
+            onChange={(newSort) => updateFilters(selectedGenre, newSort, searchQuery, 0)}
             showLabel={true}
           />
 
-          {/* Clear filters Button */}
-          {(selectedGenre !== "all" || sortBy !== "newest") && (
+          {/* Combined Keyword Search Input */}
+          <form
+            onSubmit={handleSearchSubmit}
+            style={{ display: "flex", alignItems: "center", position: "relative" }}
+            role="search"
+          >
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search keyword..."
+              aria-label="Search within catalog"
+              style={{
+                height: "38px",
+                padding: "0 30px 0 34px",
+                borderRadius: "11px",
+                border: "1px solid var(--sw-border, #E2E8F0)",
+                background: "#F8FAFC",
+                color: "var(--sw-text-h, #0F172A)",
+                fontSize: "12.5px",
+                outline: "none",
+                width: "180px",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.width = "220px";
+                e.currentTarget.style.borderColor = "#0284c7";
+                e.currentTarget.style.background = "#FFFFFF";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(2, 132, 199, 0.12), 0 2px 6px rgba(0,0,0,0.04)";
+              }}
+              onBlur={(e) => {
+                if (!searchInput) e.currentTarget.style.width = "180px";
+                e.currentTarget.style.borderColor = "var(--sw-border, #E2E8F0)";
+                e.currentTarget.style.background = "#F8FAFC";
+                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.03)";
+              }}
+            />
+            <span
+              style={{
+                position: "absolute",
+                left: "10px",
+                color: "#64748B",
+                display: "inline-flex",
+                alignItems: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <SearchIcon width={15} height={15} />
+            </span>
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  updateFilters(selectedGenre, sortBy, "", 0);
+                }}
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#94A3B8",
+                  padding: "4px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                }}
+                title="Clear search keyword"
+              >
+                ✕
+              </button>
+            )}
+          </form>
+
+          {/* AF01: Clear filters Button */}
+          {hasActiveFilters && (
             <button
+              type="button"
               className="button button-ghost"
               onClick={handleClearFilters}
               style={{
@@ -200,8 +489,8 @@ export function FilteredCatalogPage({
           )}
         </div>
 
-        {/* Result summary */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {/* Result summary & active criteria tag */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <span
             style={{
               padding: "6px 12px",
@@ -213,7 +502,8 @@ export function FilteredCatalogPage({
               fontWeight: 700,
             }}
           >
-            Result count: <b>{tracks.length}</b> tracks
+            Result count: <b>{totalElements > 0 ? totalElements : tracks.length}</b> tracks
+            {totalPages > 1 ? ` (Page ${currentPage + 1}/${totalPages})` : ""}
           </span>
           {activeGenreObj && (
             <span
@@ -227,7 +517,22 @@ export function FilteredCatalogPage({
                 border: "1px solid #BAE6FD",
               }}
             >
-              Filtered by: {activeGenreObj.name}
+              Genre: {activeGenreObj.name}
+            </span>
+          )}
+          {searchQuery && (
+            <span
+              style={{
+                padding: "6px 12px",
+                borderRadius: "999px",
+                background: "#EFF6FF",
+                color: "#1D4ED8",
+                fontSize: "11.5px",
+                fontWeight: 700,
+                border: "1px solid #BFDBFE",
+              }}
+            >
+              Keyword: "{searchQuery}"
             </span>
           )}
         </div>
@@ -250,14 +555,22 @@ export function FilteredCatalogPage({
             Loading genre filters...
           </span>
         ) : genresError && genresList.length === 0 ? (
-          /* Step 12: Display message "No genres are available right now" */
-          <span style={{ fontSize: "12px", color: "#DC2626", background: "#FEF2F2", padding: "6px 14px", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#DC2626",
+              background: "#FEF2F2",
+              padding: "6px 14px",
+              borderRadius: "8px",
+              border: "1px solid #FCA5A5",
+            }}
+          >
             No genres are available right now
           </span>
         ) : (
-          /* Step 13: Render all genre filter tags (Default: All, Ballad, Pop, ...) */
           <>
             <button
+              type="button"
               className={selectedGenre === "all" ? "is-active" : ""}
               onClick={() => handleGenreTagClick("all")}
               style={{
@@ -280,6 +593,7 @@ export function FilteredCatalogPage({
               return (
                 <button
                   key={g.id}
+                  type="button"
                   className={isSelected ? "is-active" : ""}
                   onClick={() => handleGenreTagClick(g.slug)}
                   title={isSelected ? `Unselect ${g.name} (reset to all)` : `Filter by ${g.name}`}
@@ -304,11 +618,11 @@ export function FilteredCatalogPage({
         )}
       </div>
 
-      {/* Phase 4: Track Cards Results or Empty State */}
+      {/* Phase 4: Track Cards Results, Loading State, Error State (EX02), or Empty State (AF02) */}
       {tracksLoading ? (
         <div
           style={{
-            minHeight: "240px",
+            minHeight: "260px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -316,48 +630,165 @@ export function FilteredCatalogPage({
             fontSize: "14px",
           }}
         >
-          Loading songs for selected filters...
+          Loading published tracks...
         </div>
       ) : tracksError ? (
+        /* EX02: Catalog retrieval failure with retry controls */
         <div
+          role="alert"
           style={{
-            padding: "24px",
+            padding: "28px 20px",
             background: "#FEF2F2",
             border: "1px solid #FCA5A5",
-            borderRadius: "14px",
+            borderRadius: "16px",
             color: "#991B1B",
             textAlign: "center",
+            maxWidth: "520px",
+            margin: "20px auto",
           }}
         >
-          <strong>{tracksError}</strong>
-          <div style={{ marginTop: "12px" }}>
-            <button className="button button-secondary" onClick={() => updateFilters(selectedGenre, sortBy)}>
+          <div style={{ fontSize: "24px", marginBottom: "8px" }}>⚠️</div>
+          <strong style={{ fontSize: "15px", display: "block", marginBottom: "6px" }}>
+            Unable to retrieve catalog tracks
+          </strong>
+          <span style={{ fontSize: "13px", color: "#B91C1C", display: "block", marginBottom: "16px" }}>
+            {tracksError}
+          </span>
+          <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+            <button
+              type="button"
+              className="button button-primary button-small"
+              onClick={() => fetchTracks()}
+            >
               Retry query
             </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                onClick={handleClearFilters}
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
       ) : tracks.length > 0 ? (
-        /* Step 31 & 32: Render matching Track Cards */
-        <div className="sw-track-grid sw-track-grid--catalog">
-          {tracks.map((track) => (
-            <TrackCard
-              key={track.id}
-              track={track}
-              active={currentTrack?.id === track.id}
-              playing={currentTrack?.id === track.id && playing}
-              onPlay={(t) =>
-                onPlayTrack(
-                  t,
-                  tracks,
-                  selectedGenre !== "all" ? `Genre • ${selectedGenre}` : "Catalog"
-                )
-              }
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
+        /* Render matching Track Cards with Pagination */
+        <>
+          <div className="sw-track-grid sw-track-grid--catalog">
+            {tracks.map((track) => (
+              <TrackCard
+                key={track.id}
+                track={track}
+                active={currentTrack?.id === track.id}
+                playing={currentTrack?.id === track.id && playing}
+                onPlay={(t) =>
+                  onPlayTrack(
+                    t,
+                    tracks,
+                    selectedGenre !== "all" ? `Genre • ${selectedGenre}` : "Catalog"
+                  )
+                }
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+
+          {/* AF03: Pagination Controls (Rendered when totalPages > 1) */}
+          {totalPages > 1 && (
+            <div
+              className="catalog-pagination-bar"
+              role="navigation"
+              aria-label="Catalog pagination"
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "8px",
+                marginTop: "36px",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                disabled={currentPage === 0 || tracksLoading}
+                onClick={() => handlePageChange(currentPage - 1)}
+                aria-label="Go to previous page"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  cursor: currentPage === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                ← Previous
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                {getVisiblePages().map((pageItem, idx) =>
+                  typeof pageItem === "string" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      style={{ padding: "0 4px", color: "var(--sw-muted)" }}
+                      aria-hidden="true"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={pageItem}
+                      type="button"
+                      aria-current={currentPage === pageItem ? "page" : undefined}
+                      aria-label={`Page ${pageItem + 1}`}
+                      className={
+                        currentPage === pageItem
+                          ? "button button-primary button-small"
+                          : "button button-ghost button-small"
+                      }
+                      style={{
+                        minWidth: "36px",
+                        height: "36px",
+                        padding: "0 8px",
+                        borderRadius: "8px",
+                        fontWeight: currentPage === pageItem ? 700 : 500,
+                        background: currentPage === pageItem ? "var(--sw-primary)" : "transparent",
+                        color: currentPage === pageItem ? "#fff" : "var(--sw-text)",
+                        border:
+                          currentPage === pageItem ? "none" : "1px solid var(--sw-border, #E2E8F0)",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => handlePageChange(pageItem)}
+                    >
+                      {pageItem + 1}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                disabled={currentPage >= totalPages - 1 || tracksLoading}
+                onClick={() => handlePageChange(currentPage + 1)}
+                aria-label="Go to next page"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  cursor: currentPage >= totalPages - 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </>
       ) : (
-        /* Step 30: Empty State as per Sequence Diagram */
+        /* AF02: No matching track empty state (Hides pagination, renders Clear Filters action) */
         <div
           className="sw-empty"
           style={{
@@ -388,28 +819,33 @@ export function FilteredCatalogPage({
             <HeadphonesIcon width={28} height={28} />
           </div>
 
-          {/* Sequence diagram Step 30 exact message: "No published songs found for this genre. Please select another genre." */}
           <strong style={{ fontSize: "16px", color: "var(--sw-text)" }}>
-            {selectedGenre !== "all"
+            {searchQuery
+              ? `No published songs found matching "${searchQuery}".`
+              : selectedGenre !== "all"
               ? "No published songs found for this genre. Please select another genre."
               : "No published songs found in catalog. Please check back later."}
           </strong>
 
-          <span style={{ fontSize: "13px", color: "var(--sw-muted)", maxWidth: "420px" }}>
-            {selectedGenre !== "all"
-              ? `There are currently no active public tracks assigned to ${activeGenreObj ? `"${activeGenreObj.name}"` : "this genre"}. Try exploring other musical genres.`
+          <span style={{ fontSize: "13px", color: "var(--sw-muted)", maxWidth: "440px" }}>
+            {searchQuery
+              ? "Try checking your spelling, exploring other genres, or clearing active filters to browse all songs."
+              : selectedGenre !== "all"
+              ? `There are currently no active public tracks assigned to ${
+                  activeGenreObj ? `"${activeGenreObj.name}"` : "this genre"
+                }. Try exploring other musical genres.`
               : "There are currently no published tracks available in the public catalog."}
           </span>
 
-          {selectedGenre !== "all" && (
-            <button
-              className="button button-primary"
-              onClick={handleClearFilters}
-              style={{ marginTop: "10px" }}
-            >
-              Clear filters and view all tracks
-            </button>
-          )}
+          {/* AF02 Action: Clear Filters action is always prominently displayed in empty state */}
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={handleClearFilters}
+            style={{ marginTop: "10px" }}
+          >
+            Clear filters and view all tracks
+          </button>
         </div>
       )}
     </div>

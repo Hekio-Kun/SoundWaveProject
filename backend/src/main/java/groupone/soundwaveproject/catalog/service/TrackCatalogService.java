@@ -10,6 +10,7 @@ import groupone.soundwaveproject.catalog.dto.response.TrackResponse;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.library.service.ListeningHistoryPublicService;
 import org.springframework.data.domain.Page;
@@ -30,15 +31,18 @@ import java.util.Optional;
 @Service
 public class TrackCatalogService {
     private final TrackRepository trackRepository;
+    private final GenreRepository genreRepository;
     private final UserAccountPublicService userAccountPublicService;
     private final ListeningHistoryPublicService listeningHistoryPublicService;
 
     public TrackCatalogService(
             TrackRepository trackRepository,
+            GenreRepository genreRepository,
             UserAccountPublicService userAccountPublicService,
             ListeningHistoryPublicService listeningHistoryPublicService
     ) {
         this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
         this.userAccountPublicService = userAccountPublicService;
         this.listeningHistoryPublicService = listeningHistoryPublicService;
     }
@@ -100,9 +104,15 @@ public class TrackCatalogService {
         }
 
         if (genre != null && !genre.isBlank() && !"all".equalsIgnoreCase(genre)) {
-            allPublished = allPublished.stream()
-                    .filter(t -> t.getGenre() != null && genre.equalsIgnoreCase(t.getGenre().getSlug()))
-                    .toList();
+            String trimmedGenre = genre.trim();
+            boolean isGenreActive = genreRepository.findBySlugIgnoreCaseAndIsActiveTrue(trimmedGenre).isPresent();
+            if (isGenreActive) {
+                allPublished = allPublished.stream()
+                        .filter(t -> t.getGenre() != null && trimmedGenre.equalsIgnoreCase(t.getGenre().getSlug()))
+                        .toList();
+            } else {
+                log.warn("Requested genre '{}' is unavailable or disabled; falling back to all active genres (EX01)", genre);
+            }
         }
 
         if (search != null && !search.isBlank()) {
@@ -120,9 +130,15 @@ public class TrackCatalogService {
             comparator = Comparator.comparing(
                     (Track t) -> t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L
             ).reversed().thenComparing(Track::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
-        } else if ("title".equalsIgnoreCase(sort)) {
+        } else if ("title_desc".equalsIgnoreCase(sort) || "title-desc".equalsIgnoreCase(sort) || "title_za".equalsIgnoreCase(sort) || "title-za".equalsIgnoreCase(sort)) {
             comparator = Comparator.comparing(
-                    Track::getTitle, String.CASE_INSENSITIVE_ORDER
+                    (Track t) -> t.getTitle() != null ? t.getTitle() : "",
+                    String.CASE_INSENSITIVE_ORDER
+            ).reversed();
+        } else if ("title".equalsIgnoreCase(sort) || "title_asc".equalsIgnoreCase(sort) || "title-asc".equalsIgnoreCase(sort)) {
+            comparator = Comparator.comparing(
+                    (Track t) -> t.getTitle() != null ? t.getTitle() : "",
+                    String.CASE_INSENSITIVE_ORDER
             );
         } else {
             comparator = Comparator.comparing(
@@ -132,8 +148,8 @@ public class TrackCatalogService {
 
         List<Track> sortedList = allPublished.stream().sorted(comparator).toList();
 
-        int pageNumber = pageable.getPageNumber();
-        int pageSize = pageable.getPageSize() > 0 ? pageable.getPageSize() : 20;
+        int pageNumber = pageable != null ? Math.max(0, pageable.getPageNumber()) : 0;
+        int pageSize = (pageable != null && pageable.getPageSize() > 0) ? pageable.getPageSize() : 20;
         int fromIndex = Math.min(pageNumber * pageSize, sortedList.size());
         int toIndex = Math.min(fromIndex + pageSize, sortedList.size());
 
@@ -141,7 +157,8 @@ public class TrackCatalogService {
                 .map(this::mapToTrackResponse)
                 .toList();
 
-        return new PageImpl<>(pagedResponses, pageable, sortedList.size());
+        Pageable effectivePageable = pageable != null ? pageable : org.springframework.data.domain.PageRequest.of(pageNumber, pageSize);
+        return new PageImpl<>(pagedResponses, effectivePageable, sortedList.size());
     }
 
     /**
