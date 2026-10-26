@@ -127,4 +127,11 @@ export const albumApi = {
   deleteAlbum: (id: number): Promise<void> => {
     return albumRequest<void>(`/studio/albums/${id}`, "DELETE");
   },
+
+  /**
+   * Nộp toàn bộ bài hát trong album nháp lên cho Staff kiểm duyệt (UC-21.2)
+   */
+  submitAlbumForReview: (id: number): Promise<StudioAlbum> => {
+    return albumRequest<StudioAlbum>(`/studio/albums/${id}/submit`, "POST");
+  },
 };

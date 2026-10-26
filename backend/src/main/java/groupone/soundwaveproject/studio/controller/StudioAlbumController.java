@@ -73,6 +73,17 @@ public class StudioAlbumController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Nộp toàn bộ bài hát trong album nháp lên cho Staff kiểm duyệt (UC-21.2 Submit Album For Review).
+     */
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<StudioAlbumResponse> submitAlbumForReview(
+            @PathVariable @Positive(message = "Album ID must be positive.") Long id,
+            Authentication authentication
+    ) {
+        StudioAlbumResponse response = studioAlbumService.submitAlbumForReview(id, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * Cập nhật thông tin Album, thay ảnh bìa hoặc sắp xếp lại danh sách bài hát (UC-21.3 Update Album).

@@ -12,6 +12,7 @@ import {
 import { albumApi } from "../api/album";
 import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
+import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
@@ -133,6 +134,30 @@ export function StudioPage({
   const [detailAlbum, setDetailAlbum] = useState<StudioAlbum | null>(null);
   const [deleteConfirmAlbum, setDeleteConfirmAlbum] = useState<StudioAlbum | null>(null);
   const [deletingAlbum, setDeletingAlbum] = useState(false);
+  const [submittingAlbum, setSubmittingAlbum] = useState<StudioAlbum | null>(null);
+  const [submitAlbumModalOpen, setSubmitAlbumModalOpen] = useState(false);
+
+  // Trigger Submit Album for Review (Sequence 1, 1.1, 1.2.1.1, 1.2.2.1)
+  const handleStartSubmitAlbum = (album: StudioAlbum) => {
+    // 1.1: validateAlbumBeforeSubmission(albumId)
+    // alt [contains_zero_associated_tracks]
+    if (album.trackCount === 0) {
+      // 1.2.1.1: displayAlert("Cannot submit an empty album. Please add at least one track")
+      setActionError("Cannot submit an empty album. Please add at least one track.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    // [contains_at_least_one_associated_track] -> open review modal
+    setSubmittingAlbum(album);
+    setSubmitAlbumModalOpen(true);
+  };
+
+  const handleAlbumSubmittedSuccess = async () => {
+    setSubmitAlbumModalOpen(false);
+    setSubmittingAlbum(null);
+    setActionSuccess("Album submitted successfully for Staff review.");
+    await Promise.all([loadAlbums(), loadStudioData()]);
+  };
 
   // Load albums from Backend API (UC-21.1)
   const loadAlbums = async () => {
@@ -1071,10 +1096,34 @@ export function StudioPage({
                         <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>
                           {album.releaseDate ? `Release: ${album.releaseDate}` : "No release date"}
                         </span>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ocean-primary, #0284C7)", display: "flex", alignItems: "center", gap: "4px" }}>
-                          <EyeIcon width={13} height={13} />
-                          <span>View album</span>
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {!isPublished && (
+                            <button
+                              type="button"
+                              className="button button-primary button-small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartSubmitAlbum(album);
+                              }}
+                              id={`btn-submit-album-${album.id}`}
+                              style={{
+                                padding: "4px 10px",
+                                fontSize: "12px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                              title="Submit album for staff moderation review"
+                            >
+                              <UploadIcon width={13} height={13} />
+                              <span>Submit</span>
+                            </button>
+                          )}
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ocean-primary, #0284C7)", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <EyeIcon width={13} height={13} />
+                            <span>View</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1634,6 +1683,17 @@ export function StudioPage({
         onConfirm={handleDeleteAlbum}
         onCancel={() => setDeleteConfirmAlbum(null)}
         submitting={deletingAlbum}
+      />
+
+      {/* Album Submission Review Modal (UC-21.2) */}
+      <AlbumSubmissionReviewModal
+        open={submitAlbumModalOpen}
+        album={submittingAlbum}
+        onClose={() => {
+          setSubmitAlbumModalOpen(false);
+          setSubmittingAlbum(null);
+        }}
+        onSuccess={() => void handleAlbumSubmittedSuccess()}
       />
 
       {actionSuccess && (
