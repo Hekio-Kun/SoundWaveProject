@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi } from "../api/track";
 import { AlbumFormModal } from "../components/modals/AlbumFormModal";
+import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
 
@@ -19,6 +20,7 @@ import {
   PlusIcon,
   QueueIcon,
   TrashIcon,
+  UploadIcon,
 } from "../icons";
 import type { CurrentUser, LandingTrack, StudioAlbum, StudioTrack } from "../types";
 
@@ -83,6 +85,27 @@ export function StudioAlbumDetailPage({
   const [deleting, setDeleting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [submitReviewModalOpen, setSubmitReviewModalOpen] = useState(false);
+
+  // Trigger Submit Album for Review (UC-21.2 Sequence 1, 1.1, 1.2.1.1, 1.2.2.1)
+  const handleStartSubmitAlbum = () => {
+    if (!album || !album.tracks || album.tracks.length === 0) {
+      setActionError("Cannot submit an empty album. Please add at least one track.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setActionError(null);
+    setSubmitReviewModalOpen(true);
+  };
+
+  const handleAlbumSubmittedSuccess = () => {
+    setSubmitReviewModalOpen(false);
+    sessionStorage.setItem(
+      "soundwave_flash_toast",
+      JSON.stringify({ message: "Album submitted successfully for Staff review.", type: "success" })
+    );
+    onNavigate("/album");
+  };
 
   // Xóa từng bài hát đơn lẻ (AF02 & UC-21.3)
   const [trackToDelete, setTrackToDelete] = useState<StudioTrack | null>(null);
@@ -418,9 +441,21 @@ export function StudioAlbumDetailPage({
 
           {/* Action Toolbar matching Playlist Details Page */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-            {albumTracks.length > 0 && onPlayTrack && (
+            {!isPublished && (
               <button
                 className="button button-primary button-large"
+                onClick={handleStartSubmitAlbum}
+                id="btn-page-submit-album"
+                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <UploadIcon width={18} height={18} />
+                <span>Submit for Review</span>
+              </button>
+            )}
+
+            {albumTracks.length > 0 && onPlayTrack && (
+              <button
+                className="button button-secondary button-large"
                 onClick={handlePlayAll}
                 style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
               >
@@ -833,6 +868,14 @@ export function StudioAlbumDetailPage({
         onConfirm={handleConfirmDeleteSingleTrack}
         onCancel={() => setTrackToDelete(null)}
         submitting={deletingTrack}
+      />
+
+      {/* Submit Album for Review Modal (UC-21.2) */}
+      <AlbumSubmissionReviewModal
+        open={submitReviewModalOpen}
+        album={album}
+        onClose={() => setSubmitReviewModalOpen(false)}
+        onSuccess={handleAlbumSubmittedSuccess}
       />
     </div>
   );

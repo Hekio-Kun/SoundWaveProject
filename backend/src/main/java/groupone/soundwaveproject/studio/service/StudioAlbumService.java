@@ -395,6 +395,72 @@ public class StudioAlbumService {
                 id, constituentTracks.size(), user.getId());
     }
 
+    /**
+     * Nộp toàn bộ bài hát trong một Album nháp lên cho Staff kiểm duyệt (UC-21.2 Submit Album For Review).
+     *
+     * Quy tắc nghiệp vụ (Business Rules BR-18, BR-21, BR-22, BR-23 & PRE-1 đến PRE-3, POST-1 đến POST-4):
+     * 1. PRE-1, PRE-2: Album phải tồn tại, thuộc quyền sở hữu của người dùng hiện tại và đang ở trạng thái DRAFT.
+     * 2. PRE-3, BR-18, EX01: Album bắt buộc phải chứa ít nhất một bài hát cấu thành.
+     * 3. POST-1 & Sequence 1.2.2.14.1 - 1.2.2.14.6: Chuyển toàn bộ bài hát cấu thành sang trạng thái PENDING kiểm duyệt.
+     * 4. POST-2 & Sequence 1.2.2.14.7 - 1.2.2.14.12: Tạo các bản ghi nộp duyệt TrackSubmission mới với trạng thái PENDING.
+     * 5. POST-3: Trạng thái của Album vẫn được giữ nguyên là DRAFT trong suốt quá trình chờ Staff duyệt bài hát.
+     * 6. Thực thi toàn bộ trong một giao dịch nguyên tử @Transactional (EX03 rollback nếu có lỗi).
+     */
+    @Transactional
+    public StudioAlbumResponse submitAlbumForReview(Long albumId, String currentUserEmail) {
+        if (albumId == null || albumId <= 0) {
+            throw new BadRequestOperationException("INVALID_ID", "Invalid album ID.");
+        }
+        User user = getAuthenticatedUser(currentUserEmail);
+
+        // Sequence 1.2.2.6 - 1.2.2.9: findByIdAndUserId
+        Album album = albumRepository.findByIdAndCreatedByUserId(albumId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
+
+        // RDS EX02: Check album is in DRAFT status
+        if (!"DRAFT".equalsIgnoreCase(album.getStatus())) {
+            throw new ConflictOperationException("Only DRAFT albums can be submitted for review.");
+        }
+
+        // Sequence 1.2.2.10 - 1.2.2.13: findByAlbumId
+        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+
+        // RDS EX01 & BR-18: Album contains zero associated tracks
+        if (tracks.isEmpty()) {
+            throw new BadRequestOperationException("EMPTY_ALBUM", "Cannot submit an empty album. Please add at least one track.");
+        }
+
+        // Sequence 1.2.2.14: loop for each track in constituentTracks
+        List<Track> updatedTracks = new ArrayList<>();
+        for (Track track : tracks) {
+            // 1.2.2.14.1 - 1.2.2.14.6: setPublicationStatus(PENDING) and save
+            track.setPublicationStatus(TrackPublicationStatus.PENDING);
+            track.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+            Track savedTrack = trackRepository.save(track);
+            updatedTracks.add(savedTrack);
+
+            // 1.2.2.14.7 - 1.2.2.14.12: new TrackSubmission and save
+            TrackSubmission submission = TrackSubmission.builder()
+                    .trackId(savedTrack.getId())
+                    .submittedByUserId(user.getId())
+                    .status(SubmissionStatus.PENDING)
+                    .submitterNote("Album submission: " + album.getTitle())
+                    .build();
+            trackSubmissionRepository.save(submission);
+        }
+
+        // RDS POST-3: The album status remains DRAFT awaiting review completion
+        album.setStatus("DRAFT");
+        album.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        Album savedAlbum = albumRepository.save(album);
+
+        log.info("Album ID {} and all {} constituent tracks successfully submitted for staff review by user ID {}.",
+                albumId, updatedTracks.size(), user.getId());
+
+        // Sequence 1.2.2.15: return albumSubmissionResponse
+        return studioAlbumMapper.toStudioAlbumResponse(savedAlbum, updatedTracks.size(), updatedTracks);
+    }
+
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getAvailableTracksForAlbum(Long currentAlbumId, String currentUserEmail) {
         if (currentAlbumId != null && currentAlbumId <= 0) {
