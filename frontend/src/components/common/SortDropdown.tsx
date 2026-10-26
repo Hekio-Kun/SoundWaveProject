@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ClockIcon, TrendingUpIcon, CheckIcon } from "../../icons";
 
-export type SortOptionValue = "newest" | "trending" | "title";
+export type SortOptionValue = "newest" | "trending" | "title" | "title_desc";
 
-export interface SortOption {
-  value: SortOptionValue;
+export interface SortOption<T extends string = SortOptionValue> {
+  value: T;
   label: string;
   hint: string;
   icon: React.ReactNode;
@@ -12,7 +12,7 @@ export interface SortOption {
   badgeColor: string;
 }
 
-const DEFAULT_OPTIONS: SortOption[] = [
+const DEFAULT_OPTIONS: SortOption<SortOptionValue>[] = [
   {
     value: "newest",
     label: "Newest",
@@ -45,21 +45,37 @@ const DEFAULT_OPTIONS: SortOption[] = [
     badgeBg: "#F0FDF4",
     badgeColor: "#16A34A",
   },
+  {
+    value: "title_desc",
+    label: "Title (Z-A)",
+    hint: "Alphabetical from Z to A",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="m3 16 4 4 4-4" />
+        <path d="M7 20V4" />
+        <path d="M15 5h5l-5 5h5" />
+        <path d="M15 19v-3a2 2 0 0 1 4 0v3" />
+        <path d="M15 17h4" />
+      </svg>
+    ),
+    badgeBg: "#FEF3C7",
+    badgeColor: "#D97706",
+  },
 ];
 
-interface SortDropdownProps {
-  value: SortOptionValue;
-  onChange: (value: SortOptionValue) => void;
-  options?: SortOption[];
+interface SortDropdownProps<T extends string = SortOptionValue> {
+  value: T;
+  onChange: (value: T) => void;
+  options?: SortOption<T>[];
   showLabel?: boolean;
 }
 
-export const SortDropdown: React.FC<SortDropdownProps> = ({
+export function SortDropdown<T extends string = SortOptionValue>({
   value,
   onChange,
-  options = DEFAULT_OPTIONS,
+  options = DEFAULT_OPTIONS as unknown as SortOption<T>[],
   showLabel = true,
-}) => {
+}: SortDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +105,7 @@ export const SortDropdown: React.FC<SortDropdownProps> = ({
     };
   }, [isOpen]);
 
-  const handleSelect = (val: SortOptionValue) => {
+  const handleSelect = (val: T) => {
     onChange(val);
     setIsOpen(false);
   };

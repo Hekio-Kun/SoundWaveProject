@@ -38,7 +38,7 @@ public class TrackCatalogController {
      *
      * @param genre Optional genre slug filter.
      * @param search Optional search term matching title, description, or album.
-     * @param sort Sorting criteria ('trending', 'title', or default newest).
+     * @param sort Sorting criteria ('trending', 'title' for A-Z, 'title_desc' for Z-A, or default newest).
      * @param pageable Pagination configuration.
      * @return {@link ResponseEntity} containing a paginated {@link Page} of {@link TrackResponse}.
      */

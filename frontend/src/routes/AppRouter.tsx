@@ -161,15 +161,29 @@ export function AppRouter(): React.ReactElement | null {
     const initialGenre = queryParams.get("genre") || undefined;
     const sort = queryParams.get("sort");
     const initialSort =
-      sort === "newest" ? "newest" : sort === "trending" ? "trending" : sort === "title" ? "title" : undefined;
+      sort === "newest"
+        ? "newest"
+        : sort === "trending"
+        ? "trending"
+        : sort === "title"
+        ? "title"
+        : sort === "title_desc"
+        ? "title_desc"
+        : undefined;
+    const initialSearch = queryParams.get("search") || undefined;
+    const pageParam = queryParams.get("page");
+    const parsedPage = pageParam ? parseInt(pageParam, 10) : 1;
+    const initialPage = !isNaN(parsedPage) && parsedPage > 0 ? parsedPage - 1 : 0;
     return (
       <FilteredCatalogPage
+        initialPage={initialPage}
         currentTrack={currentTrack}
         playing={playing}
         onPlayTrack={playTrack}
         onNavigate={navigate}
         initialGenre={initialGenre}
         initialSort={initialSort}
+        initialSearch={initialSearch}
       />
     );
   }
