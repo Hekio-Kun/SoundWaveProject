@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * DTO yêu cầu cập nhật thông tin và danh sách bài hát của Album (UC-21.3).
+ * DTO yêu cầu cập nhật thông tin và danh sách bài hát của Album (UC-21.5 Update An Album).
  */
 @Getter
 @Setter

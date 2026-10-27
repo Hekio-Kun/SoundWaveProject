@@ -99,12 +99,10 @@ export function AlbumFormModal({ open, onClose, album, onSaved }: Props) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      setErrorMessage("Album title is required.");
-      return;
-    }
-    if (title.trim().length > 200) {
-      setErrorMessage("Album title cannot exceed 200 characters.");
+    // UC-21.5 Step 1.1: validateInput(updateAlbumPayload)
+    // alt [payload_is_empty or exceeds limits] -> Step 1.2.1.1: displayValidationAlert("Please complete all required fields within limits")
+    if (!title.trim() || title.trim().length > 200 || (description && description.trim().length > 2000)) {
+      setErrorMessage("Please complete all required fields within limits");
       return;
     }
 
