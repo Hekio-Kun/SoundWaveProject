@@ -82,7 +82,7 @@ public class StudioAlbumService {
     }
 
     /**
-     * Xem thông tin chi tiết một Album cụ thể cùng danh sách bài hát bên trong (UC-21.2 View Albums).
+     * Xem thông tin chi tiết một Album cụ thể cùng danh sách bài hát bên trong (UC-21.3 View Album Details).
      */
     @Transactional(readOnly = true)
     public StudioAlbumResponse getAlbumById(Long id, String currentUserEmail) {

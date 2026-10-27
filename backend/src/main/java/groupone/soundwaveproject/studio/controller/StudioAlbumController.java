@@ -38,7 +38,7 @@ public class StudioAlbumController {
     }
 
     /**
-     * Xem thông tin chi tiết một Album cụ thể kèm danh sách bài hát (UC-21.2 View Albums).
+     * Xem thông tin chi tiết một Album cụ thể kèm danh sách bài hát (UC-21.3 View Album Details).
      */
     @GetMapping("/{id}")
     public StudioAlbumResponse getAlbumById(
