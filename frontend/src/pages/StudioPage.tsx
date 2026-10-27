@@ -713,6 +713,19 @@ export function StudioPage({
                         <button
                           type="button"
                           className="button button-ghost button-small"
+                          onClick={() => {
+                            setEditingAlbum(album);
+                            setAlbumModalOpen(true);
+                          }}
+                          id={`btn-edit-album-table-${album.id}`}
+                          title="Edit album metadata (UC-21.5)"
+                        >
+                          <EditIcon width={14} height={14} />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-ghost button-small"
                           onClick={() => onNavigate(`/album/submission/${album.id}`)}
                           title="View album details"
                         >
@@ -1445,6 +1458,21 @@ export function StudioPage({
                             className="button button-ghost button-small"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setEditingAlbum(album);
+                              setAlbumModalOpen(true);
+                            }}
+                            id={`btn-edit-album-card-${album.id}`}
+                            style={{ padding: "4px 8px" }}
+                            title="Edit album metadata (UC-21.5)"
+                          >
+                            <EditIcon width={13} height={13} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-ghost button-small"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onNavigate(`/album/submission/${album.id}`);
                             }}
                             style={{ padding: "4px 8px" }}
@@ -1989,7 +2017,7 @@ export function StudioPage({
         document.body
       )}
 
-      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.3) */}
+      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.5 Update An Album) */}
       <AlbumFormModal
         open={albumModalOpen}
         onClose={() => setAlbumModalOpen(false)}
