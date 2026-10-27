@@ -30,7 +30,11 @@ public class StudioAlbumController {
     private final StudioAlbumService studioAlbumService;
 
     /**
-     * Lấy danh sách toàn bộ Album của người dùng hiện tại (UC-21.2 View Albums).
+     * Lấy danh sách toàn bộ Album của người dùng hiện tại (UC-21.4 View Albums).
+     * Sequence Diagram Steps:
+     * 1.1: GET /api/v1/studio/albums
+     * 1.2: getMyAlbums(authentication.getName())
+     * 1.14 - 1.15: return studioAlbumListResponse
      */
     @GetMapping
     public List<StudioAlbumResponse> getMyAlbums(Authentication authentication) {

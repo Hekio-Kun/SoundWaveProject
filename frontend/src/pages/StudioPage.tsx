@@ -29,6 +29,7 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  SearchIcon,
   TrashIcon,
   UploadIcon,
 } from "../icons";
@@ -124,10 +125,13 @@ export function StudioPage({
     }
   }, [initialTab]);
 
-  // Albums state (UC-21: Manage My Album)
+  // Albums state (UC-21: Manage My Album - UC-21.4 View Albums)
   const [albumList, setAlbumList] = useState<StudioAlbum[]>([]);
-  const [albumFilter, setAlbumFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT">("ALL");
+  const [albumFilter, setAlbumFilter] = useState<
+    "ALL" | "PUBLISHED" | "PENDING" | "REJECTED" | "DRAFT"
+  >("ALL");
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
+  const [albumViewMode, setAlbumViewMode] = useState<"table" | "grid">("table");
   const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [albumModalOpen, setAlbumModalOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<StudioAlbum | null>(null);
@@ -551,15 +555,25 @@ export function StudioPage({
     );
   });
 
-  // Album Metrics & Filters (UC-21.1)
+  // Album Metrics & Filters (UC-21.4 View Albums - RDS AF01: Draft, Pending, Published, Rejected)
   const albumStats = {
     total: albumList.length,
-    published: albumList.filter((a) => a.status === "PUBLISHED").length,
-    draft: albumList.filter((a) => a.status === "DRAFT").length,
+    published: albumList.filter((a) => (a.status || "").toUpperCase() === "PUBLISHED" || (a.status || "").toUpperCase() === "APPROVED").length,
+    pending: albumList.filter((a) => (a.status || "").toUpperCase() === "PENDING").length,
+    rejected: albumList.filter((a) => (a.status || "").toUpperCase() === "REJECTED").length,
+    draft: albumList.filter((a) => (a.status || "DRAFT").toUpperCase() === "DRAFT").length,
   };
 
   const filteredAlbums = albumList.filter((album) => {
-    const matchesStatus = albumFilter === "ALL" || album.status === albumFilter;
+    const status = (album.status || "DRAFT").toUpperCase();
+    const isPublished = status === "PUBLISHED" || status === "APPROVED";
+    const matchesStatus =
+      albumFilter === "ALL" ||
+      (albumFilter === "PUBLISHED" && isPublished) ||
+      (albumFilter === "PENDING" && status === "PENDING") ||
+      (albumFilter === "REJECTED" && status === "REJECTED") ||
+      (albumFilter === "DRAFT" && status === "DRAFT");
+
     if (!matchesStatus) return false;
     if (!albumSearchQuery.trim()) return true;
     const q = albumSearchQuery.trim().toLowerCase();
@@ -568,6 +582,164 @@ export function StudioPage({
       (album.description && album.description.toLowerCase().includes(q))
     );
   });
+
+  /**
+   * Sequence Diagram UC-21.4 (Step 1.16):
+   * renderMyAlbumsTable(albums[coverUrl, title, statusBadge, trackCount, actions])
+   */
+  const renderMyAlbumsTable = (albumsToRender: StudioAlbum[]) => {
+    return (
+      <div className="studio-table-container">
+        <table className="studio-table">
+          <thead>
+            <tr>
+              <th>Album</th>
+              <th>Status</th>
+              <th>Tracks</th>
+              <th>Release date</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {albumsToRender.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="table-empty-cell">
+                  {albumSearchQuery
+                    ? `No albums match "${albumSearchQuery}".`
+                    : "No albums in this category. Click \"Create album\" to create one."}
+                </td>
+              </tr>
+            ) : (
+              albumsToRender.map((album) => {
+                const status = (album.status || "DRAFT").toUpperCase();
+                const isPublished = status === "PUBLISHED" || status === "APPROVED";
+                const isPending = status === "PENDING";
+                const isRejected = status === "REJECTED";
+                const statusClass = isPublished
+                  ? "status-pill--approved"
+                  : isPending
+                  ? "status-pill--pending"
+                  : isRejected
+                  ? "status-pill--rejected"
+                  : "status-pill--draft";
+
+                return (
+                  <tr key={album.id}>
+                    <td>
+                      <div className="table-track-cell">
+                        <img
+                          src={album.coverUrl || "/pics/album.png"}
+                          alt={album.title}
+                          style={{
+                            width: "42px",
+                            height: "42px",
+                            objectFit: "cover",
+                            borderRadius: "6px",
+                            flexShrink: 0,
+                            display: "block",
+                          }}
+                        />
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => onNavigate(`/album/submission/${album.id}`)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              font: "inherit",
+                              fontWeight: "bold",
+                              color: "var(--sw-text, #1e293b)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                            title="Click to view album details"
+                          >
+                            {album.title}
+                          </button>
+                          {album.description && (
+                            <small
+                              style={{
+                                display: "block",
+                                color: "var(--sw-text-muted, #64748b)",
+                                maxWidth: "340px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {album.description}
+                            </small>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`status-pill ${statusClass}`}>
+                        {status}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 500, color: "var(--sw-text-secondary, #475467)" }}>
+                        {album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: "13px", color: "var(--sw-text-muted, #64748b)" }}>
+                        {album.releaseDate || (album.createdAt ? new Date(album.createdAt).toLocaleDateString() : "—")}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
+                        {!isPublished && (
+                          <button
+                            type="button"
+                            className="button button-primary button-small"
+                            onClick={() => handleStartSubmitAlbum(album)}
+                            id={`btn-submit-album-table-${album.id}`}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                            title="Submit album for staff moderation review"
+                          >
+                            <UploadIcon width={13} height={13} />
+                            <span>Submit</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="button button-ghost button-small"
+                          onClick={() => onNavigate(`/album/submission/${album.id}`)}
+                          title="View album details"
+                        >
+                          <EyeIcon width={14} height={14} />
+                          <span>Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-ghost button-small"
+                          onClick={() => setDeleteConfirmAlbum(album)}
+                          style={{ color: "var(--sw-danger, #b42318)" }}
+                          title="Delete album"
+                        >
+                          <TrashIcon width={14} height={14} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="studio-page">
@@ -905,40 +1077,169 @@ export function StudioPage({
         </>
       ) : (
         <>
-          {/* ALBUMS TAB (UC-21: Manage My Album) without Search & Overview */}
+          {/* ALBUMS TAB (UC-21.4: View Albums - AF01: View owned albums in Content Studio) */}
           <div
-            className="studio-tabs-bar"
             style={{
               display: "flex",
-              gap: "8px",
+              justifyContent: "space-between",
+              alignItems: "center",
               flexWrap: "wrap",
-              margin: "0 0 18px",
+              gap: "12px",
+              marginBottom: "18px",
             }}
           >
-            <button
-              type="button"
-              className={`filter-pill ${albumFilter === "ALL" ? "filter-pill--active" : ""}`}
-              onClick={() => setAlbumFilter("ALL")}
+            {/* Status Filter Bar - RDS AF01: Draft, Pending Review, Published, Rejected */}
+            <div
+              className="studio-tabs-bar"
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+                margin: 0,
+              }}
             >
-              All ({albumStats.total})
-            </button>
-            <button
-              type="button"
-              className={`filter-pill ${albumFilter === "PUBLISHED" ? "filter-pill--active" : ""}`}
-              onClick={() => setAlbumFilter("PUBLISHED")}
-            >
-              Published ({albumStats.published})
-            </button>
-            <button
-              type="button"
-              className={`filter-pill ${albumFilter === "DRAFT" ? "filter-pill--active" : ""}`}
-              onClick={() => setAlbumFilter("DRAFT")}
-            >
-              Draft ({albumStats.draft})
-            </button>
+              <button
+                type="button"
+                className={`filter-pill ${albumFilter === "ALL" ? "filter-pill--active" : ""}`}
+                onClick={() => setAlbumFilter("ALL")}
+              >
+                All ({albumStats.total})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill ${albumFilter === "PUBLISHED" ? "filter-pill--active" : ""}`}
+                onClick={() => setAlbumFilter("PUBLISHED")}
+              >
+                Published ({albumStats.published})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill ${albumFilter === "PENDING" ? "filter-pill--active" : ""}`}
+                onClick={() => setAlbumFilter("PENDING")}
+              >
+                Pending ({albumStats.pending})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill ${albumFilter === "REJECTED" ? "filter-pill--active" : ""}`}
+                onClick={() => setAlbumFilter("REJECTED")}
+              >
+                Rejected ({albumStats.rejected})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill ${albumFilter === "DRAFT" ? "filter-pill--active" : ""}`}
+                onClick={() => setAlbumFilter("DRAFT")}
+              >
+                Draft ({albumStats.draft})
+              </button>
+            </div>
+
+            {/* Search and View Mode Switcher */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  background: "#ffffff",
+                  border: "1px solid #e4e7ec",
+                  borderRadius: "10px",
+                  padding: "0 10px",
+                  height: "36px",
+                  minWidth: "220px",
+                }}
+              >
+                <span style={{ color: "#94a3b8", display: "grid", placeItems: "center", marginRight: "6px" }}>
+                  <SearchIcon width={16} height={16} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search albums..."
+                  value={albumSearchQuery}
+                  onChange={(e) => setAlbumSearchQuery(e.target.value)}
+                  style={{
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    fontSize: "13px",
+                    width: "100%",
+                    color: "var(--sw-text, #1e293b)",
+                  }}
+                />
+                {albumSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setAlbumSearchQuery("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#94a3b8",
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                    title="Clear search"
+                  >
+                    <CloseIcon width={14} height={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* View Mode Toggle (Table / Grid) */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  background: "#f1f5f9",
+                  padding: "3px",
+                  borderRadius: "8px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setAlbumViewMode("table")}
+                  style={{
+                    border: "none",
+                    background: albumViewMode === "table" ? "#ffffff" : "transparent",
+                    color: albumViewMode === "table" ? "var(--color-ocean-primary, #0284C7)" : "#64748b",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    boxShadow: albumViewMode === "table" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Table view (matches Sequence Diagram UC-21.4 step 1.16)"
+                >
+                  Table
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAlbumViewMode("grid")}
+                  style={{
+                    border: "none",
+                    background: albumViewMode === "grid" ? "#ffffff" : "transparent",
+                    color: albumViewMode === "grid" ? "var(--color-ocean-primary, #0284C7)" : "#64748b",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    boxShadow: albumViewMode === "grid" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Grid card view"
+                >
+                  Cards
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Albums Grid */}
+          {/* Albums Content */}
           {loadingAlbums ? (
             <div style={{ padding: "48px", textAlign: "center", color: "var(--sw-text-muted)" }}>
               Loading albums...
@@ -975,7 +1276,15 @@ export function StudioPage({
                   ? "Try adjusting your search terms or filter."
                   : "Group your tracks into albums to showcase your creator discography."}
               </p>
-              {!albumSearchQuery && (
+              {albumSearchQuery ? (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setAlbumSearchQuery("")}
+                >
+                  Clear search
+                </button>
+              ) : (
                 <button
                   type="button"
                   className="button button-primary"
@@ -987,7 +1296,11 @@ export function StudioPage({
                 </button>
               )}
             </div>
+          ) : albumViewMode === "table" ? (
+            /* Sequence Diagram UC-21.4 Step 1.16: renderMyAlbumsTable(albums[coverUrl, title, statusBadge, trackCount, actions]) */
+            renderMyAlbumsTable(filteredAlbums)
           ) : (
+            /* Grid View */
             <div
               style={{
                 display: "grid",
@@ -996,9 +1309,19 @@ export function StudioPage({
               }}
             >
               {filteredAlbums.map((album) => {
-                const isPublished = album.status === "PUBLISHED";
+                const status = (album.status || "DRAFT").toUpperCase();
+                const isPublished = status === "PUBLISHED" || status === "APPROVED";
+                const isPending = status === "PENDING";
+                const isRejected = status === "REJECTED";
+                const statusClass = isPublished
+                  ? "status-pill--approved"
+                  : isPending
+                  ? "status-pill--pending"
+                  : isRejected
+                  ? "status-pill--rejected"
+                  : "status-pill--draft";
+
                 return (
-                  // [FEATURE]: Nhấn vào thẻ album điều hướng đến trang quản lý album (/album/submission/:id)
                   <div
                     key={album.id}
                     onClick={() => onNavigate(`/album/submission/${album.id}`)}
@@ -1032,12 +1355,10 @@ export function StudioPage({
                       />
                       <div style={{ position: "absolute", top: "12px", right: "12px" }}>
                         <span
-                          className={`status-pill ${
-                            isPublished ? "status-pill--approved" : "status-pill--draft"
-                          }`}
+                          className={`status-pill ${statusClass}`}
                           style={{ boxShadow: "0 2px 6px rgba(0,0,0,0.12)" }}
                         >
-                          {isPublished ? "PUBLISHED" : "DRAFT"}
+                          {status}
                         </span>
                       </div>
                       <div
@@ -1056,7 +1377,7 @@ export function StudioPage({
                         }}
                       >
                         <span>{album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}</span>
-                        <span>{album.releaseDate || "No release date"}</span>
+                        <span>{album.releaseDate || (album.createdAt ? new Date(album.createdAt).toLocaleDateString() : "No release date")}</span>
                       </div>
                     </div>
 
@@ -1096,7 +1417,7 @@ export function StudioPage({
                         <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>
                           {album.releaseDate ? `Release: ${album.releaseDate}` : "No release date"}
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {!isPublished && (
                             <button
                               type="button"
@@ -1107,7 +1428,7 @@ export function StudioPage({
                               }}
                               id={`btn-submit-album-${album.id}`}
                               style={{
-                                padding: "4px 10px",
+                                padding: "4px 8px",
                                 fontSize: "12px",
                                 display: "inline-flex",
                                 alignItems: "center",
@@ -1119,10 +1440,32 @@ export function StudioPage({
                               <span>Submit</span>
                             </button>
                           )}
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ocean-primary, #0284C7)", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <button
+                            type="button"
+                            className="button button-ghost button-small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigate(`/album/submission/${album.id}`);
+                            }}
+                            style={{ padding: "4px 8px" }}
+                            title="View album details"
+                          >
                             <EyeIcon width={13} height={13} />
                             <span>View</span>
-                          </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-ghost button-small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmAlbum(album);
+                            }}
+                            style={{ color: "var(--sw-danger, #b42318)", padding: "4px 8px" }}
+                            title="Delete album"
+                          >
+                            <TrashIcon width={13} height={13} />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </div>
                     </div>
