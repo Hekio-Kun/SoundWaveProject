@@ -293,6 +293,28 @@ public class StudioAlbumService {
         return createAlbum(request, cover, null, currentUserEmail);
     }
 
+    /**
+     * Cập nhật thông tin Album, thay ảnh bìa hoặc sắp xếp lại danh sách bài hát (UC-21.5 Update An Album).
+     * Sequence Diagram Steps:
+     * 1.2.2.2: updateAlbum(id, request, coverFile, authentication.getName())
+     * 1.2.2.3 - 1.2.2.7: getAuthenticatedUser(currentUserEmail) -> UserRepository.findByEmailIgnoreCase
+     * 1.2.2.8 - 1.2.2.11: AlbumRepository.findByIdAndCreatedByUserId(id, user.getId())
+     *   alt [album_does_not_exist_or_not_owned] -> 1.2.2.12.1.1: throw ResourceNotFoundException("Album not found or access denied.")
+     * 1.2.2.12.2.1 - 1.2.2.12.2.4: existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(user.getId(), cleanTitle, id)
+     *   alt [duplicate_title_exists] -> 1.2.2.12.2.5.1: throw ConflictOperationException("Another album with this title already exists.")
+     * [title_is_unique]
+     *   opt [replacement_cover_file_provided] -> 1.2.2.12.2.6.1: uploadAlbumCover -> 1.2.2.12.2.7-8: setCoverUrl, setCoverPublicId
+     *   1.2.2.12.2.9: setTitle(cleanTitle)
+     *   1.2.2.12.2.10: setDescription(cleanDescription)
+     *   opt [release_date_provided] -> 1.2.2.12.2.11: setReleaseDate(releaseDate)
+     *   1.2.2.12.2.12: setSlug(generateUniqueSlug(cleanTitle))
+     *   1.2.2.12.2.13: setUpdatedAt(nowUtc)
+     *   1.2.2.12.2.14 - 1.2.2.12.2.17: save(album)
+     *   opt [old_cover_exists_and_replaced] -> 1.2.2.12.2.18 - 1.2.2.12.2.21: deleteImageQuietly(oldCoverPublicId)
+     *   1.2.2.12.2.22 - 1.2.2.12.2.26: findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+     *   1.2.2.12.2.27 - 1.2.2.12.2.32: toStudioAlbumResponse(savedAlbum, constituentTracks.size(), constituentTracks)
+     *   1.2.2.12.2.33: return studioAlbumResponse
+     */
     @Transactional
     public StudioAlbumResponse updateAlbum(Long id, UpdateAlbumRequest request, MultipartFile cover, String currentUserEmail) {
         if (id == null || id <= 0) {
@@ -316,48 +338,75 @@ public class StudioAlbumService {
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
-        // Kiểm tra trùng tên album khác cùng tài khoản (EX01)
+        // Kiểm tra trùng tên album khác cùng tài khoản (UC-21.5 Step 1.2.2.12.2.1)
         if (albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(user.getId(), cleanTitle, id)) {
-            throw new ConflictOperationException("Another album with the title '" + cleanTitle + "' already exists.");
+            throw new ConflictOperationException("Another album with this title already exists.");
         }
 
         String newCoverPublicId = null;
         try {
-            // Nếu đổi tiêu đề thì cập nhật lại slug duy nhất
-            if (!album.getTitle().equalsIgnoreCase(cleanTitle)) {
-                album.setTitle(cleanTitle);
-                album.setSlug(generateUniqueSlug(cleanTitle));
-            }
-
-            album.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
-            album.setReleaseDate(request.getReleaseDate());
-
             String oldCoverPublicId = album.getCoverPublicId();
+
+            // opt [replacement_cover_file_provided] (Step 1.2.2.12.2.6.1 - 1.2.2.12.2.8)
             if (cover != null && !cover.isEmpty()) {
                 StoredMediaResponse newCover = cloudMediaService.uploadAlbumCover(cover, user.getId());
                 newCoverPublicId = newCover.publicId();
 
-                album.setCoverPublicId(newCover.publicId());
                 album.setCoverUrl(newCover.secureUrl());
+                album.setCoverPublicId(newCover.publicId());
             }
 
-            // Đồng bộ danh sách bài hát thuộc Album
-            List<Track> updatedTracks = request.getTrackIds() != null
-                    ? syncAlbumTracks(album, request.getTrackIds(), user.getId())
-                    : trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+            // Step 1.2.2.12.2.9 - 1.2.2.12.2.10: setTitle & setDescription
+            boolean titleChanged = !cleanTitle.equalsIgnoreCase(album.getTitle());
+            album.setTitle(cleanTitle);
+
+            String cleanDescription = (request.getDescription() != null && !request.getDescription().trim().isBlank())
+                    ? request.getDescription().trim()
+                    : null;
+            album.setDescription(cleanDescription);
+
+            // opt [release_date_provided] (Step 1.2.2.12.2.11)
+            if (request.getReleaseDate() != null) {
+                album.setReleaseDate(request.getReleaseDate());
+            }
+
+            // Step 1.2.2.12.2.12: setSlug(generateUniqueSlug(cleanTitle))
+            if (titleChanged || album.getSlug() == null || album.getSlug().isBlank()) {
+                album.setSlug(generateUniqueSlug(cleanTitle));
+            }
+
+            // Step 1.2.2.12.2.13: setUpdatedAt(nowUtc)
+            LocalDateTime nowUtc = LocalDateTime.now(ZoneOffset.UTC);
+            album.setUpdatedAt(nowUtc);
+
+            // Đồng bộ danh sách bài hát thuộc Album nếu request có cung cấp danh sách trackIds
+            List<Track> constituentTracks;
+            if (request.getTrackIds() != null) {
+                constituentTracks = syncAlbumTracks(album, request.getTrackIds(), user.getId());
+            } else {
+                constituentTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+            }
 
             // Đánh giá lại trạng thái xuất bản theo BR-18 & BR-22
             recalculateAndSaveAlbumStatus(album);
 
-            Album updatedAlbum = albumRepository.save(album);
+            // Step 1.2.2.12.2.14 - 1.2.2.12.2.17: save(album)
+            Album savedAlbum = albumRepository.save(album);
 
-            // Xóa ảnh bìa cũ trên Cloudinary sau khi lưu CSDL thành công
+            // opt [old_cover_exists_and_replaced] (Step 1.2.2.12.2.18 - 1.2.2.12.2.21)
             if (newCoverPublicId != null && oldCoverPublicId != null && !oldCoverPublicId.isBlank()) {
                 cloudMediaService.deleteImageQuietly(oldCoverPublicId);
             }
 
-            log.info("Album '{}' (ID: {}) updated by user ID {}", updatedAlbum.getTitle(), updatedAlbum.getId(), user.getId());
-            return studioAlbumMapper.toStudioAlbumResponse(updatedAlbum, updatedTracks.size(), updatedTracks);
+            // Step 1.2.2.12.2.22 - 1.2.2.12.2.26: findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+            if (request.getTrackIds() == null) {
+                constituentTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(savedAlbum.getId());
+            }
+
+            log.info("Album '{}' (ID: {}) updated by user ID {}", savedAlbum.getTitle(), savedAlbum.getId(), user.getId());
+
+            // Step 1.2.2.12.2.27 - 1.2.2.12.2.33: toStudioAlbumResponse
+            return studioAlbumMapper.toStudioAlbumResponse(savedAlbum, constituentTracks.size(), constituentTracks);
 
         } catch (Exception ex) {
             log.error("Exception during updateAlbum for ID {}. Rolling back newly uploaded media...", id, ex);

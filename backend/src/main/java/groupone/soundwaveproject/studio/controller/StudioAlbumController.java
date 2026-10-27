@@ -90,7 +90,11 @@ public class StudioAlbumController {
     }
 
     /**
-     * Cập nhật thông tin Album, thay ảnh bìa hoặc sắp xếp lại danh sách bài hát (UC-21.3 Update Album).
+     * Cập nhật thông tin Album, thay ảnh bìa hoặc sắp xếp lại danh sách bài hát (UC-21.5 Update An Album).
+     * Sequence Diagram Steps:
+     * 1.2.2.1: PUT /api/v1/studio/albums/{id}
+     * 1.2.2.2: updateAlbum(id, request, coverFile, authentication.getName())
+     * 1.2.2.33 - 1.2.2.34: return studioAlbumResponse
      */
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public StudioAlbumResponse updateAlbum(

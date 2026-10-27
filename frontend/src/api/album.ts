@@ -107,7 +107,7 @@ export const albumApi = {
   },
 
   /**
-   * Cập nhật thông tin album và thay đổi danh sách bài hát (UC-21.3)
+   * Cập nhật thông tin album và thay đổi danh sách bài hát (UC-21.5 Update An Album)
    */
   updateAlbum: (
     id: number,
