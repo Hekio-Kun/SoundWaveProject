@@ -66,7 +66,15 @@ public class StudioAlbumService {
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
     /**
-     * Lấy danh sách toàn bộ Album do người dùng hiện tại tạo ra (UC-21.2 View Albums).
+     * Lấy danh sách toàn bộ Album do người dùng hiện tại tạo ra (UC-21.4 View Albums).
+     * Sequence Diagram Steps:
+     * 1.2: getMyAlbums(currentUserEmail)
+     * 1.3: getAuthenticatedUser(currentUserEmail)
+     * 1.4: findByEmailIgnoreCase(email)
+     * 1.8: findByCreatedByUserIdOrderByCreatedAtDesc(user.getId())
+     * 1.13.1: countByAlbum_Id(album.getId())
+     * 1.13.5: toStudioAlbumResponse(album, trackCount, emptyList)
+     * 1.14: return studioAlbumListResponse
      */
     @Transactional(readOnly = true)
     public List<StudioAlbumResponse> getMyAlbums(String currentUserEmail) {
