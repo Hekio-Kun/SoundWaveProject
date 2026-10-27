@@ -122,7 +122,7 @@ export const albumApi = {
   },
 
   /**
-   * Xóa album cá nhân và toàn bộ bài hát trong album (UC-21.4)
+   * Xóa album cá nhân và toàn bộ bài hát trong album (UC-21.6 Delete An Album)
    */
   deleteAlbum: (id: number): Promise<void> => {
     return albumRequest<void>(`/studio/albums/${id}`, "DELETE");

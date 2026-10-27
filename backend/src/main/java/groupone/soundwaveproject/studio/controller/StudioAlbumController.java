@@ -107,7 +107,11 @@ public class StudioAlbumController {
     }
 
     /**
-     * Xóa Album cá nhân, gỡ liên kết các bài hát chuyển thành độc lập và xóa ảnh Cloudinary (UC-21.4 Delete Album).
+     * Xóa Album cá nhân và toàn bộ bài hát cấu thành (UC-21.6 Delete An Album).
+     * Sequence Diagram Steps:
+     * 1.1: DELETE /api/v1/studio/albums/{id}
+     * 1.2: deleteAlbum(id, authentication.getName())
+     * 1.11.2.21: return deletionSuccessResponse (204 No Content)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAlbum(

@@ -72,6 +72,9 @@ class StudioAlbumServiceTest {
     @Mock
     private CloudMediaService cloudMediaService;
 
+    @Mock
+    private StudioTrackService studioTrackService;
+
     private StudioTrackMapper studioTrackMapper;
     private StudioAlbumMapper studioAlbumMapper;
 
@@ -95,7 +98,8 @@ class StudioAlbumServiceTest {
                 userRepository,
                 cloudMediaService,
                 studioAlbumMapper,
-                studioTrackMapper
+                studioTrackMapper,
+                studioTrackService
         );
 
         mockUser = new User("creator@soundwave.com", "hashed");
@@ -313,7 +317,7 @@ class StudioAlbumServiceTest {
     }
 
     @Test
-    @DisplayName("UC-21.4: Xóa album xóa toàn bộ các bài hát cấu thành và xóa ảnh Cloudinary")
+    @DisplayName("UC-21.6: Xóa album xóa toàn bộ các bài hát cấu thành và xóa ảnh Cloudinary")
     void deleteAlbum_Success_DeletesAllConstituentTracksAndMedia() {
         mockAlbum.setCoverPublicId("album-cover-pub-id");
         when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
@@ -322,12 +326,7 @@ class StudioAlbumServiceTest {
 
         studioAlbumService.deleteAlbum(100L, mockUser.getEmail());
 
-        verify(playlistTrackRepository).deleteByTrack_Id(mockTrack.getId());
-        verify(listeningHistoryRepository).deleteByTrackId(mockTrack.getId());
-        verify(trackSubmissionRepository).deleteByTrackId(mockTrack.getId());
-        verify(cloudMediaService).deleteTrackAudioQuietly(mockTrack.getAudioPublicId());
-        verify(trackRepository).delete(mockTrack);
-
+        verify(studioTrackService).deleteTrack(mockTrack.getId(), mockUser.getEmail());
         verify(cloudMediaService).deleteImageQuietly("album-cover-pub-id");
         verify(albumRepository).delete(mockAlbum);
     }
@@ -378,14 +377,14 @@ class StudioAlbumServiceTest {
         when(cloudMediaService.uploadAlbumCover(any(), eq(10L)))
                 .thenReturn(new StoredMediaResponse("uploaded-cover-id", "https://cloud/cover.png"));
 
-        when(albumRepository.save(any(Album.class))).thenAnswer(inv -> {
+        lenient().when(albumRepository.save(any(Album.class))).thenAnswer(inv -> {
             Album a = inv.getArgument(0);
             a.setId(999L);
             return a;
         });
 
         Genre genre = Genre.builder().id(1L).name("Pop").isActive(true).build();
-        when(genreRepository.findById(1L)).thenReturn(Optional.of(genre));
+        lenient().when(genreRepository.findById(1L)).thenReturn(Optional.of(genre));
         when(cloudMediaService.uploadTrackAudio(any(), eq(10L)))
                 .thenThrow(new CloudStorageUnavailableException());
 
