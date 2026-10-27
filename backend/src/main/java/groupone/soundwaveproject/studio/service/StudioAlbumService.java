@@ -61,6 +61,7 @@ public class StudioAlbumService {
     private final CloudMediaService cloudMediaService;
     private final StudioAlbumMapper studioAlbumMapper;
     private final StudioTrackMapper studioTrackMapper;
+    private final StudioTrackService studioTrackService;
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -417,6 +418,27 @@ public class StudioAlbumService {
         }
     }
 
+    /**
+     * Xóa Album cá nhân và toàn bộ bài hát cấu thành (UC-21.6 Delete An Album).
+     * Sequence Diagram Steps:
+     * 1.1: DELETE /api/v1/studio/albums/{id}
+     * 1.2: deleteAlbum(id, authentication.getName())
+     * 1.3 - 1.7: getAuthenticatedUser(currentUserEmail) -> userRepository.findByEmailIgnoreCase -> PostgreSQL
+     * 1.8 - 1.10: albumRepository.findByIdAndCreatedByUserId(id, user.getId())
+     *   alt [album_not_found_or_access_denied] -> 1.11.1.2: throw ResourceNotFoundException("Album not found or access denied")
+     * [album_owned_by_creator]
+     *   1.11.2.4 - 1.11.2.8: trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+     *   loop [each track in constituentTracks]:
+     *     1.11.2.9.1: studioTrackService.deleteTrack(track.getId(), currentUserEmail)
+     *     1.11.2.9.2 - 1.11.2.9.7: getAudioPublicId() -> deleteTrackAudioQuietly(audioPublicId) -> Cloudinary
+     *     1.11.2.9.8 - 1.11.2.9.11: delete(track) -> PostgreSQL
+     *     1.11.2.9.12: return trackDeletedSignal
+     *   1.11.2.10 - 1.11.2.11: album.getCoverPublicId()
+     *   opt [cover_public_id != null]:
+     *     1.11.2.12 - 1.11.2.15: cloudMediaService.deleteImageQuietly(coverPublicId) -> Cloudinary
+     *   1.11.2.16 - 1.11.2.19: albumRepository.delete(album) -> PostgreSQL
+     *   1.11.2.20: return cascadeDeletionCompletedSignal
+     */
     @Transactional
     public void deleteAlbum(Long id, String currentUserEmail) {
         if (id == null || id <= 0) {
@@ -426,8 +448,20 @@ public class StudioAlbumService {
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
+        // Step 1.11.2.4 - 1.11.2.8: Lấy danh sách toàn bộ bài hát cấu thành
         List<Track> constituentTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+
+        // loop [each track in constituentTracks] (Step 1.11.2.9.1 - 1.11.2.9.12)
         for (Track track : constituentTracks) {
+            try {
+                if (studioTrackService != null) {
+                    studioTrackService.deleteTrack(track.getId(), currentUserEmail);
+                }
+            } catch (Exception ex) {
+                log.warn("Error delegating track deletion to StudioTrackService for track ID {}: {}", track.getId(), ex.getMessage());
+            }
+
+            // Đảm bảo bài hát được thanh lọc hoàn toàn khỏi CSDL (bảo toàn ràng buộc khóa ngoại khi xóa Album)
             try {
                 playlistTrackRepository.deleteByTrack_Id(track.getId());
                 listeningHistoryRepository.deleteByTrackId(track.getId());
@@ -438,16 +472,19 @@ public class StudioAlbumService {
                 }
                 trackRepository.delete(track);
             } catch (Exception ex) {
-                log.warn("Error while deleting constituent track ID {} of album ID {}: {}", track.getId(), id, ex.getMessage());
-                trackRepository.delete(track);
+                log.warn("Error deleting constituent track record ID {}: {}", track.getId(), ex.getMessage());
             }
         }
 
+        // opt [cover_public_id != null] (Step 1.11.2.10 - 1.11.2.15)
         if (album.getCoverPublicId() != null && !album.getCoverPublicId().isBlank()) {
             cloudMediaService.deleteImageQuietly(album.getCoverPublicId());
         }
 
+        // Step 1.11.2.16 - 1.11.2.19: Xóa vĩnh viễn Album khỏi CSDL
         albumRepository.delete(album);
+
+        // Step 1.11.2.20: cascadeDeletionCompletedSignal
         log.info("Album ID {} and all its {} constituent tracks permanently deleted by user ID {}.",
                 id, constituentTracks.size(), user.getId());
     }

@@ -140,17 +140,27 @@ export function StudioAlbumDetailPage({
     void fetchAlbumData();
   }, [albumId]);
 
-  // Xóa toàn bộ album và toàn bộ bài hát cấu thành (UC-21.4)
+  // Xóa toàn bộ album và toàn bộ bài hát cấu thành (UC-21.6 Delete An Album)
   const handleDeleteAlbum = async () => {
     if (!album) return;
     try {
       setDeleting(true);
       setActionError(null);
+      // Step 1.1: DELETE /api/v1/studio/albums/{id}
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
+      // Step 1.11.2.22: displaySuccessToast("Album and all constituent tracks have been permanently deleted") and navigate to MyAlbums()
+      sessionStorage.setItem(
+        "soundwave_flash_toast",
+        JSON.stringify({
+          message: "Album and all constituent tracks have been permanently deleted",
+          type: "success",
+        })
+      );
       onNavigate("/album");
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete album.");
+      // Step 1.11.1.4: displayErrorMessage("Album not found or access denied") and dismissModal()
+      setActionError(err instanceof Error ? err.message : "Album not found or access denied");
       setDeleteConfirmOpen(false);
     } finally {
       setDeleting(false);
@@ -900,12 +910,13 @@ export function StudioAlbumDetailPage({
         onTracksUpdated={fetchAlbumData}
       />
 
-      {/* Delete Album Confirmation Modal (UC-21.4) */}
+      {/* Delete Album Confirmation Modal (UC-21.6 Delete An Album) */}
       <DeleteConfirmationModal
         open={deleteConfirmOpen}
         title="Delete Album"
         message={`Deleting this album will permanently remove the album "${album.title}" and all audio tracks contained within it. This action cannot be undone. Are you sure you want to proceed?`}
-        confirmLabel="Delete album & all tracks"
+        confirmLabel="Delete Permanently"
+        submittingLabel="Deleting..."
         onConfirm={handleDeleteAlbum}
         onCancel={() => setDeleteConfirmOpen(false)}
         submitting={deleting}

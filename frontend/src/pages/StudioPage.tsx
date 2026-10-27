@@ -180,17 +180,21 @@ export function StudioPage({
     void loadAlbums();
   }, []);
 
-  // Delete album handler (UC-21.4 & BR-24 Unlink logic)
+  // Delete album handler (UC-21.6 Delete An Album)
   const handleDeleteAlbum = async () => {
     if (!deleteConfirmAlbum) return;
     try {
       setDeletingAlbum(true);
+      // Step 1.1: DELETE /api/v1/studio/albums/{id}
       await albumApi.deleteAlbum(deleteConfirmAlbum.id);
-      setActionSuccess(`Album "${deleteConfirmAlbum.title}" deleted successfully. Associated tracks are preserved as standalone tracks.`);
+      // Step 1.11.2.22: displaySuccessToast("Album and all constituent tracks have been permanently deleted")
+      setActionSuccess("Album and all constituent tracks have been permanently deleted");
       setDeleteConfirmAlbum(null);
       await Promise.all([loadAlbums(), loadStudioData()]);
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete album.");
+      // Step 1.11.1.4: displayErrorMessage("Album not found or access denied") and dismissModal()
+      setActionError(err instanceof Error ? err.message : "Album not found or access denied");
+      setDeleteConfirmAlbum(null);
     } finally {
       setDeletingAlbum(false);
     }
@@ -2045,12 +2049,13 @@ export function StudioPage({
         }}
       />
 
-      {/* Album Delete Confirmation Modal (UC-21.4 & BR-24) */}
+      {/* Album Delete Confirmation Modal (UC-21.6 Delete An Album) */}
       <DeleteConfirmationModal
         open={Boolean(deleteConfirmAlbum)}
         title="Delete Album"
-        message={`Are you sure you want to delete "${deleteConfirmAlbum?.title}"? All tracks in this album will remain in your library as standalone tracks and will not be deleted.`}
-        confirmLabel="Delete album"
+        message={`Are you sure you want to delete "${deleteConfirmAlbum?.title}"? Deleting this album will permanently remove the album and all audio tracks contained within it. This action cannot be undone.`}
+        confirmLabel="Delete Permanently"
+        submittingLabel="Deleting..."
         onConfirm={handleDeleteAlbum}
         onCancel={() => setDeleteConfirmAlbum(null)}
         submitting={deletingAlbum}
