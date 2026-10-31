@@ -240,6 +240,19 @@ BEGIN
     WHERE lyrics IS NOT NULL AND TRIM(lyrics) != ''
     ON CONFLICT (track_id) DO UPDATE SET lyric_content = EXCLUDED.lyric_content, status = 'PUBLISHED';
 
+    -- Đồng bộ sang bảng personal_lyrics (Custom Lyric) cho tác giả và test listener
+    INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at)
+    SELECT uploader_user_id, id, 'CUSTOM', lyrics, created_at, updated_at
+    FROM tracks
+    WHERE lyrics IS NOT NULL AND TRIM(lyrics) != ''
+    ON CONFLICT (user_id, track_id, lyric_type) DO UPDATE SET lyric_content = EXCLUDED.lyric_content;
+
+    INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at)
+    SELECT v_u_listener1, id, 'CUSTOM', lyrics, created_at, updated_at
+    FROM tracks
+    WHERE id IN (v_tr_1, v_tr_2) AND lyrics IS NOT NULL AND TRIM(lyrics) != ''
+    ON CONFLICT (user_id, track_id, lyric_type) DO UPDATE SET lyric_content = EXCLUDED.lyric_content;
+
     -- ==================================================================================
     -- 6. TẠO PLAYLIST MẪU
     -- ==================================================================================
@@ -256,6 +269,8 @@ BEGIN
     PERFORM setval(pg_get_serial_sequence('albums', 'id'), COALESCE(MAX(id), 1)) FROM albums;
     PERFORM setval(pg_get_serial_sequence('tracks', 'id'), COALESCE(MAX(id), 1)) FROM tracks;
     PERFORM setval(pg_get_serial_sequence('official_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM official_lyrics;
+    PERFORM setval(pg_get_serial_sequence('listening_history', 'id'), COALESCE(MAX(id), 1)) FROM listening_history;
+    PERFORM setval(pg_get_serial_sequence('personal_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM personal_lyrics;
 
 END $$;
 

@@ -335,6 +335,21 @@ BEGIN
     SET lyric_content = EXCLUDED.lyric_content, status = 'PUBLISHED', updated_at = v_now;
 
     -- ==================================================================================
+    -- 4.5.1. CUSTOM LYRICS (BẢNG PERSONAL_LYRICS)
+    -- ==================================================================================
+    INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at)
+    SELECT ol.created_by_user_id, ol.track_id, 'CUSTOM', ol.lyric_content, ol.created_at, ol.updated_at
+    FROM official_lyrics ol
+    ON CONFLICT (user_id, track_id, lyric_type) DO UPDATE SET lyric_content = EXCLUDED.lyric_content;
+
+    -- Thêm custom lyric cho test listener1
+    INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at)
+    SELECT v_u_listener1, ol.track_id, 'CUSTOM', ol.lyric_content, ol.created_at, ol.updated_at
+    FROM official_lyrics ol
+    WHERE ol.track_id IN (v_tr_1, v_tr_2)
+    ON CONFLICT (user_id, track_id, lyric_type) DO UPDATE SET lyric_content = EXCLUDED.lyric_content;
+
+    -- ==================================================================================
     -- 4.6. PLAYLISTS & PLAYLIST TRACKS
     -- ==================================================================================
     INSERT INTO playlists (title, name, slug, description, cover_url, owner_user_id, created_by_user_id, is_private, visibility, created_at, updated_at)
@@ -369,8 +384,10 @@ BEGIN
     PERFORM setval(pg_get_serial_sequence('tracks', 'id'), COALESCE(MAX(id), 1)) FROM tracks;
     PERFORM setval(pg_get_serial_sequence('track_submissions', 'id'), COALESCE(MAX(id), 1)) FROM track_submissions;
     PERFORM setval(pg_get_serial_sequence('official_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM official_lyrics;
+    PERFORM setval(pg_get_serial_sequence('personal_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM personal_lyrics;
     PERFORM setval(pg_get_serial_sequence('playlists', 'id'), COALESCE(MAX(id), 1)) FROM playlists;
     PERFORM setval(pg_get_serial_sequence('playlist_tracks', 'id'), COALESCE(MAX(id), 1)) FROM playlist_tracks;
+    PERFORM setval(pg_get_serial_sequence('listening_history', 'id'), COALESCE(MAX(id), 1)) FROM listening_history;
 
 END $$;
 

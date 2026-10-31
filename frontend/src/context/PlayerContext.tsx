@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { catalogApi } from "../api/catalog";
 import { tracks } from "../data";
 import type { LandingTrack } from "../types";
@@ -37,7 +37,7 @@ export interface PlayerContextType {
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const defaultTrack = useMemo(() => tracks.find((t) => t.id === 10) || tracks[0] || null, []);
+  const defaultTrack = useMemo(() => tracks.find((t) => t.id === 1) || tracks[0] || null, []);
   const audio = useMemo(() => {
     const el = new Audio(defaultTrack?.audioUrl || "");
     el.preload = "metadata";
@@ -79,19 +79,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [audio]);
 
+  // UC-10: Theo dõi ID track đã gửi request lấy stream info và ghi nhận lượt nghe cho phiên phát hiện tại
+  const activeStreamTrackIdRef = useRef<number | null>(null);
+
+  const syncTrackPlay = useCallback(async (targetTrack: LandingTrack) => {
+    if (!targetTrack || !targetTrack.id) return;
+    try {
+      const freshTrack = await catalogApi.getTrackById(targetTrack.id);
+      if (freshTrack) {
+        setCurrentTrack((prev) => (prev && Number(prev.id) === Number(targetTrack.id) ? { ...prev, ...freshTrack } : prev));
+        setQueue((prevQueue) =>
+          prevQueue.map((item) => (Number(item.id) === Number(targetTrack.id) ? { ...item, ...freshTrack } : item))
+        );
+        if (freshTrack.audioUrl && (!audio.src || audio.src === window.location.href)) {
+          audio.src = freshTrack.audioUrl;
+          void audio.play().catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn("Could not sync live track stream info:", err);
+    }
+  }, [audio]);
+
   const setAudioPlaying = useCallback(
     (shouldPlay: boolean) => {
       if (shouldPlay) {
         void audio
           .play()
-          .then(() => setPlaying(true))
+          .then(() => {
+            setPlaying(true);
+            if (currentTrack?.id && activeStreamTrackIdRef.current !== currentTrack.id) {
+              activeStreamTrackIdRef.current = currentTrack.id;
+              void syncTrackPlay(currentTrack);
+            }
+          })
           .catch(() => setPlaying(false));
       } else {
         audio.pause();
         setPlaying(false);
       }
     },
-    [audio]
+    [audio, currentTrack, syncTrackPlay]
   );
 
   const togglePlay = useCallback(() => {
@@ -114,37 +142,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const contextQueue = Array.isArray(contextQueueOrAutoplay) ? contextQueueOrAutoplay : undefined;
 
       if (currentTrack && Number(currentTrack.id) === Number(track.id)) {
-        setAudioPlaying(!playing);
+        if (typeof contextQueueOrAutoplay === "boolean" && contextQueueOrAutoplay === true) {
+          // Yêu cầu phát lại cụ thể từ giao diện hoặc chế độ repeat
+          audio.currentTime = 0;
+          activeStreamTrackIdRef.current = track.id;
+          void audio
+            .play()
+            .then(() => setPlaying(true))
+            .catch(() => setPlaying(false));
+          void syncTrackPlay(track);
+          return;
+        }
+
+        if (playing) {
+          setAudioPlaying(false);
+        } else {
+          activeStreamTrackIdRef.current = track.id;
+          setAudioPlaying(true);
+          void syncTrackPlay(track);
+        }
         return;
       }
+
+      activeStreamTrackIdRef.current = track.id;
       setCurrentTrack(track);
       if (contextQueue && contextQueue.length > 0) {
         setQueue(contextQueue);
       } else {
         setQueue((prev) => (prev.some((item) => Number(item.id) === Number(track.id)) ? prev : [track, ...prev]));
       }
-      audio.src = track.audioUrl;
-      audio.load();
-      if (autoplay) setAudioPlaying(true);
-      else setPlaying(false);
+      if (track.audioUrl && audio.src !== track.audioUrl) {
+        audio.src = track.audioUrl;
+        audio.load();
+      }
+      if (autoplay) {
+        void audio
+          .play()
+          .then(() => setPlaying(true))
+          .catch(() => setPlaying(false));
+      } else {
+        setPlaying(false);
+      }
 
       // UC-10: Gửi request GET /api/v1/tracks/{trackId} lấy stream info, tự động tăng play count và ghi history
       if (track.id) {
-        catalogApi.getTrackById(track.id)
-          .then((freshTrack) => {
-            if (freshTrack) {
-              setCurrentTrack((prev) => (prev && Number(prev.id) === Number(track.id) ? { ...prev, ...freshTrack } : prev));
-              setQueue((prevQueue) =>
-                prevQueue.map((item) => (Number(item.id) === Number(track.id) ? { ...item, ...freshTrack } : item))
-              );
-            }
-          })
-          .catch((err) => {
-            console.warn("Could not sync live track stream info:", err);
-          });
+        void syncTrackPlay(track);
       }
     },
-    [audio, currentTrack?.id, playing, setAudioPlaying]
+    [audio, currentTrack, playing, setAudioPlaying, syncTrackPlay]
   );
 
   const handleGuestTrackEnded = useCallback((next: LandingTrack) => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { catalogApi } from "../../api/catalog";
 import { albums, featuredCreators, genres, heroCovers, tracks } from "../../data";
 import { ArrowIcon, CheckIcon, HeadphonesIcon, MoreIcon, PauseIcon, PlayIcon, UploadIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
@@ -79,7 +80,19 @@ export function LandingPage({ currentTrack, playing, onPlay, isAuthenticated }: 
     return <main className="state-page"><div className="state-icon"><HeadphonesIcon /></div><h1>SoundWave is getting ready</h1><p>The first tracks will appear here soon.</p><button className="button button-primary" onClick={() => go(isAuthenticated ? "/studio/upload" : "/login")}>Upload the first track</button></main>;
   }
 
-  const approvedTracks = tracks.filter((track) => track.publicationStatus === "APPROVED");
+  const [liveTracks, setLiveTracks] = useState<LandingTrack[]>([]);
+
+  useEffect(() => {
+    catalogApi.getTracks({ sort: "trending", size: 10 })
+      .then((res) => {
+        if (res?.content && res.content.length > 0) {
+          setLiveTracks(res.content);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const approvedTracks = liveTracks.length > 0 ? liveTracks : tracks.filter((track) => track.publicationStatus === "APPROVED");
 
   return (
     <main className="page-main">

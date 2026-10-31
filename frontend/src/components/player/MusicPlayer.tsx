@@ -221,7 +221,7 @@ export function MusicPlayer({
       recordedRef.current = false;
       actualListenedSecondsRef.current = 0;
       lastPlayheadTimeRef.current = 0;
-      void audio.play();
+      onTrackChange(track, true);
       return;
     }
     const next = nextTrack();

@@ -154,6 +154,10 @@ export function AppRouter(): React.ReactElement | null {
         playing={playing}
         onPlayTrack={playTrack}
         onNavigate={navigate}
+        currentUser={user}
+        favoriteIds={favoriteIds}
+        onToggleFavorite={toggleFavorite}
+        onAddToPlaylist={openAddTrackModal}
       />
     );
   }
@@ -410,7 +414,7 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   // 4. Creator Studio Routes
-  // [FEATURE]: Trang chỉnh sửa bài hát (/track/submission/:id/edit hoặc /track/edit/:id) sử dụng CreateMyTrack component
+  // [FEATURE]: Đã loại bỏ luồng chỉnh sửa bài hát - Tự động điều hướng về trang chi tiết hoặc danh sách bài hát
   if (
     (pathname.startsWith("/studio/tracks/") && pathname.endsWith("/edit")) ||
     (pathname.startsWith("/studio/track/") && pathname.endsWith("/edit")) ||
@@ -424,18 +428,12 @@ export function AppRouter(): React.ReactElement | null {
       parts[2] === "edit"
         ? Number(parts[3]) || null
         : Number(parts[3]) || Number(parts[2]) || null;
-    if (!trackId) {
+    if (trackId) {
+      navigate("/track/submission/" + trackId);
+    } else {
       navigate("/track");
-      return null;
     }
-    return (
-      <CreateMyTrack
-        isAuthenticated={isAuthenticated}
-        canUpload={user?.role === "LISTENER"}
-        onNavigate={navigate}
-        editTrackId={trackId}
-      />
-    );
+    return null;
   }
 
   // [FEATURE]: Trang tải lên bài hát mới (/track/create hoặc /track/upload) sử dụng CreateMyTrack component
@@ -447,14 +445,11 @@ export function AppRouter(): React.ReactElement | null {
     pathname === "/create-track"
   ) {
     if (!authReady || !isAuthenticated) return null;
-    const editParam = queryParams.get("edit") || queryParams.get("trackId");
-    const editTrackId = editParam ? Number(editParam) : undefined;
     return (
       <CreateMyTrack
         isAuthenticated={isAuthenticated}
         canUpload={user?.role === "LISTENER"}
         onNavigate={navigate}
-        editTrackId={editTrackId}
       />
     );
   }

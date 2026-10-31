@@ -143,7 +143,6 @@ export function StudioTrackDetailPage({
   const [volume, setVolume] = useState(() => (activeAudio && Number.isFinite(activeAudio.volume) ? activeAudio.volume : 0.8));
 
   // Modals
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
@@ -190,7 +189,7 @@ export function StudioTrackDetailPage({
   const [submitCopyrightAgreed, setSubmitCopyrightAgreed] = useState(false);
   const [updateLyricModalOpen, setUpdateLyricModalOpen] = useState(false);
 
-  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen || rejectionModalOpen || updateLyricModalOpen);
+  useModalScrollLock(deleteConfirmOpen || submitModalOpen || withdrawModalOpen || rejectionModalOpen);
 
   const fetchTrackData = async (active = true) => {
     try {
@@ -213,16 +212,7 @@ export function StudioTrackDetailPage({
     let active = true;
     void fetchTrackData(active);
 
-    // Also load genres & albums for editing
-    studioApi.getGenres().then((g) => {
-      if (active && g.length > 0) setGenres(g);
-    }).catch(() => {});
-
-    studioApi.getMyAlbums().then((a) => {
-      if (active && a.length > 0) setAlbums(a);
-    }).catch(() => {});
-
-    return () => {
+        return () => {
       active = false;
     };
   }, [trackId]);
@@ -300,19 +290,18 @@ export function StudioTrackDetailPage({
 
   // Close modals on Escape key (Rule 4.7)
   useEffect(() => {
-    const hasAnyModal = deleteConfirmOpen || submitModalOpen || withdrawModalOpen || editModalOpen;
+    const hasAnyModal = deleteConfirmOpen || submitModalOpen || withdrawModalOpen;
     if (!hasAnyModal || isProcessing) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDeleteConfirmOpen(false);
         setSubmitModalOpen(false);
         setWithdrawModalOpen(false);
-        setEditModalOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteConfirmOpen, submitModalOpen, withdrawModalOpen, editModalOpen, isProcessing]);
+  }, [deleteConfirmOpen, submitModalOpen, withdrawModalOpen, isProcessing]);
 
   // Player controls
   const togglePlay = () => {
@@ -359,7 +348,7 @@ export function StudioTrackDetailPage({
   const isPending = rawStatus === "PENDING";
   const isRejected = rawStatus === "REJECTED" || rawStatus === "TAKEN_DOWN";
   const isDraft = rawStatus === "DRAFT";
-  const canEditOrDelete = isDraft || isRejected || isApproved;
+  const canDelete = isDraft || isRejected || isApproved;
 
   const statusLabel = isApproved
     ? "Approved & Published"
@@ -382,90 +371,6 @@ export function StudioTrackDetailPage({
   const submitterUsername = currentUser?.username || currentUser?.email?.split("@")[0] || "creator";
 
   // Actions
-  const openEditModal = () => {
-    if (!track) return;
-    setEditTitle(track.title);
-    setEditGenreId(track.genreId);
-    setEditAlbumId(track.albumId ?? "");
-    setEditDescription(track.description ?? "");
-    setEditLyricsContent(track.lyrics ?? "");
-    setEditAudioFile(null);
-    setEditCoverFile(null);
-    setEditAudioFileName(track.audioUrl ? "Current audio file attached" : "");
-    setEditCoverFileName(track.coverUrl ? "Current cover image attached" : "");
-    setEditLyricsFileName(track.lyrics ? "Existing lyrics attached" : "");
-    setFormErrors({});
-    setActionError(null);
-    setEditModalOpen(true);
-  };
-
-  const handleEditSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!track) return;
-
-    const errors: Record<string, string> = {};
-    if (!editTitle.trim()) {
-      errors.title = "Please enter the track title.";
-    } else if (editTitle.trim().length > 200) {
-      errors.title = "Track title cannot exceed 200 characters.";
-    }
-
-    if (!editGenreId) {
-      errors.genre = "Please select a music genre.";
-    }
-
-    if (editAudioFile) {
-      const audioErr = validateAudioFile(editAudioFile);
-      if (audioErr) errors.audio = audioErr;
-    }
-
-    if (editCoverFile) {
-      const coverErr = validateCoverFile(editCoverFile);
-      if (coverErr) errors.cover = coverErr;
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-      setActionError(null);
-      const previousStatus = track.status;
-      const updated = await studioApi.updateTrack(
-        track.id,
-        {
-          title: editTitle.trim(),
-          genreId: editGenreId,
-          albumId: editAlbumId ? Number(editAlbumId) : undefined,
-          description: editDescription.trim() || undefined,
-          lyrics: editLyricsContent.trim() || undefined,
-        },
-        editAudioFile ?? undefined,
-        editCoverFile ?? undefined
-      );
-
-      setTrack(updated);
-      setEditModalOpen(false);
-
-      // [FEATURE]: UC-19.3 Update A Track - Phản hồi thành công cho creator (POST-5)
-      // Nếu bài hát trước đó là PUBLISHED và nay chuyển sang PENDING để Staff kiểm duyệt lại:
-      if (previousStatus === "PUBLISHED" && updated.status === "PENDING") {
-        setActionSuccess(
-          "Track updated and submitted to Staff for re-moderation. Public listening visibility has been temporarily paused."
-        );
-      } else {
-        setActionSuccess("Track updated successfully.");
-      }
-      setTimeout(() => setActionSuccess(null), 5000);
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to update track.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleDeleteConfirm = async () => {
     if (!track) return;
     try {
@@ -563,9 +468,6 @@ export function StudioTrackDetailPage({
 
           <h1 className="staff-hero-title">Track Submission Details</h1>
 
-          <p className="staff-hero-description">
-            Manage your audio track details, inspect moderation status, or update submission assets.
-          </p>
         </div>
       </header>
 
@@ -655,21 +557,9 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {/* 1. Edit track button - [FEATURE]: Điều hướng sang /track/submission/:id/edit */}
-              {canEditOrDelete && (
-                <button
-                  type="button"
-                  className="studio-crud-btn studio-crud-btn-edit"
-                  onClick={() => onNavigate(`/track/submission/${track.id}/edit`)}
-                  title="Edit track information & synchronized lyrics"
-                >
-                  <EditIcon width={13} height={13} />
-                  <span>Edit track</span>
-                </button>
-              )}
 
               {/* 2. Delete button - only allowed for DRAFT, REJECTED, PUBLISHED */}
-              {canEditOrDelete && (
+              {canDelete && (
                 <button
                   type="button"
                   className="studio-crud-btn studio-crud-btn-delete"
@@ -710,22 +600,6 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {isApproved && (!track.lyrics || !track.lyrics.trim()) && (
-                <button
-                  type="button"
-                  className="studio-crud-btn studio-crud-btn-edit"
-                  onClick={() => setUpdateLyricModalOpen(true)}
-                  style={{
-                    backgroundColor: "#f0f9ff",
-                    color: "var(--color-ocean-primary, #0284C7)",
-                    borderColor: "#bae6fd",
-                  }}
-                  title="Update lyrics for this published track"
-                >
-                  <EditIcon width={13} height={13} />
-                  <span>Update Lyric</span>
-                </button>
-              )}
 
               {isApproved && (
                 <button
@@ -946,13 +820,37 @@ export function StudioTrackDetailPage({
                   <h4 className="staff-lyrics-heading">Lyrics</h4>
                 </div>
 
-                {track.lyrics ? (
-                  <div className="staff-lyrics-header-actions">
+                <div className="staff-lyrics-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {track.lyrics ? (
                     <div className="staff-lyrics-stats-badge">
                       <span><b>{track.lyrics.split(/\r?\n/).filter((l) => l.trim().length > 0).length}</b> lines</span>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+
+                  {isApproved && (
+                    <button
+                      type="button"
+                      className="studio-crud-btn studio-crud-btn-edit"
+                      onClick={() => setUpdateLyricModalOpen(true)}
+                      style={{
+                        backgroundColor: "#f0f9ff",
+                        color: "var(--color-ocean-primary, #0284C7)",
+                        borderColor: "#bae6fd",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "5px 12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        borderRadius: "8px",
+                      }}
+                      title="Update lyrics for this published track"
+                    >
+                      <EditIcon width={13} height={13} />
+                      <span>Update Lyric</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {track.lyrics ? (
@@ -1022,291 +920,6 @@ export function StudioTrackDetailPage({
       </div>
 
       {/* Edit Track Modal */}
-      {editModalOpen && track && createPortal(
-        <div className="modal-backdrop" role="presentation" onClick={() => !isProcessing && setEditModalOpen(false)}>
-          <div
-            className="modal-card modal-card--wide studio-track-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-track-modal-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div className="studio-modal-heading">
-                <span className="studio-modal-heading__icon"><UploadIcon width={20} height={20} /></span>
-                <div>
-                  <span className="eyebrow">CONTENT STUDIO</span>
-                  <h3 id="edit-track-modal-title">Edit track</h3>
-                </div>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setEditModalOpen(false)}
-                aria-label="Close edit modal"
-                disabled={isProcessing}
-              >
-                <CloseIcon width={18} height={18} />
-              </button>
-            </div>
-
-            {Object.keys(formErrors).length > 0 && (
-              <div className="auth-v2-error" role="alert">
-                <span><AlertIcon width={16} height={16} /></span>
-                <div>
-                  <b>Please review errors below</b>
-                  <small>Make sure all mandatory fields are correctly filled.</small>
-                </div>
-              </div>
-            )}
-
-            {actionError && (
-              <div className="auth-v2-error studio-inline-api-error" role="alert">
-                <span><AlertIcon width={16} height={16} /></span>
-                <div>
-                  <b>Unable to save this track</b>
-                  <small>{actionError}</small>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="modal-form" noValidate>
-              <div className="form-group">
-                <label htmlFor="edit-track-title">
-                  Title <span style={{ color: "var(--sw-danger, #ef4444)" }}>*</span>
-                </label>
-                <input
-                  id="edit-track-title"
-                  type="text"
-                  placeholder="For example: Sunset Memories"
-                  value={editTitle}
-                  aria-invalid={Boolean(formErrors.title)}
-                  style={formErrors.title ? { borderColor: "#b42318", background: "#fef3f2" } : {}}
-                  onChange={(e) => {
-                    setEditTitle(e.target.value);
-                    if (formErrors.title) {
-                      setFormErrors((prev) => ({ ...prev, title: "" }));
-                    }
-                  }}
-                  disabled={isProcessing}
-                />
-                {formErrors.title && (
-                  <small className="auth-v2-field-error">
-                    <AlertIcon width={12} height={12} />
-                    {formErrors.title}
-                  </small>
-                )}
-              </div>
-
-              <div className="studio-form-grid studio-form-grid--equal">
-                <div className="form-group">
-                  <label htmlFor="edit-track-genre">
-                    Genre <span style={{ color: "var(--sw-danger, #ef4444)" }}>*</span>
-                  </label>
-                  <select
-                    id="edit-track-genre"
-                    value={editGenreId}
-                    onChange={(e) => {
-                      setEditGenreId(Number(e.target.value));
-                      if (formErrors.genre) setFormErrors((prev) => ({ ...prev, genre: "" }));
-                    }}
-                    style={formErrors.genre ? { borderColor: "#b42318", background: "#fef3f2" } : {}}
-                    disabled={isProcessing}
-                  >
-                    <option value={0}>Select genre...</option>
-                    {genres.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.genre && (
-                    <small className="auth-v2-field-error">
-                      <AlertIcon width={12} height={12} />
-                      {formErrors.genre}
-                    </small>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="edit-track-album">Album (optional)</label>
-                  <select
-                    id="edit-track-album"
-                    value={editAlbumId}
-                    onChange={(e) => setEditAlbumId(e.target.value ? Number(e.target.value) : "")}
-                    disabled={isProcessing}
-                  >
-                    <option value="">None (Single track)</option>
-                    {albums.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: "16px" }}>
-                <label htmlFor="edit-track-desc">Description (optional)</label>
-                <textarea
-                  id="edit-track-desc"
-                  placeholder="Brief description or mood of the track"
-                  value={editDescription}
-                  rows={3}
-                  maxLength={2000}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  disabled={isProcessing}
-                />
-              </div>
-
-              <div className="studio-media-grid">
-                <MediaUploadField
-                  id="edit-audio-file-input"
-                  label="Audio file"
-                  helperText="MP3, WAV or FLAC · Max 30MB"
-                  accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
-                  file={editAudioFile}
-                  existingFileLabel={editAudioFileName}
-                  error={formErrors.audio}
-                  disabled={isProcessing}
-                  onFileChange={(file) => {
-                    setEditAudioFile(file);
-                    if (file) {
-                      setEditAudioFileName(file.name);
-                      if (formErrors.audio) setFormErrors((prev) => ({ ...prev, audio: "" }));
-                    } else {
-                      setEditAudioFileName(track.audioUrl ? "Current audio file attached" : "");
-                    }
-                  }}
-                />
-
-                <MediaUploadField
-                  id="edit-cover-file-input"
-                  label="Cover artwork"
-                  helperText="JPG or PNG · Max 5MB"
-                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                  file={editCoverFile}
-                  existingFileLabel={editCoverFileName}
-                  error={formErrors.cover}
-                  disabled={isProcessing}
-                  onFileChange={(file) => {
-                    setEditCoverFile(file);
-                    if (file) {
-                      setEditCoverFileName(file.name);
-                      if (formErrors.cover) setFormErrors((prev) => ({ ...prev, cover: "" }));
-                    } else {
-                      setEditCoverFileName(track.coverUrl ? "Current cover image attached" : "");
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginTop: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <label htmlFor="edit-lyrics-file-input" style={{ margin: 0 }}>
-                    Lyrics file (.lrc, .txt - Optional)
-                  </label>
-                  {editLyricsContent && (
-                    <button
-                      type="button"
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--sw-danger, #ef4444)",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        padding: 0,
-                      }}
-                      onClick={() => {
-                        setEditLyricsContent("");
-                        setEditLyricsFileName("");
-                      }}
-                    >
-                      Remove lyrics
-                    </button>
-                  )}
-                </div>
-
-                <div className="file-drop-zone">
-                  <input
-                    type="file"
-                    accept=".lrc,.txt,text/plain"
-                    id="edit-lyrics-file-input"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const lyricsError = validateLyricsFile(file);
-                      if (lyricsError) {
-                        setEditLyricsFileName("");
-                        setFormErrors((prev) => ({ ...prev, lyrics: lyricsError }));
-                        e.target.value = "";
-                        return;
-                      }
-                      void readLyricsFile(file)
-                        .then((content) => {
-                          setEditLyricsFileName(file.name);
-                          setEditLyricsContent(content);
-                          setFormErrors((prev) => ({ ...prev, lyrics: "" }));
-                        })
-                        .catch((error: unknown) => {
-                          setEditLyricsFileName("");
-                          setFormErrors((prev) => ({
-                            ...prev,
-                            lyrics: error instanceof Error ? error.message : "Lyrics file could not be read.",
-                          }));
-                        });
-                      e.target.value = "";
-                    }}
-                    style={{ display: "none" }}
-                  />
-                  <label htmlFor="edit-lyrics-file-input" className="file-drop-label">
-                    <FileTextIcon width={24} height={24} />
-                    <span>
-                      {editLyricsFileName
-                        ? `Selected lyrics: ${editLyricsFileName}`
-                        : editLyricsContent
-                        ? "Lyrics attached (click to choose a different file)"
-                        : "Upload lyrics file (.lrc, .txt - optional)"}
-                    </span>
-                  </label>
-                </div>
-                {formErrors.lyrics && (
-                  <small className="auth-v2-field-error">
-                    <AlertIcon width={12} height={12} />
-                    {formErrors.lyrics}
-                  </small>
-                )}
-
-
-              </div>
-
-              <div className="modal-actions studio-track-modal__actions">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => setEditModalOpen(false)}
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={isProcessing}
-                >
-                  {isProcessing
-                    ? "Saving changes..."
-                    : (track.status === "PUBLISHED" || track.status === "APPROVED")
-                    ? "Save & Submit for review"
-                    : "Save changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
       {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && track && createPortal(
         <div
@@ -1453,7 +1066,7 @@ export function StudioTrackDetailPage({
               </button>
             </div>
             <p style={{ margin: "16px 0", color: "var(--sw-text-secondary)" }}>
-              Are you sure you want to withdraw &quot;<b>{track.title}</b>&quot; from moderation review? The track will return to <b>Draft</b> status so you can continue editing.
+              Are you sure you want to withdraw &quot;<b>{track.title}</b>&quot; from moderation review? The track will return to <b>Draft</b> status.
             </p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setWithdrawModalOpen(false)} disabled={isProcessing}>

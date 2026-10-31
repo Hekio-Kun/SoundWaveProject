@@ -55,7 +55,7 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
     List<Track> findByUploaderUserIdAndAlbumIsNullOrderByCreatedAtDesc(Long uploaderUserId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Track t SET t.album = null, t.trackNumber = null, t.updatedAt = CURRENT_TIMESTAMP WHERE t.album.id = :albumId AND t.uploaderUserId = :userId")
     void unlinkAlbumFromTracks(@Param("albumId") Long albumId, @Param("userId") Long userId);
 
@@ -64,8 +64,8 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
      *
      * @param id Identifier of the track to increment.
      */
-    @Modifying
-    @Query("UPDATE Track t SET t.playCountCache = t.playCountCache + 1 WHERE t.id = :id")
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Track t SET t.playCountCache = COALESCE(t.playCountCache, 0) + 1 WHERE t.id = :id")
     void incrementPlayCount(@Param("id") Long id);
 
     /**

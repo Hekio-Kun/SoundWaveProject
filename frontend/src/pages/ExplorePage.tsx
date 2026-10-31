@@ -1,61 +1,61 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { albums, featuredCreators, genres as initialGenres } from "../data";
+import { useCallback, useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { AlbumCard, CreatorCard, SectionHeader, TrackCard } from "../components/common/MusicCards";
-import { ArrowIcon, PauseIcon, PlayIcon } from "../icons";
-import type { Genre, LandingTrack } from "../types";
+import { SectionHeader, TrackCard } from "../components/common/MusicCards";
+import { ArrowIcon, PauseIcon, PlayIcon, RefreshIcon } from "../icons";
+import type { CurrentUser, LandingTrack } from "../types";
 
 type Props = {
   currentTrack: LandingTrack | null;
   playing: boolean;
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string) => void;
   onNavigate: (route: string) => void;
+  currentUser?: CurrentUser | null;
+  favoriteIds?: number[];
+  onToggleFavorite?: (trackId: number) => Promise<void>;
+  onAddToPlaylist?: (trackId: number) => void;
 };
 
-const formatDuration = (ms: number) => {
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-};
-
-export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: Props) {
-  const [genresList, setGenresList] = useState<Genre[]>(initialGenres);
-  const [trendingTracks, setTrendingTracks] = useState<LandingTrack[]>([]);
-  const [newReleaseTracks, setNewReleaseTracks] = useState<LandingTrack[]>([]);
+export function ExplorePage({
+  currentTrack,
+  playing,
+  onPlayTrack,
+  onNavigate,
+  currentUser,
+  favoriteIds = [],
+  onToggleFavorite,
+  onAddToPlaylist,
+}: Props) {
+  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>([]);
   const [catalogTrackCount, setCatalogTrackCount] = useState(0);
   const [tracksLoading, setTracksLoading] = useState(true);
   const [tracksError, setTracksError] = useState("");
-  const heroTrack = trendingTracks[0] ?? newReleaseTracks[0] ?? null;
+
+  const heroTrack = recommendedTracks[0] ?? null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);
 
+  // [FEATURE]: UC-06 View Recommended Song - Tải danh sách bài hát gợi ý theo thể loại phổ biến và sở thích cá nhân
   const loadExploreTracks = useCallback(async () => {
     try {
-      const [trendingResponse, newestResponse] = await Promise.all([
-        catalogApi.getTracks({ sort: "trending", page: 0, size: 5 }),
-        catalogApi.getTracks({ sort: "newest", page: 0, size: 6 }),
+      setTracksLoading(true);
+      setTracksError("");
+      const [recommendedRes, catalogRes] = await Promise.all([
+        catalogApi.getCuratedRecommendations(10),
+        catalogApi.getTracks({ size: 1 }),
       ]);
-      if (trendingResponse?.content && trendingResponse.content.length > 0) {
-        setTrendingTracks(trendingResponse.content);
+
+      if (recommendedRes && recommendedRes.length > 0) {
+        setRecommendedTracks(recommendedRes);
       }
-      if (newestResponse?.content && newestResponse.content.length > 0) {
-        setNewReleaseTracks(newestResponse.content);
+      if (catalogRes?.totalElements) {
+        setCatalogTrackCount(catalogRes.totalElements);
       }
-      if (newestResponse?.totalElements) {
-        setCatalogTrackCount(newestResponse.totalElements);
-      }
-    } catch {
-      // Backend catalog API offline or unavailable: gracefully keep curated project tracks
+    } catch (err: unknown) {
+      console.error("Failed to load explore recommendations:", err);
+      // EX01: Catalog retrieval failure - hiển thị thông báo lỗi thân thiện kèm nút Retry
+      setTracksError("Unable to load recommendations at this time");
     } finally {
       setTracksLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    catalogApi.getGenres()
-      .then((data) => {
-        if (data && data.length > 0) setGenresList(data);
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
       <span>{tracksError || emptyMessage}</span>
       {tracksError ? (
         <button className="button button-secondary button-small" onClick={() => void loadExploreTracks()}>
-          Try again
+          <RefreshIcon width={14} height={14} style={{ marginRight: "4px" }} /> Try again
         </button>
       ) : null}
     </div>
@@ -86,15 +86,22 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
               className="button button-primary button-large"
               onClick={() => {
                 if (heroTrack) {
-                  onPlayTrack(heroTrack, trendingTracks.length > 0 ? trendingTracks : [heroTrack], "Explore Recommended");
+                  onPlayTrack(
+                    heroTrack,
+                    recommendedTracks,
+                    "Explore Recommended"
+                  );
                 }
               }}
               disabled={!heroTrack}
             >
               {heroPlaying ? <PauseIcon /> : <PlayIcon />} {tracksLoading ? "Loading music..." : heroPlaying ? "Pause" : "Listen now"}
             </button>
-            <button className="button button-secondary button-large" onClick={() => document.getElementById("trending")?.scrollIntoView({ behavior: "smooth" })}>
-              View trending <ArrowIcon width={17} height={17} />
+            <button
+              className="button button-secondary button-large"
+              onClick={() => document.getElementById("recommended")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              Explore picks <ArrowIcon width={17} height={17} />
             </button>
           </div>
           <div className="discover-proof">
@@ -113,7 +120,11 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
             className="discover-feature"
             onClick={() => {
               if (heroTrack) {
-                onPlayTrack(heroTrack, trendingTracks.length > 0 ? trendingTracks : [heroTrack], "Explore Recommended");
+                onPlayTrack(
+                  heroTrack,
+                  recommendedTracks,
+                  "Explore Recommended"
+                );
               }
             }}
             aria-label={`${heroPlaying ? "Pause" : "Play"} ${heroTrack.title}`}
@@ -133,83 +144,72 @@ export function ExplorePage({ currentTrack, playing, onPlayTrack, onNavigate }: 
         )}
       </section>
 
-      <section className="sw-section" id="trending">
-        <SectionHeader title="Trending tracks" description="The most-played tracks in the SoundWave community this week" actionLabel="Top Charts" onAction={() => onNavigate("/ranking")} />
+      {/* UC-06: View Recommended Song - Section: Recommended Tracks */}
+      <section className="sw-section" id="recommended">
+        <SectionHeader
+          title="Recommended for you"
+          description="Algorithmic selections based on popular genres and your listening tastes"
+        />
         {tracksLoading ? (
-          <div className="sw-track-grid" aria-busy="true" aria-label="Loading trending tracks">
-            {[1, 2, 3, 4, 5].map((item) => <div className="explore-track-skeleton" key={item}><span className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div>)}
+          <div className="sw-track-grid" aria-busy="true" aria-label="Loading recommended tracks">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((item) => (
+              <div className="explore-track-skeleton" key={item}>
+                <span className="skeleton" />
+                <i className="skeleton" />
+                <i className="skeleton" />
+              </div>
+            ))}
           </div>
-        ) : trendingTracks.length > 0 ? (
+        ) : tracksError ? (
+          /* EX01: Catalog retrieval failure with Retry button */
+          <div
+            className="explore-track-state is-error"
+            role="alert"
+            style={{
+              padding: "36px 20px",
+              textAlign: "center",
+              background: "#FFF1F2",
+              border: "1px solid #FECDD3",
+              borderRadius: "16px",
+            }}
+          >
+            <div style={{ color: "#E11D48", fontWeight: 700, fontSize: "16px", marginBottom: "6px" }}>
+              Unable to load recommendations at this time
+            </div>
+            <p style={{ color: "#64748B", fontSize: "13px", marginBottom: "16px", maxWidth: "420px", margin: "0 auto 16px" }}>
+              We encountered a connection issue while loading music recommendations. Please try again.
+            </p>
+            <button
+              type="button"
+              className="button button-primary button-small"
+              onClick={() => void loadExploreTracks()}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px", margin: "0 auto" }}
+            >
+              <RefreshIcon width={14} height={14} />
+              <span>Retry</span>
+            </button>
+          </div>
+        ) : recommendedTracks.length > 0 ? (
           <div className="sw-track-grid">
-            {trendingTracks.map((track, index) => (
+            {recommendedTracks.map((track) => (
               <TrackCard
-                key={track.id}
+                key={`rec-${track.id}`}
                 track={track}
-                rank={index + 1}
                 active={currentTrack?.id === track.id}
                 playing={currentTrack?.id === track.id && playing}
-                onPlay={(t) => onPlayTrack(t, trendingTracks, "Trending Tracks")}
+                onPlay={(t) => onPlayTrack(t, recommendedTracks, "Recommended Tracks")}
                 onNavigate={onNavigate}
+                canManageLibrary={currentUser?.role === "LISTENER"}
+                isFavorited={favoriteIds.includes(track.id)}
+                onToggleFavorite={onToggleFavorite}
+                onAddToPlaylist={onAddToPlaylist}
               />
             ))}
           </div>
-        ) : renderTrackState("Approved tracks will appear here after staff publishes them.")}
-      </section>
-
-      <section className="sw-section sw-section--split">
-        <div className="sw-release-panel">
-          <SectionHeader title="New releases" description="Recently published on SoundWave" />
-          {tracksLoading ? (
-            <div className="explore-release-skeletons" aria-busy="true" aria-label="Loading new releases">
-              {[1, 2, 3, 4, 5].map((item) => <span className="skeleton" key={item} />)}
-            </div>
-          ) : newReleaseTracks.length > 0 ? (
-            <div className="sw-release-list">
-              {newReleaseTracks.slice(0, 5).map((track, index) => {
-                const isThisTrack = currentTrack?.id === track.id;
-                const isThisPlaying = isThisTrack && playing;
-                return (
-                  <button
-                    key={track.id}
-                    className={`sw-release-row ${isThisTrack ? "is-active" : ""}`}
-                    onClick={() => onPlayTrack(track, newReleaseTracks, "New Releases")}
-                  >
-                    <span className="sw-release-index">{String(index + 1).padStart(2, "0")}</span>
-                    <img src={track.coverUrl ?? undefined} alt="" />
-                    <span className="sw-release-copy">
-                      <strong>{track.title}</strong>
-                      <small>{track.creator?.displayName ?? "Unknown Creator"} · {track.genreName || track.genreSlug}</small>
-                    </span>
-                    <span className="sw-release-duration">{formatDuration(track.durationMs)}</span>
-                    <span className="sw-release-icon">
-                      {isThisPlaying ? <PauseIcon width={15} height={15} /> : <PlayIcon width={15} height={15} />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : renderTrackState("Recently published tracks will appear here.")}
-        </div>
-        <div className="sw-genre-panel">
-          <SectionHeader title="Genres" description="Choose music that matches your mood" actionLabel="View all" onAction={() => onNavigate("/genres")} />
-          <div className="sw-genre-grid">
-            {genresList.slice(0, 6).map((genre) => (
-              <button key={genre.id} style={{ "--genre-color": genre.color, "--genre-accent": genre.accent } as CSSProperties} onClick={() => onNavigate(`/browse?genre=${genre.slug}`)}>
-                <span>{genre.name}</span><small>{genre.description}</small><ArrowIcon width={16} height={16} />
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="sw-section">
-        <SectionHeader title="Featured albums" description="Complete stories told through every album" actionLabel="View all albums" onAction={() => onNavigate("/albums")} />
-        <div className="sw-album-grid">{albums.map((album) => <AlbumCard key={album.id} album={album} onNavigate={onNavigate} />)}</div>
-      </section>
-
-      <section className="sw-section">
-        <SectionHeader title="Featured creators" description="Follow the creators shaping today's favorite sounds" />
-        <div className="sw-creator-grid">{featuredCreators.map((creator) => <CreatorCard key={creator.userId} creator={creator} onNavigate={onNavigate} />)}</div>
+        ) : (
+          /* AF01: Empty recommendation section */
+          renderTrackState("No tracks available in this section yet")
+        )}
       </section>
     </div>
   );
