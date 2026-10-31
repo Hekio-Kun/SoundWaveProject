@@ -95,6 +95,7 @@ public class TrackCatalogService {
         // opt [User is Authenticated Listener (userId != null)]
         if (userEmail != null && !userEmail.isBlank()) {
             trackRepository.incrementPlayCount(track.getId());
+            track.incrementPlayCount();
             responsePlayCount = currentPlayCount + 1L;
 
             Optional<Long> userIdOpt = userAccountPublicService.findUserIdByEmail(userEmail);
@@ -276,7 +277,8 @@ public class TrackCatalogService {
 
         // 1. Increment play count in database transaction
         trackRepository.incrementPlayCount(trackId);
-        long updatedPlayCount = (track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L) + 1;
+        track.incrementPlayCount();
+        long updatedPlayCount = (track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L);
 
         // 2. Persist listening history if user is authenticated
         boolean recordedHistory = false;

@@ -116,6 +116,15 @@ export function TrackDetailsPage({
     };
   }, [trackId]);
 
+  // Đồng bộ hóa playCount khi bài hát đang mở được phát và cập nhật lượt nghe từ PlayerContext
+  useEffect(() => {
+    if (currentTrack && track && Number(currentTrack.id) === Number(track.id)) {
+      if (currentTrack.playCount !== undefined && currentTrack.playCount !== track.playCount) {
+        setTrack((prev) => (prev ? { ...prev, playCount: currentTrack.playCount } : prev));
+      }
+    }
+  }, [currentTrack, track]);
+
   // Load lyrics bundle
   const loadTrackLyrics = async () => {
     setLyricsLoading(true);

@@ -46,7 +46,7 @@ const creators = {
 
 export const projectTracks: LandingTrack[] = [
   {
-    id: 10,
+    id: 1,
     title: "Nơi Này Có Anh",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/v1791565403/soundwave/tracks/covers/project-cover-noi-nay-co-anh.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565402/soundwave/tracks/audio/project-track-noi-nay-co-anh.mp3",
@@ -59,10 +59,10 @@ export const projectTracks: LandingTrack[] = [
     description: "Bản tình ca Pop ngọt ngào, lãng mạn đình đám của Sơn Tùng M-TP do Hekio phát hành.",
     lyrics: `Em là ai từ đâu bước đến nơi đây dịu dàng chân phương\nCầm tay anh đi qua bao giông tố cuộc đời...\nCầm tay anh, dựa vai anh\nĐừng buông tay anh nhé!`,
     creator: creators.hekio,
-    album: { id: 10, title: "Nơi Này Có Anh" },
+    album: { id: 1, title: "Nơi Này Có Anh" },
   },
   {
-    id: 6,
+    id: 2,
     title: "Baby",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-baby-mck.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565312/soundwave/tracks/audio/project-track-baby-mck.mp3",
@@ -75,10 +75,10 @@ export const projectTracks: LandingTrack[] = [
     description: "Bản hit đầy cảm xúc từ album 99% của MCK.",
     lyrics: `Baby em là một giấc mơ\nMà anh không thể nào chạm tới...\nKhi màn đêm buông xuống nơi đây\nChỉ còn nỗi nhớ đong đầy.`,
     creator: creators.mck,
-    album: { id: 6, title: "99%" },
+    album: { id: 2, title: "99%" },
   },
   {
-    id: 7,
+    id: 3,
     title: "Exit Sign",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-exit-sign-hieuthuhai.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565333/soundwave/tracks/audio/project-track-exit-sign-hieuthuhai.mp3",
@@ -91,10 +91,10 @@ export const projectTracks: LandingTrack[] = [
     description: "Ca khúc nổi bật trong album Ai Cũng Phải Bắt Đầu Từ Đâu Đó của HIEUTHUHAI kết hợp cùng marzuz và Kewtiie.",
     lyrics: `Em tìm lối ra nơi bảng exit sign\nĐể lại con tim anh vỡ tan trong đêm dài...\nLiệu có cơ hội nào cho đôi ta bắt đầu lại?`,
     creator: creators.hieuthuhai,
-    album: { id: 7, title: "Ai Cũng Phải Bắt Đầu Từ Đâu Đó" },
+    album: { id: 3, title: "Ai Cũng Phải Bắt Đầu Từ Đâu Đó" },
   },
   {
-    id: 8,
+    id: 4,
     title: "Giữa Đại Lộ Đông Tây",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-giua-dai-lo-dong-tay.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565353/soundwave/tracks/audio/project-track-giua-dai-lo-dong-tay.mp3",
@@ -107,10 +107,10 @@ export const projectTracks: LandingTrack[] = [
     description: "Ca khúc ballad da diết sáng tác bởi Hứa Kim Tuyền qua giọng hát nội lực của Uyên Linh.",
     lyrics: `Giữa đại lộ đông tây\nCó ai nghe thấy nỗi cô đơn này...\nDòng xe vội vã lướt qua nhanh\nChỉ còn em đứng lặng thầm.`,
     creator: creators.uyenlinh,
-    album: { id: 8, title: "Đại Lộ Đông Tây" },
+    album: { id: 4, title: "Đại Lộ Đông Tây" },
   },
   {
-    id: 9,
+    id: 5,
     title: "Tìm Em",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-tim-em-hngle-bao-anh.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565382/soundwave/tracks/audio/project-track-tim-em-hngle-bao-anh.mp3",
@@ -126,7 +126,7 @@ export const projectTracks: LandingTrack[] = [
     album: { id: 9, title: "Tìm Em Single" },
   },
   {
-    id: 11,
+    id: 6,
     title: "Haru (晴る)",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-haru-yorushika.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565495/soundwave/tracks/audio/project-track-haru-yorushika.mp3",
@@ -142,7 +142,7 @@ export const projectTracks: LandingTrack[] = [
     album: { id: 11, title: "Frieren OST" },
   },
   {
-    id: 12,
+    id: 7,
     title: "A Cruel Angel's Thesis (残酷な天使のテーゼ)",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-a-cruel-angels-thesis.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565521/soundwave/tracks/audio/project-track-a-cruel-angels-thesis.mp3",
@@ -158,7 +158,7 @@ export const projectTracks: LandingTrack[] = [
     album: { id: 12, title: "Evangelion OST" },
   },
   {
-    id: 13,
+    id: 8,
     title: "Yoru ni Kakeru (夜に駆ける)",
     coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-yoru-ni-kakeru.webp",
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565419/soundwave/tracks/audio/project-track-yoru-ni-kakeru.mp3",
@@ -171,14 +171,14 @@ export const projectTracks: LandingTrack[] = [
     description: "Bản hit đột phá toàn cầu của bộ đôi YOASOBI dựa trên tiểu thuyết Tanatosu no Yūwaku.",
     lyrics: `沈むように溶けてゆくように\n二人だけの空が広がる夜に...\n「さよなら」だけだった\nその一言で全てが分かった。`,
     creator: creators.yoasobi,
-    album: { id: 13, title: "THE BOOK" },
+    album: { id: 5, title: "THE BOOK" },
   },
 ];
 
 export const demoTracks: LandingTrack[] = [
 
   {
-    id: 2,
+    id: 902,
     title: "Thành Phố Sau Mưa",
     coverUrl: covers.city,
     audioUrl: "/audio/soundwave-demo.wav",
@@ -191,7 +191,7 @@ export const demoTracks: LandingTrack[] = [
     album: { id: 2, title: "Đi Qua Đêm" },
   },
   {
-    id: 3,
+    id: 903,
     title: "Phía Bên Kia Biển",
     coverUrl: covers.blue,
     audioUrl: "/audio/soundwave-demo.wav",
@@ -204,7 +204,7 @@ export const demoTracks: LandingTrack[] = [
     album: { id: 3, title: "Chạm Vào Mây" },
   },
   {
-    id: 4,
+    id: 904,
     title: "Hạ Vẫn Ở Đây",
     coverUrl: covers.warm,
     audioUrl: "/audio/soundwave-demo.wav",
@@ -217,7 +217,7 @@ export const demoTracks: LandingTrack[] = [
     album: { id: 4, title: "Gọi Nắng" },
   },
   {
-    id: 5,
+    id: 905,
     title: "Đêm Trôi Rất Khẽ",
     coverUrl: covers.night,
     audioUrl: "/audio/soundwave-demo.wav",
