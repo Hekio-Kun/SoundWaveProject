@@ -34,6 +34,7 @@ public class TrackCatalogService {
     private final GenreRepository genreRepository;
     private final UserAccountPublicService userAccountPublicService;
     private final ListeningHistoryPublicService listeningHistoryPublicService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
 
     public TrackCatalogService(
             TrackRepository trackRepository,
@@ -41,10 +42,22 @@ public class TrackCatalogService {
             UserAccountPublicService userAccountPublicService,
             ListeningHistoryPublicService listeningHistoryPublicService
     ) {
+        this(trackRepository, genreRepository, userAccountPublicService, listeningHistoryPublicService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public TrackCatalogService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            UserAccountPublicService userAccountPublicService,
+            ListeningHistoryPublicService listeningHistoryPublicService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
         this.trackRepository = trackRepository;
         this.genreRepository = genreRepository;
         this.userAccountPublicService = userAccountPublicService;
         this.listeningHistoryPublicService = listeningHistoryPublicService;
+        this.lyricService = lyricService;
     }
 
     /**
@@ -360,6 +373,10 @@ public class TrackCatalogService {
                         null
                 ));
 
+        String lyrics = (lyricService != null)
+                ? lyricService.getOfficialLyricContent(track.getId()).orElse(track.getLyrics())
+                : track.getLyrics();
+
         return new TrackResponse(
                 track.getId(),
                 track.getTitle(),
@@ -374,7 +391,8 @@ public class TrackCatalogService {
                 track.getGenre() != null ? track.getGenre().getName() : null,
                 albumSummary,
                 creatorSummary,
-                track.getCreatedAt()
+                track.getCreatedAt(),
+                lyrics
         );
     }
 }

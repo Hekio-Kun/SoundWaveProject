@@ -186,3 +186,20 @@ export type NotificationItem = {
   createdAt: string;
   navigationUrl?: string | null;
 };
+
+export type CustomLyricItem = {
+  id: number;
+  trackId: number;
+  userId: number;
+  lyricType: string;
+  lyricContent: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrackLyricsBundle = {
+  trackId: number;
+  officialLyrics?: string | null;
+  syncType: "LRC" | "PLAIN" | "NONE";
+  customLyrics: CustomLyricItem[];
+};

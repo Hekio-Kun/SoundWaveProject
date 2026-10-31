@@ -12,6 +12,7 @@ import { usePlayer } from "../context/PlayerContext";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -24,6 +25,7 @@ import {
   HeadphonesIcon,
   PauseIcon,
   PlayIcon,
+  PlusIcon,
   ShieldIcon,
   TrashIcon,
   UploadIcon,
@@ -148,6 +150,7 @@ export function StudioTrackDetailPage({
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
   const [rejectionModalDetails, setRejectionModalDetails] = useState<RejectionDetails | null>(null);
+  const [updateLyricModalOpen, setUpdateLyricModalOpen] = useState(false);
 
   /**
    * Mở modal xem chi tiết lý do từ chối kiểm duyệt (UC-20: View Rejection Reason).
@@ -357,7 +360,13 @@ export function StudioTrackDetailPage({
   const isPending = rawStatus === "PENDING";
   const isRejected = rawStatus === "REJECTED" || rawStatus === "TAKEN_DOWN";
   const isDraft = rawStatus === "DRAFT";
-  const canEditOrDelete = isDraft || isRejected || isApproved;
+  // Bài hát DRAFT hoặc REJECTED thì có thể sửa toàn bộ thông tin (Edit track)
+  const canEditGeneral = isDraft || isRejected;
+  const canDelete = isDraft || isRejected || isApproved;
+  // Kiểm tra bài hát đã có lyric hay chưa
+  const hasLyrics = Boolean(track?.lyrics && track.lyrics.trim().length > 0);
+  // Luồng mới: Khi bài hát được public và chưa có lyric thì hiện nút Update Lyric, nếu có lyric rồi thì ẩn
+  const showUpdateLyricButton = isApproved && !hasLyrics;
 
   const statusLabel = isApproved
     ? "Approved & Published"
@@ -653,21 +662,41 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {/* 1. Edit track button - [FEATURE]: Điều hướng sang /track/submission/:id/edit */}
-              {canEditOrDelete && (
+              {/* 1. Edit track button - cho phép với DRAFT hoặc REJECTED */}
+              {canEditGeneral && (
                 <button
                   type="button"
                   className="studio-crud-btn studio-crud-btn-edit"
                   onClick={() => onNavigate(`/track/submission/${track.id}/edit`)}
                   title="Edit track information & synchronized lyrics"
+                  id="btn-edit-track-general"
                 >
                   <EditIcon width={13} height={13} />
                   <span>Edit track</span>
                 </button>
               )}
 
+              {/* 1.1 Update Lyric button - Khi bài hát được public và chưa có lyric thì hiện nút update lyric, nếu có lyric rồi thì không hiện */}
+              {showUpdateLyricButton && (
+                <button
+                  type="button"
+                  className="studio-crud-btn studio-crud-btn-primary"
+                  onClick={() => setUpdateLyricModalOpen(true)}
+                  id="btn-update-lyrics-published"
+                  title="Add or update lyrics for this published song"
+                  style={{
+                    backgroundColor: "var(--color-ocean-light, #E0F2FE)",
+                    color: "var(--color-ocean-primary, #0284C7)",
+                    borderColor: "#BAE6FD",
+                  }}
+                >
+                  <FileTextIcon width={13} height={13} />
+                  <span>Update Lyric</span>
+                </button>
+              )}
+
               {/* 2. Delete button - only allowed for DRAFT, REJECTED, PUBLISHED */}
-              {canEditOrDelete && (
+              {canDelete && (
                 <button
                   type="button"
                   className="studio-crud-btn studio-crud-btn-delete"
@@ -958,6 +987,23 @@ export function StudioTrackDetailPage({
                     <strong>No lyrics provided</strong>
                     <span>The uploader did not attach lyrics for this release.</span>
                   </div>
+                  {showUpdateLyricButton && (
+                    <button
+                      type="button"
+                      className="button button-primary button-small"
+                      onClick={() => setUpdateLyricModalOpen(true)}
+                      id="btn-add-lyrics-empty-state"
+                      style={{
+                        marginTop: "12px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <PlusIcon width={14} height={14} />
+                      <span>Update Lyric</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1459,6 +1505,17 @@ export function StudioTrackDetailPage({
           if (track) {
             onNavigate(`/studio/tracks/${track.id}/edit`);
           }
+        }}
+      />
+
+      {/* Update Lyric Modal (UC-18.3 & Luồng mới khi bài hát public chưa có lyric) */}
+      <UpdateLyricModal
+        open={updateLyricModalOpen}
+        track={track}
+        onClose={() => setUpdateLyricModalOpen(false)}
+        onSaved={(updated) => {
+          setTrack(updated);
+          setActionSuccess("Lyrics updated successfully.");
         }}
       />
 

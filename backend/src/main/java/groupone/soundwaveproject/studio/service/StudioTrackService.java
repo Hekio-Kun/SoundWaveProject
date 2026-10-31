@@ -53,7 +53,6 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StudioTrackService {
 
     private final TrackRepository trackRepository;
@@ -67,6 +66,54 @@ public class StudioTrackService {
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
     private final NotificationService notificationService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService
+    ) {
+        this(trackRepository, genreRepository, albumRepository, trackSubmissionRepository,
+                playlistTrackRepository, listeningHistoryRepository, userRepository,
+                staffRepository, cloudMediaService, studioTrackMapper, notificationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
+        this.albumRepository = albumRepository;
+        this.trackSubmissionRepository = trackSubmissionRepository;
+        this.playlistTrackRepository = playlistTrackRepository;
+        this.listeningHistoryRepository = listeningHistoryRepository;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+        this.cloudMediaService = cloudMediaService;
+        this.studioTrackMapper = studioTrackMapper;
+        this.notificationService = notificationService;
+        this.lyricService = lyricService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -101,11 +148,17 @@ public class StudioTrackService {
             }
         }
 
+        List<Long> trackIds = tracks.stream().map(Track::getId).toList();
+        java.util.Map<Long, String> lyricsMap = (lyricService != null)
+                ? lyricService.getOfficialLyricsForTracks(trackIds)
+                : java.util.Collections.emptyMap();
+
         return tracks.stream().map(track -> {
             Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
             Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
             TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+            String lyrics = lyricsMap.getOrDefault(track.getId(), track.getLyrics());
+            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
         }).toList();
     }
 
@@ -118,8 +171,11 @@ public class StudioTrackService {
         Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
+        String lyrics = (lyricService != null)
+                ? lyricService.getOfficialLyricContent(track.getId()).orElse(track.getLyrics())
+                : track.getLyrics();
 
-        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
     }
 
     /**
@@ -185,7 +241,10 @@ public class StudioTrackService {
                     .build();
 
             Track savedTrack = trackRepository.save(track);
-            return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null);
+            if (lyricService != null && request.lyrics() != null && !request.lyrics().isBlank()) {
+                lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), request.lyrics().trim(), "DRAFT", user.getId());
+            }
+            return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null, request.lyrics());
         } catch (Exception ex) {
             log.error("Failed to persist track into database for user ID {}. Purging uploaded Cloudinary media...", user.getId(), ex);
             cloudMediaService.deleteTrackAudioQuietly(audioResponse.publicId());
@@ -283,7 +342,12 @@ public class StudioTrackService {
         track.setTrackNumber(request.trackNumber());
         track.setDescription(request.description() != null ? request.description().trim() : null);
         if (request.lyrics() != null) {
-            track.setLyrics(request.lyrics().isBlank() ? null : request.lyrics().trim());
+            String cleanLyrics = request.lyrics().isBlank() ? null : request.lyrics().trim();
+            track.setLyrics(cleanLyrics);
+            if (lyricService != null) {
+                String lyricStatus = (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED) ? "PUBLISHED" : "DRAFT";
+                lyricService.saveOrUpdateOfficialLyric(track.getId(), cleanLyrics, lyricStatus, user.getId());
+            }
         }
 
         TrackSubmission savedSubmission = null;
@@ -389,7 +453,48 @@ public class StudioTrackService {
                 ? savedSubmission
                 : trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
 
-        return studioTrackMapper.toStudioTrackResponse(updatedTrack, genre, album, submissionToReturn);
+        String returnLyrics = (lyricService != null)
+                ? lyricService.getOfficialLyricContent(updatedTrack.getId()).orElse(updatedTrack.getLyrics())
+                : updatedTrack.getLyrics();
+
+        return studioTrackMapper.toStudioTrackResponse(updatedTrack, genre, album, submissionToReturn, returnLyrics);
+    }
+
+    /**
+     * Cập nhật lời bài hát (lyrics) cho bài hát của Creator (UC-18.3 & Luồng mới).
+     * Cho phép tác giả thêm hoặc cập nhật lời bài hát sau khi bài hát đã được xuất bản (PUBLISHED)
+     * hoặc đang ở trạng thái DRAFT / REJECTED mà không làm gián đoạn trạng thái phát hành công khai.
+     */
+    @Transactional
+    public StudioTrackResponse updateLyrics(Long id, String lyrics, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be modified.");
+        }
+
+        String cleanLyrics = (lyrics != null && !lyrics.isBlank()) ? lyrics.trim() : null;
+        track.setLyrics(cleanLyrics);
+        Track updatedTrack = trackRepository.save(track);
+
+        if (lyricService != null) {
+            String lyricStatus = (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED) ? "PUBLISHED" : "DRAFT";
+            lyricService.saveOrUpdateOfficialLyric(track.getId(), cleanLyrics, lyricStatus, user.getId());
+        }
+
+        TrackSubmission latestSubmission = trackSubmissionRepository
+                .findFirstByTrackIdOrderBySubmittedAtDesc(track.getId())
+                .orElse(null);
+
+        return studioTrackMapper.toStudioTrackResponse(
+                updatedTrack,
+                track.getGenre(),
+                track.getAlbum(),
+                latestSubmission,
+                cleanLyrics
+        );
     }
 
 

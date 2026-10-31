@@ -1,0 +1,74 @@
+THE APPLICATION DEVELOPMENT PROJECT TOPIC,,,,,,,,,,
+PRODUCT BACKLOG,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+Link git: https://github.com/Hekio-Kun/SoundWaveProject.git,,,,,,,,,,
+,,,,,,,,,,
+Function Name,Feature,Complexity,Planned Code Iteration,In-charge Roll Number,In-charge Full Name,Actual Code Iteration,Time: Begin,Time: Deadline,Time: Resit,Note
+Login,User Authentication,Simple,Iteration 1,CE190466,DuyLH,Iteration 1,09/10/2026,10/10/2026,11/10/2026,Done
+Register Account,User Authentication,Medium,Iteration 1,CE190466,DuyLH,Iteration 1,9/10/2026,11/10/2026,12/10/2026,Done
+Verify Email,User Authentication,Medium,Iteration 1,CE190466,DuyLH,Iteration 1,9/10/2026,11/10/2026,12/10/2026,Done
+Forgot and Reset Password,User Authentication,Medium,Iteration 1,CE190466,DuyLH,Iteration 1,9/10/2026,11/10/2026,12/10/2026,Done
+View Profile,Profile Management,Medium,Iteration 3,CE190466,DuyLH,Iteration 1,9/10/2026,11/10/2026,12/10/2026,Done
+Update Profile,Profile Management,Medium,Iteration 3,CE190466,DuyLH,Iteration 1,9/10/2026,11/10/2026,12/10/2026,Done
+Logout,User Authentication,Simple,Iteration 2,CE190466,DuyLH,Iteration 1,9/10/2026,10/10/2026,11/10/2026,Done
+Create Custom Lyric,Lyrics Interaction,Simple,Iteration 2,CE190466,DuyLH,Iteration 2,14/10/2026,20/10/2026,23/10/2026,Done
+View Synchronous Lyric Public,Lyrics Interaction,Meidum,Iteration 2,CE190466,DuyLH,Iteration 2,14/10/2026,20/10/2026,23/10/2026,Done
+Update Synchronous Lyric Public,Lyrics Interaction,Complex,Iteration 2,CE190466,DuyLH,Iteration 3,,,,
+View Custom Lyric,Lyrics Interaction,Simple,Iteration 3,CE190466,DuyLH,Iteration 3,,,,
+Update Custom Lyric,Lyrics Interaction,Medium,Iteration 3,CE190466,DuyLH,Iteration 3,,,,
+Delete Custom Lyric,Lyrics Interaction,Simple,Iteration 3,CE190466,DuyLH,Iteration 3,,,,
+View Ranking Board,Music Search & Browsing,Medium,Iteration 1,CE200338,HaoTNT,Iteration 2,15/10/2026,17/10/2026,18/10/2026,Done
+Stream Music,Audio Playback,Complex,Iteration 2,CE200338,HaoTNT,Iteration 1,9/10/2026,13/10/2026,14/10/2026,Done
+Control Playback,Audio Playback,Medium,Iteration 1,CE200338,HaoTNT,Iteration 1,10/10/2026,12/10/2026,13/10/2026,Done
+View Listening History,Music Interaction,Medium,Iteration 2,CE200338,HaoTNT,Iteration 2,14/10/2026,16/10/2026,17/10/2026,Done
+Add Track to Favorites,Music Interaction,Simple,Iteration 2,CE200338,HaoTNT,Iteration 2,15/10/2026,18/10/2026,23/10/2026,Done
+View Favorite Tracks,Music Interaction,Simple,Iteration 2,CE200338,HaoTNT,Iteration 2,15/10/2026,18/10/2026,23/10/2026,Done
+Remove Song from Favorites,Music Interaction,Simple,Iteration 2,CE200338,HaoTNT,Iteration 2,15/10/2026,18/10/2026,23/10/2026,Done
+View Staff Directory,System Administration,Medium,Iteration 2,CE200338,HaoTNT,Iteration 3,,,,
+Create Staff Account,System Administration,Medium,Iteration 2,CE200338,HaoTNT,Iteration 3,,,,
+Deactivate Staff Account,System Administration,Simple,Iteration 3,CE200338,HaoTNT,Iteration 3,,,,
+View Staff Moderation Activity,System Administration,Medium,Iteration 3,CE200338,HaoTNT,Iteration 3,,,,
+Send Account Credentials Email,System Administration,Simple,Iteration 3,CE200338,HaoTNT,Iteration 3,,,,
+Filter Public Catalog,Music Search & Browsing,Simple,Iteration 1,CE201233,TuanTA,Iteration 1,9/10/2026,10/10/2026,11/10/2026,Done
+View My Notification,Notification Management,Simple,Iteration 2,CE201233,TuanTA,Iteration 2,15/10/2026,16/10/2026,17/10/2026,Done
+Create A Playlist,Playlist Management,Medium,Iteration 2,CE201233,TuanTA,Iteration 2,10/10/2026,13/10/2026,14/10/2026,Done
+View My Playlists,Playlist Management,Medium,Iteration 2,CE201233,TuanTA,Iteration 2,10/10/2026,13/10/2026,14/10/2026,Done
+Update My Playlist,Playlist Management,Medium,Iteration 2,CE201233,TuanTA,Iteration 2,10/10/2026,13/10/2026,14/10/2026,Done
+Delete A Playlist,Playlist Management,Medium,Iteration 2,CE201233,TuanTA,Iteration 2,10/10/2026,13/10/2026,14/10/2026,Done
+Submit Track For Review ,Track Management,Simple,Iteration 1,CE201233,TuanTA,Iteration 1,22/10/2026,24/10/2026,25/10/2026,Done
+Create Track Draft,Track Management,Complex,Iteration 1,CE201233,TuanTA,Iteration 1,09/10/2026,13/10/2026,14/10/2026,Done
+View Tracks List,Track Management,Simple,Iteration 1,CE201233,TuanTA,Iteration 1,9/10/2026,13/10/2026,14/10/2026,Done
+Update Track,Track Management,Complex,Iteration 1,CE201233,TuanTA,Iteration 1,9/10/2026,13/10/2026,14/10/2026,Done
+Delete Track,Track Management,Medium,Iteration 1,CE201233,TuanTA,Iteration 1,9/10/2026,13/10/2026,14/10/2026,Done
+View Track Details,Track Management,Complex,Iteration 1,CE201233,TuanTA,Iteration 1,9/10/2026,13/10/2026,14/10/2026,Done
+Search Public Catalog,Music Search & Browsing,Medium,Iteration 1,CE201233,TuanTA,Iteration 3,,,,
+View Recommended Song,Music Search & Browsing,Medium,Iteration 3,CE201183,PhucDTT,Iteration 3,,,,
+View Rejection Reason,Track Management,Medium,Iteration 1,CE201183,PhucDTT,Iteration 1,09/10/2026,10/10/2026,11/10/2026,Done
+View Album Details,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,22/10/2026,24/10/2026,25/10/2026,Done
+Submit Album For Review,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,22/10/2026,24/10/2026,25/10/2026,Done
+Create An Album,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,9/10/2026,11/10/2026,12/10/2026,Done
+View Albums List,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,9/10/2026,11/10/2026,12/10/2026,Done
+View System Statistics,System Administration,Complex,Iteration 3,CE201183,PhucDTT,Iteration 3,,,,
+Update Albums,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,9/10/2026,11/10/2026,12/10/2026,Done
+Delete Albums,Album Management,Medium,Iteration 2,CE201183,PhucDTT,Iteration 2,9/10/2026,11/10/2026,12/10/2026,Done
+Create A Content Report,Content Reporting,Medium,Iteration 2,CE201183,PhucDTT,Iteration 3,,,,
+View Content Report,Content Reporting,Medium,Iteration 2,CE201183,PhucDTT,Iteration 3,,,,
+Update Content Report,Content Reporting,Medium,Iteration 2,CE201183,PhucDTT,Iteration 3,,,,
+Withdraw Content Report,Content Reporting,Medium,Iteration 2,CE201183,PhucDTT,Iteration 3,,,,
+View Track Moderation List,Content Moderation,Medium,Iteration 1,CE190726,TriNM,Iteration 2,14/10/2026,19/10/2026,20/10/2026,Done
+Update Track Moderation,Content Moderation,Medium,Iteration 1,CE190726,TriNM,Iteration 1,10/10/2026,14/10/2026,15/10/2026,Done
+Search Moderation Track,Content Moderation,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,14/10/2026,15/10/2026,Done
+Filter Moderation Track,Content Moderation,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,14/10/2026,15/10/2026,Done
+View Track Moderation Detail,Content Moderation,Simple,Iteration 3,CE190726,TriNM,Iteration 2,14/10/2026,19/10/2026,20/10/2026,Done
+View User Reports,Content Moderation,Simple,Iteration 2,CE190726,TriNM,Iteration 3,,,,
+Resolve Content Report,Content Moderation,Medium,Iteration 2,CE190726,TriNM,Iteration 3,,,,
+Take Down Published Track,Content Moderation,Complex,Iteration 2,CE190726,TriNM,Iteration 3,,,,
+Create A Genre,System Administration,Simple,Iteration 2,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done
+View Genres,System Administration,Simple,Iteration 2,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done
+Update A Genre,System Administration,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done
+Deactivate Genre,System Administration,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done
+Search Genre,System Administration,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done
+Filter Genre,System Administration,Simple,Iteration 3,CE190726,TriNM,Iteration 1,10/10/2026,16/10/2026,17/10/2026,Done

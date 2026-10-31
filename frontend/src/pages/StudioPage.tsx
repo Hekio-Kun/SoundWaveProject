@@ -10,7 +10,7 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { albumApi } from "../api/album";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
+import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
@@ -133,8 +133,7 @@ export function StudioPage({
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
   const [albumViewMode, setAlbumViewMode] = useState<"table" | "grid">("table");
   const [loadingAlbums, setLoadingAlbums] = useState(false);
-  const [albumModalOpen, setAlbumModalOpen] = useState(false);
-  const [editingAlbum, setEditingAlbum] = useState<StudioAlbum | null>(null);
+  const [lyricModalTrack, setLyricModalTrack] = useState<StudioTrack | null>(null);
   const [detailAlbum, setDetailAlbum] = useState<StudioAlbum | null>(null);
   const [deleteConfirmAlbum, setDeleteConfirmAlbum] = useState<StudioAlbum | null>(null);
   const [deletingAlbum, setDeletingAlbum] = useState(false);
@@ -717,19 +716,6 @@ export function StudioPage({
                         <button
                           type="button"
                           className="button button-ghost button-small"
-                          onClick={() => {
-                            setEditingAlbum(album);
-                            setAlbumModalOpen(true);
-                          }}
-                          id={`btn-edit-album-table-${album.id}`}
-                          title="Edit album metadata (UC-21.5)"
-                        >
-                          <EditIcon width={14} height={14} />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-ghost button-small"
                           onClick={() => onNavigate(`/album/submission/${album.id}`)}
                           title="View album details"
                         >
@@ -1071,6 +1057,30 @@ export function StudioPage({
                           >
                             <AlertIcon width={13} height={13} />
                             <span>Rejection feedback</span>
+                          </button>
+                        )}
+                        {/* Khi bài hát được public và chưa có lyric thì hiện nút Update Lyric, nếu có lyric rồi thì ẩn */}
+                        {(t.status === "APPROVED" || t.status === "PUBLISHED") && (!t.lyrics || !t.lyrics.trim()) && (
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={() => setLyricModalTrack(t)}
+                            id={`btn-update-lyric-table-${t.id}`}
+                            title="Update lyrics for this track"
+                            style={{
+                              backgroundColor: "#E0F2FE",
+                              color: "var(--color-ocean-primary, #0284C7)",
+                              borderColor: "#BAE6FD",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              fontWeight: 600,
+                              padding: "5px 12px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <FileTextIcon width={13} height={13} />
+                            <span>Update Lyric</span>
                           </button>
                         )}
                         <button
@@ -1457,21 +1467,6 @@ export function StudioPage({
                               <span>Submit</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingAlbum(album);
-                              setAlbumModalOpen(true);
-                            }}
-                            id={`btn-edit-album-card-${album.id}`}
-                            style={{ padding: "4px 8px" }}
-                            title="Edit album metadata (UC-21.5)"
-                          >
-                            <EditIcon width={13} height={13} />
-                            <span>Edit</span>
-                          </button>
                           <button
                             type="button"
                             className="button button-ghost button-small"
@@ -2021,15 +2016,15 @@ export function StudioPage({
         document.body
       )}
 
-      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.5 Update An Album) */}
-      <AlbumFormModal
-        open={albumModalOpen}
-        onClose={() => setAlbumModalOpen(false)}
-        album={editingAlbum}
+      {/* Update Lyric Modal (UC-18.3 & New Flow) */}
+      <UpdateLyricModal
+        open={Boolean(lyricModalTrack)}
+        track={lyricModalTrack}
+        onClose={() => setLyricModalTrack(null)}
         onSaved={async () => {
-          setAlbumModalOpen(false);
-          await Promise.all([loadAlbums(), loadStudioData()]);
-          setActionSuccess(editingAlbum ? "Album updated successfully." : "Album created successfully.");
+          setLyricModalTrack(null);
+          setActionSuccess("Lyrics updated successfully.");
+          await loadStudioData();
         }}
       />
 
@@ -2038,11 +2033,6 @@ export function StudioPage({
         open={Boolean(detailAlbum)}
         onClose={() => setDetailAlbum(null)}
         album={detailAlbum}
-        onEdit={(alb) => {
-          setDetailAlbum(null);
-          setEditingAlbum(alb);
-          setAlbumModalOpen(true);
-        }}
         onDelete={(alb) => {
           setDetailAlbum(null);
           setDeleteConfirmAlbum(alb);

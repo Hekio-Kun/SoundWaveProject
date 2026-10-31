@@ -75,6 +75,9 @@ class StudioAlbumServiceTest {
     @Mock
     private StudioTrackService studioTrackService;
 
+    @Mock
+    private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
     private StudioTrackMapper studioTrackMapper;
     private StudioAlbumMapper studioAlbumMapper;
 

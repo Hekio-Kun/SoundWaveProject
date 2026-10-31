@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
+import { lyricsApi } from "../api/lyrics";
 import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { CheckIcon, FileTextIcon, HeadphonesIcon, HeartFillIcon, HeartIcon, PauseIcon, PlayIcon, PlusIcon, UserIcon } from "../icons";
-import type { LandingTrack, Playlist } from "../types";
+import type { LandingTrack, Playlist, TrackLyricsBundle } from "../types";
 
 type Props = {
   trackId: number;
@@ -60,16 +61,26 @@ export function TrackDetailsPage({
   const [submittingAction, setSubmittingAction] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lyricsBundle, setLyricsBundle] = useState<TrackLyricsBundle | null>(null);
+  const [selectedLyricSource, setSelectedLyricSource] = useState<"OFFICIAL" | "CUSTOM">("OFFICIAL");
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
     setTrack(null);
+    setLyricsBundle(null);
+    setSelectedLyricSource("OFFICIAL");
+
     void catalogApi.getTrackById(trackId)
       .then((item) => { if (active) setTrack(item); })
       .catch(() => { if (active) setError("Track not found or unavailable."); })
       .finally(() => { if (active) setLoading(false); });
+
+    void lyricsApi.getTrackLyrics(trackId)
+      .then((bundle) => { if (active) setLyricsBundle(bundle); })
+      .catch(() => {});
+
     return () => { active = false; };
   }, [trackId]);
 
@@ -210,10 +221,74 @@ export function TrackDetailsPage({
       <div className="track-content-grid">
         <section className="track-lyrics-panel">
           <header>
-            <div><span className="track-section-icon"><FileTextIcon width={19} height={19} /></span><span><small>LYRICS</small><h2>{track.title}</h2></span></div>
-            {track.lyrics ? <span className="official-lyrics-badge"><CheckIcon width={13} height={13} /> Official</span> : null}
+            <div>
+              <span className="track-section-icon"><FileTextIcon width={19} height={19} /></span>
+              <span><small>LYRICS</small><h2>{track.title}</h2></span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {lyricsBundle?.customLyrics && lyricsBundle.customLyrics.length > 0 && (
+                <div style={{ display: "inline-flex", background: "#f1f5f9", padding: "3px", borderRadius: "8px", gap: "4px" }}>
+                  <button
+                    type="button"
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      border: "none",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: selectedLyricSource === "OFFICIAL" ? "#fff" : "transparent",
+                      color: selectedLyricSource === "OFFICIAL" ? "#0284c7" : "#64748b",
+                      boxShadow: selectedLyricSource === "OFFICIAL" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+                    }}
+                    onClick={() => setSelectedLyricSource("OFFICIAL")}
+                  >
+                    Official
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      border: "none",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: selectedLyricSource === "CUSTOM" ? "#fff" : "transparent",
+                      color: selectedLyricSource === "CUSTOM" ? "#d97706" : "#64748b",
+                      boxShadow: selectedLyricSource === "CUSTOM" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+                    }}
+                    onClick={() => setSelectedLyricSource("CUSTOM")}
+                  >
+                    Custom
+                  </button>
+                </div>
+              )}
+              {selectedLyricSource === "CUSTOM" ? (
+                <span className="official-lyrics-badge" style={{ background: "#fef3c7", color: "#b45309" }}>
+                  <CheckIcon width={13} height={13} /> Custom
+                </span>
+              ) : (lyricsBundle?.officialLyrics || track.lyrics) ? (
+                <span className="official-lyrics-badge">
+                  <CheckIcon width={13} height={13} /> Official
+                </span>
+              ) : null}
+            </div>
           </header>
-          {track.lyrics ? <pre>{track.lyrics}</pre> : <div className="track-lyrics-empty"><FileTextIcon /><strong>No lyrics available</strong><span>Official lyrics have not been provided for this track.</span></div>}
+          {(() => {
+            const displayLyrics = selectedLyricSource === "CUSTOM"
+              ? (lyricsBundle?.customLyrics?.[0]?.lyricContent || null)
+              : (lyricsBundle?.officialLyrics || track.lyrics);
+            return displayLyrics ? (
+              <pre>{displayLyrics}</pre>
+            ) : (
+              <div className="track-lyrics-empty">
+                <FileTextIcon />
+                <strong>No lyrics available</strong>
+                <span>{selectedLyricSource === "CUSTOM" ? "You have not saved any custom lyrics for this track." : "Official lyrics have not been provided for this track."}</span>
+              </div>
+            );
+          })()}
           <footer>Lyrics are displayed in plain text format.</footer>
         </section>
 

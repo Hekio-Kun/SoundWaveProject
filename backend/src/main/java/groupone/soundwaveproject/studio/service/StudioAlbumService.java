@@ -48,7 +48,6 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StudioAlbumService {
 
     private final AlbumRepository albumRepository;
@@ -62,6 +61,54 @@ public class StudioAlbumService {
     private final StudioAlbumMapper studioAlbumMapper;
     private final StudioTrackMapper studioTrackMapper;
     private final StudioTrackService studioTrackService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public StudioAlbumService(
+            AlbumRepository albumRepository,
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            UserRepository userRepository,
+            CloudMediaService cloudMediaService,
+            StudioAlbumMapper studioAlbumMapper,
+            StudioTrackMapper studioTrackMapper,
+            StudioTrackService studioTrackService
+    ) {
+        this(albumRepository, trackRepository, genreRepository, playlistTrackRepository,
+                listeningHistoryRepository, trackSubmissionRepository, userRepository,
+                cloudMediaService, studioAlbumMapper, studioTrackMapper, studioTrackService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public StudioAlbumService(
+            AlbumRepository albumRepository,
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            UserRepository userRepository,
+            CloudMediaService cloudMediaService,
+            StudioAlbumMapper studioAlbumMapper,
+            StudioTrackMapper studioTrackMapper,
+            StudioTrackService studioTrackService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.albumRepository = albumRepository;
+        this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
+        this.playlistTrackRepository = playlistTrackRepository;
+        this.listeningHistoryRepository = listeningHistoryRepository;
+        this.trackSubmissionRepository = trackSubmissionRepository;
+        this.userRepository = userRepository;
+        this.cloudMediaService = cloudMediaService;
+        this.studioAlbumMapper = studioAlbumMapper;
+        this.studioTrackMapper = studioTrackMapper;
+        this.studioTrackService = studioTrackService;
+        this.lyricService = lyricService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -254,6 +301,9 @@ public class StudioAlbumService {
 
                     Track savedTrack = trackRepository.save(track);
                     constituentTracks.add(savedTrack);
+                    if (lyricService != null && item.getLyrics() != null && !item.getLyrics().isBlank()) {
+                        lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), item.getLyrics().trim(), "DRAFT", user.getId());
+                    }
 
                     if (isSubmit) {
                         TrackSubmission submission = TrackSubmission.builder()

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi, type RejectionDetails } from "../api/track";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
@@ -79,7 +78,6 @@ export function StudioAlbumDetailPage({
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
   const [manageTracksTab, setManageTracksTab] = useState<"MANAGE" | "ADD">("MANAGE");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -522,25 +520,6 @@ export function StudioAlbumDetailPage({
 
             <button
               className="button button-ghost"
-              onClick={() => setEditModalOpen(true)}
-              id="btn-page-edit-album"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                border: "1px solid var(--sw-border, #CBD5E1)",
-                height: "40px",
-                padding: "0 14px",
-                borderRadius: "10px",
-                fontWeight: 600,
-              }}
-            >
-              <EditIcon width={15} height={15} />
-              <span>Edit details</span>
-            </button>
-
-            <button
-              className="button button-ghost"
               onClick={() => setDeleteConfirmOpen(true)}
               id="btn-page-delete-album"
               style={{
@@ -888,18 +867,6 @@ export function StudioAlbumDetailPage({
           </div>
         )}
       </section>
-
-      {/* Edit Album Info Modal */}
-      <AlbumFormModal
-        open={editModalOpen}
-        album={album}
-        onClose={() => setEditModalOpen(false)}
-        onSaved={async () => {
-          setEditModalOpen(false);
-          await fetchAlbumData();
-          setActionSuccess("Album updated successfully.");
-        }}
-      />
 
       {/* Manage Tracks Modal (Styled like Playlist track manager) */}
       <ManageAlbumTracksModal
