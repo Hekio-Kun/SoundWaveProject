@@ -2159,6 +2159,10 @@
   color: #101828;
 }
 
+.library-page .page-heading {
+  color: var(--brand, #0284c7);
+}
+
 .page-subtext {
   margin: 0;
   font-size: 14px;
