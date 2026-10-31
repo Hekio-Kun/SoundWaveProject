@@ -10,6 +10,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -75,6 +76,9 @@ class StudioAlbumServiceTest {
     @Mock
     private StudioTrackService studioTrackService;
 
+    @Mock
+    private OfficialLyricRepository officialLyricRepository;
+
     private StudioTrackMapper studioTrackMapper;
     private StudioAlbumMapper studioAlbumMapper;
 
@@ -99,7 +103,8 @@ class StudioAlbumServiceTest {
                 cloudMediaService,
                 studioAlbumMapper,
                 studioTrackMapper,
-                studioTrackService
+                studioTrackService,
+                officialLyricRepository
         );
 
         mockUser = new User("creator@soundwave.com", "hashed");

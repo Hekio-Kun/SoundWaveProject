@@ -42,20 +42,7 @@ public class LyricService {
 
         LyricDetailResponse officialResponse = officialLyricRepository.findByTrackIdAndStatus(trackId, "PUBLISHED")
                 .map(this::mapOfficialToResponse)
-                .orElseGet(() -> {
-                    if (track.getLyrics() != null && !track.getLyrics().trim().isBlank()) {
-                        return new LyricDetailResponse(
-                                null,
-                                track.getId(),
-                                track.getLyrics(),
-                                "PUBLISHED",
-                                true,
-                                "OFFICIAL",
-                                track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(ZoneOffset.UTC) : Instant.now()
-                        );
-                    }
-                    return null;
-                });
+                .orElse(null);
 
         LyricDetailResponse personalResponse = null;
         if (currentUserEmailOrNull != null && !currentUserEmailOrNull.isBlank()) {
