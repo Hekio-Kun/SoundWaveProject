@@ -19,9 +19,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Core business service handling public track catalog queries, streaming metadata resolution,
@@ -338,6 +344,135 @@ public class TrackCatalogService {
         }
 
         return filtered.stream().map(this::mapToTrackResponse).toList();
+    }
+
+    /**
+     * [UC-06]: View Recommended Song
+     * Retrieves curated recommendations for Explore Music based on popular genres and user listening context.
+     * Complies with BR-09 (only PUBLISHED tracks in active genres).
+     *
+     * Quy tắc nghiệp vụ (BR-09, NF01 Step 3c):
+     * - c. Recommended Tracks: Algorithmic selections based on popular genres.
+     * - Lọc tất cả bài hát PUBLISHED và thuộc thể loại âm nhạc đang ACTIVE.
+     * - Nếu người nghe đã đăng nhập và có lịch sử nghe nhạc, ưu tiên các thể loại người nghe yêu thích / tương tác nhiều nhất.
+     * - Nếu là khách vãng lai hoặc chưa có lịch sử, thuật toán lựa chọn bài hát nổi bật đan xen theo các thể loại phổ biến nhất (popular genres)
+     *   để tạo danh sách khám phá phong phú và chất lượng cao.
+     *
+     * @param userEmail Email của người dùng (nullable nếu là Guest).
+     * @param limit Số lượng bài hát gợi ý tối đa (1-50, mặc định 10).
+     * @return Danh sách bài hát gợi ý {@link TrackResponse}.
+     */
+    @Transactional(readOnly = true)
+    public List<TrackResponse> getCuratedRecommendations(String userEmail, int limit) {
+        int maxLimit = Math.max(1, Math.min(limit, 50));
+
+        // 1. Lấy toàn bộ bài hát PUBLISHED có thể loại đang active (BR-09)
+        List<Track> allPublished = trackRepository.findAll().stream()
+                .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
+                .filter(t -> t.getGenre() != null && Boolean.TRUE.equals(t.getGenre().getIsActive()))
+                .toList();
+
+        if (allPublished.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. Xác định danh sách thể loại ưu tiên nếu người dùng đã đăng nhập (AF02)
+        Set<Long> preferredGenreIds = new LinkedHashSet<>();
+        if (userEmail != null && !userEmail.isBlank()) {
+            Optional<Long> userIdOpt = userAccountPublicService.findUserIdByEmail(userEmail);
+            if (userIdOpt.isPresent()) {
+                Long userId = userIdOpt.get();
+                if (listeningHistoryPublicService != null) {
+                    try {
+                        List<Long> listenedTrackIds = listeningHistoryPublicService.getRecentListenedTrackIds(userId, 50);
+                        if (listenedTrackIds != null && !listenedTrackIds.isEmpty()) {
+                            for (Track t : allPublished) {
+                                if (listenedTrackIds.contains(t.getId()) && t.getGenre() != null) {
+                                    preferredGenreIds.add(t.getGenre().getId());
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not retrieve personalized genres from history: {}", e.getMessage());
+                    }
+                }
+            }
+        }
+
+        // 3. Tính toán các thể loại phổ biến nhất trên hệ thống theo tổng lượt nghe (popular genres)
+        Map<Long, Long> genrePlayCounts = new HashMap<>();
+        for (Track t : allPublished) {
+            if (t.getGenre() != null) {
+                long plays = t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L;
+                genrePlayCounts.merge(t.getGenre().getId(), plays, Long::sum);
+            }
+        }
+
+        List<Long> rankedGenreIds = genrePlayCounts.entrySet().stream()
+                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .toList();
+
+        // 4. Hợp nhất thứ tự ưu tiên thể loại: [Thể loại nghe gần đây] -> [Thể loại phổ biến trên hệ thống]
+        List<Long> targetGenreOrder = new ArrayList<>(preferredGenreIds);
+        for (Long gid : rankedGenreIds) {
+            if (!targetGenreOrder.contains(gid)) {
+                targetGenreOrder.add(gid);
+            }
+        }
+
+        // 5. Gom nhóm các bài hát theo genre và sắp xếp trong từng thể loại theo lượt nghe & thời gian tạo
+        Map<Long, List<Track>> tracksByGenre = new HashMap<>();
+        for (Track t : allPublished) {
+            if (t.getGenre() != null) {
+                tracksByGenre.computeIfAbsent(t.getGenre().getId(), k -> new ArrayList<>()).add(t);
+            }
+        }
+        for (List<Track> list : tracksByGenre.values()) {
+            list.sort(Comparator
+                    .comparing((Track t) -> t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L, Comparator.reverseOrder())
+                    .thenComparing(Track::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
+
+        // 6. Thuật toán lựa chọn đan xen (Round-robin selection across popular/preferred genres)
+        List<Track> resultTracks = new ArrayList<>();
+        Set<Long> chosenTrackIds = new HashSet<>();
+        boolean addedAny = true;
+        int round = 0;
+
+        while (resultTracks.size() < maxLimit && addedAny) {
+            addedAny = false;
+            for (Long gid : targetGenreOrder) {
+                List<Track> genreTracks = tracksByGenre.get(gid);
+                if (genreTracks != null && round < genreTracks.size()) {
+                    Track candidate = genreTracks.get(round);
+                    if (chosenTrackIds.add(candidate.getId())) {
+                        resultTracks.add(candidate);
+                        addedAny = true;
+                        if (resultTracks.size() >= maxLimit) {
+                            break;
+                        }
+                    }
+                }
+            }
+            round++;
+        }
+
+        // 7. Nếu chưa đủ số lượng yêu cầu (do ít thể loại), bổ sung các bài hát có lượt nghe cao nhất còn lại
+        if (resultTracks.size() < maxLimit) {
+            List<Track> remaining = allPublished.stream()
+                    .filter(t -> !chosenTrackIds.contains(t.getId()))
+                    .sorted(Comparator.comparing((Track t) -> t.getPlayCountCache() != null ? t.getPlayCountCache() : 0L).reversed())
+                    .toList();
+            for (Track t : remaining) {
+                if (resultTracks.size() >= maxLimit) break;
+                if (chosenTrackIds.add(t.getId())) {
+                    resultTracks.add(t);
+                }
+            }
+        }
+
+        return resultTracks.stream().map(this::mapToTrackResponse).toList();
     }
 
     /**

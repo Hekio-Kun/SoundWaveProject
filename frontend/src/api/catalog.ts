@@ -70,6 +70,16 @@ export const catalogApi = {
     return apiFetch<LandingTrack[]>(`/tracks/${idOrSlug}/recommendations?limit=${limit}`);
   },
 
+  getCuratedRecommendations: async (limit = 10): Promise<LandingTrack[]> => {
+    try {
+      return await apiFetch<LandingTrack[]>(`/tracks/recommendations?limit=${limit}`);
+    } catch {
+      // Graceful fallback to trending catalog tracks if endpoint unavailable
+      const fallbackRes = await apiFetch<PageResponse<LandingTrack>>(`/tracks?sort=trending&page=0&size=${limit}`);
+      return fallbackRes?.content ?? [];
+    }
+  },
+
   getAlbums: async (params?: {
     search?: string;
     sort?: "newest" | "title" | "tracks" | "oldest";

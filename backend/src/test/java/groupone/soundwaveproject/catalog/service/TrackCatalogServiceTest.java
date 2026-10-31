@@ -316,5 +316,32 @@ class TrackCatalogServiceTest {
         assertEquals(2, result.getTotalElements());
         assertEquals(2, result.getContent().size());
     }
+
+    @Test
+    void getCuratedRecommendations_GuestUser_ReturnsCuratedMixOfPublishedTracks() {
+        Track t1 = createMockTrack(1L, "track-1", TrackPublicationStatus.PUBLISHED);
+        Track t2 = createMockTrack(2L, "track-2", TrackPublicationStatus.PUBLISHED);
+        ReflectionTestUtils.setField(t1, "playCountCache", 100L);
+        ReflectionTestUtils.setField(t2, "playCountCache", 50L);
+
+        when(trackRepository.findAll()).thenReturn(java.util.List.of(t1, t2));
+        when(userAccountPublicService.findUserSummaryById(anyLong())).thenReturn(Optional.empty());
+
+        java.util.List<TrackResponse> recommendations = trackCatalogService.getCuratedRecommendations(null, 5);
+
+        assertNotNull(recommendations);
+        assertEquals(2, recommendations.size());
+        assertEquals(1L, recommendations.get(0).id());
+    }
+
+    @Test
+    void getCuratedRecommendations_EmptyCatalog_ReturnsEmptyList() {
+        when(trackRepository.findAll()).thenReturn(java.util.List.of());
+
+        java.util.List<TrackResponse> recommendations = trackCatalogService.getCuratedRecommendations(null, 5);
+
+        assertNotNull(recommendations);
+        assertTrue(recommendations.isEmpty());
+    }
 }
 
