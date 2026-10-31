@@ -271,6 +271,7 @@ export function AppRouter(): React.ReactElement | null {
         playlists={playlists}
         onAddToPlaylist={addTrackToPlaylist}
         canManageLibrary={user?.role === "LISTENER"}
+        audio={audio}
       />
     );
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
 import { lyricsApi } from "../api/lyrics";
@@ -16,9 +16,11 @@ import {
   HeadphonesIcon,
   HeartFillIcon,
   HeartIcon,
+  MusicIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  RefreshIcon,
   TrashIcon,
   UserIcon,
 } from "../icons";
@@ -35,6 +37,7 @@ type Props = {
   playlists: Playlist[];
   onAddToPlaylist: (playlistId: number, trackId: number) => Promise<void>;
   canManageLibrary: boolean;
+  audio?: HTMLAudioElement;
 };
 
 const formatPlays = (value: number) =>
@@ -65,6 +68,7 @@ export function TrackDetailsPage({
   playlists,
   onAddToPlaylist,
   canManageLibrary,
+  audio,
 }: Props) {
   const [track, setTrack] = useState<LandingTrack | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,12 +85,20 @@ export function TrackDetailsPage({
   // Dual-Tier Lyrics State (UC-16 & UC-18)
   const [lyricsBundle, setLyricsBundle] = useState<TrackLyricsBundle | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(true);
+  const [lyricsError, setLyricsError] = useState(false);
   const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [personalEditorOpen, setPersonalEditorOpen] = useState(false);
   const [personalContent, setPersonalContent] = useState("");
   const [personalSaving, setPersonalSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+
+  // Synchronous Playback Tracking (UC-16.1)
+  const [currentTime, setCurrentTime] = useState(0);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
 
   // Center Notification State
   const [notification, setNotification] = useState<{
@@ -116,14 +128,15 @@ export function TrackDetailsPage({
     };
   }, [trackId]);
 
-  // Load lyrics bundle
+  // Load lyrics bundle (UC-16.1 & UC-18)
   const loadTrackLyrics = async () => {
     setLyricsLoading(true);
+    setLyricsError(false);
     try {
       const bundle = await lyricsApi.getTrackLyrics(trackId);
       setLyricsBundle(bundle);
     } catch {
-      // ignore, fall back to null
+      setLyricsError(true);
       setLyricsBundle(null);
     } finally {
       setLyricsLoading(false);
@@ -133,6 +146,18 @@ export function TrackDetailsPage({
   useEffect(() => {
     void loadTrackLyrics();
   }, [trackId]);
+
+  // Track real-time playback position from audio element
+  useEffect(() => {
+    if (!audio) return;
+    const handleTimeUpdate = () => {
+      if (currentTrack?.id === trackId) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [audio, currentTrack?.id, trackId]);
 
   useEffect(() => {
     let active = true;
@@ -281,6 +306,76 @@ export function TrackDetailsPage({
     }
   };
 
+  // Active lyric resolution
+  const officialLyricContent = lyricsBundle?.officialLyric?.lyricContent ?? track?.lyrics ?? null;
+  const personalLyricContent = lyricsBundle?.userPersonalLyric?.lyricContent ?? null;
+  const activeLyricContent = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
+
+  // Parse lines using standard LRC parser (EX01: safe fallback on malformed syntax)
+  const parsedActiveLines = useMemo(() => {
+    if (!activeLyricContent) return [];
+    try {
+      return parseLyricsToLines(activeLyricContent);
+    } catch {
+      return [];
+    }
+  }, [activeLyricContent]);
+
+  const hasTimestamps = useMemo(
+    () => parsedActiveLines.some((l) => l.timeSec !== null),
+    [parsedActiveLines]
+  );
+
+  // Compute active line index for real-time highlighting (UC-16.1 NF01 Step 4)
+  const isPlayingThisTrack = currentTrack?.id === track?.id;
+  const activeLineIndex = useMemo(() => {
+    if (!hasTimestamps || parsedActiveLines.length === 0 || !isPlayingThisTrack) return -1;
+    let idx = -1;
+    for (let i = 0; i < parsedActiveLines.length; i++) {
+      const lineTime = parsedActiveLines[i].timeSec;
+      if (lineTime !== null && currentTime >= lineTime) {
+        idx = i;
+      }
+    }
+    return idx;
+  }, [parsedActiveLines, currentTime, hasTimestamps, isPlayingThisTrack]);
+
+  // Auto-scroll active line into center view
+  useEffect(() => {
+    if (activeLineRef.current && !isUserScrollingRef.current) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex]);
+
+  const handleLyricsScroll = () => {
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 2500);
+  };
+
+  // Click-to-seek (UC-16.1 NF01 Step 6)
+  const handleLineClick = (timeSec: number | null) => {
+    if (timeSec === null) return;
+    if (isPlayingThisTrack && audio) {
+      audio.currentTime = Math.max(0, timeSec);
+      if (!playing) {
+        void audio.play().catch(() => {});
+      }
+    } else if (track) {
+      onPlayTrack(track);
+      setTimeout(() => {
+        if (audio) {
+          audio.currentTime = Math.max(0, timeSec);
+        }
+      }, 150);
+    }
+  };
+
   if (loading) {
     return (
       <div className="track-details-state" role="status">
@@ -302,19 +397,10 @@ export function TrackDetailsPage({
     );
   }
 
-  const isPlayingThis = currentTrack?.id === track.id && playing;
+  const isPlayingThis = isPlayingThisTrack && playing;
   const creatorId = track.creator?.userId;
   const genreLabel = track.genreName ?? track.genreSlug ?? "Uncategorized";
   const publicationLabel = track.publicationStatus === "PUBLISHED" ? "Published" : track.publicationStatus ?? "Published";
-
-  // Official lyric resolution (from bundle or track fallback)
-  const officialLyricContent = lyricsBundle?.officialLyric?.lyricContent ?? track.lyrics ?? null;
-  const personalLyricContent = lyricsBundle?.userPersonalLyric?.lyricContent ?? null;
-
-  // Active lyric content based on selected tab
-  const activeLyricContent = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
-  const parsedActiveLines = activeLyricContent ? parseLyricsToLines(activeLyricContent) : [];
-  const hasTimestamps = parsedActiveLines.some((l) => l.timeSec !== null);
 
   return (
     <div className="track-page-v2">
@@ -429,7 +515,7 @@ export function TrackDetailsPage({
       </section>
 
       <div className="track-content-grid">
-        {/* Dual-Tier Lyrics Panel (UC-16 & UC-18) */}
+        {/* Dual-Tier Synchronous Lyrics Panel (UC-16.1 & UC-18) */}
         <section className="track-lyrics-panel" aria-label="Lyrics Section">
           <header>
             <div>
@@ -441,11 +527,31 @@ export function TrackDetailsPage({
                 <h2>{track.title}</h2>
               </span>
             </div>
-            {officialLyricContent && lyricsTab === "OFFICIAL" ? (
-              <span className="official-lyrics-badge">
-                <CheckIcon width={13} height={13} /> Verified Official
-              </span>
-            ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {isPlayingThisTrack && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 9px",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: "rgba(2, 132, 199, 0.12)",
+                    color: "#0284c7",
+                  }}
+                >
+                  <MusicIcon width={13} height={13} />
+                  <span>Now Playing</span>
+                </span>
+              )}
+              {officialLyricContent && lyricsTab === "OFFICIAL" ? (
+                <span className="official-lyrics-badge">
+                  <CheckIcon width={13} height={13} /> Verified Official
+                </span>
+              ) : null}
+            </div>
           </header>
 
           {/* Dual-Tab Navigation Bar */}
@@ -509,24 +615,60 @@ export function TrackDetailsPage({
               <span className="track-details-spinner" aria-hidden="true" />
               <p>Loading lyrics...</p>
             </div>
+          ) : lyricsError ? (
+            /* EX02: Network / Loading Exception */
+            <div className="track-lyrics-empty">
+              <AlertIcon width={32} height={32} />
+              <strong>Unable to load lyrics</strong>
+              <span>A network issue prevented loading the lyric data.</span>
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ marginTop: 10 }}
+                onClick={() => void loadTrackLyrics()}
+              >
+                <RefreshIcon width={13} height={13} />
+                <span>Retry</span>
+              </button>
+            </div>
           ) : lyricsTab === "OFFICIAL" ? (
             /* Tab 1: Official Lyrics */
             officialLyricContent ? (
               hasTimestamps ? (
-                <div className="track-lyrics-synced-list">
-                  {parsedActiveLines.map((line) => (
-                    <div key={line.id} className="track-lyrics-synced-item">
-                      {line.timeSec !== null ? (
-                        <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
-                      ) : null}
-                      <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
-                    </div>
-                  ))}
+                /* NF01: Real-time Synchronized Scrolling Karaoke Lines with Click-to-seek */
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
+                    return (
+                      <div
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        title={
+                          line.timeSec !== null
+                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
+                      >
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
+                /* AF02: Plain text lyrics */
                 <pre>{officialLyricContent}</pre>
               )
             ) : (
+              /* AF01: Empty state when track has no official lyrics */
               <div className="track-lyrics-empty">
                 <FileTextIcon width={32} height={32} />
                 <strong>No official lyrics available</strong>
@@ -566,15 +708,32 @@ export function TrackDetailsPage({
               </div>
             ) : personalLyricContent ? (
               hasTimestamps ? (
-                <div className="track-lyrics-synced-list">
-                  {parsedActiveLines.map((line) => (
-                    <div key={line.id} className="track-lyrics-synced-item">
-                      {line.timeSec !== null ? (
-                        <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
-                      ) : null}
-                      <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
-                    </div>
-                  ))}
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
+                    return (
+                      <div
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        title={
+                          line.timeSec !== null
+                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
+                      >
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <pre>{personalLyricContent}</pre>
@@ -601,11 +760,9 @@ export function TrackDetailsPage({
           )}
 
           <footer>
-            {lyricsTab === "OFFICIAL"
-              ? hasTimestamps
-                ? "Time-synced official lyrics format (.lrc)"
-                : "Lyrics are displayed in plain text format."
-              : "Personal lyrics are saved privately to your Listener account."}
+            {hasTimestamps
+              ? "Time-synced lyrics (.lrc). Click any line to seek audio playback (Click-to-seek)."
+              : "Lyrics are displayed in plain text format."}
           </footer>
         </section>
 
