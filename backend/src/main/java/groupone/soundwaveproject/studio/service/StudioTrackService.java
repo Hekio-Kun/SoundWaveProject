@@ -425,15 +425,10 @@ public class StudioTrackService {
             boolean oldAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     oldAlbum.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (oldAlbumHasPublished) {
-                oldAlbum.setStatus("PUBLISHED");
-            } else {
-                boolean oldAlbumHasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(
-                        oldAlbum.getId(), TrackPublicationStatus.PENDING
-                );
-                oldAlbum.setStatus(oldAlbumHasPending ? "PENDING" : "DRAFT");
+            if (!oldAlbumHasPublished) {
+                oldAlbum.setStatus("DRAFT");
+                albumRepository.save(oldAlbum);
             }
-            albumRepository.save(oldAlbum);
         }
 
         // Kiểm tra và cập nhật album mới (nếu chuyển album)
@@ -441,15 +436,10 @@ public class StudioTrackService {
             boolean currentAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (currentAlbumHasPublished) {
-                album.setStatus("PUBLISHED");
-            } else {
-                boolean currentAlbumHasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(
-                        album.getId(), TrackPublicationStatus.PENDING
-                );
-                album.setStatus(currentAlbumHasPending ? "PENDING" : "DRAFT");
+            if (!currentAlbumHasPublished && !"DRAFT".equalsIgnoreCase(album.getStatus())) {
+                album.setStatus("DRAFT");
+                albumRepository.save(album);
             }
-            albumRepository.save(album);
         }
 
         // Lấy thông tin bản ghi nộp duyệt mới nhất để phản hồi cho UI (POST-5)
@@ -524,20 +514,15 @@ public class StudioTrackService {
             trackRepository.delete(track);
         }
 
-        // POST-4 & AF02: Đánh giá các bài hát còn lại trong Album
+        // POST-4 & AF02: Đánh giá các bài hát còn lại trong Album, hạ cấp về DRAFT nếu không còn bài hát PUBLISHED nào
         if (album != null) {
             boolean hasPublishedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (hasPublishedTrack) {
-                album.setStatus("PUBLISHED");
-            } else {
-                boolean hasPendingTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
-                        album.getId(), TrackPublicationStatus.PENDING
-                );
-                album.setStatus(hasPendingTrack ? "PENDING" : "DRAFT");
+            if (!hasPublishedTrack) {
+                album.setStatus("DRAFT");
+                albumRepository.save(album);
             }
-            albumRepository.save(album);
         }
     }
 

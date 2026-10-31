@@ -317,7 +317,7 @@ public class ModerationService {
         track.setLatestRejectionReason(null);
 
         Album album = track.getAlbum();
-        if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
+        if (album != null && "DRAFT".equalsIgnoreCase(album.getStatus())) {
             album.setStatus("PUBLISHED");
             album.setPublishedAt(nowUtc);
             albumRepository.save(album);
@@ -376,19 +376,6 @@ public class ModerationService {
         track.setPublicationStatus(TrackPublicationStatus.REJECTED);
         track.setLatestRejectionReason(rejectionReason);
         trackRepository.save(track);
-
-        Album album = track.getAlbum();
-        if (album != null) {
-            boolean hasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PUBLISHED);
-            boolean hasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PENDING);
-            if (!hasPublished && !hasPending) {
-                boolean hasRejected = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.REJECTED);
-                if (hasRejected) {
-                    album.setStatus("REJECTED");
-                    albumRepository.save(album);
-                }
-            }
-        }
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
