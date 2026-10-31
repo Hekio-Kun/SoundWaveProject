@@ -282,7 +282,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
 
   const handleSaveDraft = async (e?: FormEvent) => {
     if (e) e.preventDefault();
-    await processUpload(false);
+    await processUpload(false, undefined, true);
   };
 
   const handleStartSubmitReview = (e?: FormEvent) => {
