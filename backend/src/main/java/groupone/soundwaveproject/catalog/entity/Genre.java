@@ -52,7 +52,7 @@ public class Genre {
     }
 
     /**
-     * Kiểm tra thể loại có đang ở trạng thái hoạt động hay không (UC-26: Manage Genres).
+     * Kiểm tra thể loại có đang ở trạng thái hoạt động hay không.
      *
      * @return true nếu thể loại đang kích hoạt, ngược lại false
      */
@@ -61,7 +61,7 @@ public class Genre {
     }
 
     /**
-     * Cập nhật thông tin cơ bản của thể loại nhạc (UC-26.3 Update Genre).
+     * Cập nhật thông tin cơ bản của thể loại nhạc.
      *
      * @param name        Tên mới của thể loại
      * @param slug        Đường dẫn thân thiện (slug) mới của thể loại
@@ -76,7 +76,7 @@ public class Genre {
     }
 
     /**
-     * Thay đổi trạng thái kích hoạt / vô hiệu hóa của thể loại nhạc (UC-26.4 / BR-23 Update Genre Status).
+     * Thay đổi trạng thái kích hoạt / vô hiệu hóa của thể loại nhạc.
      *
      * @param active    Trạng thái mới (true: kích hoạt, false: vô hiệu hóa)
      * @param updatedAt Thời điểm cập nhật

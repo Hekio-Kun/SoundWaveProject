@@ -6,8 +6,6 @@ import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmation
 import { GenreFormModal } from "../components/modals/GenreFormModal";
 import { AlertIcon, CloseIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
 
-type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
-
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -16,7 +14,6 @@ export function AdminGenreManagementPage() {
   const [genrePage, setGenrePage] = useState<AdminGenrePage | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,7 +38,6 @@ export function AdminGenreManagementPage() {
     try {
       const result = await adminGenreApi.getGenres({
         search,
-        active: statusFilter === "ALL" ? undefined : statusFilter === "ACTIVE",
         page,
         size: 10,
       });
@@ -78,7 +74,7 @@ export function AdminGenreManagementPage() {
 
   useEffect(() => {
     void loadGenres();
-  }, [search, statusFilter, page]);
+  }, [search, page]);
 
   const openCreateForm = () => {
     setEditingGenre(null);
@@ -183,11 +179,6 @@ export function AdminGenreManagementPage() {
               <span>Search</span>
             </button>
           </form>
-          <div className="admin-genre-filters" role="group" aria-label="Filter genres by status">
-            {(["ALL", "ACTIVE", "INACTIVE"] as StatusFilter[]).map((status) => (
-              <button key={status} type="button" className={statusFilter === status ? "is-active" : ""} aria-pressed={statusFilter === status} onClick={() => { setStatusFilter(status); setPage(0); }}>{status.charAt(0) + status.slice(1).toLowerCase()}</button>
-            ))}
-          </div>
           <span className="admin-genre-total">{totalGenres} {totalGenres === 1 ? "genre" : "genres"}</span>
         </div>
 
@@ -196,7 +187,7 @@ export function AdminGenreManagementPage() {
         ) : error ? (
           <div className="staff-state-banner is-error" role="alert"><AlertIcon width={30} height={30} /><b>Unable to load genre management</b><p>{error}</p><button type="button" className="button button-primary button-small" onClick={() => void loadGenres()}><RefreshIcon width={15} height={15} />Retry</button></div>
         ) : !genrePage || genrePage.content.length === 0 ? (
-          <div className="staff-empty-box"><DiscIcon width={38} height={38} /><h2>No genres found</h2><p>{search || statusFilter !== "ALL" ? "Try changing the search or status filter." : "Create the first genre for the public catalog."}</p>{!search && statusFilter === "ALL" ? <button type="button" className="button button-primary" onClick={openCreateForm}>Create genre</button> : null}</div>
+          <div className="staff-empty-box"><DiscIcon width={38} height={38} /><h2>No genres found</h2><p>{search ? "Try changing the search query." : "Create the first genre for the public catalog."}</p>{!search ? <button type="button" className="button button-primary" onClick={openCreateForm}>Create genre</button> : null}</div>
         ) : (
           <>
             <div className="ops-table-wrap">
@@ -256,4 +247,3 @@ export function AdminGenreManagementPage() {
     </div>
   );
 }
-

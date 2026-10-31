@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTO chứa thông tin yêu cầu tạo mới thể loại âm nhạc (UC-26.1 Create Genre).
+ * DTO chứa thông tin yêu cầu tạo mới thể loại âm nhạc.
  *
  * @param name        Tên thể loại âm nhạc (bắt buộc, tối đa 100 ký tự)
  * @param slug        Đường dẫn thân thiện (slug) của thể loại (tùy chọn, tối đa 100 ký tự)

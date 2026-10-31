@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Controller cung cấp API lấy danh mục thể loại công khai (UC-8 Phase 1).
+ * Controller cung cấp API lấy danh mục thể loại công khai.
  */
 @Slf4j
 @RestController

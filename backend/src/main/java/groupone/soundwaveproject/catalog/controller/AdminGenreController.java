@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 
 /**
- * Controller tiếp nhận và xử lý các yêu cầu HTTP quản trị thể loại âm nhạc dành cho Admin (UC-26: Manage Genres).
- * Phân quyền yêu cầu vai trò ADMIN (BR-20).
+ * Controller tiếp nhận và xử lý các yêu cầu HTTP quản trị thể loại âm nhạc dành cho Admin.
+ * Phân quyền yêu cầu vai trò ADMIN.
  */
 @RestController
 @RequestMapping("/api/v1/admin/genres")
@@ -31,23 +31,21 @@ public class AdminGenreController {
     private final GenreService genreService;
 
     /**
-     * Lấy danh sách thể loại có tìm kiếm, lọc theo trạng thái và phân trang (UC-26 View Genres).
+     * Lấy danh sách thể loại có tìm kiếm và phân trang.
      *
      * @param search   Từ khóa tìm kiếm theo tên hoặc slug thể loại
-     * @param active   Bộ lọc trạng thái kích hoạt (true/false, hoặc để trống để lấy tất cả)
      * @param pageable Thông tin phân trang và sắp xếp (mặc định sắp xếp theo tên tăng dần)
      * @return Phản hồi chứa danh sách phân trang các thể loại
      */
     @GetMapping
     public ResponseEntity<AdminGenrePageResponse> getGenres(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Boolean active,
             @PageableDefault(sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(genreService.getGenres(search, active, pageable));
+        return ResponseEntity.ok(genreService.getGenres(search, pageable));
     }
 
     /**
-     * Lấy thông tin chi tiết một thể loại theo ID (UC-26 View Genre Detail).
+     * Lấy thông tin chi tiết một thể loại theo ID.
      *
      * @param id ID của thể loại cần xem
      * @return DTO chi tiết thể loại
@@ -58,7 +56,7 @@ public class AdminGenreController {
     }
 
     /**
-     * Tạo mới một thể loại âm nhạc (UC-26.1 Create Genre).
+     * Tạo mới một thể loại âm nhạc.
      *
      * @param request   Dữ liệu tạo thể loại bao gồm tên, slug và mô tả
      * @param principal Thông tin tài khoản Admin đang thực hiện thao tác
@@ -73,7 +71,7 @@ public class AdminGenreController {
     }
 
     /**
-     * Cập nhật thông tin thể loại âm nhạc (UC-26.3 Update Genre).
+     * Cập nhật thông tin thể loại âm nhạc.
      *
      * @param id      ID của thể loại cần cập nhật
      * @param request Dữ liệu cập nhật mới
@@ -87,7 +85,7 @@ public class AdminGenreController {
     }
 
     /**
-     * Thay đổi trạng thái kích hoạt hoặc vô hiệu hóa của một thể loại (UC-26.4 / BR-23 Update Genre Status).
+     * Thay đổi trạng thái kích hoạt hoặc vô hiệu hóa của một thể loại.
      *
      * @param id      ID của thể loại cần đổi trạng thái
      * @param request DTO chứa trạng thái kích hoạt mới
