@@ -1247,7 +1247,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                 <FileTextIcon width={20} height={20} />
                 <div>
                   <b>Save as Draft or Submit for Review</b>
-                  <p>You can keep the album and all tracks as private drafts, or submit directly to staff for moderation review.</p>
+                  <p>Save your album and tracks as a draft. You can submit it for review from your My Albums page whenever you are ready.</p>
                 </div>
               </section>
             </aside>
