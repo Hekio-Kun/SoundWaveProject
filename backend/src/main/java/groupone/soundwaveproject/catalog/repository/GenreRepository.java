@@ -13,7 +13,7 @@ import java.util.Optional;
 
 /**
  * Repository interface for music genres (genres table).
- * Serves public catalog browsing [UC-8] and Admin genre management [UC-26: Manage Genres].
+ * Serves public catalog browsing and Admin genre management.
  */
 public interface GenreRepository extends JpaRepository<Genre, Long> {
     Optional<Genre> findBySlug(String slug);
@@ -45,7 +45,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     Optional<Genre> findBySlugIgnoreCaseAndIsActiveTrue(String slug);
 
     /**
-     * Checks if a genre name exists case-insensitively (EX01).
+     * Checks if a genre name exists case-insensitively.
      *
      * @param name Genre name to check
      * @return true if the name already exists
@@ -53,7 +53,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     boolean existsByNameIgnoreCase(String name);
 
     /**
-     * Checks if a genre slug exists case-insensitively (EX01).
+     * Checks if a genre slug exists case-insensitively.
      *
      * @param slug Genre slug to check
      * @return true if the slug already exists
@@ -61,7 +61,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     boolean existsBySlugIgnoreCase(String slug);
 
     /**
-     * Checks if a genre name exists for another record excluding the given ID (EX01).
+     * Checks if a genre name exists for another record excluding the given ID.
      *
      * @param name Genre name to check
      * @param id   ID of the genre being updated
@@ -70,7 +70,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
     /**
-     * Checks if a genre slug exists for another record excluding the given ID (EX01).
+     * Checks if a genre slug exists for another record excluding the given ID.
      *
      * @param slug Genre slug to check
      * @param id   ID of the genre being updated
@@ -79,7 +79,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id);
 
     /**
-     * Filters genres by active status with pagination (UC-26).
+     * Filters genres by active status with pagination.
      *
      * @param active   Active status (true or false)
      * @param pageable Pagination and sorting configuration
@@ -88,7 +88,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     Page<Genre> findByIsActive(Boolean active, Pageable pageable);
 
     /**
-     * Searches genres matching keyword in name or slug with pagination (UC-26).
+     * Searches genres matching keyword in name or slug with pagination.
      *
      * @param search   Search keyword
      * @param pageable Pagination and sorting configuration
@@ -98,7 +98,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     Page<Genre> searchByKeyword(@Param("search") String search, Pageable pageable);
 
     /**
-     * Searches genres matching both active status and keyword with pagination (UC-26).
+     * Searches genres matching both active status and keyword with pagination.
      *
      * @param active   Active status
      * @param search   Search keyword
@@ -109,22 +109,17 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     Page<Genre> searchByActiveAndKeyword(@Param("active") Boolean active, @Param("search") String search, Pageable pageable);
 
     /**
-     * Dispatches search and pagination queries optimized for database execution (UC-26: Manage Genres).
+     * Dispatches search and pagination queries optimized for database execution.
      *
      * @param search   Search keyword (nullable)
-     * @param active   Active status filter (nullable for ALL)
      * @param pageable Pagination and sorting configuration
      * @return Page of administrator genres
      */
-    default Page<Genre> searchForAdmin(String search, Boolean active, Pageable pageable) {
+    default Page<Genre> searchForAdmin(String search, Pageable pageable) {
         boolean hasSearch = search != null && !search.trim().isBlank();
         String keyword = hasSearch ? search.trim().toLowerCase(Locale.ROOT) : null;
-        if (hasSearch && active != null) {
-            return searchByActiveAndKeyword(active, keyword, pageable);
-        } else if (hasSearch) {
+        if (hasSearch) {
             return searchByKeyword(keyword, pageable);
-        } else if (active != null) {
-            return findByIsActive(active, pageable);
         } else {
             return findAll(pageable);
         }

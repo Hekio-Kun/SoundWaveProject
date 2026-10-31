@@ -57,15 +57,15 @@ class GenreServiceTest {
     }
 
     @Test
-    void getGenres_searchAndFilter_returnsAdminGenrePageResponse() {
+    void getGenres_searchKeyword_returnsAdminGenrePageResponse() {
         Genre genre = new Genre("Rock", "rock", "Rock music", 1L);
         ReflectionTestUtils.setField(genre, "id", 10L);
 
         PageRequest pageRequest = PageRequest.of(0, 10);
-        when(genreRepository.searchForAdmin("rock", true, pageRequest))
+        when(genreRepository.searchForAdmin("rock", pageRequest))
                 .thenReturn(new PageImpl<>(List.of(genre), pageRequest, 1));
 
-        AdminGenrePageResponse response = genreService.getGenres("rock", true, pageRequest);
+        AdminGenrePageResponse response = genreService.getGenres("rock", pageRequest);
 
         assertEquals(1, response.totalElements());
         assertEquals(1, response.content().size());

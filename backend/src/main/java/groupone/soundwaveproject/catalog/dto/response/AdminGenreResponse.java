@@ -3,7 +3,7 @@ package groupone.soundwaveproject.catalog.dto.response;
 import java.time.LocalDateTime;
 
 /**
- * DTO phản hồi thông tin chi tiết một thể loại âm nhạc cho giao diện quản trị Admin (UC-26: Manage Genres).
+ * DTO phản hồi thông tin chi tiết một thể loại âm nhạc cho giao diện quản trị Admin.
  *
  * @param id              ID định danh của thể loại
  * @param name            Tên thể loại âm nhạc

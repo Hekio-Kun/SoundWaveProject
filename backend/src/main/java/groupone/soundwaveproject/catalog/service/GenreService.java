@@ -28,7 +28,7 @@ import java.util.Optional;
 
 /**
  * Service for handling business logic related to music genres (Genre).
- * Covers public catalog queries for listeners (UC-8) and administrator management (UC-26: Manage Genres).
+ * Covers public catalog queries for listeners and administrator management.
  */
 @Slf4j
 @Service
@@ -39,7 +39,7 @@ public class GenreService {
     private final UserAccountPublicService userAccountPublicService;
 
     /**
-     * Retrieves active genres (is_active = true) ordered alphabetically by name (UC-8 Phase 1).
+     * Retrieves active genres (is_active = true) ordered alphabetically by name.
      */
     @Transactional(readOnly = true)
     public List<GenreResponse> getActiveGenres() {
@@ -50,7 +50,7 @@ public class GenreService {
     }
 
     /**
-     * Looks up an active genre by its slug (UC-8 Phase 1).
+     * Looks up an active genre by its slug.
      */
     @Transactional(readOnly = true)
     public Optional<Genre> findActiveGenreBySlug(String slug) {
@@ -62,24 +62,23 @@ public class GenreService {
     }
 
     /**
-     * Searches and filters genres for the administrator management dashboard (UC-26: Manage Genres).
+     * Searches genres for the administrator management dashboard.
      *
      * @param search   Search keyword by name or slug
-     * @param active   Active status filter (null to retrieve all)
      * @param pageable Pagination and sorting configuration
      * @return Administrator genre page response DTO
      */
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
-    public AdminGenrePageResponse getGenres(String search, Boolean active, Pageable pageable) {
+    public AdminGenrePageResponse getGenres(String search, Pageable pageable) {
         String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
-        Page<AdminGenreResponse> genres = genreRepository.searchForAdmin(normalizedSearch, active, pageable)
+        Page<AdminGenreResponse> genres = genreRepository.searchForAdmin(normalizedSearch, pageable)
                 .map(this::toAdminGenreResponse);
         return AdminGenrePageResponse.from(genres);
     }
 
     /**
-     * Retrieves detailed information of a genre by its ID for admins (UC-26 View Genre Detail).
+     * Retrieves detailed information of a genre by its ID for admins.
      *
      * @param id ID of the genre to look up
      * @return Administrator genre response DTO
@@ -92,8 +91,8 @@ public class GenreService {
     }
 
     /**
-     * Creates a new music genre and tracks the creator's admin ID (UC-26.1 Create Genre).
-     * Validates name and slug uniqueness according to rule 26.0.E1.
+     * Creates a new music genre and tracks the creator's admin ID.
+     * Validates name and slug uniqueness.
      *
      * @param request          Genre creation data (name, slug, description)
      * @param currentUserEmail Email of the admin creating the genre
@@ -107,7 +106,7 @@ public class GenreService {
         String name = request.name().trim();
         String slug = resolveSlug(request.slug(), name);
 
-        // 2. Validate uniqueness of name and slug (26.0.E1)
+        // 2. Validate uniqueness of name and slug
         validateUniqueValues(name, slug, null);
 
         // 3. Resolve admin creator ID from authenticated email
@@ -119,7 +118,7 @@ public class GenreService {
     }
 
     /**
-     * Updates name, slug, and description of an existing genre (UC-26.3 Update Genre).
+     * Updates name, slug, and description of an existing genre.
      *
      * @param id      ID of the genre to update
      * @param request New genre data
@@ -146,7 +145,7 @@ public class GenreService {
     }
 
     /**
-     * Activates or deactivates a music genre according to data integrity rules (UC-26.4 / BR-23 Update Genre Status).
+     * Activates or deactivates a music genre according to data integrity rules.
      *
      * @param id     ID of the genre to toggle
      * @param active New active state (true: activate, false: deactivate)

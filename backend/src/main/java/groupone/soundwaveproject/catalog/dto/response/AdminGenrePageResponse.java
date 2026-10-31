@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 /**
- * Paginated response DTO of genres for the administrator management view (UC-26: Manage Genres).
+ * Paginated response DTO of genres for the administrator management view.
  *
  * @param content       List of genres on the current page
  * @param totalElements Total number of genres matching filter criteria

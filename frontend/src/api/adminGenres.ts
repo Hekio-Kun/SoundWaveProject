@@ -28,10 +28,9 @@ export type GenreInput = {
 };
 
 export const adminGenreApi = {
-  getGenres: (params: { search?: string; active?: boolean; page?: number; size?: number }) => {
+  getGenres: (params: { search?: string; page?: number; size?: number }) => {
     const query = new URLSearchParams();
     if (params.search?.trim()) query.set("search", params.search.trim());
-    if (params.active !== undefined) query.set("active", String(params.active));
     query.set("page", String(params.page ?? 0));
     query.set("size", String(params.size ?? 10));
     query.set("sort", "name,asc");

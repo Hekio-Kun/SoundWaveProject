@@ -3,7 +3,7 @@ package groupone.soundwaveproject.catalog.dto.request;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * DTO chứa thông tin yêu cầu thay đổi trạng thái kích hoạt / vô hiệu hóa thể loại (UC-26.4 Update Genre Status).
+ * DTO chứa thông tin yêu cầu thay đổi trạng thái kích hoạt / vô hiệu hóa thể loại.
  *
  * @param active Trạng thái kích hoạt mới (true: kích hoạt, false: vô hiệu hóa)
  */
