@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
 import { albumApi, AlbumApiError } from "../api/album";
 import { catalogApi } from "../api/catalog";
 import { LyricSyncTab } from "../components/common/LyricSyncTab";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
-import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   AlertIcon,
   ArrowDownIcon,
@@ -100,22 +98,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
-
-  // Submit for Review confirmation modal
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const [copyrightAgreed, setCopyrightAgreed] = useState(false);
-  const [submitterNote, setSubmitterNote] = useState("");
-
-  useModalScrollLock(confirmModalOpen);
-
-  useEffect(() => {
-    if (!confirmModalOpen) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) setConfirmModalOpen(false);
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [confirmModalOpen, submitting]);
 
   // Load genres for track assignment
   useEffect(() => {
@@ -382,8 +364,8 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
     setTracks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Submission process (Draft or Submit for Review - Sequence UC-21.1)
-  const processSubmitAlbum = async (submitForReview: boolean) => {
+  // Submission process (Save Draft - Sequence UC-21.1)
+  const processSubmitAlbum = async () => {
     // 1.1: validateAlbumAndTracks()
     let finalTracks = [...tracks];
     if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
@@ -440,20 +422,17 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
         title: title.trim(),
         description: description.trim() ? description.trim() : undefined,
         releaseDate: releaseDate ? releaseDate : undefined,
-        submitForReview,
+        submitForReview: false,
         tracks: constituentTracksPayload,
       };
 
       const audioFiles = finalTracks.map((t) => t.file);
       await albumApi.createAlbum(payload, coverFile ?? undefined, audioFiles);
 
-      // Sequence 1.2.2.16: displaySuccessToast("Album draft saved successfully") and redirect("/albums")
-      const toastMessage = submitForReview
-        ? "Album submitted for review successfully."
-        : "Album draft saved successfully.";
+      // Sequence 1.2.2.16: displaySuccessToast("Album draft saved successfully") and redirect to /album
       sessionStorage.setItem(
         "soundwave_flash_toast",
-        JSON.stringify({ message: toastMessage, type: "success" })
+        JSON.stringify({ message: "Album draft saved successfully.", type: "success" })
       );
       onNavigate("/album");
     } catch (err: unknown) {
@@ -471,26 +450,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleStartSubmitReview = () => {
-    let finalCount = tracks.length;
-    if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
-      finalCount++;
-    }
-
-    if (finalCount === 0) {
-      setSubmitError("Please add at least one track to your album before submitting.");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    setConfirmModalOpen(true);
-  };
-
-  const handleConfirmSubmitReview = async () => {
-    setConfirmModalOpen(false);
-    await processSubmitAlbum(true);
   };
 
   const totalDurationMs = tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
@@ -538,7 +497,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
           <p style={{ color: "var(--sw-text-secondary, #64748B)", fontSize: "14px", margin: 0 }}>
             {step === 1
               ? "Step 1 of 2: Set album title, artwork, and release details."
-              : "Step 2 of 2: Build your album track by track, then submit or save as draft."}
+              : "Step 2 of 2: Build your album track by track, then save as draft."}
           </p>
         </div>
 
@@ -1288,7 +1247,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                 <FileTextIcon width={20} height={20} />
                 <div>
                   <b>Save as Draft or Submit for Review</b>
-                  <p>You can keep the album and all tracks as private drafts, or submit directly to staff for moderation review.</p>
+                  <p>Save your album and tracks as a draft. You can submit it for review from your My Albums page whenever you are ready.</p>
                 </div>
               </section>
             </aside>
@@ -1323,86 +1282,19 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
               <button
                 type="button"
-                className="button button-secondary"
-                onClick={() => void processSubmitAlbum(false)}
+                className="button button-primary"
+                onClick={() => void processSubmitAlbum()}
                 disabled={submitting || (tracks.length === 0 && !currentAudioFile)}
                 id="btn-create-album"
-                title="Create album and constituent tracks as draft"
-              >
-                Create Album (Save Draft)
-              </button>
-
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={() => handleStartSubmitReview()}
-                disabled={submitting || (tracks.length === 0 && !currentAudioFile)}
-                id="btn-submit-review-album"
-                title="Submit album and all constituent tracks for staff moderation"
+                title="Save album and constituent tracks as draft"
                 style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
               >
-                <UploadIcon width={16} height={16} />
-                <span>{submitting ? "Submitting..." : "Submit Album for Review"}</span>
+                <DiscIcon width={16} height={16} />
+                <span>{submitting ? "Saving Draft..." : "Save Draft"}</span>
               </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Confirmation Modal for Review Submission */}
-      {confirmModalOpen && createPortal(
-        <div className="modal-backdrop" role="presentation" onClick={() => !submitting && setConfirmModalOpen(false)}>
-          <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Submit Album for Staff review</h3>
-              <button type="button" className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting} aria-label="Close dialog">
-                <CloseIcon width={18} height={18} />
-              </button>
-            </div>
-            <p style={{ margin: "12px 0 8px", color: "var(--sw-text-secondary)" }}>
-              You are submitting <b>“{title}”</b> with {tracks.length + (editingTrackIndex === null && currentAudioFile && currentTitle.trim() ? 1 : 0)} track(s) to the moderation queue. Once submitted, editing is locked until staff completes review.
-            </p>
-            <div className="form-group" style={{ marginTop: "12px" }}>
-              <label htmlFor="upload-submitter-note">Note for reviewer (optional)</label>
-              <textarea
-                id="upload-submitter-note"
-                rows={3}
-                placeholder="Mention master source, licenses, or specific credits..."
-                value={submitterNote}
-                onChange={(e) => setSubmitterNote(e.target.value)}
-                style={{ width: "100%", padding: "10px", borderRadius: "10px", border: "1px solid var(--sw-border)" }}
-              />
-            </div>
-            <div style={{ marginTop: "14px", padding: "12px", background: "var(--sw-surface-alt, #f8fafc)", borderRadius: "8px", border: "1px solid var(--sw-border)" }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", fontSize: "13px", color: "var(--sw-text-primary)" }}>
-                <input
-                  type="checkbox"
-                  id="chk-copyright-agree"
-                  checked={copyrightAgreed}
-                  onChange={(e) => setCopyrightAgreed(e.target.checked)}
-                  style={{ marginTop: "3px" }}
-                />
-                <span>
-                  I confirm that I own all rights to this album, audio tracks, and artwork, or hold legal authorization to publish them, and agree to SoundWave Community Guidelines.
-                </span>
-              </label>
-            </div>
-            <div className="modal-actions" style={{ marginTop: "18px" }}>
-              <button className="button button-secondary" onClick={() => setConfirmModalOpen(false)} disabled={submitting}>
-                Cancel
-              </button>
-              <button
-                className="button button-primary"
-                disabled={!copyrightAgreed || submitting}
-                onClick={() => void handleConfirmSubmitReview()}
-                id="btn-confirm-agree-submit"
-              >
-                {submitting ? "Submitting..." : "Agree & Submit Album"}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
       )}
 
       {/* Center Toast Notification Popup */}

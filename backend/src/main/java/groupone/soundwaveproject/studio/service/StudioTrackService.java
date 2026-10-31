@@ -31,7 +31,6 @@ import groupone.soundwaveproject.notification.entity.NotificationType;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
-import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
@@ -55,7 +54,6 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StudioTrackService {
 
     private final TrackRepository trackRepository;
@@ -68,8 +66,55 @@ public class StudioTrackService {
     private final StaffRepository staffRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
-    private final OfficialLyricRepository officialLyricRepository;
     private final NotificationService notificationService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService
+    ) {
+        this(trackRepository, genreRepository, albumRepository, trackSubmissionRepository,
+                playlistTrackRepository, listeningHistoryRepository, userRepository,
+                staffRepository, cloudMediaService, studioTrackMapper, notificationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
+        this.albumRepository = albumRepository;
+        this.trackSubmissionRepository = trackSubmissionRepository;
+        this.playlistTrackRepository = playlistTrackRepository;
+        this.listeningHistoryRepository = listeningHistoryRepository;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+        this.cloudMediaService = cloudMediaService;
+        this.studioTrackMapper = studioTrackMapper;
+        this.notificationService = notificationService;
+        this.lyricService = lyricService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -108,7 +153,8 @@ public class StudioTrackService {
             Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
             Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
             TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+            String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
+            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
         }).toList();
     }
 
@@ -121,8 +167,9 @@ public class StudioTrackService {
         Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
-        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
     }
 
     /**
@@ -188,13 +235,8 @@ public class StudioTrackService {
 
             Track savedTrack = trackRepository.save(track);
             String requestLyrics = (request.lyrics() != null && !request.lyrics().isBlank()) ? request.lyrics().trim() : null;
-            if (requestLyrics != null) {
-                OfficialLyric officialLyric = OfficialLyric.builder()
-                        .track(savedTrack)
-                        .lyricContent(requestLyrics)
-                        .status("DRAFT")
-                        .build();
-                officialLyricRepository.save(officialLyric);
+            if (requestLyrics != null && lyricService != null) {
+                lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), requestLyrics, "DRAFT", user.getId());
             }
             return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null, requestLyrics);
         } catch (Exception ex) {
@@ -207,210 +249,7 @@ public class StudioTrackService {
         }
     }
 
-    /**
-     * [FEATURE]: UC-19.3 Update A Track
-     * Cho phép Creator (Listener) cập nhật metadata, file audio hoặc cover artwork của bài hát.
-     *
-     * Quy tắc nghiệp vụ (Business Rules BR-21, BR-23, BR-24, BR-36):
-     * 1. Chỉ cho phép chỉnh sửa bài hát ở trạng thái DRAFT, REJECTED hoặc PUBLISHED (PRE-3).
-     * 2. Bài hát đang PENDING kiểm duyệt bị KHÓA hoàn toàn (EX01), yêu cầu rút bài trước nếu muốn sửa.
-     * 3. Khi bài hát PUBLISHED được chỉnh sửa (POST-4, Normal Flow Step 12):
-     *    - Thu hồi ngay lập tức quyền nghe công khai, chuyển trạng thái sang PENDING.
-     *    - Tạo bản ghi nộp duyệt mới (TrackSubmission) với trạng thái PENDING.
-     *    - Gửi thông báo đến toàn bộ Staff để kiểm duyệt lại nhằm ngăn chặn thay thế nhạc bản quyền / vi phạm tiêu chuẩn cộng đồng.
-     *    - Nếu album cũ/hiện tại không còn bài hát nào PUBLISHED, chuyển trạng thái album về DRAFT.
-     * 4. Khi bài hát REJECTED được chỉnh sửa kèm cờ resubmitForReview (AF02):
-     *    - Chuyển trạng thái sang PENDING, tạo TrackSubmission và gửi thông báo kiểm duyệt cho Staff.
-     * 5. Bài hát DRAFT hoặc REJECTED (chỉnh sửa thông thường, POST-3, Step 11):
-     *    - Giữ nguyên trạng thái làm việc (DRAFT/REJECTED), cập nhật lại slug nếu đổi tiêu đề.
-     * 6. Khi tải lên file thay thế mới thành công, các tệp media cũ trên Cloudinary sẽ được xóa dọn dẹp (POST-2).
-     */
-    @Transactional
-    public StudioTrackResponse updateTrack(Long id, UpdateTrackRequest request, MultipartFile audio, MultipartFile cover, String currentUserEmail) {
-        User user = getAuthenticatedUser(currentUserEmail);
-        Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
-        // EX01: Từ chối sửa nếu bài hát đang ở trạng thái PENDING chờ Staff duyệt
-        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
-            throw new ForbiddenOperationException("Tracks currently pending review cannot be modified. Please withdraw the submission first.");
-        }
-        if (track.getPublicationStatus() != TrackPublicationStatus.DRAFT
-                && track.getPublicationStatus() != TrackPublicationStatus.REJECTED
-                && track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
-            throw new ForbiddenOperationException("Tracks in " + track.getPublicationStatus() + " status cannot be modified.");
-        }
-
-        // [FEATURE]: Ghi nhận trạng thái phát hành ban đầu trước khi cập nhật
-        TrackPublicationStatus originalStatus = track.getPublicationStatus();
-
-        // Kiểm tra thể loại nhạc hợp lệ và đang hoạt động (Step 8, EX03)
-        Genre genre = genreRepository.findById(request.genreId())
-                .orElseThrow(() -> new BadRequestOperationException("Selected genre is invalid."));
-        if (!Boolean.TRUE.equals(genre.getIsActive())) {
-            throw new BadRequestOperationException("Selected genre is currently inactive.");
-        }
-
-        // Kiểm tra quyền sở hữu album liên kết nếu có chọn album (Step 8, EX03)
-        Album oldAlbum = track.getAlbum();
-        Album album = null;
-        if (request.albumId() != null) {
-            album = albumRepository.findByIdAndCreatedByUserId(request.albumId(), user.getId())
-                    .orElseThrow(() -> new BadRequestOperationException("Selected album is invalid or unauthorized."));
-        }
-
-        // POST-2 & Step 9: Tải file audio thay thế lên Cloudinary và xóa tệp audio cũ
-        if (audio != null && !audio.isEmpty()) {
-            StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audio, user.getId());
-            cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
-
-            track.setAudioPublicId(audioResponse.publicId());
-            track.setAudioUrl(audioResponse.secureUrl());
-            track.setAudioFormat(audioResponse.format() != null ? audioResponse.format() : "mp3");
-            track.setDurationMs(request.durationMs() != null && request.durationMs() > 0
-                    ? request.durationMs()
-                    : (audioResponse.durationMs() != null ? audioResponse.durationMs() : track.getDurationMs()));
-        } else if (request.durationMs() != null && request.durationMs() > 0) {
-            track.setDurationMs(request.durationMs());
-        }
-
-        // POST-2 & Step 9: Tải ảnh bìa cover thay thế lên Cloudinary và xóa ảnh bìa cũ
-        if (cover != null && !cover.isEmpty()) {
-            StoredMediaResponse coverResponse = cloudMediaService.uploadTrackCover(cover, user.getId());
-            cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
-
-            track.setCoverPublicId(coverResponse.publicId());
-            track.setCoverUrl(coverResponse.secureUrl());
-        }
-
-        // Cập nhật tiêu đề và tái tạo slug duy nhất nếu tiêu đề thay đổi (Step 11)
-        if (!track.getTitle().equalsIgnoreCase(request.title().trim())) {
-            track.setTitle(request.title().trim());
-            track.setSlug(generateUniqueSlug(request.title()));
-        }
-
-        track.setGenre(genre);
-        track.setAlbum(album);
-        track.setTrackNumber(request.trackNumber());
-        track.setDescription(request.description() != null ? request.description().trim() : null);
-        if (request.lyrics() != null) {
-            if (request.lyrics().isBlank()) {
-                officialLyricRepository.findByTrackId(track.getId())
-                        .ifPresent(officialLyricRepository::delete);
-            } else {
-                OfficialLyric lyric = officialLyricRepository.findByTrackId(track.getId())
-                        .orElseGet(() -> OfficialLyric.builder().track(track).build());
-                lyric.setLyricContent(request.lyrics().trim());
-                lyric.setStatus("DRAFT");
-                officialLyricRepository.save(lyric);
-            }
-        }
-
-        TrackSubmission savedSubmission = null;
-
-        // [FEATURE]: Xử lý trạng thái vòng đời xuất bản theo UC-19.3
-        if (originalStatus == TrackPublicationStatus.PUBLISHED) {
-            // POST-4 & Step 12: Bài hát PUBLISHED bị thu hồi quyền nghe công khai, chuyển về PENDING để Staff kiểm duyệt lại
-            track.setPublicationStatus(TrackPublicationStatus.PENDING);
-
-            // Tạo bản ghi nộp duyệt mới cho đợt kiểm duyệt lại bắt buộc này
-            String note = (request.submitterNote() != null && !request.submitterNote().isBlank())
-                    ? request.submitterNote().trim()
-                    : "Published track updated by creator and queued for mandatory re-moderation.";
-            TrackSubmission submission = TrackSubmission.builder()
-                    .trackId(track.getId())
-                    .submittedByUserId(user.getId())
-                    .status(SubmissionStatus.PENDING)
-                    .submitterNote(note)
-                    .build();
-            savedSubmission = trackSubmissionRepository.save(submission);
-
-            // Gửi thông báo đến toàn bộ Staff để kiểm duyệt lại bài hát
-            try {
-                List<Staff> staffMembers = staffRepository.findAll();
-                for (Staff staff : staffMembers) {
-                    notificationService.createStaffNotification(
-                            staff.getId(),
-                            user.getId(),
-                            NotificationType.TRACK_SUBMISSION,
-                            "Track re-moderation required",
-                            "Track \"" + track.getTitle() + "\" has been updated and queued for re-moderation.",
-                            "SUBMISSION",
-                            String.valueOf(savedSubmission.getId())
-                    );
-                }
-            } catch (Exception e) {
-                log.warn("Failed to create re-moderation notification for staff: {}", e.getMessage());
-            }
-        } else if (originalStatus == TrackPublicationStatus.REJECTED && Boolean.TRUE.equals(request.resubmitForReview())) {
-            // AF02: Bài hát REJECTED được cập nhật và yêu cầu nộp duyệt lại ngay
-            track.setPublicationStatus(TrackPublicationStatus.PENDING);
-
-            String note = (request.submitterNote() != null && !request.submitterNote().isBlank())
-                    ? request.submitterNote().trim()
-                    : "Rejected track updated and resubmitted for moderation review.";
-            TrackSubmission submission = TrackSubmission.builder()
-                    .trackId(track.getId())
-                    .submittedByUserId(user.getId())
-                    .status(SubmissionStatus.PENDING)
-                    .submitterNote(note)
-                    .build();
-            savedSubmission = trackSubmissionRepository.save(submission);
-
-            // Gửi thông báo đến toàn bộ Staff
-            try {
-                List<Staff> staffMembers = staffRepository.findAll();
-                for (Staff staff : staffMembers) {
-                    notificationService.createStaffNotification(
-                            staff.getId(),
-                            user.getId(),
-                            NotificationType.TRACK_SUBMISSION,
-                            "New submission for review",
-                            "Track \"" + track.getTitle() + "\" has been updated and resubmitted for moderation.",
-                            "SUBMISSION",
-                            String.valueOf(savedSubmission.getId())
-                    );
-                }
-            } catch (Exception e) {
-                log.warn("Failed to create resubmission notification for staff: {}", e.getMessage());
-            }
-        } else {
-            // POST-3 & Step 11: Bài hát DRAFT hoặc REJECTED giữ nguyên trạng thái làm việc
-            track.setPublicationStatus(originalStatus);
-        }
-
-        // Lưu bản ghi bài hát đã cập nhật vào PostgreSQL (POST-1)
-        Track updatedTrack = trackRepository.save(track);
-
-        // Kiểm tra và cập nhật trạng thái album cũ nếu không còn bài hát nào PUBLISHED
-        if (oldAlbum != null) {
-            boolean oldAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
-                    oldAlbum.getId(), TrackPublicationStatus.PUBLISHED
-            );
-            if (!oldAlbumHasPublished) {
-                oldAlbum.setStatus("DRAFT");
-                albumRepository.save(oldAlbum);
-            }
-        }
-
-        // Kiểm tra và cập nhật album mới (nếu chuyển album)
-        if (album != null && (oldAlbum == null || !oldAlbum.getId().equals(album.getId()))) {
-            boolean currentAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
-                    album.getId(), TrackPublicationStatus.PUBLISHED
-            );
-            if (!currentAlbumHasPublished && !"DRAFT".equalsIgnoreCase(album.getStatus())) {
-                album.setStatus("DRAFT");
-                albumRepository.save(album);
-            }
-        }
-
-        // Lấy thông tin bản ghi nộp duyệt mới nhất để phản hồi cho UI (POST-5)
-        TrackSubmission submissionToReturn = savedSubmission != null
-                ? savedSubmission
-                : trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-
-        return studioTrackMapper.toStudioTrackResponse(updatedTrack, genre, album, submissionToReturn);
-    }
 
 
     /**
@@ -467,6 +306,9 @@ public class StudioTrackService {
             trackRepository.save(track);
         } else {
             // [FEATURE]: HARD DELETE (POST-2 & Step 7) cho bài hát DRAFT hoặc REJECTED
+            if (lyricService != null) {
+                lyricService.deleteAllLyricsForTrack(track.getId());
+            }
             playlistTrackRepository.deleteByTrack_Id(track.getId());
             listeningHistoryRepository.deleteByTrackId(track.getId());
             trackSubmissionRepository.deleteByTrackId(track.getId());
@@ -483,6 +325,40 @@ public class StudioTrackService {
                 albumRepository.save(album);
             }
         }
+    }
+
+    /**
+     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
+     */
+    @Transactional
+    public StudioTrackResponse updateLyrics(Long id, String lyrics, String currentUserEmail) {
+        return updateTrackLyrics(id, new groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest(lyrics), currentUserEmail);
+    }
+
+    /**
+     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
+     */
+    @Transactional
+    public StudioTrackResponse updateTrackLyrics(Long id, groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be modified.");
+        }
+
+        String rawLyrics = request != null ? request.lyrics() : null;
+        if (lyricService != null) {
+            lyricService.saveOrUpdateOfficialLyrics(id, rawLyrics, user.getId());
+        }
+
+        Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
+        Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
+        TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
+
+        String finalLyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, finalLyrics);
     }
 
     @Transactional

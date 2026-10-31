@@ -50,7 +50,6 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StudioAlbumService {
 
     private final AlbumRepository albumRepository;
@@ -64,7 +63,54 @@ public class StudioAlbumService {
     private final StudioAlbumMapper studioAlbumMapper;
     private final StudioTrackMapper studioTrackMapper;
     private final StudioTrackService studioTrackService;
-    private final OfficialLyricRepository officialLyricRepository;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public StudioAlbumService(
+            AlbumRepository albumRepository,
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            UserRepository userRepository,
+            CloudMediaService cloudMediaService,
+            StudioAlbumMapper studioAlbumMapper,
+            StudioTrackMapper studioTrackMapper,
+            StudioTrackService studioTrackService
+    ) {
+        this(albumRepository, trackRepository, genreRepository, playlistTrackRepository,
+                listeningHistoryRepository, trackSubmissionRepository, userRepository,
+                cloudMediaService, studioAlbumMapper, studioTrackMapper, studioTrackService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public StudioAlbumService(
+            AlbumRepository albumRepository,
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            UserRepository userRepository,
+            CloudMediaService cloudMediaService,
+            StudioAlbumMapper studioAlbumMapper,
+            StudioTrackMapper studioTrackMapper,
+            StudioTrackService studioTrackService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.albumRepository = albumRepository;
+        this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
+        this.playlistTrackRepository = playlistTrackRepository;
+        this.listeningHistoryRepository = listeningHistoryRepository;
+        this.trackSubmissionRepository = trackSubmissionRepository;
+        this.userRepository = userRepository;
+        this.cloudMediaService = cloudMediaService;
+        this.studioAlbumMapper = studioAlbumMapper;
+        this.studioTrackMapper = studioTrackMapper;
+        this.studioTrackService = studioTrackService;
+        this.lyricService = lyricService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -195,8 +241,8 @@ public class StudioAlbumService {
                 }
             }
 
-            // 3. Khởi tạo Album entity với trạng thái DRAFT và lưu vào CSDL (Sequence 1.2.2.7 đến 1.2.2.12: new Album -> save -> persistAlbum)
-            String initialAlbumStatus = "DRAFT";
+            // 3. Khởi tạo Album entity với trạng thái DRAFT hoặc PENDING (nếu gửi kiểm duyệt ngay) và lưu vào CSDL
+            String initialAlbumStatus = isSubmit ? "PENDING" : "DRAFT";
             String uniqueSlug = generateUniqueSlug(cleanTitle);
 
             Album album = Album.builder()
@@ -256,6 +302,9 @@ public class StudioAlbumService {
 
                     Track savedTrack = trackRepository.save(track);
                     constituentTracks.add(savedTrack);
+                    if (lyricService != null && item.getLyrics() != null && !item.getLyrics().isBlank()) {
+                        lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), item.getLyrics().trim(), "DRAFT", user.getId());
+                    }
 
                     if (isSubmit) {
                         TrackSubmission submission = TrackSubmission.builder()
@@ -269,6 +318,21 @@ public class StudioAlbumService {
                 }
             } else if (hasTrackIds) {
                 constituentTracks = assignTracksToAlbum(savedAlbum, request.getTrackIds(), user.getId());
+                if (isSubmit) {
+                    for (Track track : constituentTracks) {
+                        track.setPublicationStatus(TrackPublicationStatus.PENDING);
+                        track.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+                        trackRepository.save(track);
+
+                        TrackSubmission submission = TrackSubmission.builder()
+                                .trackId(track.getId())
+                                .submittedByUserId(user.getId())
+                                .status(SubmissionStatus.PENDING)
+                                .submitterNote("Album submission: " + savedAlbum.getTitle())
+                                .build();
+                        trackSubmissionRepository.save(submission);
+                    }
+                }
             }
 
             // 5. Đánh giá lại trạng thái xuất bản của Album theo BR-18 và quy chuẩn
@@ -513,9 +577,15 @@ public class StudioAlbumService {
         Album album = albumRepository.findByIdAndCreatedByUserId(albumId, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
-        // RDS EX02: Check album is in DRAFT status
-        if (!"DRAFT".equalsIgnoreCase(album.getStatus())) {
-            throw new ConflictOperationException("Only DRAFT albums can be submitted for review.");
+        // UC-21.2 Check album status: cannot submit if already pending or published
+        if ("PENDING".equalsIgnoreCase(album.getStatus())) {
+            throw new ConflictOperationException("This album has already been submitted and is currently pending review.");
+        }
+        if ("PUBLISHED".equalsIgnoreCase(album.getStatus()) || "APPROVED".equalsIgnoreCase(album.getStatus())) {
+            throw new ConflictOperationException("This album is already published.");
+        }
+        if (!"DRAFT".equalsIgnoreCase(album.getStatus()) && !"REJECTED".equalsIgnoreCase(album.getStatus())) {
+            throw new ConflictOperationException("Only DRAFT or REJECTED albums can be submitted for review. Current status: " + album.getStatus());
         }
 
         // Sequence 1.2.2.10 - 1.2.2.13: findByAlbumId
@@ -545,8 +615,8 @@ public class StudioAlbumService {
             trackSubmissionRepository.save(submission);
         }
 
-        // RDS POST-3: The album status remains DRAFT awaiting review completion
-        album.setStatus("DRAFT");
+        // UC-21.2: Set album status to PENDING awaiting Staff review
+        album.setStatus("PENDING");
         album.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         Album savedAlbum = albumRepository.save(album);
 
@@ -647,14 +717,29 @@ public class StudioAlbumService {
         boolean hasPublishedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                 album.getId(), TrackPublicationStatus.PUBLISHED
         );
+        boolean hasPendingTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                album.getId(), TrackPublicationStatus.PENDING
+        );
 
         if (hasPublishedTrack) {
             album.setStatus("PUBLISHED");
             if (album.getPublishedAt() == null) {
                 album.setPublishedAt(LocalDateTime.now(ZoneOffset.UTC));
             }
+        } else if (hasPendingTrack || "PENDING".equalsIgnoreCase(album.getStatus())) {
+            album.setStatus("PENDING");
         } else {
-            album.setStatus("DRAFT");
+            boolean hasRejectedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.REJECTED
+            );
+            boolean hasDraftTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.DRAFT
+            );
+            if (hasRejectedTrack && !hasDraftTrack) {
+                album.setStatus("REJECTED");
+            } else {
+                album.setStatus("DRAFT");
+            }
         }
         albumRepository.save(album);
     }

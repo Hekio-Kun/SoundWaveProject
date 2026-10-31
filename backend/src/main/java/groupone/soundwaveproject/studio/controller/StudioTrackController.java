@@ -3,7 +3,6 @@ package groupone.soundwaveproject.studio.controller;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.request.SubmitTrackRequest;
-import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
@@ -57,15 +56,18 @@ public class StudioTrackController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PutMapping(value = "/tracks/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public StudioTrackResponse updateTrack(
+
+    /**
+     * Cập nhật lời bài hát cho bài hát (UC-18.3 & New Flow).
+     * Cho phép Creator thêm/cập nhật lyric cho bài hát đã phát hành hoặc đang tạo mà không làm gián đoạn trạng thái phát hành.
+     */
+    @PutMapping("/tracks/{id}/lyrics")
+    public StudioTrackResponse updateLyrics(
             @PathVariable Long id,
-            @RequestPart("track") @Valid UpdateTrackRequest request,
-            @RequestPart(value = "audio", required = false) MultipartFile audio,
-            @RequestPart(value = "cover", required = false) MultipartFile cover,
+            @RequestBody @Valid groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request,
             Authentication authentication
     ) {
-        return studioTrackService.updateTrack(id, request, audio, cover, authentication.getName());
+        return studioTrackService.updateLyrics(id, request.lyrics(), authentication.getName());
     }
 
     @DeleteMapping("/tracks/{id}")
@@ -122,3 +124,4 @@ public class StudioTrackController {
         return studioTrackService.getActiveGenres();
     }
 }
+
