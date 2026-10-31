@@ -29,6 +29,7 @@ import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
 import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.studio.mapper.StudioTrackMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -72,6 +73,8 @@ class StudioTrackServiceTest {
     private CloudMediaService cloudMediaService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private OfficialLyricRepository officialLyricRepository;
     @Spy
     private StudioTrackMapper studioTrackMapper;
 

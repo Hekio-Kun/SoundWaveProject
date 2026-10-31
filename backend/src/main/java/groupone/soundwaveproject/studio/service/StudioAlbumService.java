@@ -13,6 +13,8 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -62,6 +64,7 @@ public class StudioAlbumService {
     private final StudioAlbumMapper studioAlbumMapper;
     private final StudioTrackMapper studioTrackMapper;
     private final StudioTrackService studioTrackService;
+    private final OfficialLyricRepository officialLyricRepository;
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -247,7 +250,6 @@ public class StudioAlbumService {
                             .playCountCache(0L)
                             .coverPublicId(savedAlbum.getCoverPublicId())
                             .coverUrl(savedAlbum.getCoverUrl())
-                            .lyrics(item.getLyrics() != null && !item.getLyrics().isBlank() ? item.getLyrics().trim() : null)
                             .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                             .updatedAt(LocalDateTime.now(ZoneOffset.UTC))
                             .build();

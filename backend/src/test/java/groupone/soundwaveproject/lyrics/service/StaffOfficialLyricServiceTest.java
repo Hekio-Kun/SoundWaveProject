@@ -139,8 +139,7 @@ class StaffOfficialLyricServiceTest {
         assertNotNull(response);
         assertEquals(200L, response.id());
         assertEquals("PUBLISHED", response.status());
-        assertEquals("[00:01.00]Song lyrics", track.getLyrics());
-        verify(trackRepository, times(1)).save(track);
+        verify(officialLyricRepository, times(1)).save(any(OfficialLyric.class));
     }
 
     @Test
@@ -164,15 +163,13 @@ class StaffOfficialLyricServiceTest {
 
         assertNotNull(response);
         assertEquals("PUBLISHED", lyric.getStatus());
-        assertEquals("Song lyrics", track.getLyrics());
-        verify(trackRepository, times(1)).save(track);
+        verify(officialLyricRepository, times(1)).save(any(OfficialLyric.class));
     }
 
     @Test
     @DisplayName("deleteOfficialLyric - deletes lyric and clears track.lyrics")
     void deleteOfficialLyric_Success() {
         Track track = createTrack(1L, "Song One");
-        track.setLyrics("Existing lyrics");
         Staff staff = createStaff(10L, "staff@soundwave.com");
 
         OfficialLyric lyric = OfficialLyric.builder()
@@ -189,7 +186,6 @@ class StaffOfficialLyricServiceTest {
         staffOfficialLyricService.deleteOfficialLyric("staff@soundwave.com", 1L);
 
         verify(officialLyricRepository, times(1)).delete(lyric);
-        assertNull(track.getLyrics());
-        verify(trackRepository, times(1)).save(track);
+        // Track lyrics column removed
     }
 }

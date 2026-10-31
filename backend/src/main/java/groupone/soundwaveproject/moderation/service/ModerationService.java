@@ -27,6 +27,8 @@ import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundExceptio
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.notification.entity.NotificationType;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -57,6 +59,7 @@ public class ModerationService {
     private final TrackRepository trackRepository;
     private final AlbumRepository albumRepository;
     private final TrackSubmissionMapper mapper;
+    private final OfficialLyricRepository officialLyricRepository;
     private final UserRepository userRepository;
     private final StaffRepository staffRepository;
     private final UserProfileRepository profileRepository;
@@ -221,7 +224,7 @@ public class ModerationService {
                 .orElseThrow(() -> new SubmissionNotFoundException(id));
 
         Track track = trackRepository.findById(submission.getTrackId()).orElse(null);
-        String lyrics = track != null ? track.getLyrics() : null;
+        String lyrics = resolveTrackLyrics(track);
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
@@ -300,7 +303,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -353,7 +356,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -406,7 +409,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -419,6 +422,15 @@ public class ModerationService {
      * @param currentTrack      Thực thể bài hát hiện tại
      * @return DTO AlbumTrackNavigationResponse chứa ID bài trước, bài sau, bài pending kế tiếp và toàn bộ bài hát trong album
      */
+    private String resolveTrackLyrics(Track track) {
+        if (track == null) {
+            return null;
+        }
+        return officialLyricRepository.findByTrackId(track.getId())
+                .map(OfficialLyric::getLyricContent)
+                .orElse(null);
+    }
+
     public AlbumTrackNavigationResponse buildAlbumNavigation(TrackSubmission currentSubmission, Track currentTrack) {
         if (currentTrack == null || currentTrack.getAlbum() == null) {
             return null;
