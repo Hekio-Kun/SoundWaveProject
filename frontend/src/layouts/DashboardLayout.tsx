@@ -7,6 +7,7 @@ import {
   FileTextIcon,
   LogoutIcon,
   MenuIcon,
+  MusicIcon,
   ShieldIcon,
   UserIcon,
 } from "../icons";
@@ -75,24 +76,8 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
         ) : null}
       </div>
 
-      {/* Staff Workspace Status Box */}
-      <div className="ops-shell-workspace">
-        <div className="ops-workspace-top">
-          <span className="ops-workspace-eyebrow">
-            {isAdmin ? "ADMIN" : "MODERATION"}
-          </span>
-          <span className="ops-workspace-live-dot" title="Active session">
-            <i /> Live
-          </span>
-        </div>
-        <strong className="ops-workspace-title">
-          {isAdmin ? "Platform Admin" : "Track Moderation"}
-        </strong>
-      </div>
-
       {/* Navigation Menu */}
       <nav className="ops-shell-nav" aria-label="Operations Navigation">
-        <span className="ops-nav-heading">MENU</span>
 
         {isStaff ? (
           <>
