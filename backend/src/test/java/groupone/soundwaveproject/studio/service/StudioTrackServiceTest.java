@@ -599,4 +599,50 @@ class StudioTrackServiceTest {
                 .isInstanceOf(ForbiddenOperationException.class)
                 .hasMessageContaining("Tracks currently pending review cannot be modified");
     }
+
+    @Test
+    @DisplayName("submitLyricsForReview - creates PENDING LYRIC_UPDATE submission and keeps track PUBLISHED")
+    void submitLyricsForReview_Success_OnPublishedTrack() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com")).thenReturn(Optional.of(activeUser));
+
+        Track publishedTrack = Track.builder()
+                .id(400L)
+                .uploaderUserId(10L)
+                .title("Great Song")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(400L, 10L)).thenReturn(Optional.of(publishedTrack));
+        when(trackSubmissionRepository.findFirstByTrackIdAndSubmissionTypeAndStatus(
+                400L, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE, SubmissionStatus.PENDING))
+                .thenReturn(Optional.empty());
+
+        when(trackSubmissionRepository.save(any(TrackSubmission.class))).thenAnswer(inv -> {
+            TrackSubmission sub = inv.getArgument(0);
+            return TrackSubmission.builder()
+                    .id(999L)
+                    .trackId(sub.getTrackId())
+                    .submittedByUserId(sub.getSubmittedByUserId())
+                    .submissionType(sub.getSubmissionType())
+                    .proposedLyrics(sub.getProposedLyrics())
+                    .submitterNote(sub.getSubmitterNote())
+                    .status(sub.getStatus())
+                    .submittedAt(java.time.Instant.now())
+                    .build();
+        });
+
+        groupone.soundwaveproject.studio.dto.response.PendingLyricSubmissionResponse res = studioTrackService.submitLyricsForReview(
+                400L,
+                new groupone.soundwaveproject.studio.dto.request.SubmitTrackLyricsRequest("[00:01.00]Hello world", "Please review"),
+                "creator@soundwave.com"
+        );
+
+        assertThat(res).isNotNull();
+        assertThat(res.submissionId()).isEqualTo(999L);
+        assertThat(res.trackId()).isEqualTo(400L);
+        assertThat(res.proposedLyrics()).isEqualTo("[00:01.00]Hello world");
+        assertThat(res.submissionType()).isEqualTo(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE);
+        assertThat(res.status()).isEqualTo(SubmissionStatus.PENDING);
+        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PUBLISHED);
+    }
 }

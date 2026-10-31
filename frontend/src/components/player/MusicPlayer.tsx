@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon } from "../../icons";
+import { FileTextIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
 
 /**
@@ -26,6 +26,10 @@ export type MusicPlayerProps = {
   onToggleQueue?: () => void;
   /** Controlled open state of the queue drawer */
   isQueueOpen?: boolean;
+  /** Optional callback to toggle the visibility of the synchronous lyrics drawer (UC-16.1) */
+  onToggleLyrics?: () => void;
+  /** Controlled open state of the lyrics drawer */
+  isLyricsOpen?: boolean;
   /** Callback to record playback count when valid listening threshold is met (BR.13) */
   onRecordPlay?: (trackId: number, listenedDurationMs: number, completed: boolean) => void;
   /** Human-readable playback context description (e.g., "Playing from Top Charts") */
@@ -63,6 +67,8 @@ export function MusicPlayer({
   isAuthenticated,
   onToggleQueue,
   isQueueOpen,
+  onToggleLyrics,
+  isLyricsOpen,
   onRecordPlay,
   playbackContext,
   onReorderQueue,
@@ -388,6 +394,14 @@ export function MusicPlayer({
       </div>
 
       <div className="player-tools">
+        <button
+          className={`player-icon ${isLyricsOpen ? "player-icon--active" : ""}`}
+          onClick={onToggleLyrics}
+          aria-label={isLyricsOpen ? "Close lyrics" : "View lyrics"}
+          title="Lyrics"
+        >
+          <FileTextIcon width={17} height={17} />
+        </button>
         <button className={`player-icon ${isQueueActive ? "player-icon--active" : ""}`} onClick={handleQueueClick} aria-label="Queue"><QueueIcon /></button>
         <VolumeIcon />
         <input

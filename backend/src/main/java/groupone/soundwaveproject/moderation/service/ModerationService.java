@@ -21,6 +21,7 @@ import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailRespons
 import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateException;
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
@@ -111,6 +112,14 @@ public class ModerationService {
      */
     @Transactional(readOnly = true)
     public Page<SubmissionQueueItemResponse> getQueue(SubmissionStatus status, String search, Pageable pageable) {
+        return getQueue(status, null, search, pageable);
+    }
+
+    /**
+     * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt theo phân trang, loại yêu cầu và bộ lọc tìm kiếm.
+     */
+    @Transactional(readOnly = true)
+    public Page<SubmissionQueueItemResponse> getQueue(SubmissionStatus status, SubmissionType type, String search, Pageable pageable) {
         boolean searchProvided = search != null && !search.trim().isBlank();
         Page<TrackSubmission> page;
 
@@ -147,9 +156,17 @@ public class ModerationService {
 
             Collection<Long> safeTrackIds = matchingTrackIds.isEmpty() ? List.of(-1L) : matchingTrackIds;
             Collection<Long> safeUserIds = matchingUserIds.isEmpty() ? List.of(-1L) : matchingUserIds;
-            page = submissionRepository.findByStatusAndMatchingIds(status, safeTrackIds, safeUserIds, pageable);
+            if (type != null) {
+                page = submissionRepository.findByStatusAndSubmissionTypeAndMatchingIds(status, type, safeTrackIds, safeUserIds, pageable);
+            } else {
+                page = submissionRepository.findByStatusAndMatchingIds(status, safeTrackIds, safeUserIds, pageable);
+            }
+        } else if (status != null && type != null) {
+            page = submissionRepository.findByStatusAndSubmissionType(status, type, pageable);
         } else if (status != null) {
             page = submissionRepository.findByStatus(status, pageable);
+        } else if (type != null) {
+            page = submissionRepository.findBySubmissionType(type, pageable);
         } else {
             page = submissionRepository.findAll(pageable);
         }
@@ -191,7 +208,7 @@ public class ModerationService {
             Track track = tracksMap.get(submission.getTrackId());
             if (track == null) continue;
 
-            if (track.getAlbum() == null) {
+            if (track.getAlbum() == null || submission.getSubmissionType() == SubmissionType.LYRIC_UPDATE) {
                 User submitter = usersMap.get(submission.getSubmittedByUserId());
                 UserProfile submitterProfile = profilesMap.get(submission.getSubmittedByUserId());
                 Staff reviewer = submission.getReviewerUserId() != null ? reviewersMap.get(submission.getReviewerUserId()) : null;
@@ -276,6 +293,21 @@ public class ModerationService {
      */
     @Transactional(readOnly = true)
     public SubmissionStatsResponse getQueueStats() {
+        return getQueueStats(null);
+    }
+
+    /**
+     * Lấy số liệu thống kê tổng hợp số lượng yêu cầu kiểm duyệt theo loại (TRACK_RELEASE hoặc LYRIC_UPDATE).
+     */
+    @Transactional(readOnly = true)
+    public SubmissionStatsResponse getQueueStats(SubmissionType type) {
+        if (type != null) {
+            long pending = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.PENDING, type);
+            long approved = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.APPROVED, type);
+            long rejected = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.REJECTED, type);
+            long total = submissionRepository.countBySubmissionType(type);
+            return new SubmissionStatsResponse(pending, approved, rejected, total);
+        }
         long pending = submissionRepository.countByStatus(SubmissionStatus.PENDING);
         long approved = submissionRepository.countByStatus(SubmissionStatus.APPROVED);
         long rejected = submissionRepository.countByStatus(SubmissionStatus.REJECTED);
@@ -311,6 +343,44 @@ public class ModerationService {
 
         Track track = trackRepository.findById(submission.getTrackId())
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + submission.getTrackId()));
+
+        // UC-24.6: If LYRIC_UPDATE, update lyric and keep track PUBLISHED
+        if (submission.getSubmissionType() == SubmissionType.LYRIC_UPDATE) {
+            if (lyricService != null && submission.getProposedLyrics() != null) {
+                lyricService.saveOrUpdateOfficialLyric(track.getId(), submission.getProposedLyrics(), "PUBLISHED", reviewer.getId());
+            }
+
+            User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
+            UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
+
+            if (submitter != null) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer.getId(),
+                        NotificationType.TRACK_APPROVED,
+                        "Official Lyric Approved",
+                        "Your lyric update for \"" + track.getTitle() + "\" has been approved and is now live!",
+                        "TRACK",
+                        String.valueOf(track.getId())
+                );
+            }
+
+            String lyrics = resolveTrackLyrics(track);
+            AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+            return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
+        }
+
+        track.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
+        track.setApprovedAt(nowUtc);
+        track.setLatestRejectionReason(null);
+
+        Album album = track.getAlbum();
+        if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
+            album.setStatus("PUBLISHED");
+            album.setPublishedAt(nowUtc);
+            albumRepository.save(album);
+        }
+        trackRepository.save(track);
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
@@ -389,6 +459,28 @@ public class ModerationService {
 
         Track track = trackRepository.findById(submission.getTrackId())
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + submission.getTrackId()));
+
+        // UC-24.6: If LYRIC_UPDATE, reject submission but KEEP track PUBLISHED and preserve existing lyrics
+        if (submission.getSubmissionType() == SubmissionType.LYRIC_UPDATE) {
+            User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
+            UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
+
+            if (submitter != null) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer.getId(),
+                        NotificationType.TRACK_REJECTED,
+                        "Official Lyric Rejected",
+                        "Your lyric update for \"" + track.getTitle() + "\" was not approved: " + rejectionReason,
+                        "TRACK",
+                        String.valueOf(track.getId())
+                );
+            }
+
+            String lyrics = resolveTrackLyrics(track);
+            AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
+            return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
+        }
 
         track.setPublicationStatus(TrackPublicationStatus.REJECTED);
         track.setLatestRejectionReason(rejectionReason);

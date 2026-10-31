@@ -328,6 +328,25 @@ export function PendingTrackDetailView({
         </div>
       ) : detail ? (
         <div className="staff-detail-content-body">
+          {/* Lyric Update Notice Banner (UC-24.6) */}
+          {detail.submissionType === "LYRIC_UPDATE" ? (
+            <div style={{
+              padding: "14px 18px",
+              background: "#F0F9FF",
+              border: "1px solid #BAE6FD",
+              borderRadius: "14px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}>
+              <FileTextIcon width={22} height={22} style={{ color: "#0284C7", flexShrink: 0 }} />
+              <div style={{ fontSize: "13px", color: "#0369A1", lineHeight: "1.5" }}>
+                <strong>Lyric Update Moderation (UC-24.6):</strong> The creator submitted updated synchronized lyrics for this already published song. Making a decision here only modifies the song's official lyrics; the song remains published and streamable without interruption.
+              </div>
+            </div>
+          ) : null}
+
           {/* Status & Submission Metadata Banner */}
           <div className="staff-inspector-status-banner">
             <div className="staff-status-group">
@@ -798,10 +817,10 @@ export function PendingTrackDetailView({
               {actionType === "APPROVE" ? (
                 <div className="staff-decision-panel is-approve">
                   <h4 className="staff-decision-panel-title text-success">
-                    Approve & Publish “{detail.track.title}”
+                    {detail.submissionType === "LYRIC_UPDATE" ? "Approve Lyric Update" : "Approve & Publish"} “{detail.track.title}”
                   </h4>
                   <p className="staff-decision-panel-desc">
-                    The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave.
+                    {detail.submissionType === "LYRIC_UPDATE" ? "The proposed lyrics will become the official published lyrics for this track. The track remains PUBLISHED and streamable." : "The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave."}
                   </p>
 
                   <label className="staff-input-group" htmlFor="detail-approve-note">
@@ -839,7 +858,7 @@ export function PendingTrackDetailView({
                       onClick={() => void handleApprove()}
                       disabled={submittingAction}
                     >
-                      {submittingAction ? "Publishing..." : "Confirm & Publish Track"}
+                      {submittingAction ? "Processing..." : detail.submissionType === "LYRIC_UPDATE" ? "Confirm & Approve Lyrics" : "Confirm & Publish Track"}
                     </button>
                   </div>
                 </div>

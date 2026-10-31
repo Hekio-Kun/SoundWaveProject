@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { studioApi, type ApiTrack } from "../../api/track";
+import { studioApi, type ApiTrack, type PendingLyricSubmission } from "../../api/track";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import {
   AlertIcon,
@@ -33,6 +33,10 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
   const [lyricsText, setLyricsText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [pendingSubmission, setPendingSubmission] = useState<PendingLyricSubmission | null>(null);
+  const [submitterNote, setSubmitterNote] = useState<string>("");
+  const [withdrawing, setWithdrawing] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,6 +77,22 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
     }
   };
 
+    const handleWithdraw = async () => {
+    if (!track) return;
+    setWithdrawing(true);
+    setErrorMessage(null);
+    try {
+      await studioApi.withdrawLyricsSubmission(track.id);
+      setPendingSubmission(null);
+      setLyricsText(track.lyrics || "");
+      setSuccessNotice("Lyric submission withdrawn. You can edit and submit again.");
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to withdraw lyric submission.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!lyricsText.trim()) {
       setErrorMessage("Lyrics content cannot be empty. Please enter or upload lyrics.");
@@ -82,11 +102,22 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
     setSubmitting(true);
     setErrorMessage(null);
 
+    const isPublished = track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED";
+
     try {
-      const updated = await studioApi.updateTrackLyrics(track.id, lyricsText.trim());
-      onSaved?.(updated);
-      onSuccess?.(updated);
-      onClose();
+      if (isPublished) {
+        const pending = await studioApi.submitLyricsForReview(track.id, lyricsText.trim(), submitterNote.trim() || undefined);
+        setPendingSubmission(pending);
+        setSuccessNotice("Your lyric update has been submitted for Staff review! The track remains published and streamable.");
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        const updated = await studioApi.updateTrackLyrics(track.id, lyricsText.trim());
+        onSaved?.(updated);
+        onSuccess?.(updated);
+        onClose();
+      }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Failed to update lyrics. Please try again.");
     } finally {
@@ -446,7 +477,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
           <div style={{ fontSize: "12px", color: "#64748B" }}>
             {track.status === "PUBLISHED" || track.status === "APPROVED" ? (
               <span>
-                ● This track is live. Updating lyrics will be applied immediately without revoking publication.
+                ● This track is live. Lyric update will be queued for Staff moderation before going public; the song continues streaming without interruption.
               </span>
             ) : (
               <span>Lyrics will be attached to this track draft.</span>
@@ -484,7 +515,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
                 cursor: submitting || !lyricsText.trim() ? "not-allowed" : "pointer",
               }}
             >
-              {submitting ? "Saving Lyrics..." : "Save Lyrics"}
+              {submitting ? "Submitting..." : (track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED") ? "Submit for Review" : "Save Lyrics"}
             </button>
           </div>
         </div>

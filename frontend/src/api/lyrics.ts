@@ -1,5 +1,6 @@
 import { apiFetch } from "./client";
 import { LyricDetail, TrackLyricsBundle, StaffTrackLyricSummary } from "../types";
+import { SubmissionDetail, SubmissionQueueItem, SubmissionStats } from "./moderation";
 
 export type PageResponse<T> = {
   content: T[];
@@ -88,6 +89,57 @@ export const lyricsApi = {
   deleteStaffOfficialLyric: (trackId: number): Promise<{ message: string }> => {
     return apiFetch<{ message: string }>(`/staff/lyrics/tracks/${trackId}`, {
       method: "DELETE",
+    });
+  },
+
+  // Staff Lyrics Moderation Queue (UC-24.6)
+  getLyricSubmissions: (params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PageResponse<SubmissionQueueItem>> => {
+    const query = new URLSearchParams();
+    if (params?.status && params.status !== "ALL") query.set("status", params.status);
+    if (params?.search && params.search.trim()) query.set("search", params.search.trim());
+    if (typeof params?.page === "number") query.set("page", params.page.toString());
+    if (typeof params?.size === "number") query.set("size", params.size.toString());
+
+    const qs = query.toString();
+    return apiFetch<PageResponse<SubmissionQueueItem>>(
+      `/staff/lyrics/submissions${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  getLyricSubmissionStats: (): Promise<SubmissionStats> => {
+    return apiFetch<SubmissionStats>("/staff/lyrics/submissions/stats");
+  },
+
+  getLyricSubmissionDetail: (id: number): Promise<SubmissionDetail> => {
+    return apiFetch<SubmissionDetail>(`/staff/lyrics/submissions/${id}`);
+  },
+
+  approveLyricSubmission: (
+    id: number,
+    reviewerNote?: string
+  ): Promise<SubmissionDetail> => {
+    return apiFetch<SubmissionDetail>(`/staff/lyrics/submissions/${id}/approve`, {
+      method: "POST",
+      body: { reviewerNote: reviewerNote || undefined },
+    });
+  },
+
+  rejectLyricSubmission: (
+    id: number,
+    rejectionReason: string,
+    reviewerNote?: string
+  ): Promise<SubmissionDetail> => {
+    return apiFetch<SubmissionDetail>(`/staff/lyrics/submissions/${id}/reject`, {
+      method: "POST",
+      body: {
+        rejectionReason,
+        reviewerNote: reviewerNote || undefined,
+      },
     });
   },
 };

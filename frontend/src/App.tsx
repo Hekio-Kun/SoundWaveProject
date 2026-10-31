@@ -39,6 +39,9 @@ function AppContent() {
     queueOpen,
     setQueueOpen,
     toggleQueue,
+    lyricsOpen,
+    setLyricsOpen,
+    toggleLyrics,
     handleRecordPlay,
     removeFromQueue,
     clearQueue,
@@ -78,6 +81,9 @@ function AppContent() {
           onCreatePlaylist={openCreatePlaylist}
           queueOpen={queueOpen}
           onCloseQueue={() => setQueueOpen(false)}
+          lyricsOpen={lyricsOpen}
+          onCloseLyrics={() => setLyricsOpen(false)}
+          audio={audio}
           currentTrack={activeTrack}
           playing={playing}
           queue={activeQueue}
@@ -107,6 +113,8 @@ function AppContent() {
           isAuthenticated={isAuthenticated}
           onToggleQueue={toggleQueue}
           isQueueOpen={queueOpen}
+          onToggleLyrics={toggleLyrics}
+          isLyricsOpen={lyricsOpen}
           onRecordPlay={handleRecordPlay}
           onReorderQueue={reorderQueue}
         />
