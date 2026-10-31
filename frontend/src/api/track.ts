@@ -1,5 +1,15 @@
 import { ApiError, apiFetch } from "./client";
 
+export type PendingLyricSubmission = {
+  submissionId: number;
+  trackId: number;
+  proposedLyrics: string;
+  submitterNote: string | null;
+  status: string;
+  submissionType: string;
+  submittedAt: string;
+};
+
 export type ApiTrack = {
   id: number;
   title: string;
@@ -170,5 +180,11 @@ export const studioApi = {
     studioRequest<AlbumOption[]>("/studio/albums"),
   updateTrackLyrics: (id: number, lyrics: string) =>
     studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
+  submitLyricsForReview: (id: number, lyrics: string, submitterNote?: string) =>
+    studioRequest<PendingLyricSubmission>(`/studio/tracks/${id}/lyrics/submit`, "POST", { lyrics, submitterNote }),
+  getPendingLyricsSubmission: (id: number) =>
+    studioRequest<PendingLyricSubmission | null>(`/studio/tracks/${id}/lyrics/pending`),
+  withdrawLyricsSubmission: (id: number) =>
+    studioRequest<void>(`/studio/tracks/${id}/lyrics/pending`, "DELETE"),
 };
 

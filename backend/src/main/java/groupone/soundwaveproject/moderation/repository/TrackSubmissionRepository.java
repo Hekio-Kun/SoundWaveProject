@@ -1,6 +1,7 @@
 package groupone.soundwaveproject.moderation.repository;
 
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,9 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
     java.util.List<TrackSubmission> findByTrackIdInOrderBySubmittedAtDesc(Collection<Long> trackIds);
     void deleteByTrackId(Long trackId);
 
+    Optional<TrackSubmission> findFirstByTrackIdAndSubmissionTypeAndStatus(Long trackId, SubmissionType submissionType, SubmissionStatus status);
+    Optional<TrackSubmission> findFirstByTrackIdAndSubmissionTypeOrderBySubmittedAtDesc(Long trackId, SubmissionType submissionType);
+
     /**
      * Đếm số lượng yêu cầu kiểm duyệt theo trạng thái (PENDING, APPROVED, REJECTED).
      *
@@ -37,6 +41,7 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      * @return Số lượng bản ghi thỏa mãn
      */
     long countByStatus(SubmissionStatus status);
+    long countByStatusAndSubmissionType(SubmissionStatus status, SubmissionType submissionType);
 
     /**
      * Lấy danh sách yêu cầu kiểm duyệt theo trạng thái có phân trang (UC-24.1 View Moderation Queue).
@@ -46,6 +51,8 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      * @return Trang danh sách các yêu cầu kiểm duyệt thỏa mãn
      */
     Page<TrackSubmission> findByStatus(SubmissionStatus status, Pageable pageable);
+    Page<TrackSubmission> findByStatusAndSubmissionType(SubmissionStatus status, SubmissionType submissionType, Pageable pageable);
+    Page<TrackSubmission> findBySubmissionType(SubmissionType submissionType, Pageable pageable);
 
     /**
      * Tìm kiếm và phân trang các yêu cầu kiểm duyệt kết hợp trạng thái và danh sách ID bài hát hoặc ID tác giả khớp từ khóa.
@@ -60,6 +67,16 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
            "AND (s.trackId IN :trackIds OR s.submittedByUserId IN :userIds)")
     Page<TrackSubmission> findByStatusAndMatchingIds(
             @Param("status") SubmissionStatus status,
+            @Param("trackIds") Collection<Long> trackIds,
+            @Param("userIds") Collection<Long> userIds,
+            Pageable pageable);
+
+    @Query("SELECT s FROM TrackSubmission s WHERE (:status IS NULL OR s.status = :status) " +
+           "AND (:submissionType IS NULL OR s.submissionType = :submissionType) " +
+           "AND (s.trackId IN :trackIds OR s.submittedByUserId IN :userIds)")
+    Page<TrackSubmission> findByStatusAndSubmissionTypeAndMatchingIds(
+            @Param("status") SubmissionStatus status,
+            @Param("submissionType") SubmissionType submissionType,
             @Param("trackIds") Collection<Long> trackIds,
             @Param("userIds") Collection<Long> userIds,
             Pageable pageable);

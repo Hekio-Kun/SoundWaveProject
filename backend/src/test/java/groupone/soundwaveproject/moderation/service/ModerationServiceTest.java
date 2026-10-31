@@ -272,4 +272,66 @@ class ModerationServiceTest {
         assertEquals(2, nav.totalTracks());
         assertEquals(2, nav.tracks().size());
     }
+
+    @Test
+    void approveSubmission_LyricUpdate_KeepsTrackPublishedAndUpdatesOfficialLyric() {
+        Track publishedTrack = Track.builder()
+                .title("Echoes of Silence")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+        ReflectionTestUtils.setField(publishedTrack, "id", 200L);
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(200L)
+                .submittedByUserId(10L)
+                .submissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)
+                .proposedLyrics("[00:01.00]First line\n[00:04.00]Second line")
+                .status(SubmissionStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(submission, "id", 2L);
+
+        when(submissionRepository.findById(2L)).thenReturn(Optional.of(submission));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(200L)).thenReturn(Optional.of(publishedTrack));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+
+        ApproveTrackRequest request = new ApproveTrackRequest("Lyrics look great");
+        moderationService.approveSubmission(2L, request, "staff@soundwave.com");
+
+        assertEquals(SubmissionStatus.APPROVED, submission.getStatus());
+        assertEquals(TrackPublicationStatus.PUBLISHED, publishedTrack.getPublicationStatus());
+        verify(lyricService).saveOrUpdateOfficialLyric(200L, "[00:01.00]First line\n[00:04.00]Second line", "PUBLISHED", 99L);
+    }
+
+    @Test
+    void rejectSubmission_LyricUpdate_KeepsTrackPublishedWithoutChangingTrackStatus() {
+        Track publishedTrack = Track.builder()
+                .title("Echoes of Silence")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+        ReflectionTestUtils.setField(publishedTrack, "id", 200L);
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(200L)
+                .submittedByUserId(10L)
+                .submissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)
+                .proposedLyrics("[00:01.00]Desynced line")
+                .status(SubmissionStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(submission, "id", 3L);
+
+        when(submissionRepository.findById(3L)).thenReturn(Optional.of(submission));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(200L)).thenReturn(Optional.of(publishedTrack));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+
+        RejectTrackRequest request = new RejectTrackRequest("Lyrics desynchronized after 00:30");
+        moderationService.rejectSubmission(3L, request, "staff@soundwave.com");
+
+        assertEquals(SubmissionStatus.REJECTED, submission.getStatus());
+        assertEquals("Lyrics desynchronized after 00:30", submission.getRejectionReason());
+        // Track must remain PUBLISHED!
+        assertEquals(TrackPublicationStatus.PUBLISHED, publishedTrack.getPublicationStatus());
+        verify(trackRepository, org.mockito.Mockito.never()).save(publishedTrack);
+    }
 }

@@ -9,6 +9,7 @@ import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailRespons
 import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
 import groupone.soundwaveproject.moderation.service.ModerationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

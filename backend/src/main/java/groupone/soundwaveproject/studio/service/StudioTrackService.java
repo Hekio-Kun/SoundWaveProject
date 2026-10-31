@@ -25,6 +25,10 @@ import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
+import groupone.soundwaveproject.studio.dto.request.SubmitTrackLyricsRequest;
+import groupone.soundwaveproject.studio.dto.response.PendingLyricSubmissionResponse;
+import java.util.Optional;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.notification.entity.NotificationType;
@@ -541,18 +545,115 @@ public class StudioTrackService {
         }
     }
 
-    /**
-     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
-     */
-    @Transactional
     public StudioTrackResponse updateLyrics(Long id, String lyrics, String currentUserEmail) {
         return updateTrackLyrics(id, new groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest(lyrics), currentUserEmail);
     }
 
     /**
-     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
+     * Gửi đề xuất cập nhật lời bài hát chính thức cho bài hát đã PUBLISHED để Staff kiểm duyệt (UC-16.2).
+     * Trạng thái bài hát trên hệ thống vẫn duy trì PUBLISHED để phục vụ người nghe bình thường.
      */
     @Transactional
+    public PendingLyricSubmissionResponse submitLyricsForReview(Long trackId, SubmitTrackLyricsRequest request, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(trackId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        if (track.getPublicationStatus() != TrackPublicationStatus.PUBLISHED) {
+            throw new ConflictOperationException("Only PUBLISHED tracks can submit lyric updates for moderation.");
+        }
+
+        // EX02: Existing pending submission
+        Optional<TrackSubmission> pendingOpt = trackSubmissionRepository.findFirstByTrackIdAndSubmissionTypeAndStatus(
+                trackId, SubmissionType.LYRIC_UPDATE, SubmissionStatus.PENDING);
+        if (pendingOpt.isPresent()) {
+            throw new ConflictOperationException("A lyric update for this track is already pending moderation. Please await completion of the current review.");
+        }
+
+        String rawLyrics = request != null && request.lyrics() != null ? request.lyrics().trim() : "";
+        if (rawLyrics.isEmpty()) {
+            throw new BadRequestOperationException("EMPTY_LYRICS", "Lyrics content cannot be blank.");
+        }
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(track.getId())
+                .submittedByUserId(user.getId())
+                .submissionType(SubmissionType.LYRIC_UPDATE)
+                .proposedLyrics(rawLyrics)
+                .submitterNote(request != null ? request.submitterNote() : null)
+                .status(SubmissionStatus.PENDING)
+                .build();
+
+        TrackSubmission saved = trackSubmissionRepository.save(submission);
+
+        // Notify active staff
+        try {
+            for (Staff staff : staffRepository.findAll()) {
+                notificationService.createNotification(
+                        staff.getId(),
+                        user.getId(),
+                        NotificationType.TRACK_SUBMISSION,
+                        "Lyric Update Submitted",
+                        "Creator submitted updated lyrics for published track " + track.getTitle() + ".",
+                        "TRACK_SUBMISSION",
+                        String.valueOf(saved.getId())
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify staff for lyric submission: {}", e.getMessage());
+        }
+
+        return new PendingLyricSubmissionResponse(
+                saved.getId(),
+                track.getId(),
+                saved.getProposedLyrics(),
+                saved.getSubmitterNote(),
+                saved.getStatus(),
+                saved.getSubmissionType(),
+                saved.getSubmittedAt()
+        );
+    }
+
+    /**
+     * Tra cứu yêu cầu cập nhật lời bài hát đang chờ Staff duyệt của bài hát (nếu có) (UC-16.2).
+     */
+    @Transactional(readOnly = true)
+    public PendingLyricSubmissionResponse getPendingLyricsSubmission(Long trackId, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(trackId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        return trackSubmissionRepository.findFirstByTrackIdAndSubmissionTypeAndStatus(
+                track.getId(), SubmissionType.LYRIC_UPDATE, SubmissionStatus.PENDING)
+                .map(sub -> new PendingLyricSubmissionResponse(
+                        sub.getId(),
+                        sub.getTrackId(),
+                        sub.getProposedLyrics(),
+                        sub.getSubmitterNote(),
+                        sub.getStatus(),
+                        sub.getSubmissionType(),
+                        sub.getSubmittedAt()
+                ))
+                .orElse(null);
+    }
+
+    /**
+     * Rút lại yêu cầu cập nhật lời bài hát đang chờ Staff duyệt (UC-16.2 AF02 Withdraw submission).
+     */
+    @Transactional
+    public void withdrawLyricsSubmission(Long trackId, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(trackId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        TrackSubmission pending = trackSubmissionRepository.findFirstByTrackIdAndSubmissionTypeAndStatus(
+                track.getId(), SubmissionType.LYRIC_UPDATE, SubmissionStatus.PENDING)
+                .orElseThrow(() -> new ResourceNotFoundException("No pending lyric update submission found for this track."));
+
+        trackSubmissionRepository.delete(pending);
+        log.info("Withdrawn pending lyric submission id={} for trackId={} by userId={}", pending.getId(), trackId, user.getId());
+    }
+
     public StudioTrackResponse updateTrackLyrics(Long id, groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request, String currentUserEmail) {
         User user = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())

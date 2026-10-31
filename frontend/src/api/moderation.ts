@@ -1,6 +1,7 @@
 import { apiFetch } from "./client";
 
 export type SubmissionStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type SubmissionType = "TRACK_RELEASE" | "LYRIC_UPDATE";
 
 export type SubmissionStats = {
   pendingCount: number;
@@ -24,6 +25,8 @@ export type SubmissionQueueItem = {
   submitterDisplayName: string | null;
   submitterEmail: string | null;
   status: SubmissionStatus;
+  submissionType?: SubmissionType;
+  proposedLyrics?: string | null;
   submittedAt: string;
   reviewedAt: string | null;
   reviewerDisplayName: string | null;
@@ -58,6 +61,8 @@ export type SubmissionDetail = {
   submitterNote: string | null;
   reviewerNote: string | null;
   rejectionReason: string | null;
+  submissionType?: SubmissionType;
+  proposedLyrics?: string | null;
   submittedAt: string;
   reviewedAt: string | null;
   track: {
@@ -97,10 +102,13 @@ export type PageResponse<T> = {
 export const moderationApi = {
   getStats: () => apiFetch<SubmissionStats>("/moderation/submissions/stats"),
 
-  getQueue: (params: { status?: string; search?: string; page?: number; size?: number }) => {
+  getQueue: (params: { status?: string; type?: string; search?: string; page?: number; size?: number }) => {
     const searchParams = new URLSearchParams();
     if (params.status && params.status !== "ALL") {
       searchParams.set("status", params.status);
+    }
+    if (params.type && params.type !== "ALL") {
+      searchParams.set("type", params.type);
     }
     if (params.search && params.search.trim()) {
       searchParams.set("search", params.search.trim());
