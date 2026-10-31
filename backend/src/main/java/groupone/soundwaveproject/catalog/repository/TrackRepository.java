@@ -19,6 +19,8 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
 
     Page<Track> findByPublicationStatus(TrackPublicationStatus publicationStatus, Pageable pageable);
 
+    Page<Track> findByPublicationStatusAndTitleContainingIgnoreCase(TrackPublicationStatus publicationStatus, String title, Pageable pageable);
+
     Optional<Track> findBySlug(String slug);
 
     List<Track> findByUploaderUserIdOrderByCreatedAtDesc(Long uploaderUserId);

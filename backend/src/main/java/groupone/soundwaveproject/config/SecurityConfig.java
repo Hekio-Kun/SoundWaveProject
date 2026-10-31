@@ -57,6 +57,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/studio/genres").permitAll()
                         .requestMatchers("/api/v1/studio/**").authenticated()
                         .requestMatchers("/api/v1/favorites/**").authenticated()
+                        .requestMatchers("/api/v1/staff/**").hasAnyRole("STAFF", "ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
