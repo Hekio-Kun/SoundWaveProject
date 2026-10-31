@@ -370,17 +370,7 @@ public class ModerationService {
             return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
         }
 
-        track.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
-        track.setApprovedAt(nowUtc);
-        track.setLatestRejectionReason(null);
 
-        Album album = track.getAlbum();
-        if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
-            album.setStatus("PUBLISHED");
-            album.setPublishedAt(nowUtc);
-            albumRepository.save(album);
-        }
-        trackRepository.save(track);
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
