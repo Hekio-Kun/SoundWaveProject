@@ -373,7 +373,7 @@ public class TrackCatalogService {
                         null
                 ));
 
-        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
         return new TrackResponse(
                 track.getId(),

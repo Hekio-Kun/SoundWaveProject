@@ -307,7 +307,11 @@ export function StudioAlbumDetailPage({
     );
   }
 
-  const isPublished = album.status === "PUBLISHED";
+  const status = (album.status || "DRAFT").toUpperCase();
+  const isPublished = status === "PUBLISHED" || status === "APPROVED";
+  const isPending = status === "PENDING";
+  const isRejected = status === "REJECTED";
+  const canSubmit = status === "DRAFT" || status === "REJECTED";
   const albumTracks = album.tracks || [];
   const totalDurationMs = albumTracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMinutes = Math.round(totalDurationMs / 60000);
@@ -431,12 +435,30 @@ export function StudioAlbumDetailPage({
                   fontSize: "10.5px",
                   fontWeight: 800,
                   textTransform: "uppercase",
-                  background: isPublished ? "#ECFEFF" : "#FFFBEB",
-                  color: isPublished ? "var(--color-ocean-primary, #0284C7)" : "#D97706",
-                  border: isPublished ? "1px solid #BAE6FD" : "1px solid #FDE68A",
+                  background: isPublished
+                    ? "#ECFEFF"
+                    : isPending
+                    ? "#FFFBEB"
+                    : isRejected
+                    ? "#FEF2F2"
+                    : "#F1F5F9",
+                  color: isPublished
+                    ? "var(--color-ocean-primary, #0284C7)"
+                    : isPending
+                    ? "#D97706"
+                    : isRejected
+                    ? "#DC2626"
+                    : "#64748B",
+                  border: isPublished
+                    ? "1px solid #BAE6FD"
+                    : isPending
+                    ? "1px solid #FDE68A"
+                    : isRejected
+                    ? "1px solid #FECACA"
+                    : "1px solid #CBD5E1",
                 }}
               >
-                {isPublished ? "● Published (Live)" : "○ Draft"}
+                {isPublished ? "● Published (Live)" : isPending ? "● Pending Review" : isRejected ? "● Rejected" : "○ Draft"}
               </span>
             </div>
 
@@ -497,7 +519,7 @@ export function StudioAlbumDetailPage({
 
           {/* Action Toolbar matching Playlist Details Page */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-            {!isPublished && (
+            {canSubmit && (
               <button
                 className="button button-primary button-large"
                 onClick={handleStartSubmitAlbum}

@@ -689,13 +689,12 @@ class StudioTrackServiceTest {
                 .uploaderUserId(10L)
                 .title("Public Track Without Lyrics")
                 .publicationStatus(TrackPublicationStatus.PUBLISHED)
-                .lyrics(null)
                 .build();
 
         when(trackRepository.findByIdAndUploaderUserId(300L, 10L))
                 .thenReturn(Optional.of(publishedTrack));
-        when(trackRepository.save(any(Track.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+        when(lyricService.getOfficialLyrics(300L))
+                .thenReturn("[00:05.00] New Synced Lyric Line");
 
         StudioTrackResponse response = studioTrackService.updateLyrics(
                 300L,
@@ -704,9 +703,9 @@ class StudioTrackServiceTest {
         );
 
         assertThat(response).isNotNull();
-        assertThat(publishedTrack.getLyrics()).isEqualTo("[00:05.00] New Synced Lyric Line");
-        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PUBLISHED);
-        verify(trackRepository).save(publishedTrack);
+        assertThat(response.lyrics()).isEqualTo("[00:05.00] New Synced Lyric Line");
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(lyricService).saveOrUpdateOfficialLyrics(300L, "[00:05.00] New Synced Lyric Line", 10L);
     }
 
     @Test

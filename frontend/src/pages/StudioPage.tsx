@@ -621,6 +621,7 @@ export function StudioPage({
                 const isPublished = status === "PUBLISHED" || status === "APPROVED";
                 const isPending = status === "PENDING";
                 const isRejected = status === "REJECTED";
+                const canSubmit = status === "DRAFT" || status === "REJECTED";
                 const statusClass = isPublished
                   ? "status-pill--approved"
                   : isPending
@@ -697,7 +698,7 @@ export function StudioPage({
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
-                        {!isPublished && (
+                        {canSubmit && (
                           <button
                             type="button"
                             className="button button-primary button-small"
@@ -1341,6 +1342,7 @@ export function StudioPage({
                 const isPublished = status === "PUBLISHED" || status === "APPROVED";
                 const isPending = status === "PENDING";
                 const isRejected = status === "REJECTED";
+                const canSubmit = status === "DRAFT" || status === "REJECTED";
                 const statusClass = isPublished
                   ? "status-pill--approved"
                   : isPending
@@ -1446,7 +1448,7 @@ export function StudioPage({
                           {album.releaseDate ? `Release: ${album.releaseDate}` : "No release date"}
                         </span>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          {!isPublished && (
+                          {canSubmit && (
                             <button
                               type="button"
                               className="button button-primary button-small"
