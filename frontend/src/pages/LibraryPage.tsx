@@ -227,7 +227,6 @@ export function LibraryPage({
         <div>
           <span className="eyebrow">PERSONAL COLLECTION</span>
           <h1 className="page-heading">Your Library</h1>
-          <p className="page-subtext">Manage your Favorite tracks, Playlists, and Listening History.</p>
         </div>
       </div>
 
