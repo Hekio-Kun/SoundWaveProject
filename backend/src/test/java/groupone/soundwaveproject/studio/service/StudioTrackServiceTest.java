@@ -26,7 +26,6 @@ import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
-import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
 import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
@@ -74,7 +73,7 @@ class StudioTrackServiceTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private OfficialLyricRepository officialLyricRepository;
+    private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
     @Spy
     private StudioTrackMapper studioTrackMapper;
 
@@ -254,134 +253,6 @@ class StudioTrackServiceTest {
                 .hasMessageContaining("Failed to upload media to cloud storage");
 
         verify(trackRepository, never()).save(any(Track.class));
-    }
-
-    @Test
-    @DisplayName("updateTrack throws ForbiddenOperationException when track is PENDING")
-    void updateTrack_ThrowsWhenPending() {
-        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
-                .thenReturn(Optional.of(activeUser));
-
-        Track pendingTrack = Track.builder()
-                .id(200L)
-                .uploaderUserId(10L)
-                .genre(activeGenre)
-                .title("Pending Song")
-                .publicationStatus(TrackPublicationStatus.PENDING)
-                .audioPublicId("audio-pending")
-                .build();
-        when(trackRepository.findByIdAndUploaderUserId(200L, 10L))
-                .thenReturn(Optional.of(pendingTrack));
-
-        UpdateTrackRequest request = new UpdateTrackRequest(
-                "New Title", 1L, null, null, null, null, null);
-
-        assertThatThrownBy(() -> studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com"))
-                .isInstanceOf(ForbiddenOperationException.class)
-                .hasMessageContaining("Tracks currently pending review cannot be modified");
-    }
-
-    @Test
-    @DisplayName("updateTrack transitions PUBLISHED track to PENDING, creates submission, and notifies staff (UC-19.3 POST-4)")
-    void updateTrack_SuccessWhenPublished() {
-        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
-                .thenReturn(Optional.of(activeUser));
-
-        Track publishedTrack = Track.builder()
-                .id(200L)
-                .uploaderUserId(10L)
-                .genre(activeGenre)
-                .title("Published Song")
-                .slug("published-song-old")
-                .publicationStatus(TrackPublicationStatus.PUBLISHED)
-                .audioPublicId("audio-pub")
-                .audioUrl("https://cloudinary.com/audio-pub.mp3")
-                .build();
-        when(trackRepository.findByIdAndUploaderUserId(200L, 10L))
-                .thenReturn(Optional.of(publishedTrack));
-        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
-        when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(trackSubmissionRepository.save(any(TrackSubmission.class))).thenAnswer(invocation -> {
-            TrackSubmission sub = invocation.getArgument(0);
-            org.springframework.test.util.ReflectionTestUtils.setField(sub, "id", 999L);
-            return sub;
-        });
-        Staff mockStaff = org.mockito.Mockito.mock(Staff.class);
-        when(mockStaff.getId()).thenReturn(1L);
-        when(staffRepository.findAll()).thenReturn(List.of(mockStaff));
-
-        UpdateTrackRequest request = new UpdateTrackRequest(
-                "Updated Published Title", 1L, null, null, "Updated description", null, null, false, "Updated artwork and lyrics");
-
-        StudioTrackResponse response = studioTrackService.updateTrack(200L, request, null, null, "creator@soundwave.com");
-
-        assertThat(response).isNotNull();
-        assertThat(response.id()).isEqualTo(200L);
-        assertThat(response.title()).isEqualTo("Updated Published Title");
-        // [FEATURE]: UC-19.3 POST-4 - Bài hát PUBLISHED chuyển sang PENDING để kiểm duyệt lại
-        assertThat(response.status()).isEqualTo("PENDING");
-        assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
-        verify(trackRepository).save(publishedTrack);
-        verify(trackSubmissionRepository).save(any(TrackSubmission.class));
-        verify(notificationService).createStaffNotification(
-                eq(1L),
-                eq(10L),
-                eq(NotificationType.TRACK_SUBMISSION),
-                eq("Track re-moderation required"),
-                contains("Updated Published Title"),
-                eq("SUBMISSION"),
-                eq("999")
-        );
-    }
-
-    @Test
-    @DisplayName("updateTrack with resubmit on REJECTED track transitions to PENDING and notifies staff (UC-19.3 AF02)")
-    void updateTrack_SuccessWhenRejectedAndResubmitted() {
-        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
-                .thenReturn(Optional.of(activeUser));
-
-        Track rejectedTrack = Track.builder()
-                .id(205L)
-                .uploaderUserId(10L)
-                .genre(activeGenre)
-                .title("Rejected Song")
-                .slug("rejected-song-old")
-                .publicationStatus(TrackPublicationStatus.REJECTED)
-                .audioPublicId("audio-rej")
-                .audioUrl("https://cloudinary.com/audio-rej.mp3")
-                .build();
-        when(trackRepository.findByIdAndUploaderUserId(205L, 10L))
-                .thenReturn(Optional.of(rejectedTrack));
-        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
-        when(trackRepository.save(any(Track.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(trackSubmissionRepository.save(any(TrackSubmission.class))).thenAnswer(invocation -> {
-            TrackSubmission sub = invocation.getArgument(0);
-            org.springframework.test.util.ReflectionTestUtils.setField(sub, "id", 1000L);
-            return sub;
-        });
-        Staff mockStaff = org.mockito.Mockito.mock(Staff.class);
-        when(mockStaff.getId()).thenReturn(2L);
-        when(staffRepository.findAll()).thenReturn(List.of(mockStaff));
-
-        UpdateTrackRequest request = new UpdateTrackRequest(
-                "Fixed Rejected Song", 1L, null, null, "Fixed issues", null, null, true, "Fixed copyright notice");
-
-        StudioTrackResponse response = studioTrackService.updateTrack(205L, request, null, null, "creator@soundwave.com");
-
-        assertThat(response).isNotNull();
-        assertThat(response.status()).isEqualTo("PENDING");
-        assertThat(rejectedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
-        verify(trackRepository).save(rejectedTrack);
-        verify(trackSubmissionRepository).save(any(TrackSubmission.class));
-        verify(notificationService).createStaffNotification(
-                eq(2L),
-                eq(10L),
-                eq(NotificationType.TRACK_SUBMISSION),
-                eq("New submission for review"),
-                contains("Fixed Rejected Song"),
-                eq("SUBMISSION"),
-                eq("1000")
-        );
     }
 
 
@@ -676,5 +547,56 @@ class StudioTrackServiceTest {
         assertThatThrownBy(() -> studioTrackService.getRejectionDetails(999L, "creator@soundwave.com"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Track not found or access denied");
+    }
+
+    @Test
+    @DisplayName("updateLyrics updates lyrics and keeps PUBLISHED status intact without sending to PENDING")
+    void updateLyrics_Success_OnPublishedTrack() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track publishedTrack = Track.builder()
+                .id(300L)
+                .uploaderUserId(10L)
+                .title("Public Track Without Lyrics")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(300L, 10L))
+                .thenReturn(Optional.of(publishedTrack));
+        when(lyricService.getOfficialLyrics(300L))
+                .thenReturn("[00:05.00] New Synced Lyric Line");
+
+        StudioTrackResponse response = studioTrackService.updateLyrics(
+                300L,
+                "[00:05.00] New Synced Lyric Line",
+                "creator@soundwave.com"
+        );
+
+        assertThat(response).isNotNull();
+        assertThat(response.lyrics()).isEqualTo("[00:05.00] New Synced Lyric Line");
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(lyricService).saveOrUpdateOfficialLyrics(300L, "[00:05.00] New Synced Lyric Line", 10L);
+    }
+
+    @Test
+    @DisplayName("updateLyrics throws ForbiddenOperationException when track is PENDING")
+    void updateLyrics_ThrowsWhenPending() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track pendingTrack = Track.builder()
+                .id(301L)
+                .uploaderUserId(10L)
+                .title("Pending Track")
+                .publicationStatus(TrackPublicationStatus.PENDING)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(301L, 10L))
+                .thenReturn(Optional.of(pendingTrack));
+
+        assertThatThrownBy(() -> studioTrackService.updateLyrics(301L, "Some lyrics", "creator@soundwave.com"))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("Tracks currently pending review cannot be modified");
     }
 }

@@ -77,19 +77,6 @@ export type CreateTrackPayload = {
   lyrics?: string;
 };
 
-// [FEATURE]: UC-19.3 Update A Track - Payload gửi lên backend để cập nhật thông tin bài hát
-export type UpdateTrackPayload = {
-  title: string;
-  genreId: number;
-  albumId?: number;
-  trackNumber?: number;
-  description?: string;
-  durationMs?: number;
-  lyrics?: string;
-  resubmitForReview?: boolean; // AF02: Nộp duyệt lại bài hát REJECTED
-  submitterNote?: string;      // Ghi chú gửi cho Staff khi kiểm duyệt lại
-};
-
 type TrackApiErrorPayload = {
   code?: string;
   message?: string;
@@ -130,7 +117,7 @@ async function studioRequest<T>(
 }
 
 function buildTrackFormData(
-  payload: CreateTrackPayload | UpdateTrackPayload,
+  payload: CreateTrackPayload,
   audio?: File,
   cover?: File,
 ): FormData {
@@ -150,8 +137,6 @@ export const studioApi = {
     studioRequest<ApiTrack>(`/studio/tracks/${id}`),
   createDraft: (payload: CreateTrackPayload, audio: File, cover?: File) =>
     studioRequest<ApiTrack>("/studio/tracks", "POST", buildTrackFormData(payload, audio, cover)),
-  updateTrack: (id: number, payload: UpdateTrackPayload, audio?: File, cover?: File) =>
-    studioRequest<ApiTrack>(`/studio/tracks/${id}`, "PUT", buildTrackFormData(payload, audio, cover)),
   deleteTrack: (id: number) =>
     studioRequest<void>(`/studio/tracks/${id}`, "DELETE"),
   submitForReview: (id: number, submitterNote?: string) =>
@@ -160,10 +145,15 @@ export const studioApi = {
     studioRequest<ApiTrack>(`/studio/tracks/${id}/withdraw`, "POST"),
   getRejectionDetails: (id: number) =>
     studioRequest<RejectionDetails>(`/studio/tracks/${id}/rejection`),
+  updateLyrics: (id: number, lyrics: string) =>
+    studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
   getStats: () =>
     studioRequest<StudioStats>("/studio/stats"),
   getGenres: () =>
     studioRequest<GenreOption[]>("/studio/genres"),
   getMyAlbums: () =>
     studioRequest<AlbumOption[]>("/studio/albums"),
+  updateTrackLyrics: (id: number, lyrics: string) =>
+    studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
 };
+

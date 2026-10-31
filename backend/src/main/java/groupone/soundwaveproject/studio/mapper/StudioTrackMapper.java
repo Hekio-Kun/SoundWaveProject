@@ -35,10 +35,6 @@ public class StudioTrackMapper {
         return rawReason.trim();
     }
 
-    public StudioTrackResponse toStudioTrackResponse(Track track, Genre genre, Album album, TrackSubmission latestSubmission) {
-        return toStudioTrackResponse(track, genre, album, latestSubmission, null);
-    }
-
     public StudioTrackResponse toStudioTrackResponse(Track track, Genre genre, Album album, TrackSubmission latestSubmission, String lyrics) {
         String genreName = genre != null ? genre.getName() : (track.getGenre() != null ? track.getGenre().getName() : "Unknown");
         String genreSlug = genre != null ? genre.getSlug() : (track.getGenre() != null ? track.getGenre().getSlug() : "");
@@ -59,6 +55,8 @@ public class StudioTrackMapper {
             submittedAt = latestSubmission.getSubmittedAt();
             reviewedAt = latestSubmission.getReviewedAt();
         }
+
+        String finalLyrics = lyrics;
 
         return new StudioTrackResponse(
                 track.getId(),
@@ -84,8 +82,12 @@ public class StudioTrackMapper {
                 reviewedAt,
                 track.getCreatedAt() != null ? track.getCreatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
                 track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC) : null,
-                lyrics
+                finalLyrics
         );
+    }
+
+    public StudioTrackResponse toStudioTrackResponse(Track track, Genre genre, Album album, TrackSubmission latestSubmission) {
+        return toStudioTrackResponse(track, genre, album, latestSubmission, null);
     }
 
     public GenreOptionResponse toGenreOption(Genre genre) {

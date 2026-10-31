@@ -21,9 +21,9 @@ export type RejectionDetailsModalProps = {
   /** Callback khi người dùng nhấn đóng modal */
   onClose: () => void;
   /** Callback khi người dùng nhấn "Chỉnh sửa bài hát" để sửa và nộp lại duyệt (UC-19, BR-24) */
-  onEditTrack?: (trackId: number) => void;
   /** Callback điều hướng tới trang chi tiết bài hát (tuỳ chọn) */
   onViewTrackDetail?: (trackId: number) => void;
+  onEditTrack?: (trackId?: any) => void;
 };
 
 /**
@@ -39,8 +39,8 @@ export function RejectionDetailsModal({
   details,
   isOpen,
   onClose,
-  onEditTrack,
   onViewTrackDetail,
+  onEditTrack,
 }: RejectionDetailsModalProps) {
   // Khoá scroll chuột khi mở modal
   useModalScrollLock(isOpen);
