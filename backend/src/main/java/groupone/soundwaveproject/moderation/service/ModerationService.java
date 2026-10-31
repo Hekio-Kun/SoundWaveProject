@@ -312,31 +312,47 @@ public class ModerationService {
         Track track = trackRepository.findById(submission.getTrackId())
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + submission.getTrackId()));
 
-        track.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
-        track.setApprovedAt(nowUtc);
-        track.setLatestRejectionReason(null);
-
-        Album album = track.getAlbum();
-        if (album != null && "DRAFT".equalsIgnoreCase(album.getStatus())) {
-            album.setStatus("PUBLISHED");
-            album.setPublishedAt(nowUtc);
-            albumRepository.save(album);
-        }
-        trackRepository.save(track);
-
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
 
-        if (submitter != null) {
-            notificationService.createNotification(
-                    submitter.getId(),
-                    reviewer.getId(),
-                    NotificationType.TRACK_APPROVED,
-                    "Track approved",
-                    "Your track \"" + track.getTitle() + "\" has been approved and is now available in the public catalog.",
-                    "TRACK",
-                    String.valueOf(track.getId())
-            );
+        Album album = track.getAlbum();
+        if (album == null) {
+            // Track đơn lẻ: Xuất bản trực tiếp ngay khi được duyệt
+            track.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
+            track.setApprovedAt(nowUtc);
+            track.setLatestRejectionReason(null);
+            trackRepository.save(track);
+
+            if (submitter != null) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer.getId(),
+                        NotificationType.TRACK_APPROVED,
+                        "Track approved",
+                        "Your track \"" + track.getTitle() + "\" has been approved and is now available in the public catalog.",
+                        "TRACK",
+                        String.valueOf(track.getId())
+                );
+            }
+        } else {
+            // Track thuộc Album: Ghi nhận duyệt nhưng chỉ xuất bản khi TOÀN BỘ bài trong album đã duyệt xong
+            track.setApprovedAt(nowUtc);
+            track.setLatestRejectionReason(null);
+            trackRepository.save(track);
+
+            processAlbumPublicationIfAllReviewed(album, nowUtc, submitter, reviewer);
+
+            if (submitter != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer.getId(),
+                        NotificationType.TRACK_APPROVED,
+                        "Track approved",
+                        "Your track \"" + track.getTitle() + "\" in album \"" + album.getTitle() + "\" has been approved. It will be published once all tracks in the album are reviewed.",
+                        "TRACK",
+                        String.valueOf(track.getId())
+                );
+            }
         }
 
         String lyrics = resolveTrackLyrics(track);
@@ -360,6 +376,7 @@ public class ModerationService {
                 .orElseThrow(() -> new ResourceNotFoundException("REVIEWER_NOT_FOUND", "Reviewer staff account not found."));
 
         Instant nowInstant = Instant.now();
+        LocalDateTime nowUtc = LocalDateTime.now(ZoneOffset.UTC);
         String rejectionReason = request.rejectionReason().trim();
         String reviewerNote = request.reviewerNote();
 
@@ -380,6 +397,12 @@ public class ModerationService {
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
 
+        Album album = track.getAlbum();
+        if (album != null) {
+            // Kiểm tra xem bài bị reject này có phải là bài cuối cùng đang pending trong album hay không
+            processAlbumPublicationIfAllReviewed(album, nowUtc, submitter, reviewer);
+        }
+
         if (submitter != null) {
             notificationService.createNotification(
                     submitter.getId(),
@@ -395,6 +418,102 @@ public class ModerationService {
         String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
+    }
+
+    /**
+     * Đồng bộ và xuất bản Album nếu tất cả các bài hát trong Album đã được Staff duyệt qua.
+     * Quy tắc nghiệp vụ:
+     * - Khi Staff duyệt từng bài trong Album (Approve hoặc Reject), nếu vẫn còn bài PENDING thì cả Album và các bài hát chưa được public.
+     * - Khi Staff đã duyệt qua HẾT toàn bộ bài trong Album:
+     *   + Chỉ những bài có trạng thái APPROVED mới được chuyển thành PUBLISHED.
+     *   + Những bài bị REJECTED giữ nguyên REJECTED (không public).
+     *   + Nếu Album có ít nhất 1 bài APPROVED -> Album được đặt status = "PUBLISHED" và xuất bản công khai.
+     *   + Nếu toàn bộ bài trong Album bị REJECTED -> Album được đặt status = "REJECTED".
+     */
+    private void processAlbumPublicationIfAllReviewed(Album album, LocalDateTime nowUtc, User submitter, Staff reviewer) {
+        if (album == null || album.getId() == null) {
+            return;
+        }
+
+        List<Track> albumTracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        if (albumTracks == null || albumTracks.isEmpty()) {
+            return;
+        }
+
+        List<Long> trackIds = albumTracks.stream().map(Track::getId).toList();
+        List<TrackSubmission> submissions = submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(trackIds);
+        Map<Long, TrackSubmission> latestSubByTrackId = submissions.stream()
+                .collect(Collectors.toMap(TrackSubmission::getTrackId, Function.identity(), (existing, replacement) -> existing));
+
+        // Kiểm tra xem còn bài nào trong Album đang ở trạng thái PENDING hay không
+        boolean hasPendingTracks = albumTracks.stream().anyMatch(t -> {
+            TrackSubmission sub = latestSubByTrackId.get(t.getId());
+            return sub == null || sub.getStatus() == SubmissionStatus.PENDING;
+        });
+
+        if (hasPendingTracks) {
+            // Vẫn còn bài chờ duyệt: Album giữ nguyên trạng thái PENDING/DRAFT, chưa công khai
+            if (!"PENDING".equalsIgnoreCase(album.getStatus()) && !"DRAFT".equalsIgnoreCase(album.getStatus())) {
+                album.setStatus("PENDING");
+                albumRepository.save(album);
+            }
+            return;
+        }
+
+        // Toàn bộ bài hát trong Album đã được duyệt xong (không còn bài nào PENDING)
+        List<Track> approvedTracks = new ArrayList<>();
+        List<Track> rejectedTracks = new ArrayList<>();
+
+        for (Track t : albumTracks) {
+            TrackSubmission sub = latestSubByTrackId.get(t.getId());
+            if (sub != null && sub.getStatus() == SubmissionStatus.APPROVED) {
+                t.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
+                t.setApprovedAt(nowUtc);
+                t.setLatestRejectionReason(null);
+                approvedTracks.add(t);
+            } else {
+                t.setPublicationStatus(TrackPublicationStatus.REJECTED);
+                if (sub != null && sub.getRejectionReason() != null) {
+                    t.setLatestRejectionReason(sub.getRejectionReason());
+                }
+                rejectedTracks.add(t);
+            }
+            trackRepository.save(t);
+        }
+
+        if (!approvedTracks.isEmpty()) {
+            album.setStatus("PUBLISHED");
+            album.setPublishedAt(nowUtc);
+            albumRepository.save(album);
+
+            if (submitter != null) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer != null ? reviewer.getId() : null,
+                        NotificationType.TRACK_APPROVED,
+                        "Album published",
+                        "All tracks in album \"" + album.getTitle() + "\" have been reviewed. "
+                                + approvedTracks.size() + " track(s) have been approved and published to the public catalog.",
+                        "ALBUM",
+                        String.valueOf(album.getId())
+                );
+            }
+        } else {
+            album.setStatus("REJECTED");
+            albumRepository.save(album);
+
+            if (submitter != null) {
+                notificationService.createNotification(
+                        submitter.getId(),
+                        reviewer != null ? reviewer.getId() : null,
+                        NotificationType.TRACK_REJECTED,
+                        "Album rejected",
+                        "All tracks in album \"" + album.getTitle() + "\" were rejected. The album was not published.",
+                        "ALBUM",
+                        String.valueOf(album.getId())
+                );
+            }
+        }
     }
 
     /**
