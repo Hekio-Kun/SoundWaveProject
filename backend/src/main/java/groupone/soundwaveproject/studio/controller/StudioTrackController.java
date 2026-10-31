@@ -3,7 +3,6 @@ package groupone.soundwaveproject.studio.controller;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.request.SubmitTrackRequest;
-import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
@@ -57,16 +56,6 @@ public class StudioTrackController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PutMapping(value = "/tracks/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public StudioTrackResponse updateTrack(
-            @PathVariable Long id,
-            @RequestPart("track") @Valid UpdateTrackRequest request,
-            @RequestPart(value = "audio", required = false) MultipartFile audio,
-            @RequestPart(value = "cover", required = false) MultipartFile cover,
-            Authentication authentication
-    ) {
-        return studioTrackService.updateTrack(id, request, audio, cover, authentication.getName());
-    }
 
     @DeleteMapping("/tracks/{id}")
     public ResponseEntity<Void> deleteTrack(

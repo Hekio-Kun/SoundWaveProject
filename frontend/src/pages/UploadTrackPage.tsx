@@ -44,14 +44,7 @@ type FormErrors = Record<string, string>;
  * - Điều hướng sau khi hoàn tất về /track/submission/:id hoặc /track
  */
 export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrackId }: Props) {
-  const isEditMode = Boolean(editTrackId && editTrackId > 0);
-  const [existingTrack, setExistingTrack] = useState<ApiTrack | null>(null);
-  const [loadingTrack, setLoadingTrack] = useState(false);
-  const [trackFetchError, setTrackFetchError] = useState("");
-  const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null);
-  const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
-  const [existingAudioName, setExistingAudioName] = useState<string>("");
-  const [existingCoverName, setExistingCoverName] = useState<string>("");
+
 
   const [genres, setGenres] = useState<GenreOption[]>([]);
   const [albums, setAlbums] = useState<AlbumOption[]>([]);
@@ -102,9 +95,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       ]);
       setGenres(fetchedGenres);
       setAlbums(fetchedAlbums);
-      if (!isEditMode) {
-        setGenreId((current) => current || fetchedGenres[0]?.id || 0);
-      }
+      setGenreId((current) => current || fetchedGenres[0]?.id || 0);
     } catch (error: unknown) {
       setOptionsError(error instanceof Error
         ? error.message
@@ -118,39 +109,6 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     void loadOptions();
   }, [isAuthenticated, canUpload]);
 
-  // Load existing track data when editTrackId is supplied
-  useEffect(() => {
-    if (!editTrackId) return;
-    let active = true;
-    setLoadingTrack(true);
-    setTrackFetchError("");
-
-    studioApi.getTrackById(editTrackId)
-      .then((data) => {
-        if (!active) return;
-        setExistingTrack(data);
-        setTitle(data.title || "");
-        setGenreId(data.genreId || 0);
-        setAlbumId(data.albumId ?? "");
-        setDescription(data.description || "");
-        setLyrics(data.lyrics || "");
-        setDurationMs(data.durationMs);
-        setExistingAudioUrl(data.audioUrl || null);
-        setExistingCoverUrl(data.coverUrl || null);
-        setExistingAudioName(data.audioUrl ? "Current audio file attached" : "");
-        setExistingCoverName(data.coverUrl ? "Current cover artwork attached" : "");
-        setLoadingTrack(false);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setTrackFetchError(err instanceof Error ? err.message : "Failed to load track details.");
-        setLoadingTrack(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [editTrackId]);
 
   const clearError = (field: string) => {
     if (formErrors[field]) {
@@ -233,7 +191,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     if (!title.trim()) errors.title = "Please enter the track title.";
     else if (title.trim().length > 200) errors.title = "Track title cannot exceed 200 characters.";
     if (!genreId) errors.genre = "Please select a music genre.";
-    if (!audioFile && !existingAudioUrl) errors.audio = "Please select an MP3, WAV or FLAC audio file.";
+    if (!audioFile) errors.audio = "Please select an MP3, WAV or FLAC audio file.";
     else if (audioFile) {
       const audioError = validateAudioFile(audioFile);
       if (audioError) errors.audio = audioError;
@@ -271,71 +229,29 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     setSubmitting(true);
     setSubmitError("");
     try {
-      let targetTrackId: number;
-      let resultingStatus: string | undefined;
+      const created = await studioApi.createDraft({
+        title: title.trim(),
+        genreId,
+        albumId: albumId === "" ? undefined : Number(albumId),
+        description: description.trim() || undefined,
+        durationMs,
+        lyrics: lyrics.trim() || undefined,
+      }, audioFile!, coverFile ?? undefined);
 
-      if (isEditMode && editTrackId) {
-        // [FEATURE]: UC-19.3 Update A Track
-        // Gửi yêu cầu cập nhật bài hát. Nếu bài hát gốc là PUBLISHED, backend sẽ tự động thu hồi quyền nghe công khai
-        // và chuyển trạng thái sang PENDING để Staff kiểm duyệt lại, đồng thời tạo TrackSubmission và thông báo cho Staff.
-        // Nếu bài hát là REJECTED kèm cờ submitForReview (AF02), backend chuyển sang PENDING và nộp duyệt lại.
-        const updated = await studioApi.updateTrack(
-          editTrackId,
-          {
-            title: title.trim(),
-            genreId,
-            albumId: albumId === "" ? undefined : Number(albumId),
-            description: description.trim() || undefined,
-            durationMs,
-            lyrics: lyrics.trim() || undefined,
-            resubmitForReview: submitForReview || undefined,
-            submitterNote: note || undefined,
-          },
-          audioFile ?? undefined,
-          coverFile ?? undefined
-        );
-        targetTrackId = updated.id;
-        resultingStatus = updated.status;
-      } else {
-        const created = await studioApi.createDraft({
-          title: title.trim(),
-          genreId,
-          albumId: albumId === "" ? undefined : Number(albumId),
-          description: description.trim() || undefined,
-          durationMs,
-          lyrics: lyrics.trim() || undefined,
-        }, audioFile!, coverFile ?? undefined);
-        targetTrackId = created.id;
-        resultingStatus = created.status;
-      }
+      const targetTrackId = created.id;
 
       if (submitForReview && targetTrackId) {
-        if (!isEditMode) {
-          await studioApi.submitForReview(targetTrackId, note);
-        }
+        await studioApi.submitForReview(targetTrackId, note);
         sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
-          message: isEditMode
-            ? "Track resubmitted for review successfully!"
-            : "Track submitted for review successfully!",
+          message: "Track submitted for review successfully!",
           type: "success",
         }));
         onNavigate(`/track/submission/${targetTrackId}`);
         return true;
       }
 
-      // [FEATURE]: UC-19.3 POST-4 & POST-5
-      // Thông báo rõ ràng cho creator khi bài hát PUBLISHED được chỉnh sửa và chuyển sang PENDING để Staff kiểm duyệt lại
-      let successMsg: string;
-      if (isEditMode && existingTrack?.status === "PUBLISHED" && resultingStatus === "PENDING") {
-        successMsg = "Track updated and submitted to Staff for re-moderation. Public listening visibility has been temporarily paused.";
-      } else if (isEditMode) {
-        successMsg = "Draft updated successfully!";
-      } else {
-        successMsg = "Draft saved successfully!";
-      }
-
       sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
-        message: successMsg,
+        message: "Draft saved successfully!",
         type: "success",
       }));
 
@@ -402,23 +318,9 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     setShowLyricMaker(false);
     setCopyrightAgreed(false);
     setSubmitterNote("");
-    setExistingAudioUrl(null);
-    setExistingCoverUrl(null);
   };
 
   const hasUnsavedChanges = () => {
-    if (isEditMode) {
-      if (!existingTrack) return false;
-      return (
-        title.trim() !== (existingTrack.title || "").trim() ||
-        genreId !== (existingTrack.genreId || 0) ||
-        albumId !== (existingTrack.albumId ?? "") ||
-        description.trim() !== (existingTrack.description || "").trim() ||
-        lyrics.trim() !== (existingTrack.lyrics || "").trim() ||
-        audioFile !== null ||
-        coverFile !== null
-      );
-    }
     const initialGenreId = genres[0]?.id || 0;
     return Boolean(
       title.trim() !== "" ||
@@ -439,7 +341,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       if (window.history.length > 1) {
         window.history.back();
       } else {
-        onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+        onNavigate("/track");
       }
     }
   };
@@ -466,7 +368,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       if (window.history.length > 1) {
         window.history.back();
       } else {
-        onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+        onNavigate("/track");
       }
     }
   };
@@ -497,86 +399,18 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     );
   }
 
-  if (loadingTrack) {
-    return (
-      <div className="createmytrack upload-track-page">
-        <div style={{ textAlign: "center", padding: "80px 20px" }}>
-          <div className="studio-spinner" style={{ margin: "0 auto 16px" }} />
-          <p style={{ color: "#786F65", fontWeight: 600 }}>Loading draft details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (trackFetchError) {
-    return (
-      <div className="createmytrack upload-track-page">
-        <div className="auth-v2-error upload-track-alert" role="alert" style={{ margin: "24px 0" }}>
-          <span><AlertIcon width={17} height={17} /></span>
-          <div><b>Unable to load track</b><small>{trackFetchError}</small></div>
-          <button className="button button-secondary button-small" type="button" onClick={() => onNavigate("/track")}>Back to My Tracks</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (existingTrack && existingTrack.status === "PENDING") {
-    return (
-      <div className="createmytrack upload-track-page">
-        <section className="upload-track-success" role="status" style={{ borderTop: "4px solid #EAB308" }}>
-          <span className="upload-track-success__icon" style={{ background: "#FEF9C3", color: "#CA8A04" }}>
-            <AlertIcon width={34} height={34} />
-          </span>
-          <span className="eyebrow" style={{ color: "#CA8A04" }}>PENDING REVIEW</span>
-          <h1>Track currently in review</h1>
-          <p>
-            <strong>{existingTrack.title}</strong> is currently being reviewed by staff and cannot be modified directly.
-            If you need to make changes, please withdraw the submission first from the track details page.
-          </p>
-          <div className="upload-track-success__actions">
-            <button className="button button-primary" onClick={() => onNavigate(`/track/submission/${existingTrack.id}`)}>
-              Go to Track Details
-            </button>
-            <button className="button button-secondary" onClick={() => onNavigate("/track")}>
-              Return to My Tracks
-            </button>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div className="createmytrack upload-track-page">
       <header className="upload-track-hero">
         <span className="upload-track-hero__icon">
-          {isEditMode ? <EditIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
+          <UploadIcon width={24} height={24} />
         </span>
         <div>
-          <span className="eyebrow">
-            {isEditMode
-              ? (existingTrack?.status === "PUBLISHED"
-                  ? "CONTENT STUDIO · EDIT PUBLISHED TRACK"
-                  : existingTrack?.status === "REJECTED"
-                  ? "CONTENT STUDIO · RESUBMIT TRACK"
-                  : "CONTENT STUDIO · EDIT DRAFT")
-              : "CONTENT STUDIO"}
-          </span>
-          <h1>
-            {isEditMode
-              ? (existingTrack?.status === "PUBLISHED"
-                  ? `Edit published track: ${existingTrack?.title || title || "Track"}`
-                  : existingTrack?.status === "REJECTED"
-                  ? `Edit & resubmit: ${existingTrack?.title || title || "Track"}`
-                  : `Edit draft: ${existingTrack?.title || title || "Track"}`)
-              : "Upload a new track"}
-          </h1>
+          <span className="eyebrow">CONTENT STUDIO · CREATE NEW TRACK</span>
+          <h1>Upload a new track</h1>
           <p>
-            {isEditMode
-              ? (existingTrack?.status === "REJECTED"
-                  ? "Update your track audio, artwork, lyrics, or notes to address reviewer feedback and resubmit for review."
-                  : "Update track details, replace audio or cover artwork, and synchronize lyrics. Changes remain in your private drafts until submitted.")
-              : "Add the audio and track information now. The track stays private as a draft until you submit it for review."}
+            Add the audio and track information now. The track stays private as a draft until you submit it for review.
           </p>
         </div>
       </header>
@@ -668,9 +502,8 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               helperText="MP3, WAV or FLAC · Max 30MB"
               accept=".mp3,.wav,.flac,audio/mpeg,audio/wav,audio/flac"
               file={audioFile}
-              existingFileLabel={existingAudioName}
               error={formErrors.audio}
-              required={!isEditMode && !existingAudioUrl}
+              required
               disabled={submitting}
               onFileChange={(file) => void handleAudioChange(file)}
             />
@@ -680,8 +513,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               helperText="JPG or PNG · Max 5MB"
               accept=".jpg,.jpeg,.png,image/jpeg,image/png"
               file={coverFile}
-              existingFileLabel={existingCoverName}
-              error={formErrors.cover}
+                            error={formErrors.cover}
               disabled={submitting}
               onFileChange={handleCoverChange}
             />
@@ -736,8 +568,8 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
                   <button
                     type="button"
                     className={`button button-small ${showLyricMaker ? "button-primary" : "button-secondary"}`}
-                    disabled={submitting || (!audioFile && !existingAudioUrl)}
-                    title={(!audioFile && !existingAudioUrl) ? "Upload audio or choose a track first to synchronize lyrics" : undefined}
+                    disabled={submitting || !audioFile}
+                    title={!audioFile ? "Upload audio first to synchronize lyrics" : undefined}
                     onClick={() => setShowLyricMaker((prev) => !prev)}
                     style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
                   >
@@ -752,7 +584,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               <div style={{ marginTop: "14px" }}>
                 <LyricSyncTab
                   audioFile={audioFile}
-                  audioUrl={existingAudioUrl}
+                  audioUrl={null}
                   initialLyrics={lyrics}
                   trackTitle={title}
                   onApplyLyrics={(lrcString, virtualFile) => {
@@ -773,7 +605,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
           {submitting && (
             <div className="studio-upload-progress" role="status" aria-live="polite">
               <span className="studio-upload-progress__bar" />
-              <div><b>{isEditMode ? "Updating your track" : "Uploading your track"}</b><small>Please keep this page open while media is being processed.</small></div>
+              <div><b>Uploading your track</b><small>Please keep this page open while media is being processed.</small></div>
             </div>
           )}
 
@@ -793,24 +625,8 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               disabled={submitting || loadingOptions || Boolean(optionsError)}
               id="btn-upload-save-draft"
             >
-              {isEditMode
-                ? existingTrack?.status === "PUBLISHED"
-                  ? "Save changes & submit for re-moderation"
-                  : "Save draft changes"
-                : "Save as draft"}
+              Save as draft
             </button>
-            {(isEditMode && existingTrack?.status === "REJECTED") && (
-              <button
-                className="button button-secondary"
-                type="button"
-                disabled={submitting || loadingOptions || Boolean(optionsError)}
-                onClick={handleStartSubmitReview}
-                id="btn-upload-submit-review"
-              >
-                <UploadIcon width={17} height={17} />{" "}
-                {submitting ? "Saving..." : "Resubmit for review"}
-              </button>
-            )}
           </div>
         </form>
 
@@ -835,13 +651,13 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
         <div className="modal-backdrop" role="presentation" onClick={() => !submitting && setConfirmModalOpen(false)}>
           <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{existingTrack?.status === "REJECTED" ? "Resubmit track for Staff review" : "Submit track for Staff review"}</h3>
+              <h3>Submit track for Staff review</h3>
               <button type="button" className="icon-button" onClick={() => setConfirmModalOpen(false)} disabled={submitting} aria-label="Close dialog">
                 <CloseIcon width={18} height={18} />
               </button>
             </div>
             <p style={{ margin: "12px 0 8px", color: "var(--sw-text-secondary)" }}>
-              You are {existingTrack?.status === "REJECTED" ? "resubmitting" : "submitting"} <b>“{title}”</b> to the moderation queue. Once submitted, editing is locked until staff completes review.
+              You are submitting <b>“{title}”</b> to the moderation queue. Once submitted, editing is locked until staff completes review.
             </p>
             <div className="form-group" style={{ marginTop: "12px" }}>
               <label htmlFor="upload-submitter-note">Note for reviewer (optional)</label>
@@ -878,9 +694,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
                 onClick={() => void handleConfirmSubmitReview()}
                 id="btn-confirm-agree-submit"
               >
-                {submitting
-                  ? (existingTrack?.status === "REJECTED" ? "Resubmitting..." : "Submitting...")
-                  : (existingTrack?.status === "REJECTED" ? "Agree & Resubmit" : "Agree & Submit")}
+                {submitting ? "Submitting..." : "Agree & Submit"}
               </button>
             </div>
           </div>
@@ -936,7 +750,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
                   if (window.history.length > 1) {
                     window.history.back();
                   } else {
-                    onNavigate(isEditMode && editTrackId && existingTrack?.status !== "DRAFT" ? `/track/submission/${editTrackId}` : "/track");
+                    onNavigate("/track");
                   }
                 }}
               >
