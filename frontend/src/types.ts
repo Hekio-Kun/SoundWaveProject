@@ -186,3 +186,30 @@ export type NotificationItem = {
   createdAt: string;
   navigationUrl?: string | null;
 };
+
+export type LyricDetail = {
+  id: number | null;
+  trackId: number;
+  lyricContent: string;
+  status: string; // "PUBLISHED", "DRAFT", "PERSONAL"
+  isOfficial: boolean;
+  lyricType: string; // "OFFICIAL", "CUSTOM", "TRANSLATION"
+  updatedAt?: string;
+};
+
+export type TrackLyricsBundle = {
+  officialLyric: LyricDetail | null;
+  userPersonalLyric: LyricDetail | null;
+};
+
+export type StaffTrackLyricSummary = {
+  trackId: number;
+  title: string;
+  artistName: string;
+  albumTitle?: string | null;
+  durationSeconds?: number | null;
+  hasOfficialLyric: boolean;
+  lyricStatus?: string | null; // "PUBLISHED", "DRAFT", null
+  lastUpdated?: string | null;
+  updatedByStaffName?: string | null;
+};

@@ -4,6 +4,7 @@ import {
   CloseIcon,
   DashboardIcon,
   DiscIcon,
+  FileTextIcon,
   LogoutIcon,
   MenuIcon,
   ShieldIcon,
@@ -97,12 +98,21 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           <>
             <button
               type="button"
-              className={activeRoute.startsWith("/staff") ? "is-active" : ""}
+              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/dashboard")}
               title="Pending track submissions"
             >
               <DashboardIcon width={17} height={17} />
               <span>Pending Tracks</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute === "/staff/lyrics" ? "is-active" : ""}
+              onClick={() => handleNavClick("/staff/lyrics")}
+              title="Official lyrics management"
+            >
+              <FileTextIcon width={17} height={17} />
+              <span>Official Lyrics</span>
             </button>
           </>
         ) : (
@@ -125,7 +135,16 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
             </button>
             <button
               type="button"
-              className={activeRoute.startsWith("/staff") ? "is-active" : ""}
+              className={activeRoute === "/admin/lyrics" ? "is-active" : ""}
+              onClick={() => handleNavClick("/admin/lyrics")}
+              title="Official lyrics management"
+            >
+              <FileTextIcon width={17} height={17} />
+              <span>Official Lyrics</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/dashboard")}
             >
               <DashboardIcon width={17} height={17} />
