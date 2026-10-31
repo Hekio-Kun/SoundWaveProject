@@ -170,7 +170,5 @@ export const studioApi = {
     studioRequest<AlbumOption[]>("/studio/albums"),
   updateTrackLyrics: (id: number, lyrics: string) =>
     studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
-  updateLyrics: (id: number, lyrics: string) =>
-    studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
 };
 

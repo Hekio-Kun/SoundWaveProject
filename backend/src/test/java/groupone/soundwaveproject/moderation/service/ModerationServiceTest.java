@@ -51,7 +51,7 @@ class ModerationServiceTest {
     @Mock private StaffRepository staffRepository;
     @Mock private UserProfileRepository profileRepository;
     @Mock private NotificationService notificationService;
-    @Mock private OfficialLyricRepository officialLyricRepository;
+    @Mock private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
 
     private ModerationService moderationService;
     private Staff staffUser;
@@ -64,11 +64,11 @@ class ModerationServiceTest {
                 trackRepository,
                 albumRepository,
                 mapper,
-                officialLyricRepository,
                 userRepository,
                 staffRepository,
                 profileRepository,
-                notificationService
+                notificationService,
+                lyricService
         );
 
         StaffRole staffRole = new StaffRole("STAFF", "Staff", "Staff role");
@@ -219,12 +219,7 @@ class ModerationServiceTest {
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
-        OfficialLyric lyric = OfficialLyric.builder()
-                .track(testTrack)
-                .lyricContent("[00:01.00]Hello world\n[00:05.00]Echoes of summer")
-                .status("PUBLISHED")
-                .build();
-        when(officialLyricRepository.findByTrackId(100L)).thenReturn(Optional.of(lyric));
+        when(lyricService.getOfficialLyrics(100L)).thenReturn("[00:01.00]Hello world\n[00:05.00]Echoes of summer");
 
         moderationService.getSubmissionDetail(1L);
 

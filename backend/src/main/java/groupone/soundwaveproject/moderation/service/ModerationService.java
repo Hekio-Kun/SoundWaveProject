@@ -58,7 +58,6 @@ public class ModerationService {
     private final TrackRepository trackRepository;
     private final AlbumRepository albumRepository;
     private final TrackSubmissionMapper mapper;
-    private final OfficialLyricRepository officialLyricRepository;
     private final UserRepository userRepository;
     private final StaffRepository staffRepository;
     private final UserProfileRepository profileRepository;
@@ -261,7 +260,7 @@ public class ModerationService {
                 .orElseThrow(() -> new SubmissionNotFoundException(id));
 
         Track track = trackRepository.findById(submission.getTrackId()).orElse(null);
-        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(submission.getTrackId()) : (track != null ? track.getLyrics() : null);
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(submission.getTrackId()) : null;
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
@@ -318,7 +317,7 @@ public class ModerationService {
         track.setLatestRejectionReason(null);
 
         Album album = track.getAlbum();
-        if (album != null && "DRAFT".equalsIgnoreCase(album.getStatus())) {
+        if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
             album.setStatus("PUBLISHED");
             album.setPublishedAt(nowUtc);
             albumRepository.save(album);
@@ -377,6 +376,19 @@ public class ModerationService {
         track.setPublicationStatus(TrackPublicationStatus.REJECTED);
         track.setLatestRejectionReason(rejectionReason);
         trackRepository.save(track);
+
+        Album album = track.getAlbum();
+        if (album != null) {
+            boolean hasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PUBLISHED);
+            boolean hasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PENDING);
+            if (!hasPublished && !hasPending) {
+                boolean hasRejected = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.REJECTED);
+                if (hasRejected) {
+                    album.setStatus("REJECTED");
+                    albumRepository.save(album);
+                }
+            }
+        }
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
@@ -463,9 +475,7 @@ public class ModerationService {
         if (track == null) {
             return null;
         }
-        return officialLyricRepository.findByTrackId(track.getId())
-                .map(OfficialLyric::getLyricContent)
-                .orElse(null);
+        return lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
     }
 
     public AlbumTrackNavigationResponse buildAlbumNavigation(TrackSubmission currentSubmission, Track currentTrack) {

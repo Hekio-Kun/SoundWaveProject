@@ -56,7 +56,7 @@ public class StudioTrackMapper {
             reviewedAt = latestSubmission.getReviewedAt();
         }
 
-        String finalLyrics = lyrics != null ? lyrics : track.getLyrics();
+        String finalLyrics = lyrics;
 
         return new StudioTrackResponse(
                 track.getId(),
@@ -87,7 +87,7 @@ public class StudioTrackMapper {
     }
 
     public StudioTrackResponse toStudioTrackResponse(Track track, Genre genre, Album album, TrackSubmission latestSubmission) {
-        return toStudioTrackResponse(track, genre, album, latestSubmission, track.getLyrics());
+        return toStudioTrackResponse(track, genre, album, latestSubmission, null);
     }
 
     public GenreOptionResponse toGenreOption(Genre genre) {

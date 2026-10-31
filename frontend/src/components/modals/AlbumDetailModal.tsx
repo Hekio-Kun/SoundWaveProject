@@ -56,7 +56,10 @@ export function AlbumDetailModal({ open, onClose, album, onEdit, onDelete }: Pro
   if (!open || !album) return null;
 
   const current = fullAlbum ?? album;
-  const isPublished = current.status === "PUBLISHED";
+  const status = (current.status || "DRAFT").toUpperCase();
+  const isPublished = status === "PUBLISHED" || status === "APPROVED";
+  const isPending = status === "PENDING";
+  const isRejected = status === "REJECTED";
 
   return createPortal(
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -118,14 +121,32 @@ export function AlbumDetailModal({ open, onClose, album, onEdit, onDelete }: Pro
                     fontWeight: 700,
                     padding: "3px 10px",
                     borderRadius: "20px",
-                    backgroundColor: isPublished ? "#ECFDF5" : "#FEF3F2",
-                    color: isPublished ? "#059669" : "#B42318",
+                    backgroundColor: isPublished
+                      ? "#ECFDF5"
+                      : isPending
+                      ? "#FFFBEB"
+                      : isRejected
+                      ? "#FEF2F2"
+                      : "#F1F5F9",
+                    color: isPublished
+                      ? "#059669"
+                      : isPending
+                      ? "#D97706"
+                      : isRejected
+                      ? "#DC2626"
+                      : "#64748B",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "4px",
                   }}
                 >
-                  {isPublished ? "● PUBLISHED (Live)" : "○ DRAFT"}
+                  {isPublished
+                    ? "● PUBLISHED (Live)"
+                    : isPending
+                    ? "● PENDING"
+                    : isRejected
+                    ? "● REJECTED"
+                    : "○ DRAFT"}
                 </span>
                 {current.releaseDate && (
                   <span style={{ fontSize: "12px", color: "var(--color-text-secondary, #57534E)" }}>

@@ -67,7 +67,6 @@ public class StudioTrackService {
     private final StaffRepository staffRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
-    private final OfficialLyricRepository officialLyricRepository;
     private final NotificationService notificationService;
     private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
 
@@ -155,7 +154,7 @@ public class StudioTrackService {
             Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
             Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
             TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-            String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+            String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
             return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
         }).toList();
     }
@@ -169,7 +168,7 @@ public class StudioTrackService {
         Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
     }
@@ -237,13 +236,8 @@ public class StudioTrackService {
 
             Track savedTrack = trackRepository.save(track);
             String requestLyrics = (request.lyrics() != null && !request.lyrics().isBlank()) ? request.lyrics().trim() : null;
-            if (requestLyrics != null) {
-                OfficialLyric officialLyric = OfficialLyric.builder()
-                        .track(savedTrack)
-                        .lyricContent(requestLyrics)
-                        .status("DRAFT")
-                        .build();
-                officialLyricRepository.save(officialLyric);
+            if (requestLyrics != null && lyricService != null) {
+                lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), requestLyrics, "DRAFT", user.getId());
             }
             return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null, requestLyrics);
         } catch (Exception ex) {
@@ -342,16 +336,11 @@ public class StudioTrackService {
         track.setAlbum(album);
         track.setTrackNumber(request.trackNumber());
         track.setDescription(request.description() != null ? request.description().trim() : null);
-        if (request.lyrics() != null) {
+        if (request.lyrics() != null && lyricService != null) {
             if (request.lyrics().isBlank()) {
-                officialLyricRepository.findByTrackId(track.getId())
-                        .ifPresent(officialLyricRepository::delete);
+                lyricService.deleteAllLyricsForTrack(track.getId());
             } else {
-                OfficialLyric lyric = officialLyricRepository.findByTrackId(track.getId())
-                        .orElseGet(() -> OfficialLyric.builder().track(track).build());
-                lyric.setLyricContent(request.lyrics().trim());
-                lyric.setStatus("DRAFT");
-                officialLyricRepository.save(lyric);
+                lyricService.saveOrUpdateOfficialLyric(track.getId(), request.lyrics().trim(), "DRAFT", user.getId());
             }
         }
 
@@ -436,10 +425,15 @@ public class StudioTrackService {
             boolean oldAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     oldAlbum.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (!oldAlbumHasPublished) {
-                oldAlbum.setStatus("DRAFT");
-                albumRepository.save(oldAlbum);
+            if (oldAlbumHasPublished) {
+                oldAlbum.setStatus("PUBLISHED");
+            } else {
+                boolean oldAlbumHasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                        oldAlbum.getId(), TrackPublicationStatus.PENDING
+                );
+                oldAlbum.setStatus(oldAlbumHasPending ? "PENDING" : "DRAFT");
             }
+            albumRepository.save(oldAlbum);
         }
 
         // Kiểm tra và cập nhật album mới (nếu chuyển album)
@@ -447,10 +441,15 @@ public class StudioTrackService {
             boolean currentAlbumHasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (!currentAlbumHasPublished && !"DRAFT".equalsIgnoreCase(album.getStatus())) {
-                album.setStatus("DRAFT");
-                albumRepository.save(album);
+            if (currentAlbumHasPublished) {
+                album.setStatus("PUBLISHED");
+            } else {
+                boolean currentAlbumHasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                        album.getId(), TrackPublicationStatus.PENDING
+                );
+                album.setStatus(currentAlbumHasPending ? "PENDING" : "DRAFT");
             }
+            albumRepository.save(album);
         }
 
         // Lấy thông tin bản ghi nộp duyệt mới nhất để phản hồi cho UI (POST-5)
@@ -525,16 +524,29 @@ public class StudioTrackService {
             trackRepository.delete(track);
         }
 
-        // POST-4 & AF02: Đánh giá các bài hát còn lại trong Album, hạ cấp về DRAFT nếu không còn bài hát PUBLISHED nào
+        // POST-4 & AF02: Đánh giá các bài hát còn lại trong Album
         if (album != null) {
             boolean hasPublishedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.PUBLISHED
             );
-            if (!hasPublishedTrack) {
-                album.setStatus("DRAFT");
-                albumRepository.save(album);
+            if (hasPublishedTrack) {
+                album.setStatus("PUBLISHED");
+            } else {
+                boolean hasPendingTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
+                        album.getId(), TrackPublicationStatus.PENDING
+                );
+                album.setStatus(hasPendingTrack ? "PENDING" : "DRAFT");
             }
+            albumRepository.save(album);
         }
+    }
+
+    /**
+     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
+     */
+    @Transactional
+    public StudioTrackResponse updateLyrics(Long id, String lyrics, String currentUserEmail) {
+        return updateTrackLyrics(id, new groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest(lyrics), currentUserEmail);
     }
 
     /**
@@ -546,19 +558,20 @@ public class StudioTrackService {
         Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
+        if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
+            throw new ForbiddenOperationException("Tracks currently pending review cannot be modified.");
+        }
+
         String rawLyrics = request != null ? request.lyrics() : null;
         if (lyricService != null) {
             lyricService.saveOrUpdateOfficialLyrics(id, rawLyrics, user.getId());
-        } else {
-            track.setLyrics(rawLyrics != null && !rawLyrics.trim().isBlank() ? rawLyrics.trim() : null);
-            trackRepository.save(track);
         }
 
         Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
 
-        String finalLyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+        String finalLyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
         return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, finalLyrics);
     }
 
