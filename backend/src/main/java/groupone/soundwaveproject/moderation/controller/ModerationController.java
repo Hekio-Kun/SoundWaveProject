@@ -43,9 +43,10 @@ public class ModerationController {
     @GetMapping
     public ResponseEntity<Page<SubmissionQueueItemResponse>> getQueue(
             @RequestParam(required = false) SubmissionStatus status,
+            @RequestParam(required = false) SubmissionType type,
             @RequestParam(required = false) String search,
             @PageableDefault(sort = "submittedAt", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(moderationService.getQueue(status, search, pageable));
+        return ResponseEntity.ok(moderationService.getQueue(status, type, search, pageable));
     }
 
     /**
@@ -54,8 +55,9 @@ public class ModerationController {
      * @return DTO thống kê số lượng bài hát/album chờ duyệt, đã duyệt, bị từ chối và tổng số
      */
     @GetMapping("/stats")
-    public ResponseEntity<SubmissionStatsResponse> getQueueStats() {
-        return ResponseEntity.ok(moderationService.getQueueStats());
+    public ResponseEntity<SubmissionStatsResponse> getQueueStats(
+            @RequestParam(required = false) SubmissionType type) {
+        return ResponseEntity.ok(moderationService.getQueueStats(type));
     }
 
     /**

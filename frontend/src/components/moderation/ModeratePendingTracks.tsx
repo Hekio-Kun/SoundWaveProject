@@ -148,7 +148,7 @@ export function ModeratePendingTracks({
 
   const loadStats = async () => {
     try {
-      const data = await moderationApi.getStats();
+      const data = await moderationApi.getStats("TRACK_RELEASE");
       setStats(data);
     } catch (err: unknown) {
       console.error("Error loading moderation stats:", err);
@@ -168,7 +168,7 @@ export function ModeratePendingTracks({
     try {
       const data = await moderationApi.getQueue({
         status: statusFilter,
-        type: typeFilter,
+        type: "TRACK_RELEASE",
         search: searchQuery,
         page,
         size: pageSize,

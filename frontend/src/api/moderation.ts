@@ -100,7 +100,10 @@ export type PageResponse<T> = {
 };
 
 export const moderationApi = {
-  getStats: () => apiFetch<SubmissionStats>("/moderation/submissions/stats"),
+  getStats: (type?: string) => {
+    const query = type && type !== "ALL" ? `?type=${encodeURIComponent(type)}` : "";
+    return apiFetch<SubmissionStats>(`/moderation/submissions/stats${query}`);
+  },
 
   getQueue: (params: { status?: string; type?: string; search?: string; page?: number; size?: number }) => {
     const searchParams = new URLSearchParams();

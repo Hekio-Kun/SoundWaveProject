@@ -334,4 +334,20 @@ class ModerationServiceTest {
         assertEquals(TrackPublicationStatus.PUBLISHED, publishedTrack.getPublicationStatus());
         verify(trackRepository, org.mockito.Mockito.never()).save(publishedTrack);
     }
+
+    @Test
+    void getQueueStats_WithType_ReturnsStatsFilteredByType() {
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.PENDING, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(5L);
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.APPROVED, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(10L);
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.REJECTED, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(2L);
+        when(submissionRepository.countBySubmissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(17L);
+
+        groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse stats =
+                moderationService.getQueueStats(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE);
+
+        assertEquals(5L, stats.pendingCount());
+        assertEquals(10L, stats.approvedCount());
+        assertEquals(2L, stats.rejectedCount());
+        assertEquals(17L, stats.totalCount());
+    }
 }

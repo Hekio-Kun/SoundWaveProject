@@ -112,6 +112,14 @@ public class ModerationService {
      */
     @Transactional(readOnly = true)
     public Page<SubmissionQueueItemResponse> getQueue(SubmissionStatus status, String search, Pageable pageable) {
+        return getQueue(status, null, search, pageable);
+    }
+
+    /**
+     * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt theo phân trang, loại yêu cầu và bộ lọc tìm kiếm.
+     */
+    @Transactional(readOnly = true)
+    public Page<SubmissionQueueItemResponse> getQueue(SubmissionStatus status, SubmissionType type, String search, Pageable pageable) {
         boolean searchProvided = search != null && !search.trim().isBlank();
         Page<TrackSubmission> page;
 
@@ -148,9 +156,17 @@ public class ModerationService {
 
             Collection<Long> safeTrackIds = matchingTrackIds.isEmpty() ? List.of(-1L) : matchingTrackIds;
             Collection<Long> safeUserIds = matchingUserIds.isEmpty() ? List.of(-1L) : matchingUserIds;
-            page = submissionRepository.findByStatusAndMatchingIds(status, safeTrackIds, safeUserIds, pageable);
+            if (type != null) {
+                page = submissionRepository.findByStatusAndSubmissionTypeAndMatchingIds(status, type, safeTrackIds, safeUserIds, pageable);
+            } else {
+                page = submissionRepository.findByStatusAndMatchingIds(status, safeTrackIds, safeUserIds, pageable);
+            }
+        } else if (status != null && type != null) {
+            page = submissionRepository.findByStatusAndSubmissionType(status, type, pageable);
         } else if (status != null) {
             page = submissionRepository.findByStatus(status, pageable);
+        } else if (type != null) {
+            page = submissionRepository.findBySubmissionType(type, pageable);
         } else {
             page = submissionRepository.findAll(pageable);
         }
@@ -277,6 +293,21 @@ public class ModerationService {
      */
     @Transactional(readOnly = true)
     public SubmissionStatsResponse getQueueStats() {
+        return getQueueStats(null);
+    }
+
+    /**
+     * Lấy số liệu thống kê tổng hợp số lượng yêu cầu kiểm duyệt theo loại (TRACK_RELEASE hoặc LYRIC_UPDATE).
+     */
+    @Transactional(readOnly = true)
+    public SubmissionStatsResponse getQueueStats(SubmissionType type) {
+        if (type != null) {
+            long pending = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.PENDING, type);
+            long approved = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.APPROVED, type);
+            long rejected = submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.REJECTED, type);
+            long total = submissionRepository.countBySubmissionType(type);
+            return new SubmissionStatsResponse(pending, approved, rejected, total);
+        }
         long pending = submissionRepository.countByStatus(SubmissionStatus.PENDING);
         long approved = submissionRepository.countByStatus(SubmissionStatus.APPROVED);
         long rejected = submissionRepository.countByStatus(SubmissionStatus.REJECTED);

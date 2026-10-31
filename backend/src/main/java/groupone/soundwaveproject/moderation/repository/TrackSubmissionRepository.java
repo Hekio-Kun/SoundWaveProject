@@ -42,6 +42,7 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      */
     long countByStatus(SubmissionStatus status);
     long countByStatusAndSubmissionType(SubmissionStatus status, SubmissionType submissionType);
+    long countBySubmissionType(SubmissionType submissionType);
 
     /**
      * Lấy danh sách yêu cầu kiểm duyệt theo trạng thái có phân trang (UC-24.1 View Moderation Queue).
