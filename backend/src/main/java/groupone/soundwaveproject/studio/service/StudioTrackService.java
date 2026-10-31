@@ -55,7 +55,6 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StudioTrackService {
 
     private final TrackRepository trackRepository;
@@ -70,6 +69,54 @@ public class StudioTrackService {
     private final StudioTrackMapper studioTrackMapper;
     private final OfficialLyricRepository officialLyricRepository;
     private final NotificationService notificationService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService
+    ) {
+        this(trackRepository, genreRepository, albumRepository, trackSubmissionRepository,
+                playlistTrackRepository, listeningHistoryRepository, userRepository,
+                staffRepository, cloudMediaService, studioTrackMapper, notificationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public StudioTrackService(
+            TrackRepository trackRepository,
+            GenreRepository genreRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionRepository trackSubmissionRepository,
+            PlaylistTrackRepository playlistTrackRepository,
+            ListeningHistoryRepository listeningHistoryRepository,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            CloudMediaService cloudMediaService,
+            StudioTrackMapper studioTrackMapper,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.trackRepository = trackRepository;
+        this.genreRepository = genreRepository;
+        this.albumRepository = albumRepository;
+        this.trackSubmissionRepository = trackSubmissionRepository;
+        this.playlistTrackRepository = playlistTrackRepository;
+        this.listeningHistoryRepository = listeningHistoryRepository;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+        this.cloudMediaService = cloudMediaService;
+        this.studioTrackMapper = studioTrackMapper;
+        this.notificationService = notificationService;
+        this.lyricService = lyricService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -108,7 +155,8 @@ public class StudioTrackService {
             Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
             Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
             TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
-            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+            String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+            return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
         }).toList();
     }
 
@@ -121,8 +169,9 @@ public class StudioTrackService {
         Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
         TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
 
-        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission);
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, lyrics);
     }
 
     /**
@@ -467,6 +516,9 @@ public class StudioTrackService {
             trackRepository.save(track);
         } else {
             // [FEATURE]: HARD DELETE (POST-2 & Step 7) cho bài hát DRAFT hoặc REJECTED
+            if (lyricService != null) {
+                lyricService.deleteAllLyricsForTrack(track.getId());
+            }
             playlistTrackRepository.deleteByTrack_Id(track.getId());
             listeningHistoryRepository.deleteByTrackId(track.getId());
             trackSubmissionRepository.deleteByTrackId(track.getId());
@@ -483,6 +535,31 @@ public class StudioTrackService {
                 albumRepository.save(album);
             }
         }
+    }
+
+    /**
+     * Cập nhật lời bài hát chính thức (Official Lyrics) cho bài hát khi bài hát đã PUBLIC và chưa có lyric (hoặc cập nhật lyric).
+     */
+    @Transactional
+    public StudioTrackResponse updateTrackLyrics(Long id, groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request, String currentUserEmail) {
+        User user = getAuthenticatedUser(currentUserEmail);
+        Track track = trackRepository.findByIdAndUploaderUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
+
+        String rawLyrics = request != null ? request.lyrics() : null;
+        if (lyricService != null) {
+            lyricService.saveOrUpdateOfficialLyrics(id, rawLyrics, user.getId());
+        } else {
+            track.setLyrics(rawLyrics != null && !rawLyrics.trim().isBlank() ? rawLyrics.trim() : null);
+            trackRepository.save(track);
+        }
+
+        Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
+        Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
+        TrackSubmission submission = trackSubmissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId()).orElse(null);
+
+        String finalLyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : track.getLyrics();
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, submission, finalLyrics);
     }
 
     @Transactional

@@ -18,4 +18,6 @@ public interface PersonalLyricRepository extends JpaRepository<PersonalLyric, Lo
     void deleteByUserIdAndTrackIdAndLyricType(Long userId, Long trackId, String lyricType);
 
     void deleteByUserIdAndTrackId(Long userId, Long trackId);
+
+    void deleteByTrackId(Long trackId);
 }

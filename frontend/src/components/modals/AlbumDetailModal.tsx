@@ -9,7 +9,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   album: StudioAlbum | null;
-  onEdit: (album: StudioAlbum) => void;
+  onEdit?: (album: StudioAlbum) => void;
   onDelete?: (album: StudioAlbum) => void;
 };
 
@@ -143,19 +143,6 @@ export function AlbumDetailModal({ open, onClose, album, onEdit, onDelete }: Pro
               )}
 
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
-                <button
-                  type="button"
-                  className="button button-primary button-small"
-                  onClick={() => {
-                    onClose();
-                    onEdit(current);
-                  }}
-                  id="btn-modal-edit-album"
-                >
-                  <EditIcon width={14} height={14} />
-                  <span>Edit Album</span>
-                </button>
-
                 {onDelete && (
                   <button
                     type="button"

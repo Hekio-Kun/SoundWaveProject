@@ -53,7 +53,6 @@ import java.util.stream.Collectors;
  * - Gỡ bài hát đã xuất bản (Take Down) (UC-24.2)
  */
 @Service
-@RequiredArgsConstructor
 public class ModerationService {
     private final TrackSubmissionRepository submissionRepository;
     private final TrackRepository trackRepository;
@@ -64,6 +63,44 @@ public class ModerationService {
     private final StaffRepository staffRepository;
     private final UserProfileRepository profileRepository;
     private final NotificationService notificationService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public ModerationService(
+            TrackSubmissionRepository submissionRepository,
+            TrackRepository trackRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionMapper mapper,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            UserProfileRepository profileRepository,
+            NotificationService notificationService
+    ) {
+        this(submissionRepository, trackRepository, albumRepository, mapper,
+                userRepository, staffRepository, profileRepository, notificationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ModerationService(
+            TrackSubmissionRepository submissionRepository,
+            TrackRepository trackRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionMapper mapper,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            UserProfileRepository profileRepository,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.submissionRepository = submissionRepository;
+        this.trackRepository = trackRepository;
+        this.albumRepository = albumRepository;
+        this.mapper = mapper;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+        this.profileRepository = profileRepository;
+        this.notificationService = notificationService;
+        this.lyricService = lyricService;
+    }
 
     /**
      * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt theo phân trang và bộ lọc tìm kiếm (UC-24.1 View Moderation Queue).
@@ -224,7 +261,7 @@ public class ModerationService {
                 .orElseThrow(() -> new SubmissionNotFoundException(id));
 
         Track track = trackRepository.findById(submission.getTrackId()).orElse(null);
-        String lyrics = resolveTrackLyrics(track);
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(submission.getTrackId()) : (track != null ? track.getLyrics() : null);
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);

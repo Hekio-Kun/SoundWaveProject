@@ -16,6 +16,7 @@ import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmission
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
+import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import {
   AlertIcon,
@@ -140,6 +141,7 @@ export function StudioPage({
   const [deletingAlbum, setDeletingAlbum] = useState(false);
   const [submittingAlbum, setSubmittingAlbum] = useState<StudioAlbum | null>(null);
   const [submitAlbumModalOpen, setSubmitAlbumModalOpen] = useState(false);
+  const [updateLyricTrack, setUpdateLyricTrack] = useState<StudioTrack | null>(null);
 
   // Trigger Submit Album for Review (Sequence 1, 1.1, 1.2.1.1, 1.2.2.1)
   const handleStartSubmitAlbum = (album: StudioAlbum) => {
@@ -717,19 +719,6 @@ export function StudioPage({
                         <button
                           type="button"
                           className="button button-ghost button-small"
-                          onClick={() => {
-                            setEditingAlbum(album);
-                            setAlbumModalOpen(true);
-                          }}
-                          id={`btn-edit-album-table-${album.id}`}
-                          title="Edit album metadata (UC-21.5)"
-                        >
-                          <EditIcon width={14} height={14} />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-ghost button-small"
                           onClick={() => onNavigate(`/album/submission/${album.id}`)}
                           title="View album details"
                         >
@@ -1071,6 +1060,28 @@ export function StudioPage({
                           >
                             <AlertIcon width={13} height={13} />
                             <span>Rejection feedback</span>
+                          </button>
+                        )}
+                        {(t.status === "APPROVED" || t.status === "PUBLISHED") && (!t.lyrics || !t.lyrics.trim()) && (
+                          <button
+                            type="button"
+                            className="button button-ghost button-small"
+                            onClick={() => setUpdateLyricTrack(t)}
+                            title="Update lyrics for this published track"
+                            style={{
+                              color: "var(--color-ocean-primary, #0284C7)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontWeight: 600,
+                              fontSize: "12px",
+                              border: "1px solid #BAE6FD",
+                              borderRadius: "8px",
+                              backgroundColor: "#F0F9FF",
+                            }}
+                          >
+                            <EditIcon width={13} height={13} />
+                            <span>Update Lyric</span>
                           </button>
                         )}
                         <button
@@ -1457,21 +1468,6 @@ export function StudioPage({
                               <span>Submit</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingAlbum(album);
-                              setAlbumModalOpen(true);
-                            }}
-                            id={`btn-edit-album-card-${album.id}`}
-                            style={{ padding: "4px 8px" }}
-                            title="Edit album metadata (UC-21.5)"
-                          >
-                            <EditIcon width={13} height={13} />
-                            <span>Edit</span>
-                          </button>
                           <button
                             type="button"
                             className="button button-ghost button-small"
@@ -2038,11 +2034,6 @@ export function StudioPage({
         open={Boolean(detailAlbum)}
         onClose={() => setDetailAlbum(null)}
         album={detailAlbum}
-        onEdit={(alb) => {
-          setDetailAlbum(null);
-          setEditingAlbum(alb);
-          setAlbumModalOpen(true);
-        }}
         onDelete={(alb) => {
           setDetailAlbum(null);
           setDeleteConfirmAlbum(alb);
@@ -2071,6 +2062,19 @@ export function StudioPage({
         }}
         onSuccess={() => void handleAlbumSubmittedSuccess()}
       />
+
+      {updateLyricTrack && (
+        <UpdateLyricModal
+          open={Boolean(updateLyricTrack)}
+          onClose={() => setUpdateLyricTrack(null)}
+          track={updateLyricTrack}
+          onSuccess={async (updatedTrack) => {
+            setUpdateLyricTrack(null);
+            setActionSuccess(`Lyrics updated successfully for "${updatedTrack.title}".`);
+            await loadStudioData();
+          }}
+        />
+      )}
 
       {actionSuccess && (
         <CenterNotificationPopup

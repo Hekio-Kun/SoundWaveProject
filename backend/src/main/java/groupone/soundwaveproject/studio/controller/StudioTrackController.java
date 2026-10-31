@@ -68,6 +68,19 @@ public class StudioTrackController {
         return studioTrackService.updateTrack(id, request, audio, cover, authentication.getName());
     }
 
+    /**
+     * Cập nhật lời bài hát cho bài hát (UC-18.3 & New Flow).
+     * Cho phép Creator thêm/cập nhật lyric cho bài hát đã phát hành hoặc đang tạo mà không làm gián đoạn trạng thái phát hành.
+     */
+    @PutMapping("/tracks/{id}/lyrics")
+    public StudioTrackResponse updateLyrics(
+            @PathVariable Long id,
+            @RequestBody @Valid groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request,
+            Authentication authentication
+    ) {
+        return studioTrackService.updateLyrics(id, request.lyrics(), authentication.getName());
+    }
+
     @DeleteMapping("/tracks/{id}")
     public ResponseEntity<Void> deleteTrack(
             @PathVariable Long id,
@@ -121,4 +134,14 @@ public class StudioTrackController {
     public List<GenreOptionResponse> getGenres() {
         return studioTrackService.getActiveGenres();
     }
+
+    @PutMapping("/tracks/{id}/lyrics")
+    public StudioTrackResponse updateTrackLyrics(
+            @PathVariable Long id,
+            @Valid @RequestBody groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request,
+            Authentication authentication
+    ) {
+        return studioTrackService.updateTrackLyrics(id, request, authentication.getName());
+    }
 }
+

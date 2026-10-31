@@ -13,6 +13,7 @@ export * from "./modals/ManageAlbumTracksModal";
 export * from "./modals/ManagePlaylistTracksModal";
 export * from "./modals/PlaylistFormModal";
 export * from "./modals/RejectionDetailsModal";
+export * from "./modals/UpdateLyricModal";
 
 // Layout
 export * from "./layout/AppTopBar";

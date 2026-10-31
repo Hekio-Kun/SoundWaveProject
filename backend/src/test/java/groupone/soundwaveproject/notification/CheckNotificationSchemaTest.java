@@ -28,9 +28,9 @@ public class CheckNotificationSchemaTest {
 
     @Test
     void inspectDatabaseAndLogin() {
-        System.out.println("=== 1. CHECK TABLES IN NEON DB ===");
-        var tables = jdbcTemplate.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name");
-        tables.forEach(System.out::println);
+        System.out.println("=== 1. TEST LISTENER NOTIFICATIONS ===");
+        var notifs = notificationService.getMyNotifications("staff@soundwave.com");
+        System.out.println("STAFF NOTIFS FOUND: " + notifs.size());
 
         System.out.println("=== 2. CHECK STAFFS ===");
         var staffs = jdbcTemplate.queryForList("SELECT id, email, status, role_id FROM staffs");
