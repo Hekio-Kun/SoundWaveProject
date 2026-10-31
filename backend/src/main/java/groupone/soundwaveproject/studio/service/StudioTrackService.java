@@ -37,6 +37,8 @@ import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.studio.mapper.StudioTrackMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +67,7 @@ public class StudioTrackService {
     private final StaffRepository staffRepository;
     private final CloudMediaService cloudMediaService;
     private final StudioTrackMapper studioTrackMapper;
+    private final OfficialLyricRepository officialLyricRepository;
     private final NotificationService notificationService;
     private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
 
@@ -230,11 +233,19 @@ public class StudioTrackService {
                     .coverPublicId(coverResponse != null ? coverResponse.publicId() : null)
                     .coverUrl(coverResponse != null ? coverResponse.secureUrl() : null)
                     .playCountCache(0L)
-                    .lyrics(request.lyrics() != null && !request.lyrics().isBlank() ? request.lyrics().trim() : null)
                     .build();
 
             Track savedTrack = trackRepository.save(track);
-            return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null);
+            String requestLyrics = (request.lyrics() != null && !request.lyrics().isBlank()) ? request.lyrics().trim() : null;
+            if (requestLyrics != null) {
+                OfficialLyric officialLyric = OfficialLyric.builder()
+                        .track(savedTrack)
+                        .lyricContent(requestLyrics)
+                        .status("DRAFT")
+                        .build();
+                officialLyricRepository.save(officialLyric);
+            }
+            return studioTrackMapper.toStudioTrackResponse(savedTrack, genre, album, null, requestLyrics);
         } catch (Exception ex) {
             log.error("Failed to persist track into database for user ID {}. Purging uploaded Cloudinary media...", user.getId(), ex);
             cloudMediaService.deleteTrackAudioQuietly(audioResponse.publicId());
@@ -332,7 +343,16 @@ public class StudioTrackService {
         track.setTrackNumber(request.trackNumber());
         track.setDescription(request.description() != null ? request.description().trim() : null);
         if (request.lyrics() != null) {
-            track.setLyrics(request.lyrics().isBlank() ? null : request.lyrics().trim());
+            if (request.lyrics().isBlank()) {
+                officialLyricRepository.findByTrackId(track.getId())
+                        .ifPresent(officialLyricRepository::delete);
+            } else {
+                OfficialLyric lyric = officialLyricRepository.findByTrackId(track.getId())
+                        .orElseGet(() -> OfficialLyric.builder().track(track).build());
+                lyric.setLyricContent(request.lyrics().trim());
+                lyric.setStatus("DRAFT");
+                officialLyricRepository.save(lyric);
+            }
         }
 
         TrackSubmission savedSubmission = null;

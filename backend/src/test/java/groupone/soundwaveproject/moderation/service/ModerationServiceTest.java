@@ -22,6 +22,8 @@ import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateExce
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,7 @@ class ModerationServiceTest {
     @Mock private StaffRepository staffRepository;
     @Mock private UserProfileRepository profileRepository;
     @Mock private NotificationService notificationService;
+    @Mock private OfficialLyricRepository officialLyricRepository;
 
     private ModerationService moderationService;
     private Staff staffUser;
@@ -61,6 +64,7 @@ class ModerationServiceTest {
                 trackRepository,
                 albumRepository,
                 mapper,
+                officialLyricRepository,
                 userRepository,
                 staffRepository,
                 profileRepository,
@@ -80,7 +84,6 @@ class ModerationServiceTest {
                 .slug("echoes-of-summer")
                 .genre(genre)
                 .publicationStatus(TrackPublicationStatus.PENDING)
-                .lyrics("[00:01.00]Hello world\n[00:05.00]Echoes of summer")
                 .build();
         ReflectionTestUtils.setField(testTrack, "id", 100L);
     }
@@ -216,6 +219,12 @@ class ModerationServiceTest {
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
+        OfficialLyric lyric = OfficialLyric.builder()
+                .track(testTrack)
+                .lyricContent("[00:01.00]Hello world\n[00:05.00]Echoes of summer")
+                .status("PUBLISHED")
+                .build();
+        when(officialLyricRepository.findByTrackId(100L)).thenReturn(Optional.of(lyric));
 
         moderationService.getSubmissionDetail(1L);
 

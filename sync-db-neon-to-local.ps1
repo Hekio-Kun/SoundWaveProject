@@ -16,6 +16,10 @@ try {
     & "$pgBin\pg_dump.exe" -h ep-broad-truth-b337hf2b-pooler.c-4.ap-southeast-1.aws.neon.tech `
         -U SoundWave_owner -d SoundWave -p 5432 --no-owner --no-privileges -f $dumpFile
     
+    if (-not (Test-Path $dumpFile) -or (Get-Item $dumpFile).Length -lt 1024) {
+        throw "Tep dump tu Neon Cloud bi trong hoac bi loi ket noi (do vuot han muc bang thong Neon)! Da tu dong huy thao tac de bao ve an toan tuyet doi cho Local DB."
+    }
+
     Write-Host "[2/3] Dang lam sach Schema public tren Local DB (SoundWaveProject)..." -ForegroundColor Yellow
     $env:PGPASSWORD = "postgres"
     & "$pgBin\psql.exe" -h localhost -U postgres -d SoundWaveProject -p 5432 -q `
