@@ -213,3 +213,43 @@ export type StaffTrackLyricSummary = {
   lastUpdated?: string | null;
   updatedByStaffName?: string | null;
 };
+
+export type CreatorSearchResult = {
+  userId: number;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  trackCount: number;
+};
+
+export type LyricSearchResult = {
+  officialLyricId: number;
+  track: LandingTrack;
+  lyricSnippet: string;
+};
+
+export type TopSearchResult = {
+  type: "SONG" | "ALBUM" | "CREATOR";
+  track?: LandingTrack | null;
+  album?: PublicAlbum | null;
+  creator?: CreatorSearchResult | null;
+};
+
+export type SearchPageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+};
+
+export type UnifiedSearchResponse = {
+  query: string;
+  type: string;
+  topResult: TopSearchResult | null;
+  tracks: SearchPageResponse<LandingTrack>;
+  albums: SearchPageResponse<PublicAlbum>;
+  creators: SearchPageResponse<CreatorSearchResult>;
+  lyrics: SearchPageResponse<LyricSearchResult>;
+};

@@ -163,55 +163,6 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
             showLabel={true}
           />
 
-          {/* Search Input */}
-          <div style={{ position: "relative", minWidth: "260px", maxWidth: "380px", flex: "1" }}>
-            <SearchIcon
-              width={16}
-              height={16}
-              style={{
-                position: "absolute",
-                left: "14px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--sw-muted)",
-              }}
-            />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search albums by title or artist..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                height: "38px",
-                paddingLeft: "38px",
-                paddingRight: search ? "34px" : "14px",
-                borderRadius: "10px",
-                fontSize: "13px",
-                width: "100%",
-                background: "#ffffff",
-                border: "1px solid var(--sw-border)",
-              }}
-            />
-            {search && (
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setSearch("")}
-                style={{
-                  position: "absolute",
-                  right: "8px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  padding: "4px",
-                }}
-                title="Clear search"
-              >
-                <CloseIcon width={13} height={13} />
-              </button>
-            )}
-          </div>
-
           {/* Clear filters Button */}
           {(debouncedSearch || sortBy !== "newest") && (
             <button
