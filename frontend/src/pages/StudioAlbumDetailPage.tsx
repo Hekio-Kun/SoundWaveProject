@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi, type RejectionDetails } from "../api/track";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
+import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 
 import {
   AlertIcon,
@@ -79,7 +79,6 @@ export function StudioAlbumDetailPage({
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
   const [manageTracksTab, setManageTracksTab] = useState<"MANAGE" | "ADD">("MANAGE");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -88,6 +87,7 @@ export function StudioAlbumDetailPage({
   const [reordering, setReordering] = useState(false);
   const [submitReviewModalOpen, setSubmitReviewModalOpen] = useState(false);
   const [rejectionModalTrack, setRejectionModalTrack] = useState<RejectionDetails | null>(null);
+  const [updateLyricTrack, setUpdateLyricTrack] = useState<StudioTrack | null>(null);
 
   // Xem lý do từ chối kiểm duyệt của bài hát trong album (UC-21.3 AF02 & UC-20)
   const handleOpenRejectionModal = async (track: StudioTrack) => {
@@ -307,7 +307,11 @@ export function StudioAlbumDetailPage({
     );
   }
 
-  const isPublished = album.status === "PUBLISHED";
+  const status = (album.status || "DRAFT").toUpperCase();
+  const isPublished = status === "PUBLISHED" || status === "APPROVED";
+  const isPending = status === "PENDING";
+  const isRejected = status === "REJECTED";
+  const canSubmit = status === "DRAFT" || status === "REJECTED";
   const albumTracks = album.tracks || [];
   const totalDurationMs = albumTracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMinutes = Math.round(totalDurationMs / 60000);
@@ -431,12 +435,30 @@ export function StudioAlbumDetailPage({
                   fontSize: "10.5px",
                   fontWeight: 800,
                   textTransform: "uppercase",
-                  background: isPublished ? "#ECFEFF" : "#FFFBEB",
-                  color: isPublished ? "var(--color-ocean-primary, #0284C7)" : "#D97706",
-                  border: isPublished ? "1px solid #BAE6FD" : "1px solid #FDE68A",
+                  background: isPublished
+                    ? "#ECFEFF"
+                    : isPending
+                    ? "#FFFBEB"
+                    : isRejected
+                    ? "#FEF2F2"
+                    : "#F1F5F9",
+                  color: isPublished
+                    ? "var(--color-ocean-primary, #0284C7)"
+                    : isPending
+                    ? "#D97706"
+                    : isRejected
+                    ? "#DC2626"
+                    : "#64748B",
+                  border: isPublished
+                    ? "1px solid #BAE6FD"
+                    : isPending
+                    ? "1px solid #FDE68A"
+                    : isRejected
+                    ? "1px solid #FECACA"
+                    : "1px solid #CBD5E1",
                 }}
               >
-                {isPublished ? "● Published (Live)" : "○ Draft"}
+                {isPublished ? "● Published (Live)" : isPending ? "● Pending Review" : isRejected ? "● Rejected" : "○ Draft"}
               </span>
             </div>
 
@@ -497,7 +519,7 @@ export function StudioAlbumDetailPage({
 
           {/* Action Toolbar matching Playlist Details Page */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-            {!isPublished && (
+            {canSubmit && (
               <button
                 className="button button-primary button-large"
                 onClick={handleStartSubmitAlbum}
@@ -519,25 +541,6 @@ export function StudioAlbumDetailPage({
                 <span>Play all</span>
               </button>
             )}
-
-            <button
-              className="button button-ghost"
-              onClick={() => setEditModalOpen(true)}
-              id="btn-page-edit-album"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                border: "1px solid var(--sw-border, #CBD5E1)",
-                height: "40px",
-                padding: "0 14px",
-                borderRadius: "10px",
-                fontWeight: 600,
-              }}
-            >
-              <EditIcon width={15} height={15} />
-              <span>Edit details</span>
-            </button>
 
             <button
               className="button button-ghost"
@@ -844,6 +847,29 @@ export function StudioAlbumDetailPage({
 
                   {/* Inline Actions (Reorder / Remove / View) */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                    {(track.status === "PUBLISHED" || track.status === "APPROVED") && (!track.lyrics || !track.lyrics.trim()) && (
+                      <button
+                        type="button"
+                        className="button button-ghost button-small"
+                        onClick={() => setUpdateLyricTrack(track)}
+                        style={{
+                          padding: "4px 8px",
+                          color: "var(--color-ocean-primary, #0284C7)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          border: "1px solid #BAE6FD",
+                          borderRadius: "6px",
+                          backgroundColor: "#F0F9FF",
+                        }}
+                        title="Update lyrics for this public track"
+                      >
+                        <EditIcon width={12} height={12} />
+                        <span>Update Lyric</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="button button-ghost button-small"
@@ -888,18 +914,6 @@ export function StudioAlbumDetailPage({
           </div>
         )}
       </section>
-
-      {/* Edit Album Info Modal */}
-      <AlbumFormModal
-        open={editModalOpen}
-        album={album}
-        onClose={() => setEditModalOpen(false)}
-        onSaved={async () => {
-          setEditModalOpen(false);
-          await fetchAlbumData();
-          setActionSuccess("Album updated successfully.");
-        }}
-      />
 
       {/* Manage Tracks Modal (Styled like Playlist track manager) */}
       <ManageAlbumTracksModal
@@ -951,6 +965,20 @@ export function StudioAlbumDetailPage({
           onNavigate(`/studio/tracks/${trackId}/edit`);
         }}
       />
+
+      {/* Update Lyrics Modal */}
+      {updateLyricTrack && (
+        <UpdateLyricModal
+          open={Boolean(updateLyricTrack)}
+          onClose={() => setUpdateLyricTrack(null)}
+          track={updateLyricTrack}
+          onSuccess={async (updatedTrack) => {
+            setUpdateLyricTrack(null);
+            setActionSuccess(`Lyrics updated successfully for "${updatedTrack.title}".`);
+            await fetchAlbumData();
+          }}
+        />
+      )}
     </div>
   );
 }

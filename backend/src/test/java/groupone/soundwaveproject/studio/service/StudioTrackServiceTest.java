@@ -28,6 +28,7 @@ import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.studio.mapper.StudioTrackMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,6 +72,8 @@ class StudioTrackServiceTest {
     private CloudMediaService cloudMediaService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
     @Spy
     private StudioTrackMapper studioTrackMapper;
 
@@ -544,5 +547,56 @@ class StudioTrackServiceTest {
         assertThatThrownBy(() -> studioTrackService.getRejectionDetails(999L, "creator@soundwave.com"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Track not found or access denied");
+    }
+
+    @Test
+    @DisplayName("updateLyrics updates lyrics and keeps PUBLISHED status intact without sending to PENDING")
+    void updateLyrics_Success_OnPublishedTrack() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track publishedTrack = Track.builder()
+                .id(300L)
+                .uploaderUserId(10L)
+                .title("Public Track Without Lyrics")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(300L, 10L))
+                .thenReturn(Optional.of(publishedTrack));
+        when(lyricService.getOfficialLyrics(300L))
+                .thenReturn("[00:05.00] New Synced Lyric Line");
+
+        StudioTrackResponse response = studioTrackService.updateLyrics(
+                300L,
+                "[00:05.00] New Synced Lyric Line",
+                "creator@soundwave.com"
+        );
+
+        assertThat(response).isNotNull();
+        assertThat(response.lyrics()).isEqualTo("[00:05.00] New Synced Lyric Line");
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(lyricService).saveOrUpdateOfficialLyrics(300L, "[00:05.00] New Synced Lyric Line", 10L);
+    }
+
+    @Test
+    @DisplayName("updateLyrics throws ForbiddenOperationException when track is PENDING")
+    void updateLyrics_ThrowsWhenPending() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+
+        Track pendingTrack = Track.builder()
+                .id(301L)
+                .uploaderUserId(10L)
+                .title("Pending Track")
+                .publicationStatus(TrackPublicationStatus.PENDING)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(301L, 10L))
+                .thenReturn(Optional.of(pendingTrack));
+
+        assertThatThrownBy(() -> studioTrackService.updateLyrics(301L, "Some lyrics", "creator@soundwave.com"))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("Tracks currently pending review cannot be modified");
     }
 }

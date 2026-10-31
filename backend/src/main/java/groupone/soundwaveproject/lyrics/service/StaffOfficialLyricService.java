@@ -48,20 +48,7 @@ public class StaffOfficialLyricService {
 
         return officialLyricRepository.findByTrackId(trackId)
                 .map(this::mapToResponse)
-                .orElseGet(() -> {
-                    if (track.getLyrics() != null && !track.getLyrics().trim().isBlank()) {
-                        return new LyricDetailResponse(
-                                null,
-                                track.getId(),
-                                track.getLyrics(),
-                                "PUBLISHED",
-                                true,
-                                "OFFICIAL",
-                                track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(ZoneOffset.UTC) : Instant.now()
-                        );
-                    }
-                    return null;
-                });
+                .orElse(null);
     }
 
     /**
@@ -100,8 +87,8 @@ public class StaffOfficialLyricService {
                     String durationStr = formatDuration(track.getDurationMs());
                     String genreName = track.getGenre() != null ? track.getGenre().getName() : "Uncategorized";
 
-                    boolean hasLyric = official != null || (track.getLyrics() != null && !track.getLyrics().isBlank());
-                    String lyricStatus = official != null ? official.getStatus() : (hasLyric ? "PUBLISHED" : null);
+                    boolean hasLyric = official != null;
+                    String lyricStatus = official != null ? official.getStatus() : null;
                     Instant updatedAt = official != null ? official.getUpdatedAt() :
                             (track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(ZoneOffset.UTC) : null);
 
@@ -176,11 +163,7 @@ public class StaffOfficialLyricService {
 
         OfficialLyric saved = officialLyricRepository.save(lyric);
 
-        // Sync legacy track.lyrics if published
-        if ("PUBLISHED".equals(status)) {
-            track.setLyrics(content);
-            trackRepository.save(track);
-        }
+        // Official lyric status updated
 
         log.info("Official lyric saved id={} for trackId={} by staff={} status={}",
                 saved.getId(), track.getId(), staff.getEmail(), status);
@@ -209,11 +192,7 @@ public class StaffOfficialLyricService {
         lyric.setUpdatedAt(Instant.now());
         OfficialLyric saved = officialLyricRepository.save(lyric);
 
-        Track track = lyric.getTrack();
-        if ("PUBLISHED".equals(status)) {
-            track.setLyrics(lyric.getLyricContent());
-            trackRepository.save(track);
-        }
+        // Official lyric status updated
 
         log.info("Updated official lyric status to {} for trackId={} by staff={}", status, trackId, staff.getEmail());
         return mapToResponse(saved);
@@ -232,8 +211,7 @@ public class StaffOfficialLyricService {
 
         officialLyricRepository.findByTrackId(trackId).ifPresent(lyric -> {
             officialLyricRepository.delete(lyric);
-            track.setLyrics(null);
-            trackRepository.save(track);
+            // Official lyric removed
             log.info("Deleted official lyric for trackId={} by staff={}", trackId, staff.getEmail());
         });
     }

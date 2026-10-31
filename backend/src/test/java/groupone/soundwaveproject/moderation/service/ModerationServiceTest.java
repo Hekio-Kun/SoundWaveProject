@@ -22,6 +22,8 @@ import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateExce
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,7 @@ class ModerationServiceTest {
     @Mock private StaffRepository staffRepository;
     @Mock private UserProfileRepository profileRepository;
     @Mock private NotificationService notificationService;
+    @Mock private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
 
     private ModerationService moderationService;
     private Staff staffUser;
@@ -64,7 +67,8 @@ class ModerationServiceTest {
                 userRepository,
                 staffRepository,
                 profileRepository,
-                notificationService
+                notificationService,
+                lyricService
         );
 
         StaffRole staffRole = new StaffRole("STAFF", "Staff", "Staff role");
@@ -80,7 +84,6 @@ class ModerationServiceTest {
                 .slug("echoes-of-summer")
                 .genre(genre)
                 .publicationStatus(TrackPublicationStatus.PENDING)
-                .lyrics("[00:01.00]Hello world\n[00:05.00]Echoes of summer")
                 .build();
         ReflectionTestUtils.setField(testTrack, "id", 100L);
     }
@@ -216,6 +219,7 @@ class ModerationServiceTest {
 
         when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
+        when(lyricService.getOfficialLyrics(100L)).thenReturn("[00:01.00]Hello world\n[00:05.00]Echoes of summer");
 
         moderationService.getSubmissionDetail(1L);
 

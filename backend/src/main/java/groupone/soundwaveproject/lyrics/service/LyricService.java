@@ -7,6 +7,7 @@ import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.lyrics.dto.request.SavePersonalLyricRequest;
+import groupone.soundwaveproject.lyrics.dto.response.CustomLyricResponse;
 import groupone.soundwaveproject.lyrics.dto.response.LyricDetailResponse;
 import groupone.soundwaveproject.lyrics.dto.response.TrackLyricsBundleResponse;
 import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
@@ -19,7 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -42,20 +45,7 @@ public class LyricService {
 
         LyricDetailResponse officialResponse = officialLyricRepository.findByTrackIdAndStatus(trackId, "PUBLISHED")
                 .map(this::mapOfficialToResponse)
-                .orElseGet(() -> {
-                    if (track.getLyrics() != null && !track.getLyrics().trim().isBlank()) {
-                        return new LyricDetailResponse(
-                                null,
-                                track.getId(),
-                                track.getLyrics(),
-                                "PUBLISHED",
-                                true,
-                                "OFFICIAL",
-                                track.getUpdatedAt() != null ? track.getUpdatedAt().toInstant(ZoneOffset.UTC) : Instant.now()
-                        );
-                    }
-                    return null;
-                });
+                .orElse(null);
 
         LyricDetailResponse personalResponse = null;
         if (currentUserEmailOrNull != null && !currentUserEmailOrNull.isBlank()) {
@@ -69,6 +59,14 @@ public class LyricService {
         }
 
         return new TrackLyricsBundleResponse(officialResponse, personalResponse);
+    }
+
+    /**
+     * Đồng bộ API lấy lời bài hát cho PersonalLyricController (UC-18.1).
+     */
+    @Transactional(readOnly = true)
+    public TrackLyricsBundleResponse getSynchronousLyrics(Long trackId, String currentUserEmailOrNull) {
+        return getTrackLyrics(trackId, currentUserEmailOrNull);
     }
 
     /**
@@ -120,6 +118,41 @@ public class LyricService {
     }
 
     /**
+     * Tạo mới hoặc cập nhật bản lyric cá nhân trả về CustomLyricResponse (cho PersonalLyricController).
+     */
+    @Transactional
+    public CustomLyricResponse saveOrUpdatePersonalLyric(Long trackId, String lyricType, String lyricContent, String userEmail) {
+        LyricDetailResponse detail = savePersonalLyric(userEmail, trackId, new SavePersonalLyricRequest(lyricContent, lyricType));
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
+        PersonalLyric entity = personalLyricRepository.findById(detail.id())
+                .orElseThrow(() -> new ResourceNotFoundException("LYRIC_NOT_FOUND", "Lyric not found with id: " + detail.id()));
+        return mapToCustomResponse(entity);
+    }
+
+    /**
+     * Lấy danh sách lyric cá nhân của User cho Track (UC-18.2).
+     */
+    @Transactional(readOnly = true)
+    public List<CustomLyricResponse> getPersonalLyrics(Long trackId, String userEmail) {
+        if (userEmail == null || userEmail.isBlank()) return List.of();
+        User user = userRepository.findByEmailIgnoreCase(userEmail).orElse(null);
+        if (user == null) return List.of();
+        return personalLyricRepository.findByUserIdAndTrackId(user.getId(), trackId)
+                .stream()
+                .map(this::mapToCustomResponse)
+                .toList();
+    }
+
+    /**
+     * Xóa bản lyric cá nhân của User cho Track (UC-18).
+     */
+    @Transactional
+    public void deletePersonalLyric(Long trackId, String userEmail, String lyricType) {
+        deletePersonalLyric(userEmail, trackId, lyricType);
+    }
+
+    /**
      * Xóa bản lyric cá nhân của User cho Track (UC-18).
      */
     @Transactional
@@ -157,5 +190,78 @@ public class LyricService {
                 lyric.getLyricType(),
                 lyric.getUpdatedAt()
         );
+    }
+
+    public CustomLyricResponse mapToCustomResponse(PersonalLyric lyric) {
+        LocalDateTime created = lyric.getCreatedAt() != null
+                ? LocalDateTime.ofInstant(lyric.getCreatedAt(), ZoneOffset.UTC)
+                : LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime updated = lyric.getUpdatedAt() != null
+                ? LocalDateTime.ofInstant(lyric.getUpdatedAt(), ZoneOffset.UTC)
+                : created;
+        return new CustomLyricResponse(
+                lyric.getId(),
+                lyric.getTrack().getId(),
+                lyric.getUser().getId(),
+                lyric.getLyricType(),
+                lyric.getLyricContent(),
+                created,
+                updated
+        );
+    }
+
+    /**
+     * Tra cứu nội dung lời bài hát chính thức dạng String (cho TrackResponse & StudioTrackResponse).
+     */
+    @Transactional(readOnly = true)
+    public String getOfficialLyrics(Long trackId) {
+        if (trackId == null) return null;
+        return officialLyricRepository.findByTrackIdAndStatus(trackId, "PUBLISHED")
+                .map(OfficialLyric::getLyricContent)
+                .orElse(null);
+    }
+
+    /**
+     * Lưu hoặc cập nhật lời bài hát chính thức (Official Lyric) với trạng thái chỉ định.
+     */
+    @Transactional
+    public OfficialLyric saveOrUpdateOfficialLyric(Long trackId, String rawLyrics, String status, Long userId) {
+        Track track = trackRepository.findById(trackId)
+                .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + trackId));
+
+        String trimmed = rawLyrics != null ? rawLyrics.trim() : "";
+        OfficialLyric official = officialLyricRepository.findByTrackId(trackId)
+                .orElseGet(() -> OfficialLyric.builder()
+                        .track(track)
+                        .status(status != null ? status : "PUBLISHED")
+                        .build());
+
+        official.setLyricContent(trimmed);
+        if (status != null && !status.isBlank()) {
+            official.setStatus(status);
+        }
+        official.setUpdatedAt(Instant.now());
+
+        OfficialLyric saved = officialLyricRepository.save(official);
+        log.info("Saved official lyric id={} for trackId={} by userId={}", saved.getId(), trackId, userId);
+        return saved;
+    }
+
+    /**
+     * Lưu hoặc cập nhật lời bài hát chính thức (Official Lyric) do tác giả (Creator) cập nhật.
+     */
+    @Transactional
+    public OfficialLyric saveOrUpdateOfficialLyrics(Long trackId, String rawLyrics, Long userId) {
+        return saveOrUpdateOfficialLyric(trackId, rawLyrics, "PUBLISHED", userId);
+    }
+
+    /**
+     * Xóa toàn bộ lyrics liên kết với bài hát khi bài hát bị xóa khỏi hệ thống.
+     */
+    @Transactional
+    public void deleteAllLyricsForTrack(Long trackId) {
+        if (trackId == null) return;
+        officialLyricRepository.deleteByTrackId(trackId);
+        personalLyricRepository.deleteByTrackId(trackId);
     }
 }

@@ -10,6 +10,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -19,6 +20,7 @@ import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.exception.CloudStorageUnavailableException;
 import groupone.soundwaveproject.media.service.CloudMediaService;
+import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.studio.dto.request.AlbumTrackItemRequest;
 import groupone.soundwaveproject.studio.dto.request.CreateAlbumRequest;
@@ -75,6 +77,9 @@ class StudioAlbumServiceTest {
     @Mock
     private StudioTrackService studioTrackService;
 
+    @Mock
+    private groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
     private StudioTrackMapper studioTrackMapper;
     private StudioAlbumMapper studioAlbumMapper;
 
@@ -99,7 +104,8 @@ class StudioAlbumServiceTest {
                 cloudMediaService,
                 studioAlbumMapper,
                 studioTrackMapper,
-                studioTrackService
+                studioTrackService,
+                lyricService
         );
 
         mockUser = new User("creator@soundwave.com", "hashed");
@@ -193,6 +199,7 @@ class StudioAlbumServiceTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getTitle()).isEqualTo("New Package Album");
+        assertThat(response.getStatus()).isEqualTo("PENDING");
         assertThat(response.getTrackCount()).isEqualTo(1);
         verify(trackSubmissionRepository).save(any());
         verify(trackRepository).save(any(Track.class));
@@ -288,6 +295,60 @@ class StudioAlbumServiceTest {
         assertThatThrownBy(() -> studioAlbumService.getAlbumById(999L, mockUser.getEmail()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Album not found or access denied");
+    }
+
+    @Test
+    @DisplayName("UC-21.2: Nộp album cho Staff kiểm duyệt chuyển trạng thái Album và bài hát sang PENDING")
+    void submitAlbumForReview_Success_TransitionsToPending() {
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(List.of(mockTrack));
+        when(trackRepository.save(any(Track.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(albumRepository.save(any(Album.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StudioAlbumResponse response = studioAlbumService.submitAlbumForReview(100L, mockUser.getEmail());
+
+        assertThat(response.getStatus()).isEqualTo("PENDING");
+        assertThat(mockAlbum.getStatus()).isEqualTo("PENDING");
+        assertThat(mockTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PENDING);
+        verify(trackSubmissionRepository).save(any(TrackSubmission.class));
+        verify(albumRepository).save(mockAlbum);
+    }
+
+    @Test
+    @DisplayName("UC-21.2 EX: Báo lỗi Conflict khi nộp album đã ở trạng thái PENDING")
+    void submitAlbumForReview_AlreadyPending_ThrowsConflict() {
+        mockAlbum.setStatus("PENDING");
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+
+        assertThatThrownBy(() -> studioAlbumService.submitAlbumForReview(100L, mockUser.getEmail()))
+                .isInstanceOf(ConflictOperationException.class)
+                .hasMessageContaining("already been submitted and is currently pending review");
+    }
+
+    @Test
+    @DisplayName("UC-21.2 EX: Báo lỗi Conflict khi nộp album đã ở trạng thái PUBLISHED")
+    void submitAlbumForReview_AlreadyPublished_ThrowsConflict() {
+        mockAlbum.setStatus("PUBLISHED");
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+
+        assertThatThrownBy(() -> studioAlbumService.submitAlbumForReview(100L, mockUser.getEmail()))
+                .isInstanceOf(ConflictOperationException.class)
+                .hasMessageContaining("already published");
+    }
+
+    @Test
+    @DisplayName("UC-21.2 EX01: Báo lỗi BadRequest khi nộp album không có bài hát nào")
+    void submitAlbumForReview_EmptyAlbum_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> studioAlbumService.submitAlbumForReview(100L, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("Cannot submit an empty album");
     }
 
     @Test

@@ -27,6 +27,8 @@ import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundExceptio
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.notification.entity.NotificationType;
+import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
+import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -51,7 +53,6 @@ import java.util.stream.Collectors;
  * - Gỡ bài hát đã xuất bản (Take Down) (UC-24.2)
  */
 @Service
-@RequiredArgsConstructor
 public class ModerationService {
     private final TrackSubmissionRepository submissionRepository;
     private final TrackRepository trackRepository;
@@ -61,6 +62,44 @@ public class ModerationService {
     private final StaffRepository staffRepository;
     private final UserProfileRepository profileRepository;
     private final NotificationService notificationService;
+    private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+
+    public ModerationService(
+            TrackSubmissionRepository submissionRepository,
+            TrackRepository trackRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionMapper mapper,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            UserProfileRepository profileRepository,
+            NotificationService notificationService
+    ) {
+        this(submissionRepository, trackRepository, albumRepository, mapper,
+                userRepository, staffRepository, profileRepository, notificationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ModerationService(
+            TrackSubmissionRepository submissionRepository,
+            TrackRepository trackRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionMapper mapper,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            UserProfileRepository profileRepository,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this.submissionRepository = submissionRepository;
+        this.trackRepository = trackRepository;
+        this.albumRepository = albumRepository;
+        this.mapper = mapper;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+        this.profileRepository = profileRepository;
+        this.notificationService = notificationService;
+        this.lyricService = lyricService;
+    }
 
     /**
      * Lấy danh sách hàng đợi các bài hát và album cần kiểm duyệt theo phân trang và bộ lọc tìm kiếm (UC-24.1 View Moderation Queue).
@@ -221,7 +260,7 @@ public class ModerationService {
                 .orElseThrow(() -> new SubmissionNotFoundException(id));
 
         Track track = trackRepository.findById(submission.getTrackId()).orElse(null);
-        String lyrics = track != null ? track.getLyrics() : null;
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(submission.getTrackId()) : null;
 
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
@@ -278,7 +317,7 @@ public class ModerationService {
         track.setLatestRejectionReason(null);
 
         Album album = track.getAlbum();
-        if (album != null && "DRAFT".equalsIgnoreCase(album.getStatus())) {
+        if (album != null && !"PUBLISHED".equalsIgnoreCase(album.getStatus())) {
             album.setStatus("PUBLISHED");
             album.setPublishedAt(nowUtc);
             albumRepository.save(album);
@@ -300,7 +339,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -338,6 +377,19 @@ public class ModerationService {
         track.setLatestRejectionReason(rejectionReason);
         trackRepository.save(track);
 
+        Album album = track.getAlbum();
+        if (album != null) {
+            boolean hasPublished = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PUBLISHED);
+            boolean hasPending = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.PENDING);
+            if (!hasPublished && !hasPending) {
+                boolean hasRejected = trackRepository.existsByAlbum_IdAndPublicationStatus(album.getId(), TrackPublicationStatus.REJECTED);
+                if (hasRejected) {
+                    album.setStatus("REJECTED");
+                    albumRepository.save(album);
+                }
+            }
+        }
+
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
 
@@ -353,7 +405,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -406,7 +458,7 @@ public class ModerationService {
             );
         }
 
-        String lyrics = track.getLyrics();
+        String lyrics = resolveTrackLyrics(track);
         AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
         return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
@@ -419,6 +471,13 @@ public class ModerationService {
      * @param currentTrack      Thực thể bài hát hiện tại
      * @return DTO AlbumTrackNavigationResponse chứa ID bài trước, bài sau, bài pending kế tiếp và toàn bộ bài hát trong album
      */
+    private String resolveTrackLyrics(Track track) {
+        if (track == null) {
+            return null;
+        }
+        return lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
+    }
+
     public AlbumTrackNavigationResponse buildAlbumNavigation(TrackSubmission currentSubmission, Track currentTrack) {
         if (currentTrack == null || currentTrack.getAlbum() == null) {
             return null;

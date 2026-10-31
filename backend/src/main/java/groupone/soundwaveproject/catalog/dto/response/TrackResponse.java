@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 /**
  * Metadata bài hát và URL streaming phục vụ phát nhạc (Phase 1 trong Sequence Diagram).
+ * Bao gồm lời bài hát chính thức (Official Lyrics) nếu có.
  */
 public record TrackResponse(
         Long id,
@@ -19,8 +20,29 @@ public record TrackResponse(
         String genreName,
         TrackAlbumSummary album,
         TrackCreatorSummary creator,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String lyrics
 ) {
+    public TrackResponse(
+            Long id,
+            String title,
+            String slug,
+            String description,
+            String audioUrl,
+            String coverUrl,
+            Integer durationMs,
+            Long playCount,
+            String publicationStatus,
+            String genreSlug,
+            String genreName,
+            TrackAlbumSummary album,
+            TrackCreatorSummary creator,
+            LocalDateTime createdAt
+    ) {
+        this(id, title, slug, description, audioUrl, coverUrl, durationMs, playCount,
+                publicationStatus, genreSlug, genreName, album, creator, createdAt, null);
+    }
+
     public record TrackAlbumSummary(
             Long id,
             String title
