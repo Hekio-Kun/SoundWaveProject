@@ -31,7 +31,6 @@ import groupone.soundwaveproject.notification.entity.NotificationType;
 import groupone.soundwaveproject.notification.service.NotificationService;
 import groupone.soundwaveproject.studio.dto.request.CreateTrackRequest;
 import groupone.soundwaveproject.studio.dto.request.GetRejectionDetailsRequest;
-import groupone.soundwaveproject.studio.dto.request.UpdateTrackRequest;
 import groupone.soundwaveproject.studio.dto.response.AlbumOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
