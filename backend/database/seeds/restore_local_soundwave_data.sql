@@ -256,6 +256,7 @@ BEGIN
     PERFORM setval(pg_get_serial_sequence('albums', 'id'), COALESCE(MAX(id), 1)) FROM albums;
     PERFORM setval(pg_get_serial_sequence('tracks', 'id'), COALESCE(MAX(id), 1)) FROM tracks;
     PERFORM setval(pg_get_serial_sequence('official_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM official_lyrics;
+    PERFORM setval(pg_get_serial_sequence('listening_history', 'id'), COALESCE(MAX(id), 1)) FROM listening_history;
 
 END $$;
 
