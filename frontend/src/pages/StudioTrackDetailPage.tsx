@@ -11,6 +11,7 @@ import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { usePlayer } from "../context/PlayerContext";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
+import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import {
   AlertIcon,
@@ -187,8 +188,9 @@ export function StudioTrackDetailPage({
   // Submit for review state
   const [submitterNote, setSubmitterNote] = useState("");
   const [submitCopyrightAgreed, setSubmitCopyrightAgreed] = useState(false);
+  const [updateLyricModalOpen, setUpdateLyricModalOpen] = useState(false);
 
-  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen || rejectionModalOpen);
+  useModalScrollLock(editModalOpen || deleteConfirmOpen || submitModalOpen || withdrawModalOpen || rejectionModalOpen || updateLyricModalOpen);
 
   const fetchTrackData = async (active = true) => {
     try {
@@ -705,6 +707,23 @@ export function StudioTrackDetailPage({
                   onClick={() => setWithdrawModalOpen(true)}
                 >
                   <span>Withdraw submission</span>
+                </button>
+              )}
+
+              {isApproved && (!track.lyrics || !track.lyrics.trim()) && (
+                <button
+                  type="button"
+                  className="studio-crud-btn studio-crud-btn-edit"
+                  onClick={() => setUpdateLyricModalOpen(true)}
+                  style={{
+                    backgroundColor: "#f0f9ff",
+                    color: "var(--color-ocean-primary, #0284C7)",
+                    borderColor: "#bae6fd",
+                  }}
+                  title="Update lyrics for this published track"
+                >
+                  <EditIcon width={13} height={13} />
+                  <span>Update Lyric</span>
                 </button>
               )}
 
@@ -1461,6 +1480,20 @@ export function StudioTrackDetailPage({
           }
         }}
       />
+
+      {/* Update Lyric Modal */}
+      {updateLyricModalOpen && track && (
+        <UpdateLyricModal
+          open={updateLyricModalOpen}
+          onClose={() => setUpdateLyricModalOpen(false)}
+          track={track}
+          onSuccess={(updatedTrack) => {
+            setTrack(updatedTrack);
+            setUpdateLyricModalOpen(false);
+            setActionSuccess(`Lyrics updated successfully for "${updatedTrack.title}".`);
+          }}
+        />
+      )}
 
       {actionSuccess && (
         <CenterNotificationPopup

@@ -19,8 +19,29 @@ public record TrackResponse(
         String genreName,
         TrackAlbumSummary album,
         TrackCreatorSummary creator,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String lyrics
 ) {
+    public TrackResponse(
+            Long id,
+            String title,
+            String slug,
+            String description,
+            String audioUrl,
+            String coverUrl,
+            Integer durationMs,
+            Long playCount,
+            String publicationStatus,
+            String genreSlug,
+            String genreName,
+            TrackAlbumSummary album,
+            TrackCreatorSummary creator,
+            LocalDateTime createdAt
+    ) {
+        this(id, title, slug, description, audioUrl, coverUrl, durationMs, playCount,
+                publicationStatus, genreSlug, genreName, album, creator, createdAt, null);
+    }
+
     public record TrackAlbumSummary(
             Long id,
             String title

@@ -158,4 +158,58 @@ public class LyricService {
                 lyric.getUpdatedAt()
         );
     }
+
+    /**
+     * Tra cứu nội dung lời bài hát chính thức dạng String (cho TrackResponse & StudioTrackResponse).
+     */
+    @Transactional(readOnly = true)
+    public String getOfficialLyrics(Long trackId) {
+        if (trackId == null) return null;
+        Optional<OfficialLyric> official = officialLyricRepository.findByTrackIdAndStatus(trackId, "PUBLISHED");
+        if (official.isPresent() && official.get().getLyricContent() != null) {
+            return official.get().getLyricContent();
+        }
+        return trackRepository.findById(trackId)
+                .map(Track::getLyrics)
+                .orElse(null);
+    }
+
+    /**
+     * Lưu hoặc cập nhật lời bài hát chính thức (Official Lyric) do tác giả (Creator) cập nhật.
+     */
+    @Transactional
+    public OfficialLyric saveOrUpdateOfficialLyrics(Long trackId, String rawLyrics, Long userId) {
+        Track track = trackRepository.findById(trackId)
+                .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + trackId));
+
+        String trimmed = rawLyrics != null ? rawLyrics.trim() : "";
+        OfficialLyric official = officialLyricRepository.findByTrackId(trackId)
+                .orElseGet(() -> OfficialLyric.builder()
+                        .track(track)
+                        .status("PUBLISHED")
+                        .build());
+
+        official.setLyricContent(trimmed);
+        official.setStatus("PUBLISHED");
+        official.setUpdatedAt(Instant.now());
+
+        OfficialLyric saved = officialLyricRepository.save(official);
+
+        // Đồng bộ ngược lại bảng tracks
+        track.setLyrics(trimmed.isBlank() ? null : trimmed);
+        trackRepository.save(track);
+
+        log.info("Saved official lyrics for track {} by user {}", trackId, userId);
+        return saved;
+    }
+
+    /**
+     * Xóa toàn bộ lyrics liên kết với bài hát khi bài hát bị xóa khỏi hệ thống.
+     */
+    @Transactional
+    public void deleteAllLyricsForTrack(Long trackId) {
+        if (trackId == null) return;
+        officialLyricRepository.deleteByTrackId(trackId);
+        personalLyricRepository.deleteByTrackId(trackId);
+    }
 }

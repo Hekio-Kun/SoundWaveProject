@@ -121,4 +121,14 @@ public class StudioTrackController {
     public List<GenreOptionResponse> getGenres() {
         return studioTrackService.getActiveGenres();
     }
+
+    @PutMapping("/tracks/{id}/lyrics")
+    public StudioTrackResponse updateTrackLyrics(
+            @PathVariable Long id,
+            @Valid @RequestBody groupone.soundwaveproject.studio.dto.request.UpdateTrackLyricsRequest request,
+            Authentication authentication
+    ) {
+        return studioTrackService.updateTrackLyrics(id, request, authentication.getName());
+    }
 }
+
