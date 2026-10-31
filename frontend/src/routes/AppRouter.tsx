@@ -154,6 +154,10 @@ export function AppRouter(): React.ReactElement | null {
         playing={playing}
         onPlayTrack={playTrack}
         onNavigate={navigate}
+        currentUser={user}
+        favoriteIds={favoriteIds}
+        onToggleFavorite={toggleFavorite}
+        onAddToPlaylist={openAddTrackModal}
       />
     );
   }

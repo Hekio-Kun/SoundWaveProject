@@ -468,9 +468,6 @@ export function StudioTrackDetailPage({
 
           <h1 className="staff-hero-title">Track Submission Details</h1>
 
-          <p className="staff-hero-description">
-            Manage your audio track details, inspect moderation status, or update submission assets.
-          </p>
         </div>
       </header>
 
@@ -603,22 +600,6 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {isApproved && (!track.lyrics || !track.lyrics.trim()) && (
-                <button
-                  type="button"
-                  className="studio-crud-btn studio-crud-btn-edit"
-                  onClick={() => setUpdateLyricModalOpen(true)}
-                  style={{
-                    backgroundColor: "#f0f9ff",
-                    color: "var(--color-ocean-primary, #0284C7)",
-                    borderColor: "#bae6fd",
-                  }}
-                  title="Update lyrics for this published track"
-                >
-                  <EditIcon width={13} height={13} />
-                  <span>Update Lyric</span>
-                </button>
-              )}
 
               {isApproved && (
                 <button
@@ -839,13 +820,37 @@ export function StudioTrackDetailPage({
                   <h4 className="staff-lyrics-heading">Lyrics</h4>
                 </div>
 
-                {track.lyrics ? (
-                  <div className="staff-lyrics-header-actions">
+                <div className="staff-lyrics-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {track.lyrics ? (
                     <div className="staff-lyrics-stats-badge">
                       <span><b>{track.lyrics.split(/\r?\n/).filter((l) => l.trim().length > 0).length}</b> lines</span>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+
+                  {isApproved && (
+                    <button
+                      type="button"
+                      className="studio-crud-btn studio-crud-btn-edit"
+                      onClick={() => setUpdateLyricModalOpen(true)}
+                      style={{
+                        backgroundColor: "#f0f9ff",
+                        color: "var(--color-ocean-primary, #0284C7)",
+                        borderColor: "#bae6fd",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "5px 12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        borderRadius: "8px",
+                      }}
+                      title="Update lyrics for this published track"
+                    >
+                      <EditIcon width={13} height={13} />
+                      <span>Update Lyric</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {track.lyrics ? (

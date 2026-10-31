@@ -72,6 +72,26 @@ public class TrackCatalogController {
     }
 
     /**
+     * [UC-06]: View Recommended Song
+     * Lấy danh sách các bài hát gợi ý nổi bật cho màn hình Explore Music (Home).
+     * Thuật toán lựa chọn dựa trên các thể loại phổ biến và ngữ cảnh nghe nhạc của người dùng (nếu có).
+     * Tuân thủ quy tắc BR-09 (chỉ hiển thị bài hát PUBLISHED và thể loại đang ACTIVE).
+     *
+     * @param limit Số lượng bài hát gợi ý tối đa (mặc định: 10).
+     * @param authentication Ngữ cảnh xác thực (cho phép cả Guest và Listener).
+     * @return Danh sách bài hát gợi ý {@link TrackResponse}.
+     */
+    @GetMapping("/recommendations")
+    public ResponseEntity<java.util.List<TrackResponse>> getCuratedRecommendations(
+            @RequestParam(defaultValue = "10") int limit,
+            Authentication authentication
+    ) {
+        String userEmail = extractUserEmail(authentication);
+        log.info("Fetching curated recommendations: userEmail={}, limit={}", userEmail, limit);
+        return ResponseEntity.ok(trackCatalogService.getCuratedRecommendations(userEmail, limit));
+    }
+
+    /**
      * Lấy dữ liệu phát bài hát và URL stream CDN (UC-10: Play Music).
      * <p>
      * Tuân thủ quy tắc:
