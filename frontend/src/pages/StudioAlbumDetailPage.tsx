@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi, type RejectionDetails } from "../api/track";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
@@ -80,7 +79,6 @@ export function StudioAlbumDetailPage({
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [manageTracksModalOpen, setManageTracksModalOpen] = useState(false);
   const [manageTracksTab, setManageTracksTab] = useState<"MANAGE" | "ADD">("MANAGE");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -894,18 +892,6 @@ export function StudioAlbumDetailPage({
           </div>
         )}
       </section>
-
-      {/* Edit Album Info Modal */}
-      <AlbumFormModal
-        open={editModalOpen}
-        album={album}
-        onClose={() => setEditModalOpen(false)}
-        onSaved={async () => {
-          setEditModalOpen(false);
-          await fetchAlbumData();
-          setActionSuccess("Album updated successfully.");
-        }}
-      />
 
       {/* Manage Tracks Modal (Styled like Playlist track manager) */}
       <ManageAlbumTracksModal

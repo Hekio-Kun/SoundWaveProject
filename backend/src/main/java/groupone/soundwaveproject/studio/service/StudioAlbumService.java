@@ -301,6 +301,9 @@ public class StudioAlbumService {
 
                     Track savedTrack = trackRepository.save(track);
                     constituentTracks.add(savedTrack);
+                    if (lyricService != null && item.getLyrics() != null && !item.getLyrics().isBlank()) {
+                        lyricService.saveOrUpdateOfficialLyric(savedTrack.getId(), item.getLyrics().trim(), "DRAFT", user.getId());
+                    }
 
                     if (isSubmit) {
                         TrackSubmission submission = TrackSubmission.builder()

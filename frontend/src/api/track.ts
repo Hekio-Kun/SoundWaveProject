@@ -160,6 +160,8 @@ export const studioApi = {
     studioRequest<ApiTrack>(`/studio/tracks/${id}/withdraw`, "POST"),
   getRejectionDetails: (id: number) =>
     studioRequest<RejectionDetails>(`/studio/tracks/${id}/rejection`),
+  updateLyrics: (id: number, lyrics: string) =>
+    studioRequest<ApiTrack>(`/studio/tracks/${id}/lyrics`, "PUT", { lyrics }),
   getStats: () =>
     studioRequest<StudioStats>("/studio/stats"),
   getGenres: () =>

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 /**
  * Metadata bài hát và URL streaming phục vụ phát nhạc (Phase 1 trong Sequence Diagram).
+ * Bao gồm lời bài hát chính thức (Official Lyrics) nếu có.
  */
 public record TrackResponse(
         Long id,
