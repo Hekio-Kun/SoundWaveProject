@@ -112,6 +112,8 @@ class ModerationServiceTest {
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(20L)).thenReturn(java.util.List.of(testTrack));
+        when(submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(java.util.List.of(100L))).thenReturn(java.util.List.of(submission));
 
         ApproveTrackRequest request = new ApproveTrackRequest("Great track!");
         moderationService.approveSubmission(1L, request, "staff@soundwave.com");
@@ -127,6 +129,47 @@ class ModerationServiceTest {
         verify(albumRepository).save(draftAlbum);
         verify(trackRepository).save(testTrack);
         verify(submissionRepository).save(submission);
+    }
+
+    @Test
+    void approveSubmission_AlbumWithMultipleTracks_WaitsUntilAllReviewedBeforePublishing() {
+        Album draftAlbum = Album.builder()
+                .createdByUserId(10L)
+                .title("Multi-track Album")
+                .slug("multi-track-album")
+                .status("DRAFT")
+                .build();
+        ReflectionTestUtils.setField(draftAlbum, "id", 50L);
+
+        Track track1 = Track.builder().uploaderUserId(10L).title("Track 1").slug("track-1").publicationStatus(TrackPublicationStatus.PENDING).build();
+        ReflectionTestUtils.setField(track1, "id", 101L);
+        track1.setAlbum(draftAlbum);
+
+        Track track2 = Track.builder().uploaderUserId(10L).title("Track 2").slug("track-2").publicationStatus(TrackPublicationStatus.PENDING).build();
+        ReflectionTestUtils.setField(track2, "id", 102L);
+        track2.setAlbum(draftAlbum);
+
+        TrackSubmission sub1 = TrackSubmission.builder().trackId(101L).submittedByUserId(10L).status(SubmissionStatus.PENDING).submittedAt(Instant.now()).build();
+        ReflectionTestUtils.setField(sub1, "id", 11L);
+
+        TrackSubmission sub2 = TrackSubmission.builder().trackId(102L).submittedByUserId(10L).status(SubmissionStatus.PENDING).submittedAt(Instant.now()).build();
+        ReflectionTestUtils.setField(sub2, "id", 12L);
+
+        when(submissionRepository.findById(11L)).thenReturn(Optional.of(sub1));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(101L)).thenReturn(Optional.of(track1));
+        when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(50L)).thenReturn(java.util.List.of(track1, track2));
+        when(submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(java.util.List.of(101L, 102L))).thenReturn(java.util.List.of(sub1, sub2));
+
+        // Act: Approve Track 1 (Track 2 is still PENDING)
+        moderationService.approveSubmission(11L, new ApproveTrackRequest("Track 1 approved"), "staff@soundwave.com");
+
+        // Assert: Track 1's submission is APPROVED, but track 1 is NOT published yet and album is NOT published yet!
+        assertEquals(SubmissionStatus.APPROVED, sub1.getStatus());
+        assertNotEquals(TrackPublicationStatus.PUBLISHED, track1.getPublicationStatus());
+        assertNotEquals("PUBLISHED", draftAlbum.getStatus());
     }
 
     @Test
