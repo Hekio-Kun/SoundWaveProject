@@ -225,8 +225,8 @@ export function LibraryPage({
     <div className="library-page">
       <div className="page-title-banner">
         <div>
-          <span className="eyebrow">PERSONAL COLLECTION</span>
-          <h1 className="page-heading">Your Library</h1>
+          <h1 className="page-heading" style={{ color: "var(--brand, #0284c7)" }}>Your Library</h1>
+          <p className="page-subtext">Manage your Favorite tracks, Playlists, and Listening History.</p>
         </div>
       </div>
 
