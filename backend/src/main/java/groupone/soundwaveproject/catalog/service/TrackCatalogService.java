@@ -12,9 +12,11 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.library.service.ListeningHistoryPublicService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -159,6 +161,10 @@ public class TrackCatalogService {
 
     @Transactional(readOnly = true)
     public Page<TrackResponse> getPublishedTracks(String genre, String search, String sort, Long creatorId, Pageable pageable) {
+        boolean hasGenre = genre != null && !genre.isBlank() && !"all".equalsIgnoreCase(genre);
+        boolean hasSearch = search != null && !search.isBlank();
+
+
         List<Track> allPublished = trackRepository.findAll().stream()
                 .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
                 .toList();
@@ -183,11 +189,12 @@ public class TrackCatalogService {
 
         if (search != null && !search.isBlank()) {
             String lowerSearch = search.trim().toLowerCase();
+            String unaccentedSearch = SearchNormalizeUtil.toUnaccented(lowerSearch);
             allPublished = allPublished.stream()
-                    .filter(t -> (t.getTitle() != null && t.getTitle().toLowerCase().contains(lowerSearch))
-                            || (t.getSlug() != null && t.getSlug().toLowerCase().contains(lowerSearch))
-                            || (t.getDescription() != null && t.getDescription().toLowerCase().contains(lowerSearch))
-                            || (t.getAlbum() != null && t.getAlbum().getTitle() != null && t.getAlbum().getTitle().toLowerCase().contains(lowerSearch)))
+                    .filter(t -> t.getTitle() != null && (t.getTitle().toLowerCase().contains(lowerSearch) || SearchNormalizeUtil.toUnaccented(t.getTitle()).contains(unaccentedSearch)))
+
+
+
                     .toList();
         }
 
@@ -483,12 +490,12 @@ public class TrackCatalogService {
      * @param track Track entity to map.
      * @return Populated {@link TrackResponse} containing audio URL, genre, album, and creator summaries.
      */
-    private TrackResponse mapToTrackResponse(Track track) {
+    public TrackResponse mapToTrackResponse(Track track) {
         long playCount = track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L;
         return mapToTrackResponse(track, playCount);
     }
 
-    private TrackResponse mapToTrackResponse(Track track, long playCount) {
+    public TrackResponse mapToTrackResponse(Track track, long playCount) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
             albumSummary = new TrackResponse.TrackAlbumSummary(

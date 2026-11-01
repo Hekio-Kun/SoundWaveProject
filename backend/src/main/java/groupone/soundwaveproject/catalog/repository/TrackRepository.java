@@ -76,4 +76,55 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
      */
     @Query("SELECT t.playCountCache FROM Track t WHERE t.id = :id")
     Optional<Long> getPlayCountById(@Param("id") Long id);
+
+    /**
+     * Highly optimized SQL search for published tracks matching keyword in title, slug, description, or album title.
+     * Orders by play count and creation date.
+     *
+     * @param keyword Search keyword.
+     * @param pageable Pagination settings.
+     * @return Paginated {@link Page} of matching published {@link Track} entities.
+     */
+    @Query(value = """
+        SELECT t FROM Track t
+        LEFT JOIN t.album a
+        WHERE t.publicationStatus = groupone.soundwaveproject.catalog.entity.TrackPublicationStatus.PUBLISHED
+          AND (
+              LOWER(t.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(t.slug) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(t.slug) LIKE LOWER(CONCAT('%', :slugKeyword, '%'))
+              OR REPLACE(LOWER(t.slug), '-', ' ') LIKE LOWER(CONCAT('%', :unaccentedKeyword, '%'))
+              OR LOWER(t.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR (a IS NOT NULL AND (
+                  LOWER(a.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  OR LOWER(a.slug) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  OR LOWER(a.slug) LIKE LOWER(CONCAT('%', :slugKeyword, '%'))
+                  OR REPLACE(LOWER(a.slug), '-', ' ') LIKE LOWER(CONCAT('%', :unaccentedKeyword, '%'))
+              ))
+          )
+        ORDER BY COALESCE(t.playCountCache, 0L) DESC, t.createdAt DESC
+    """, countQuery = """
+        SELECT COUNT(t) FROM Track t
+        LEFT JOIN t.album a
+        WHERE t.publicationStatus = groupone.soundwaveproject.catalog.entity.TrackPublicationStatus.PUBLISHED
+          AND (
+              LOWER(t.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(t.slug) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(t.slug) LIKE LOWER(CONCAT('%', :slugKeyword, '%'))
+              OR REPLACE(LOWER(t.slug), '-', ' ') LIKE LOWER(CONCAT('%', :unaccentedKeyword, '%'))
+              OR LOWER(t.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR (a IS NOT NULL AND (
+                  LOWER(a.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  OR LOWER(a.slug) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                  OR LOWER(a.slug) LIKE LOWER(CONCAT('%', :slugKeyword, '%'))
+                  OR REPLACE(LOWER(a.slug), '-', ' ') LIKE LOWER(CONCAT('%', :unaccentedKeyword, '%'))
+              ))
+          )
+    """)
+    Page<Track> searchPublishedTracks(
+            @Param("keyword") String keyword,
+            @Param("unaccentedKeyword") String unaccentedKeyword,
+            @Param("slugKeyword") String slugKeyword,
+            Pageable pageable
+    );
 }
