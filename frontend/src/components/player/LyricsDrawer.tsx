@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lyricsApi } from "../../api/lyrics";
 import { parseLyricsToLines, formatTimeDisplay, LyricLine } from "../common/LyricSyncTab";
+import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
+import { ReportLyricModal } from "../modals/ReportLyricModal";
+import { downloadLrcFile } from "../../utils/lyricsDownload";
 import {
   AlertIcon,
   CheckIcon,
   CloseIcon,
+  DownloadIcon,
   FileTextIcon,
+  FlagIcon,
   MaximizeIcon,
   MinimizeIcon,
   MusicIcon,
@@ -42,6 +47,12 @@ export function LyricsDrawer({
   const [activeSource, setActiveSource] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [toastNotification, setToastNotification] = useState<{
+    open: boolean;
+    message: string;
+    type: "success" | "error" | "info" | "warning";
+  }>({ open: false, message: "", type: "success" });
 
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -182,13 +193,36 @@ export function LyricsDrawer({
                 zIndex: 100,
                 background: "linear-gradient(170deg, #fdfaf4 0%, #f6efe3 100%)",
                 boxShadow: "none",
+                position: "relative",
+                overflow: "hidden",
               }
             : { zIndex: 55 }
         }
         aria-label="Synchronous Lyrics Viewer"
       >
+        {/* Ambient Glow Background Reflection (Fullscreen Theater Mode) */}
+        {isFullScreen && currentTrack?.coverUrl && (
+          <div
+            className="lyrics-ambient-glow"
+            style={{
+              position: "absolute",
+              inset: -60,
+              backgroundImage: `url(${currentTrack.coverUrl})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+              filter: "blur(90px) saturate(180%) brightness(0.95)",
+              opacity: 0.28,
+              pointerEvents: "none",
+              zIndex: 0,
+              transform: "scale(1.2)",
+              transition: "background-image 0.5s ease",
+            }}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Header Bar */}
-        <div className="queue-drawer-header" style={{ padding: "0 20px" }}>
+        <div className="queue-drawer-header" style={{ padding: "0 20px", position: "relative", zIndex: 1 }}>
           <div className="queue-drawer-tabs">
             <button
               type="button"
@@ -226,17 +260,57 @@ export function LyricsDrawer({
                     borderRadius: 999,
                     fontSize: 10,
                     fontWeight: 700,
-                    background: "#fef3c7",
-                    color: "#b45309",
+                    background:
+                      lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                        ? "#eff6ff"
+                        : "#fef3c7",
+                    color:
+                      lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                        ? "#1d4ed8"
+                        : "#b45309",
                   }}
                 >
-                  Custom
+                  {lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                    ? "Translation"
+                    : "Custom"}
                 </span>
               )}
             </button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {/* Download .LRC */}
+            {rawContent && (
+              <button
+                type="button"
+                className="queue-close-btn"
+                onClick={() => {
+                  downloadLrcFile(
+                    currentTrack?.title || "lyrics",
+                    currentTrack?.creator?.displayName,
+                    rawContent
+                  );
+                }}
+                title="Download lyrics as .lrc file"
+                aria-label="Download lyrics as .lrc file"
+              >
+                <DownloadIcon width={16} height={16} />
+              </button>
+            )}
+
+            {/* Report Lyrics Issue */}
+            {activeSource === "OFFICIAL" && officialContent && isAuthenticated && (
+              <button
+                type="button"
+                className="queue-close-btn"
+                onClick={() => setReportModalOpen(true)}
+                title="Report lyrics issue"
+                aria-label="Report lyrics issue"
+              >
+                <FlagIcon width={15} height={15} />
+              </button>
+            )}
+
             {/* Toggle Fullscreen / Karaoke Mode */}
             <button
               type="button"
@@ -698,6 +772,31 @@ export function LyricsDrawer({
           <span style={{ fontSize: 11, fontWeight: 600 }}>UC-16.1</span>
         </div>
       </aside>
+
+      {/* Report Lyric Modal */}
+      {currentTrack && (
+        <ReportLyricModal
+          isOpen={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          trackId={currentTrack.id}
+          trackTitle={currentTrack.title}
+          onSuccess={(msg) =>
+            setToastNotification({
+              open: true,
+              message: msg,
+              type: "success",
+            })
+          }
+        />
+      )}
+
+      {/* Central Feedback Toast Popup */}
+      <CenterNotificationPopup
+        open={toastNotification.open}
+        type={toastNotification.type}
+        message={toastNotification.message}
+        onClose={() => setToastNotification((prev) => ({ ...prev, open: false }))}
+      />
     </>
   );
 }

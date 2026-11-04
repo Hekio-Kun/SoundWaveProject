@@ -498,10 +498,14 @@ public class TrackCatalogService {
     public TrackResponse mapToTrackResponse(Track track, long playCount) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
-            albumSummary = new TrackResponse.TrackAlbumSummary(
-                    track.getAlbum().getId(),
-                    track.getAlbum().getTitle()
-            );
+            try {
+                albumSummary = new TrackResponse.TrackAlbumSummary(
+                        track.getAlbum().getId(),
+                        track.getAlbum().getTitle()
+                );
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch album for track id {}: {}", track.getId(), ex.getMessage());
+            }
         }
 
         TrackResponse.TrackCreatorSummary creatorSummary = userAccountPublicService
@@ -519,6 +523,17 @@ public class TrackCatalogService {
 
         String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
+        String genreSlug = null;
+        String genreName = null;
+        if (track.getGenre() != null) {
+            try {
+                genreSlug = track.getGenre().getSlug();
+                genreName = track.getGenre().getName();
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch genre for track id {}: {}", track.getId(), ex.getMessage());
+            }
+        }
+
         return new TrackResponse(
                 track.getId(),
                 track.getTitle(),
@@ -529,8 +544,8 @@ public class TrackCatalogService {
                 track.getDurationMs(),
                 playCount,
                 track.getPublicationStatus().name(),
-                track.getGenre() != null ? track.getGenre().getSlug() : null,
-                track.getGenre() != null ? track.getGenre().getName() : null,
+                genreSlug,
+                genreName,
                 albumSummary,
                 creatorSummary,
                 track.getCreatedAt(),
