@@ -642,7 +642,7 @@ body.modal-open .app-scroll-region {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 28px clamp(20px, 3vw, 44px) 56px;
+  padding: 10px clamp(20px, 3vw, 44px) 56px;
 }
 
 /* --------------------------------------------------------------------------
@@ -653,12 +653,11 @@ body.modal-open .app-scroll-region {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 28px 32px;
-  margin-bottom: 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 55%, #f8fafc 100%);
-  border: 1px solid #ccfbf1;
-  box-shadow: 0 4px 20px rgba(2, 132, 199, 0.04);
+  padding: 0;
+  margin-bottom: 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .staff-hero-copy {
@@ -705,9 +704,26 @@ body.modal-open .app-scroll-region {
   display: inline-block;
 }
 
+.staff-hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.staff-hero-title-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--ops-brand-light, #e0f2fe);
+  color: var(--ops-brand, #0284c7);
+  flex-shrink: 0;
+}
+
 .staff-hero-title {
   margin: 0;
-  font-size: clamp(26px, 2.5vw, 34px);
+  font-size: 28px;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.03em;
@@ -715,8 +731,8 @@ body.modal-open .app-scroll-region {
 }
 
 .staff-hero-description {
-  margin: 10px 0 0;
-  font-size: 14.5px;
+  margin: 4px 0 0;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--ops-text-secondary);
 }
@@ -740,9 +756,9 @@ body.modal-open .app-scroll-region {
 }
 
 .staff-hero-badge-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: var(--ops-amber-light);
@@ -775,14 +791,14 @@ body.modal-open .app-scroll-region {
 .staff-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .staff-metric-card {
   position: relative;
-  padding: 16px 18px;
-  border-radius: 16px;
+  padding: 8px 12px 10px;
+  border-radius: 12px;
   background: #ffffff;
   border: 1px solid var(--ops-border);
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.02);
@@ -871,17 +887,17 @@ body.modal-open .app-scroll-region {
 }
 
 .staff-metric-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ops-text-secondary);
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 /* --------------------------------------------------------------------------
    5. Main Queue Panel & Controls
    -------------------------------------------------------------------------- */
 .staff-queue-panel {
-  padding: 24px;
-  border-radius: 20px;
+  padding: 16px 20px 20px;
+  border-radius: 16px;
   background: #ffffff;
   border: 1px solid var(--ops-border);
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
@@ -1185,15 +1201,30 @@ body.modal-open .app-scroll-region {
 }
 
 .staff-track-card {
-  display: grid;
-  grid-template-columns: 64px minmax(260px, 1fr) auto auto;
+  display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 14px 20px;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 22px;
   border: 1px solid var(--ops-border);
   border-radius: 16px;
   background: #ffffff;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.staff-track-primary-content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.staff-track-secondary-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
 .staff-track-card:hover {
@@ -1340,7 +1371,7 @@ body.modal-open .app-scroll-region {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -1395,7 +1426,7 @@ body.modal-open .app-scroll-region {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 18px;
   border-radius: 10px;
   background: var(--ops-brand-light);
   color: var(--ops-brand-hover);
@@ -3009,27 +3040,62 @@ body.modal-open .app-scroll-region {
     flex: 1;
   }
 
-  .staff-track-card {
-    grid-template-columns: 56px minmax(0, 1fr);
-    gap: 14px;
+  .staff-track-card,
+  .staff-album-main-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
   }
 
-  .staff-track-status-col,
-  .staff-track-actions-col {
-    grid-column: 2 / -1;
+  .staff-track-primary-content {
     display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .staff-thumb-container {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .staff-track-meta-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .staff-track-secondary-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px solid var(--ops-border-subtle);
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .staff-track-status-col {
+    display: flex;
+    align-items: center;
   }
 
   .staff-track-actions-col {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
   }
 }
 
 @media (max-width: 640px) {
   .staff-kpi-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .staff-inspector-hero-card {
@@ -3091,6 +3157,46 @@ body.modal-open .app-scroll-region {
   outline: 2px solid var(--ops-brand);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+@media (max-width: 480px) {
+  .staff-track-card,
+  .staff-album-main-row {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .staff-thumb-container {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+  }
+
+  .staff-track-title-btn {
+    font-size: 15px;
+  }
+
+  .staff-btn-review,
+  .staff-album-expand-btn {
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+
+  .staff-album-track-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .staff-album-track-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px dashed var(--ops-border-subtle);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -3708,11 +3814,11 @@ body.modal-open .app-scroll-region {
 }
 
 .staff-album-main-row {
-  display: grid;
-  grid-template-columns: 64px minmax(240px, 1fr) auto auto;
+  display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 14px 20px;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 22px;
 }
 
 .staff-album-expand-btn {

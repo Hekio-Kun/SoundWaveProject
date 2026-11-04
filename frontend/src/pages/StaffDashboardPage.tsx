@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ShieldIcon } from "../icons";
+import { MusicIcon } from "../icons";
 import { ModeratePendingTracks } from "../components/moderation/ModeratePendingTracks";
 
 type Props = {
@@ -21,14 +21,13 @@ export function StaffDashboardPage({ onNavigate, initialSubmissionId }: Props) {
       {/* Executive Hero Banner */}
       <header className="staff-hero-banner">
         <div className="staff-hero-copy">
-          <div className="staff-hero-eyebrow">
-            <span className="staff-hero-eyebrow-pill">
-              <ShieldIcon width={13} height={13} />
-              <span>TRACK MODERATION</span>
-            </span>
-          </div>
 
-          <h1 className="staff-hero-title">Moderate Pending Tracks</h1>
+          <div className="staff-hero-title-row">
+            <span className="staff-hero-title-icon" aria-hidden="true">
+              <MusicIcon width={18} height={18} />
+            </span>
+            <h1 className="staff-hero-title">Moderate Pending Tracks</h1>
+          </div>
 
           <p className="staff-hero-description">
             Review pending submissions and record an approval or rejection decision.

@@ -847,30 +847,7 @@ export function StudioAlbumDetailPage({
 
                   {/* Inline Actions (Reorder / Remove / View) */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
-                    {(track.status === "PUBLISHED" || track.status === "APPROVED") && (!track.lyrics || !track.lyrics.trim()) && (
-                      <button
-                        type="button"
-                        className="button button-ghost button-small"
-                        onClick={() => setUpdateLyricTrack(track)}
-                        style={{
-                          padding: "4px 8px",
-                          color: "var(--color-ocean-primary, #0284C7)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontWeight: 600,
-                          fontSize: "11px",
-                          border: "1px solid #BAE6FD",
-                          borderRadius: "6px",
-                          backgroundColor: "#F0F9FF",
-                        }}
-                        title="Update lyrics for this public track"
-                      >
-                        <EditIcon width={12} height={12} />
-                        <span>Update Lyric</span>
-                      </button>
-                    )}
-                    <button
+                                        <button
                       type="button"
                       className="button button-ghost button-small"
                       onClick={() => handleInlineReorder(idx, "up")}

@@ -500,20 +500,6 @@ export function StudioPage({
                           >
                             {album.title}
                           </button>
-                          {album.description && (
-                            <small
-                              style={{
-                                display: "block",
-                                color: "var(--sw-text-muted, #64748b)",
-                                maxWidth: "340px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {album.description}
-                            </small>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -588,11 +574,8 @@ export function StudioPage({
     <div className="studio-page">
       <div className="studio-header">
         <div>
-          <span className="eyebrow">CONTENT STUDIO</span>
-          <h1 className="page-heading">Content Studio</h1>
-          <p className="page-subtext">
-            Upload tracks, curate albums, save drafts, manage submissions, and review staff feedback.
-          </p>
+
+          <h1 className="page-heading" style={{ fontSize: "28px", fontWeight: 800, margin: "0 0 6px", color: "var(--color-primary-600, #0284C7)" }}>Content Studio</h1>
         </div>
         {/* [FEATURE]: Nút tạo bài hát / tạo album mới điều hướng trực tiếp đến /track/create hoặc /album/create */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -830,20 +813,6 @@ export function StudioPage({
                               </span>
                             )}
                           </div>
-                          {t.description && (
-                            <small
-                              style={{
-                                display: "block",
-                                color: "var(--sw-text-muted)",
-                                maxWidth: "260px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {t.description}
-                            </small>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -899,29 +868,7 @@ export function StudioPage({
                             <span>Rejection feedback</span>
                           </button>
                         )}
-                        {(t.status === "APPROVED" || t.status === "PUBLISHED") && (!t.lyrics || !t.lyrics.trim()) && (
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={() => setUpdateLyricTrack(t)}
-                            title="Update lyrics for this published track"
-                            style={{
-                              color: "var(--color-ocean-primary, #0284C7)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              fontWeight: 600,
-                              fontSize: "12px",
-                              border: "1px solid #BAE6FD",
-                              borderRadius: "8px",
-                              backgroundColor: "#F0F9FF",
-                            }}
-                          >
-                            <EditIcon width={13} height={13} />
-                            <span>Update Lyric</span>
-                          </button>
-                        )}
-                        <button
+                                                <button
                           type="button"
                           className="button button-ghost button-small"
                           onClick={() => handleOpenDetail(t)}
@@ -1263,21 +1210,6 @@ export function StudioPage({
                       >
                         {album.title}
                       </h4>
-                      <p
-                        style={{
-                          margin: "0 0 12px",
-                          fontSize: "13px",
-                          color: "var(--sw-text-secondary, #64748B)",
-                          lineHeight: "1.4",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                          minHeight: "36px",
-                        }}
-                      >
-                        {album.description || "No description provided."}
-                      </p>
 
                       <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>

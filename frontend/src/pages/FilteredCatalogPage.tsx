@@ -277,11 +277,6 @@ export function FilteredCatalogPage({
           <h1 className="page-heading">
             {activeGenreObj ? `${activeGenreObj.name} Music` : "Filter by Genre & Catalog"}
           </h1>
-          <p className="page-subtext" style={{ color: "var(--sw-muted)", marginTop: "4px", fontSize: "14px" }}>
-            {activeGenreObj
-              ? activeGenreObj.description || `Discover trending and fresh ${activeGenreObj.name} tracks on SoundWave.`
-              : "Filter tracks by genre, sort by newest releases, trending plays, or alphabetical title, and stream published music."}
-          </p>
         </div>
       </div>
 

@@ -52,5 +52,23 @@ public class ListeningHistoryPublicService {
                     userId, trackId, listenedDurationMs, completed);
         }
     }
+
+    /**
+     * Lấy danh sách ID các bài hát người dùng đã nghe gần đây nhất (hỗ trợ đề xuất âm nhạc theo sở thích cá nhân).
+     *
+     * @param userId ID người dùng.
+     * @param limit Số lượng bản ghi tối đa cần lấy.
+     * @return Danh sách trackId đã nghe.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> getRecentListenedTrackIds(Long userId, int limit) {
+        if (userId == null) {
+            return List.of();
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, Math.max(1, limit));
+        return listeningHistoryRepository.findByUserIdOrderByPlayedAtDesc(userId, pageable).stream()
+                .map(ListeningHistory::getTrackId)
+                .toList();
+    }
 }
 

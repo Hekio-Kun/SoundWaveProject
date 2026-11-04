@@ -139,9 +139,6 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
             <span className="eyebrow">PUBLIC CATALOG</span>
           </div>
           <h1 className="page-heading">Browse Public Albums</h1>
-          <p className="page-subtext" style={{ color: "var(--sw-muted)", marginTop: "4px", fontSize: "14px" }}>
-            Explore full albums, LPs, and curated records officially released by SoundWave creators.
-          </p>
         </div>
       </div>
 

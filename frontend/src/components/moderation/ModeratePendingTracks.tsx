@@ -377,28 +377,6 @@ export function ModeratePendingTracks({
 
       {/* Main Review Workspace Panel */}
       <section className="staff-queue-panel">
-        {/* Panel Header & Live Controls */}
-        <div className="staff-queue-panel-header">
-          <div className="staff-queue-title-group">
-            <h2 className="staff-queue-heading">Moderation Queue</h2>
-            <span className="staff-counter-badge">
-              {queuePage ? `${queuePage.totalElements} tracks` : "..."}
-            </span>
-          </div>
-
-          <div className="staff-queue-header-actions">
-            <button
-              type="button"
-              className="staff-btn-refresh"
-              onClick={handleManualRefresh}
-              disabled={refreshing || loading}
-              title="Refresh queue"
-            >
-              <RefreshIcon width={14} height={14} className={refreshing ? "spin-icon" : ""} />
-              <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
-            </button>
-          </div>
-        </div>
 
         {/* Toolbar: Segmented Filter Tabs & Instant Search */}
         <div className="staff-filter-toolbar">
@@ -415,7 +393,6 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-amber" />
               <span>Pending</span>
-              <span className="staff-tab-count">{stats?.pendingCount ?? 0}</span>
             </button>
 
             <button
@@ -430,7 +407,6 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-green" />
               <span>Approved</span>
-              <span className="staff-tab-count">{stats?.approvedCount ?? 0}</span>
             </button>
 
             <button
@@ -445,7 +421,6 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-red" />
               <span>Rejected</span>
-              <span className="staff-tab-count">{stats?.rejectedCount ?? 0}</span>
             </button>
 
             <button
@@ -460,7 +435,6 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-cyan" />
               <span>All History</span>
-              <span className="staff-tab-count">{stats?.totalCount ?? 0}</span>
             </button>
           </div>
 
@@ -607,6 +581,7 @@ export function ModeratePendingTracks({
                     key={`album-${item.id}`}
                   >
                     <div className="staff-album-main-row">
+                      <div className="staff-track-primary-content">
                       {/* Album Artwork Thumbnail */}
                       <div className="staff-thumb-container">
                         {item.coverUrl ? (
@@ -677,8 +652,8 @@ export function ModeratePendingTracks({
                           </span>
                         </div>
                       </div>
-
-                      {/* Moderation status tag */}
+                      </div>
+                      <div className="staff-track-secondary-content">{/* Moderation status tag */}
                       <div className="staff-track-status-col staff-album-status-col">
                         {statusFilter === "APPROVED" ? (
                           <span className="staff-status-chip is-approved">
@@ -762,6 +737,7 @@ export function ModeratePendingTracks({
                           )}
                         </button>
                       </div>
+                      </div>
                     </div>
 
                     {/* Expanded album constituent tracks list */}
@@ -837,6 +813,7 @@ export function ModeratePendingTracks({
                   className={`staff-track-card ${item.status === "PENDING" ? "is-pending-track" : ""}`}
                   key={item.id}
                 >
+                  <div className="staff-track-primary-content">
                   {/* Track artwork */}
                   <div className="staff-thumb-container">
                     <img
@@ -899,8 +876,8 @@ export function ModeratePendingTracks({
                       </span>
                     </div>
                   </div>
-
-                  {/* Moderation status */}
+                  </div>
+                  <div className="staff-track-secondary-content">{/* Moderation status */}
                   <div className="staff-track-status-col">
                     <span
                       className={`staff-status-chip ${
@@ -933,6 +910,7 @@ export function ModeratePendingTracks({
                       <EyeIcon width={15} height={15} />
                       <span>View Details</span>
                     </button>
+                  </div>
                   </div>
                 </article>
               );
