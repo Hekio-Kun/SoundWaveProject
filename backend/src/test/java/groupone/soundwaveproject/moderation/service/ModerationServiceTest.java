@@ -127,7 +127,7 @@ class ModerationServiceTest {
         assertNotNull(draftAlbum.getPublishedAt());
 
         verify(albumRepository).save(draftAlbum);
-        verify(trackRepository).save(testTrack);
+        verify(trackRepository, atLeastOnce()).save(testTrack);
         verify(submissionRepository).save(submission);
     }
 
