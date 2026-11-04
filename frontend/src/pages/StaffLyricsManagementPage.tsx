@@ -23,7 +23,6 @@ import {
   ShieldIcon,
   TrashIcon,
   UserIcon,
-  VolumeIcon,
 } from "../icons";
 import type { StaffTrackLyricSummary } from "../types";
 
@@ -92,6 +91,828 @@ type MainTab = "MODERATION" | "CATALOG";
 type ModStatusFilter = "PENDING" | "APPROVED" | "REJECTED" | "ALL";
 type CatStatusFilter = "ALL" | "PUBLISHED" | "DRAFT" | "NO_LYRICS";
 
+type ParsedProposedLine = {
+  lineNumber: number;
+  raw: string;
+  tsMatch: string | null;
+  tsSeconds: number | null;
+  text: string;
+};
+
+// =========================================================================
+// ISOLATED SUB-COMPONENT: LyricInspectionModal (Shields Parent from Re-renders)
+// =========================================================================
+type LyricInspectionModalProps = {
+  submissionId: number;
+  onClose: () => void;
+  onDecisionSuccess: (message: string, type: "success" | "info") => void;
+};
+
+function LyricInspectionModal({
+  submissionId,
+  onClose,
+  onDecisionSuccess,
+}: LyricInspectionModalProps) {
+  const [inspectingDetail, setInspectingDetail] = useState<SubmissionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [submittingDecision, setSubmittingDecision] = useState(false);
+  const [reviewerNote, setReviewerNote] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectForm, setShowRejectForm] = useState(false);
+
+  // Localized audio player state: updates DO NOT cause the parent page to re-render
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+
+  // Cleanup audio playback on modal unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  // Fetch submission details with race condition prevention
+  useEffect(() => {
+    let isCurrent = true;
+    setLoadingDetail(true);
+    setDetailError(null);
+    setActionError(null);
+    setReviewerNote("");
+    setRejectionReason("");
+    setShowRejectForm(false);
+    setAudioPlaying(false);
+    setAudioCurrentTime(0);
+
+    lyricsApi
+      .getLyricSubmissionDetail(submissionId)
+      .then((detail) => {
+        if (isCurrent) {
+          setInspectingDetail(detail);
+        }
+      })
+      .catch((err: any) => {
+        if (isCurrent) {
+          setDetailError(err.message || "Failed to load submission details.");
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setLoadingDetail(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [submissionId]);
+
+  // Audio Playback Handlers (UC-24.6 AF02)
+  const togglePlayAudio = () => {
+    if (!audioRef.current) return;
+    if (audioPlaying) {
+      audioRef.current.pause();
+      setAudioPlaying(false);
+    } else {
+      audioRef.current.play().catch((e) => console.warn("Playback prevented:", e));
+      setAudioPlaying(true);
+    }
+  };
+
+  const handleAudioTimeUpdate = () => {
+    if (!audioRef.current) return;
+    setAudioCurrentTime(audioRef.current.currentTime);
+  };
+
+  const handleAudioLoadedMetadata = () => {
+    if (!audioRef.current) return;
+    setAudioDuration(audioRef.current.duration || 0);
+  };
+
+  const handleAudioSeek = (e: ChangeEvent<HTMLInputElement>) => {
+    const target = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = target;
+      setAudioCurrentTime(target);
+    }
+  };
+
+  const handleJumpToTimestamp = (seconds: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = seconds;
+      setAudioCurrentTime(seconds);
+      if (!audioPlaying) {
+        audioRef.current.play().catch((e) => console.warn("Playback prevented:", e));
+        setAudioPlaying(true);
+      }
+    }
+  };
+
+  // Pre-parse proposed lyrics with useMemo to eliminate repetitive Regex executions during audio playback
+  const currentLines = useMemo(() => {
+    if (!inspectingDetail?.track.lyrics) return [];
+    return inspectingDetail.track.lyrics.split(/\r?\n/);
+  }, [inspectingDetail?.track.lyrics]);
+
+  const parsedProposedLines = useMemo<ParsedProposedLine[]>(() => {
+    if (!inspectingDetail?.proposedLyrics) return [];
+    return inspectingDetail.proposedLyrics.split(/\r?\n/).map((line, idx) => {
+      const match = line.match(/^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])(.*)$/);
+      const tsSeconds = parseTimestampToSeconds(line);
+      return {
+        lineNumber: idx + 1,
+        raw: line,
+        tsMatch: match ? match[1] : null,
+        tsSeconds,
+        text: match ? match[2] : line,
+      };
+    });
+  }, [inspectingDetail?.proposedLyrics]);
+
+  // Approve Proposed Lyric
+  const handleApproveLyric = async () => {
+    setSubmittingDecision(true);
+    setActionError(null);
+
+    try {
+      await lyricsApi.approveLyricSubmission(submissionId, reviewerNote.trim() || undefined);
+      onDecisionSuccess("Proposed lyrics approved and published as official successfully!", "success");
+      onClose();
+    } catch (err: any) {
+      setActionError(err.message || "Failed to approve lyric submission.");
+    } finally {
+      setSubmittingDecision(false);
+    }
+  };
+
+  // Reject Proposed Lyric
+  const handleRejectLyric = async () => {
+    if (!rejectionReason.trim() || rejectionReason.trim().length < 10) {
+      setActionError("A detailed rejection reason of at least 10 characters is required.");
+      return;
+    }
+
+    setSubmittingDecision(true);
+    setActionError(null);
+
+    try {
+      await lyricsApi.rejectLyricSubmission(
+        submissionId,
+        rejectionReason.trim(),
+        reviewerNote.trim() || undefined
+      );
+      onDecisionSuccess("Lyric submission rejected. The creator has been notified with your reason.", "info");
+      onClose();
+    } catch (err: any) {
+      setActionError(err.message || "Failed to reject lyric submission.");
+    } finally {
+      setSubmittingDecision(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.65)",
+        backdropFilter: "blur(4px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submittingDecision) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="modal-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lyric-inspect-title"
+        style={{
+          background: "#FFFFFF",
+          borderRadius: "16px",
+          width: "100%",
+          maxWidth: "1080px",
+          maxHeight: "92vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+        }}
+      >
+        {/* Modal Header */}
+        <div
+          style={{
+            padding: "18px 24px",
+            borderBottom: "1px solid #E2E8F0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#FAFAFA",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: "rgba(2, 132, 199, 0.1)",
+                color: "#0284C7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FileTextIcon width={22} height={22} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <h2 id="lyric-inspect-title" style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: 0 }}>
+                  {inspectingDetail?.track.title || "Review Proposed Lyrics"}
+                </h2>
+                {inspectingDetail?.status === "PENDING" ? (
+                  <span className="staff-status-chip is-pending">
+                    <i />
+                    <span>Pending Review</span>
+                  </span>
+                ) : inspectingDetail?.status === "APPROVED" ? (
+                  <span className="staff-status-chip is-approved">
+                    <i />
+                    <span>Approved</span>
+                  </span>
+                ) : inspectingDetail?.status === "REJECTED" ? (
+                  <span className="staff-status-chip is-rejected">
+                    <i />
+                    <span>Rejected</span>
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ fontSize: "12.5px", color: "#64748B", marginTop: 2 }}>
+                Submitted by{" "}
+                <strong style={{ color: "#334155" }}>
+                  {inspectingDetail?.submitter?.displayName || inspectingDetail?.submitter?.email || "Creator"}
+                </strong>{" "}
+                • {formatDate(inspectingDetail?.submittedAt)}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submittingDecision}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#64748B",
+              cursor: "pointer",
+              padding: 8,
+              borderRadius: 8,
+            }}
+            title="Close (Esc)"
+          >
+            <CloseIcon width={18} height={18} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div
+          style={{
+            padding: "20px 24px",
+            overflowY: "auto",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+          }}
+        >
+          {loadingDetail ? (
+            <div className="staff-empty-state" style={{ minHeight: 280 }}>
+              <span className="track-details-spinner" aria-hidden="true" />
+              <p>Loading submission details...</p>
+            </div>
+          ) : detailError ? (
+            <div className="staff-state-banner is-error">
+              <AlertIcon width={24} height={24} />
+              <b>Failed to load detail</b>
+              <p>{detailError}</p>
+            </div>
+          ) : inspectingDetail ? (
+            <>
+              {/* Audio Auditioning Player (UC-24.6 AF02) */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)",
+                  border: "1px solid #BAE6FD",
+                  borderRadius: "12px",
+                  padding: "14px 18px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <audio
+                  ref={audioRef}
+                  src={inspectingDetail.track.audioUrl}
+                  preload="metadata"
+                  onTimeUpdate={handleAudioTimeUpdate}
+                  onLoadedMetadata={handleAudioLoadedMetadata}
+                  onEnded={() => setAudioPlaying(false)}
+                />
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      type="button"
+                      onClick={togglePlayAudio}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        background: "#0284C7",
+                        color: "#FFFFFF",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)",
+                        transition: "transform 0.1s ease",
+                      }}
+                      title={audioPlaying ? "Pause audio" : "Play audio to audition lyrics"}
+                    >
+                      {audioPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
+                    </button>
+                    <div>
+                      <strong style={{ fontSize: "13.5px", color: "#0369A1", display: "block" }}>
+                        Audio Auditioning Player
+                      </strong>
+                      <span style={{ fontSize: "12px", color: "#0284C7" }}>
+                        {formatDurationSeconds(audioCurrentTime)} / {formatDurationSeconds(audioDuration || (inspectingDetail.track.durationMs / 1000))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#0369A1",
+                      background: "rgba(255, 255, 255, 0.7)",
+                      padding: "6px 12px",
+                      borderRadius: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <ClockIcon width={13} height={13} style={{ color: "#0284C7" }} />
+                    <span>Tip: Click any timestamp button below to jump audio directly to that line!</span>
+                  </div>
+                </div>
+
+                {/* Scrubber Range */}
+                <input
+                  type="range"
+                  min={0}
+                  max={audioDuration || (inspectingDetail.track.durationMs / 1000) || 100}
+                  step={0.1}
+                  value={audioCurrentTime}
+                  onChange={handleAudioSeek}
+                  style={{
+                    width: "100%",
+                    cursor: "pointer",
+                    accentColor: "#0284C7",
+                  }}
+                />
+              </div>
+
+              {/* Side-by-Side Diff Container */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "16px",
+                  minHeight: "340px",
+                }}
+              >
+                {/* Left: Current Official Lyric */}
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "10px 16px",
+                      background: "#F1F5F9",
+                      borderBottom: "1px solid #E2E8F0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#475569" }}>
+                      CURRENT OFFICIAL LYRICS
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#64748B" }}>
+                      {currentLines.length > 0 ? `${currentLines.length} lines` : "No lyrics"}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      overflowY: "auto",
+                      flex: 1,
+                      maxHeight: "360px",
+                      fontFamily: "monospace",
+                      fontSize: "12.5px",
+                      lineHeight: "1.7",
+                    }}
+                  >
+                    {currentLines.length > 0 ? (
+                      currentLines.map((line, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            color: line.trim() ? "#334155" : "transparent",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 28,
+                              color: "#94A3B8",
+                              userSelect: "none",
+                              textAlign: "right",
+                              fontSize: 11,
+                            }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <span>{line || "\u00A0"}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          color: "#94A3B8",
+                          gap: 6,
+                          padding: 24,
+                          textAlign: "center",
+                        }}
+                      >
+                        <FileTextIcon width={32} height={32} />
+                        <strong style={{ fontSize: 13, color: "#64748B" }}>No Official Lyrics Published</strong>
+                        <span style={{ fontSize: 12 }}>This track currently has no official synchronized lyrics.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Proposed Lyrics */}
+                <div
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid #BAE6FD",
+                    borderRadius: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    boxShadow: "0 2px 4px rgba(2, 132, 199, 0.04)",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "10px 16px",
+                      background: "#F0F9FF",
+                      borderBottom: "1px solid #BAE6FD",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#0369A1", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0284C7" }} />
+                      PROPOSED LYRICS (NEW)
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
+                      {parsedProposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      overflowY: "auto",
+                      flex: 1,
+                      maxHeight: "360px",
+                      fontFamily: "monospace",
+                      fontSize: "12.5px",
+                      lineHeight: "1.7",
+                    }}
+                  >
+                    {parsedProposedLines.length > 0 ? (
+                      parsedProposedLines.map((item) => {
+                        const isCloseToCurrent =
+                          item.tsSeconds !== null &&
+                          Math.abs(audioCurrentTime - item.tsSeconds) < 2;
+
+                        return (
+                          <div
+                            key={item.lineNumber}
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "baseline",
+                              background: isCloseToCurrent ? "rgba(2, 132, 199, 0.1)" : "transparent",
+                              borderRadius: 4,
+                              padding: "1px 4px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 24,
+                                color: "#94A3B8",
+                                userSelect: "none",
+                                textAlign: "right",
+                                fontSize: 11,
+                              }}
+                            >
+                              {item.lineNumber}
+                            </span>
+
+                            {item.tsMatch && item.tsSeconds !== null ? (
+                              <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
+                                  style={{
+                                    background: "rgba(2, 132, 199, 0.12)",
+                                    border: "1px solid rgba(2, 132, 199, 0.25)",
+                                    color: "#0369A1",
+                                    padding: "1px 6px",
+                                    borderRadius: 4,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                  }}
+                                  title={`Jump audio to ${formatDurationSeconds(item.tsSeconds)}`}
+                                >
+                                  {item.tsMatch}
+                                </button>
+                                <span style={{ color: "#0F172A" }}>{item.text}</span>
+                              </div>
+                            ) : (
+                              <span style={{ color: "#0F172A" }}>{item.raw || "\u00A0"}</span>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div style={{ color: "#94A3B8", padding: 16 }}>No proposed lyric content found.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Submitter Note if any */}
+              {inspectingDetail.submitterNote ? (
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "10px",
+                    padding: "12px 16px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <strong style={{ color: "#475569", display: "block", marginBottom: 2 }}>Creator Note:</strong>
+                  <span style={{ color: "#1E293B" }}>{inspectingDetail.submitterNote}</span>
+                </div>
+              ) : null}
+
+              {/* Review Decision Info if already decided */}
+              {inspectingDetail.status !== "PENDING" ? (
+                <div
+                  style={{
+                    background: inspectingDetail.status === "APPROVED" ? "#F0FDF4" : "#FEF2F2",
+                    border: inspectingDetail.status === "APPROVED" ? "1px solid #BBF7D0" : "1px solid #FECACA",
+                    borderRadius: "10px",
+                    padding: "14px 18px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    {inspectingDetail.status === "APPROVED" ? (
+                      <CheckIcon width={16} height={16} style={{ color: "#16A34A" }} />
+                    ) : (
+                      <CloseIcon width={16} height={16} style={{ color: "#DC2626" }} />
+                    )}
+                    <strong style={{ color: inspectingDetail.status === "APPROVED" ? "#166534" : "#991B1B" }}>
+                      Decision: {inspectingDetail.status}
+                    </strong>
+                    <span style={{ color: "#64748B" }}>
+                      by {inspectingDetail.reviewer?.displayName || inspectingDetail.reviewer?.email || "Staff"} on {formatDate(inspectingDetail.reviewedAt)}
+                    </span>
+                  </div>
+
+                  {inspectingDetail.rejectionReason ? (
+                    <div style={{ marginTop: 6, color: "#991B1B" }}>
+                      <strong>Rejection Reason:</strong> {inspectingDetail.rejectionReason}
+                    </div>
+                  ) : null}
+
+                  {inspectingDetail.reviewerNote ? (
+                    <div style={{ marginTop: 4, color: "#475569" }}>
+                      <strong>Internal Note:</strong> {inspectingDetail.reviewerNote}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Action Error Banner */}
+              {actionError ? (
+                <div className="staff-state-banner is-error" style={{ margin: 0 }}>
+                  <AlertIcon width={18} height={18} />
+                  <span>{actionError}</span>
+                </div>
+              ) : null}
+
+              {/* Decision Form for Pending Submissions */}
+              {inspectingDetail.status === "PENDING" && (
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "12px",
+                    padding: "16px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
+                      Reviewer Internal Note (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Add internal notes for staff audit logs..."
+                      value={reviewerNote}
+                      onChange={(e) => setReviewerNote(e.target.value)}
+                      disabled={submittingDecision}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid #CBD5E1",
+                        fontSize: "13px",
+                      }}
+                    />
+                  </div>
+
+                  {showRejectForm ? (
+                    <div
+                      style={{
+                        background: "#FEF2F2",
+                        border: "1px solid #FECACA",
+                        borderRadius: "8px",
+                        padding: "14px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <strong style={{ fontSize: "13px", color: "#991B1B" }}>
+                          Reason for Rejection (Required, min 10 characters)
+                        </strong>
+                        <span style={{ fontSize: "11px", color: rejectionReason.trim().length >= 10 ? "#16A34A" : "#DC2626" }}>
+                          {rejectionReason.trim().length} / 10 chars minimum
+                        </span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        placeholder="Explain clearly to the creator what is wrong (e.g. lyrics desynchronized after 00:45, offensive wording, wrong song)..."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        disabled={submittingDecision}
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #FCA5A5",
+                          fontSize: "13px",
+                          resize: "vertical",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          type="button"
+                          className="button button-secondary button-small"
+                          onClick={() => setShowRejectForm(false)}
+                          disabled={submittingDecision}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-danger button-small"
+                          onClick={handleRejectLyric}
+                          disabled={submittingDecision || rejectionReason.trim().length < 10}
+                          style={{ background: "#DC2626", color: "#FFFFFF" }}
+                        >
+                          {submittingDecision ? "Rejecting..." : "Confirm Reject"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+
+        {/* Modal Footer */}
+        <div
+          style={{
+            padding: "16px 24px",
+            borderTop: "1px solid #E2E8F0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#FAFAFA",
+          }}
+        >
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={onClose}
+            disabled={submittingDecision}
+          >
+            Close
+          </button>
+
+          {inspectingDetail?.status === "PENDING" && !showRejectForm ? (
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setShowRejectForm(true)}
+                disabled={submittingDecision}
+                style={{ color: "#DC2626", borderColor: "#FECACA" }}
+              >
+                Reject Lyric...
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleApproveLyric}
+                disabled={submittingDecision}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <CheckIcon width={16} height={16} />
+                <span>{submittingDecision ? "Approving..." : "Approve & Publish Official Lyric"}</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// =========================================================================
+// MAIN PAGE COMPONENT: StaffLyricsManagementPage
+// =========================================================================
 export function StaffLyricsManagementPage() {
   const [activeTab, setActiveTab] = useState<MainTab>("MODERATION");
 
@@ -115,22 +936,8 @@ export function StaffLyricsManagementPage() {
   const [modRefreshing, setModRefreshing] = useState(false);
   const modRequestIdRef = useRef(0);
 
-  // Inspection Modal State (Side-by-Side Diff & Audio Player)
+  // Inspection Modal ID
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
-  const [inspectingDetail, setInspectingDetail] = useState<SubmissionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [submittingDecision, setSubmittingDecision] = useState(false);
-  const [reviewerNote, setReviewerNote] = useState("");
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [showRejectForm, setShowRejectForm] = useState(false);
-
-  // Audio Player State for Auditioning (UC-24.6 AF02)
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
 
   // -------------------------------------------------------------
   // TAB 2: OFFICIAL LYRICS CATALOG STATE (UC-26)
@@ -165,16 +972,14 @@ export function StaffLyricsManagementPage() {
     if (!anyModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (!submittingDecision && selectedSubmissionId !== null) {
-          handleCloseInspectModal();
-        }
+        if (selectedSubmissionId !== null) setSelectedSubmissionId(null);
         if (!savingLyric && editorOpen) setEditorOpen(false);
         if (!deletingLyric && deleteTargetTrack !== null) setDeleteTargetTrack(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [anyModalOpen, submittingDecision, selectedSubmissionId, savingLyric, editorOpen, deletingLyric, deleteTargetTrack]);
+  }, [anyModalOpen, selectedSubmissionId, savingLyric, editorOpen, deletingLyric, deleteTargetTrack]);
 
   // Debounce search inputs
   useEffect(() => {
@@ -193,9 +998,49 @@ export function StaffLyricsManagementPage() {
     return () => clearTimeout(timer);
   }, [catSearch]);
 
-  // -------------------------------------------------------------
-  // TAB 1 API CALLS (Moderation)
-  // -------------------------------------------------------------
+  const handleModSearchSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const trimmed = modSearch.trim();
+    if (trimmed === debouncedModSearch && modPageIndex === 0) {
+      void loadModQueue(true);
+    } else {
+      setDebouncedModSearch(trimmed);
+      setModPageIndex(0);
+    }
+  };
+
+  const handleClearModSearch = () => {
+    setModSearch("");
+    if (debouncedModSearch === "" && modPageIndex === 0) {
+      void loadModQueue(true);
+    } else {
+      setDebouncedModSearch("");
+      setModPageIndex(0);
+    }
+  };
+
+  const handleCatSearchSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const trimmed = catSearch.trim();
+    if (trimmed === debouncedCatSearch && catPageIndex === 0) {
+      void loadCatTracks(true);
+    } else {
+      setDebouncedCatSearch(trimmed);
+      setCatPageIndex(0);
+    }
+  };
+
+  const handleClearCatSearch = () => {
+    setCatSearch("");
+    if (debouncedCatSearch === "" && catPageIndex === 0) {
+      void loadCatTracks(true);
+    } else {
+      setDebouncedCatSearch("");
+      setCatPageIndex(0);
+    }
+  };
+
+  // Load Lyric Moderation Stats & Queue
   const loadModStats = async () => {
     try {
       const stats = await lyricsApi.getLyricSubmissionStats();
@@ -246,134 +1091,7 @@ export function StaffLyricsManagementPage() {
     }
   }, [activeTab, modStatusFilter, debouncedModSearch, modPageIndex]);
 
-  // Open Inspection Modal
-  const handleOpenInspectModal = async (id: number) => {
-    setSelectedSubmissionId(id);
-    setLoadingDetail(true);
-    setDetailError(null);
-    setActionError(null);
-    setReviewerNote("");
-    setRejectionReason("");
-    setShowRejectForm(false);
-    setAudioPlaying(false);
-    setAudioCurrentTime(0);
-
-    try {
-      const detail = await lyricsApi.getLyricSubmissionDetail(id);
-      setInspectingDetail(detail);
-    } catch (err: any) {
-      setDetailError(err.message || "Failed to load submission details.");
-    } finally {
-      setLoadingDetail(false);
-    }
-  };
-
-  const handleCloseInspectModal = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setSelectedSubmissionId(null);
-    setInspectingDetail(null);
-    setAudioPlaying(false);
-  };
-
-  // Audio Playback Handlers (UC-24.6 AF02)
-  const togglePlayAudio = () => {
-    if (!audioRef.current) return;
-    if (audioPlaying) {
-      audioRef.current.pause();
-      setAudioPlaying(false);
-    } else {
-      audioRef.current.play().catch((e) => console.warn("Playback prevented:", e));
-      setAudioPlaying(true);
-    }
-  };
-
-  const handleAudioTimeUpdate = () => {
-    if (!audioRef.current) return;
-    setAudioCurrentTime(audioRef.current.currentTime);
-  };
-
-  const handleAudioLoadedMetadata = () => {
-    if (!audioRef.current) return;
-    setAudioDuration(audioRef.current.duration || 0);
-  };
-
-  const handleAudioSeek = (e: ChangeEvent<HTMLInputElement>) => {
-    const target = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = target;
-      setAudioCurrentTime(target);
-    }
-  };
-
-  const handleJumpToTimestamp = (seconds: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = seconds;
-      setAudioCurrentTime(seconds);
-      if (!audioPlaying) {
-        audioRef.current.play().catch((e) => console.warn("Playback prevented:", e));
-        setAudioPlaying(true);
-      }
-    }
-  };
-
-  // Approve Proposed Lyric
-  const handleApproveLyric = async () => {
-    if (!selectedSubmissionId) return;
-    setSubmittingDecision(true);
-    setActionError(null);
-
-    try {
-      await lyricsApi.approveLyricSubmission(selectedSubmissionId, reviewerNote.trim() || undefined);
-      setNotification({
-        open: true,
-        message: "Proposed lyrics approved and published as official successfully!",
-        type: "success",
-      });
-      handleCloseInspectModal();
-      void loadModQueue(true);
-    } catch (err: any) {
-      setActionError(err.message || "Failed to approve lyric submission.");
-    } finally {
-      setSubmittingDecision(false);
-    }
-  };
-
-  // Reject Proposed Lyric
-  const handleRejectLyric = async () => {
-    if (!selectedSubmissionId) return;
-    if (!rejectionReason.trim() || rejectionReason.trim().length < 10) {
-      setActionError("A detailed rejection reason of at least 10 characters is required.");
-      return;
-    }
-
-    setSubmittingDecision(true);
-    setActionError(null);
-
-    try {
-      await lyricsApi.rejectLyricSubmission(
-        selectedSubmissionId,
-        rejectionReason.trim(),
-        reviewerNote.trim() || undefined
-      );
-      setNotification({
-        open: true,
-        message: "Lyric submission rejected. The creator has been notified with your reason.",
-        type: "info",
-      });
-      handleCloseInspectModal();
-      void loadModQueue(true);
-    } catch (err: any) {
-      setActionError(err.message || "Failed to reject lyric submission.");
-    } finally {
-      setSubmittingDecision(false);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // TAB 2 API CALLS (Catalog)
-  // -------------------------------------------------------------
+  // Load Catalog Tracks
   const loadCatTracks = async (isManual = false) => {
     const reqId = ++catRequestIdRef.current;
     if (isManual) setCatRefreshing(true);
@@ -492,478 +1210,484 @@ export function StaffLyricsManagementPage() {
     }
   };
 
-  // Helper lines for side-by-side display
-  const currentLines = useMemo(() => {
-    if (!inspectingDetail?.track.lyrics) return [];
-    return inspectingDetail.track.lyrics.split(/\r?\n/);
-  }, [inspectingDetail?.track.lyrics]);
-
-  const proposedLines = useMemo(() => {
-    if (!inspectingDetail?.proposedLyrics) return [];
-    return inspectingDetail.proposedLyrics.split(/\r?\n/);
-  }, [inspectingDetail?.proposedLyrics]);
-
   return (
     <div className="ops-dashboard ops-dashboard--staff">
-      {/* Top Banner & Header */}
-      <header className="staff-hero-banner" style={{ borderBottom: "1px solid #E2E8F0" }}>
-        <div className="staff-hero-copy">
-          <div className="staff-hero-eyebrow">
-            <span className="staff-hero-eyebrow-pill" style={{ color: "#0284C7", borderColor: "rgba(2, 132, 199, 0.2)", background: "rgba(2, 132, 199, 0.06)" }}>
-              <FileTextIcon width={13} height={13} />
-              <span>OFFICIAL LYRICS MANAGEMENT & MODERATION</span>
-            </span>
-          </div>
-
-          <h1 className="staff-hero-title">Official Lyrics Hub</h1>
-
-          <p className="staff-hero-description">
-            Review creator proposals to add or update synchronized lyrics (UC-24.6), and manage the catalog of verified official lyrics (UC-26).
-          </p>
-        </div>
-
-        {/* Top-Level Mode Switcher Tabs */}
-        <div
-          role="tablist"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            background: "#F1F5F9",
-            padding: "5px",
-            borderRadius: "10px",
-            border: "1px solid #E2E8F0",
-          }}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "MODERATION"}
-            onClick={() => setActiveTab("MODERATION")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "7px",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              border: "none",
-              background: activeTab === "MODERATION" ? "#FFFFFF" : "transparent",
-              color: activeTab === "MODERATION" ? "#0284C7" : "#64748B",
-              boxShadow: activeTab === "MODERATION" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-            }}
-          >
-            <ShieldIcon width={15} height={15} />
-            <span>Proposed Lyrics Queue</span>
-            {modStats?.pendingCount ? (
-              <span
-                style={{
-                  background: "#D97706",
-                  color: "#FFFFFF",
-                  padding: "1px 7px",
-                  borderRadius: "12px",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                }}
-              >
-                {modStats.pendingCount}
+      <div className="mod-track-view">
+        {/* Top Executive Header */}
+        <header className="staff-hero-banner">
+          <div className="staff-hero-copy">
+            <div className="staff-hero-title-row">
+              <span className="staff-hero-title-icon" aria-hidden="true">
+                <FileTextIcon width={18} height={18} />
               </span>
-            ) : null}
-          </button>
-
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "CATALOG"}
-            onClick={() => setActiveTab("CATALOG")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "7px",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              border: "none",
-              background: activeTab === "CATALOG" ? "#FFFFFF" : "transparent",
-              color: activeTab === "CATALOG" ? "#0284C7" : "#64748B",
-              boxShadow: activeTab === "CATALOG" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-            }}
-          >
-            <DiscIcon width={15} height={15} />
-            <span>Official Lyrics Catalog</span>
-          </button>
-        </div>
-      </header>
-
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 1: LYRIC MODERATION QUEUE (UC-24.6) */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === "MODERATION" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Executive Stats Cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "14px",
-              marginTop: "4px",
-            }}
-          >
-            <div
-              style={{
-                background: "#FFFFFF",
-                padding: "16px 20px",
-                borderRadius: "12px",
-                border: "1px solid #E2E8F0",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>Pending Review</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#F59E0B" }} />
-              </div>
-              <strong style={{ fontSize: "26px", fontWeight: 700, color: "#0F172A" }}>
-                {modStats?.pendingCount ?? 0}
-              </strong>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Awaiting staff verification</span>
+              <h1 className="staff-hero-title">Official Lyrics Hub</h1>
             </div>
 
-            <div
-              style={{
-                background: "#FFFFFF",
-                padding: "16px 20px",
-                borderRadius: "12px",
-                border: "1px solid #E2E8F0",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>Approved</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981" }} />
-              </div>
-              <strong style={{ fontSize: "26px", fontWeight: 700, color: "#0F172A" }}>
-                {modStats?.approvedCount ?? 0}
-              </strong>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Published as official lyrics</span>
-            </div>
-
-            <div
-              style={{
-                background: "#FFFFFF",
-                padding: "16px 20px",
-                borderRadius: "12px",
-                border: "1px solid #E2E8F0",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>Rejected</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444" }} />
-              </div>
-              <strong style={{ fontSize: "26px", fontWeight: 700, color: "#0F172A" }}>
-                {modStats?.rejectedCount ?? 0}
-              </strong>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Sent back with feedback</span>
-            </div>
-
-            <div
-              style={{
-                background: "#FFFFFF",
-                padding: "16px 20px",
-                borderRadius: "12px",
-                border: "1px solid #E2E8F0",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>Total History</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0284C7" }} />
-              </div>
-              <strong style={{ fontSize: "26px", fontWeight: 700, color: "#0F172A" }}>
-                {modStats?.totalCount ?? 0}
-              </strong>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Lifetime lyric tickets</span>
-            </div>
+            <p className="staff-hero-description">
+              Review creator proposals to add or update synchronized lyrics (UC-24.6), and manage the catalog of verified official lyrics (UC-26).
+            </p>
           </div>
 
-          {/* Filter & Search Toolbar */}
-          <div className="staff-filter-toolbar">
-            <div className="staff-segmented-tabs" role="tablist">
+          {/* Top-Level Mode Switcher Tabs */}
+          <div className="staff-segmented-tabs" role="tablist" aria-label="Lyrics management section">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "MODERATION"}
+              className={`staff-segment-btn ${activeTab === "MODERATION" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("MODERATION")}
+            >
+              <ShieldIcon width={15} height={15} />
+              <span>Proposed Lyrics Queue</span>
+              {modStats?.pendingCount ? (
+                <span className="staff-tab-count" style={{ background: "var(--ops-amber)", color: "#FFFFFF" }}>
+                  {modStats.pendingCount}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "CATALOG"}
+              className={`staff-segment-btn ${activeTab === "CATALOG" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("CATALOG")}
+            >
+              <DiscIcon width={15} height={15} />
+              <span>Official Lyrics Catalog</span>
+            </button>
+          </div>
+        </header>
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 1: LYRIC MODERATION QUEUE (UC-24.6) */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === "MODERATION" && (
+          <>
+            {/* Top Interactive KPI Metric Cards (Semantic Buttons) */}
+            <section className="staff-kpi-grid" aria-label="Lyric moderation throughput statistics">
+              {/* 1. Pending */}
               <button
                 type="button"
-                role="tab"
-                aria-selected={modStatusFilter === "PENDING"}
-                className={`staff-segment-btn ${modStatusFilter === "PENDING" ? "is-active" : ""}`}
+                className={`staff-metric-card is-amber ${
+                  modStatusFilter === "PENDING" ? "is-selected-filter" : ""
+                }`}
                 onClick={() => {
                   setModStatusFilter("PENDING");
                   setModPageIndex(0);
                 }}
+                aria-pressed={modStatusFilter === "PENDING"}
+                title="Filter: Pending review"
               >
-                <span className="staff-tab-dot is-amber" />
-                <span>Pending</span>
-                <span className="staff-tab-count">{modStats?.pendingCount ?? 0}</span>
+                <div className="staff-metric-header">
+                  <span className="staff-metric-icon is-amber">
+                    <ClockIcon width={18} height={18} />
+                  </span>
+                </div>
+                <div className="staff-metric-body">
+                  <span className="staff-metric-value">{modStats ? modStats.pendingCount : "--"}</span>
+                  <strong className="staff-metric-title">Pending</strong>
+                </div>
               </button>
 
+              {/* 2. Approved */}
               <button
                 type="button"
-                role="tab"
-                aria-selected={modStatusFilter === "APPROVED"}
-                className={`staff-segment-btn ${modStatusFilter === "APPROVED" ? "is-active" : ""}`}
+                className={`staff-metric-card is-green ${
+                  modStatusFilter === "APPROVED" ? "is-selected-filter" : ""
+                }`}
                 onClick={() => {
                   setModStatusFilter("APPROVED");
                   setModPageIndex(0);
                 }}
+                aria-pressed={modStatusFilter === "APPROVED"}
+                title="Filter: Approved catalog"
               >
-                <span className="staff-tab-dot is-green" />
-                <span>Approved</span>
-                <span className="staff-tab-count">{modStats?.approvedCount ?? 0}</span>
+                <div className="staff-metric-header">
+                  <span className="staff-metric-icon is-green">
+                    <CheckIcon width={18} height={18} />
+                  </span>
+                </div>
+                <div className="staff-metric-body">
+                  <span className="staff-metric-value">{modStats ? modStats.approvedCount : "--"}</span>
+                  <strong className="staff-metric-title">Approved</strong>
+                </div>
               </button>
 
+              {/* 3. Rejected */}
               <button
                 type="button"
-                role="tab"
-                aria-selected={modStatusFilter === "REJECTED"}
-                className={`staff-segment-btn ${modStatusFilter === "REJECTED" ? "is-active" : ""}`}
+                className={`staff-metric-card is-red ${
+                  modStatusFilter === "REJECTED" ? "is-selected-filter" : ""
+                }`}
                 onClick={() => {
                   setModStatusFilter("REJECTED");
                   setModPageIndex(0);
                 }}
+                aria-pressed={modStatusFilter === "REJECTED"}
+                title="Filter: Rejected"
               >
-                <span className="staff-tab-dot is-red" />
-                <span>Rejected</span>
-                <span className="staff-tab-count">{modStats?.rejectedCount ?? 0}</span>
+                <div className="staff-metric-header">
+                  <span className="staff-metric-icon is-red">
+                    <AlertIcon width={18} height={18} />
+                  </span>
+                </div>
+                <div className="staff-metric-body">
+                  <span className="staff-metric-value">{modStats ? modStats.rejectedCount : "--"}</span>
+                  <strong className="staff-metric-title">Rejected</strong>
+                </div>
               </button>
 
+              {/* 4. Total History */}
               <button
                 type="button"
-                role="tab"
-                aria-selected={modStatusFilter === "ALL"}
-                className={`staff-segment-btn ${modStatusFilter === "ALL" ? "is-active" : ""}`}
+                className={`staff-metric-card is-cyan ${
+                  modStatusFilter === "ALL" ? "is-selected-filter" : ""
+                }`}
                 onClick={() => {
                   setModStatusFilter("ALL");
                   setModPageIndex(0);
                 }}
+                aria-pressed={modStatusFilter === "ALL"}
+                title="Filter: All records"
               >
-                <span className="staff-tab-dot is-cyan" />
-                <span>All History</span>
-                <span className="staff-tab-count">{modStats?.totalCount ?? 0}</span>
+                <div className="staff-metric-header">
+                  <span className="staff-metric-icon is-cyan">
+                    <DiscIcon width={18} height={18} />
+                  </span>
+                </div>
+                <div className="staff-metric-body">
+                  <span className="staff-metric-value">{modStats ? modStats.totalCount : "--"}</span>
+                  <strong className="staff-metric-title">Total Tickets</strong>
+                </div>
               </button>
-            </div>
+            </section>
 
-            {/* Search Input */}
-            <div className="staff-search-box" style={{ maxWidth: 360 }}>
-              <SearchIcon width={15} height={15} />
-              <input
-                type="text"
-                placeholder="Search by track title, creator or email..."
-                value={modSearch}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setModSearch(e.target.value)}
-                aria-label="Search lyric moderation tickets"
-              />
-              {modSearch ? (
-                <button
-                  type="button"
-                  className="staff-search-clear"
-                  onClick={() => setModSearch("")}
-                  title="Clear search"
-                >
-                  <CloseIcon width={12} height={12} />
-                </button>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              className="staff-btn-refresh"
-              onClick={() => void loadModQueue(true)}
-              disabled={modRefreshing || modLoading}
-              title="Refresh queue"
-            >
-              <RefreshIcon width={14} height={14} className={modRefreshing ? "spin-icon" : ""} />
-              <span>{modRefreshing ? "Refreshing..." : "Refresh"}</span>
-            </button>
-          </div>
-
-          {/* Submissions Table */}
-          <div className="staff-table-wrap">
-            {modLoading ? (
-              <div className="staff-empty-state" style={{ minHeight: 300 }}>
-                <span className="track-details-spinner" aria-hidden="true" />
-                <p>Loading lyric update submissions...</p>
-              </div>
-            ) : !modPage || modPage.content.length === 0 ? (
-              <div className="staff-empty-state" style={{ minHeight: 300 }}>
-                <FileTextIcon width={38} height={38} style={{ color: "#94A3B8" }} />
-                <strong>No lyric submissions found</strong>
-                <span>There are currently no proposals matching your filter.</span>
-              </div>
-            ) : (
-              <table className="staff-table">
-                <thead>
-                  <tr>
-                    <th>TRACK</th>
-                    <th>SUBMITTER</th>
-                    <th>SUBMITTED</th>
-                    <th>STATUS</th>
-                    <th style={{ textAlign: "right" }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {modPage.content.map((item) => (
-                    <tr key={item.id}>
-                      {/* Track info */}
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          {item.coverUrl ? (
-                            <img
-                              src={item.coverUrl}
-                              alt={item.trackTitle}
-                              style={{ width: 42, height: 42, borderRadius: 8, objectFit: "cover" }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: 42,
-                                height: 42,
-                                borderRadius: 8,
-                                background: "#F1F5F9",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "#0284C7",
-                              }}
-                            >
-                              <MusicIcon width={20} height={20} />
-                            </div>
-                          )}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <strong style={{ color: "#0F172A", fontSize: 13.5 }}>{item.trackTitle}</strong>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#64748B" }}>
-                              {item.albumTitle ? <span>{item.albumTitle}</span> : <span>Single</span>}
-                              {item.durationMs ? <span>• {formatDurationMs(item.durationMs)}</span> : null}
-                              <span style={{ color: "#0284C7", background: "rgba(2, 132, 199, 0.08)", padding: "1px 6px", borderRadius: 4, fontWeight: 600, fontSize: 11 }}>
-                                Lyric Update
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Submitter */}
-                      <td>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B" }}>
-                            {item.submitterDisplayName || "Unknown Creator"}
-                          </span>
-                          <span style={{ fontSize: 12, color: "#64748B" }}>
-                            {item.submitterEmail || "--"}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Submitted At */}
-                      <td>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <span style={{ fontSize: 13, color: "#1E293B" }}>
-                            {formatRelativeTime(item.submittedAt)}
-                          </span>
-                          <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                            {formatDate(item.submittedAt)}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td>
-                        {item.status === "PENDING" ? (
-                          <span className="staff-status-pill is-pending">
-                            <ClockIcon width={12} height={12} /> Pending Review
-                          </span>
-                        ) : item.status === "APPROVED" ? (
-                          <span className="staff-status-pill is-approved">
-                            <CheckIcon width={12} height={12} /> Approved
-                          </span>
-                        ) : (
-                          <span className="staff-status-pill is-rejected">
-                            <CloseIcon width={12} height={12} /> Rejected
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Action */}
-                      <td style={{ textAlign: "right" }}>
-                        <button
-                          type="button"
-                          className={item.status === "PENDING" ? "button button-primary button-small" : "button button-secondary button-small"}
-                          onClick={() => handleOpenInspectModal(item.id)}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                        >
-                          <EyeIcon width={14} height={14} />
-                          <span>{item.status === "PENDING" ? "Review & Verify" : "View Decision"}</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {/* Pagination Controls */}
-            {modPage && modPage.totalPages > 1 ? (
-              <div className="staff-pagination-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #E2E8F0" }}>
-                <span style={{ fontSize: 13, color: "#64748B" }}>
-                  Page {modPage.number + 1} of {modPage.totalPages} ({modPage.totalElements} submissions)
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
+            {/* Main Review Workspace Panel */}
+            <section className="staff-queue-panel">
+              {/* Toolbar: Segmented Filter Tabs & Instant Search */}
+              <div className="staff-filter-toolbar">
+                <div className="staff-segmented-tabs" role="tablist" aria-label="Lyric submission status tabs">
                   <button
                     type="button"
-                    className="button button-secondary button-small"
-                    disabled={modPage.first}
-                    onClick={() => setModPageIndex((p) => Math.max(0, p - 1))}
+                    role="tab"
+                    aria-selected={modStatusFilter === "PENDING"}
+                    className={`staff-segment-btn ${modStatusFilter === "PENDING" ? "is-active" : ""}`}
+                    onClick={() => {
+                      setModStatusFilter("PENDING");
+                      setModPageIndex(0);
+                    }}
                   >
-                    Previous
+                    <span className="staff-tab-dot is-amber" />
+                    <span>Pending</span>
+                    <span className="staff-tab-count">{modStats?.pendingCount ?? 0}</span>
                   </button>
+
                   <button
                     type="button"
-                    className="button button-secondary button-small"
-                    disabled={modPage.last}
-                    onClick={() => setModPageIndex((p) => p + 1)}
+                    role="tab"
+                    aria-selected={modStatusFilter === "APPROVED"}
+                    className={`staff-segment-btn ${modStatusFilter === "APPROVED" ? "is-active" : ""}`}
+                    onClick={() => {
+                      setModStatusFilter("APPROVED");
+                      setModPageIndex(0);
+                    }}
                   >
-                    Next
+                    <span className="staff-tab-dot is-green" />
+                    <span>Approved</span>
+                    <span className="staff-tab-count">{modStats?.approvedCount ?? 0}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={modStatusFilter === "REJECTED"}
+                    className={`staff-segment-btn ${modStatusFilter === "REJECTED" ? "is-active" : ""}`}
+                    onClick={() => {
+                      setModStatusFilter("REJECTED");
+                      setModPageIndex(0);
+                    }}
+                  >
+                    <span className="staff-tab-dot is-red" />
+                    <span>Rejected</span>
+                    <span className="staff-tab-count">{modStats?.rejectedCount ?? 0}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={modStatusFilter === "ALL"}
+                    className={`staff-segment-btn ${modStatusFilter === "ALL" ? "is-active" : ""}`}
+                    onClick={() => {
+                      setModStatusFilter("ALL");
+                      setModPageIndex(0);
+                    }}
+                  >
+                    <span className="staff-tab-dot is-cyan" />
+                    <span>All History</span>
+                    <span className="staff-tab-count">{modStats?.totalCount ?? 0}</span>
                   </button>
                 </div>
+
+                {/* Search Box */}
+                <form className="staff-search-wrapper" onSubmit={handleModSearchSubmit} role="search">
+                  <div className="staff-search-input-box">
+                    <button
+                      type="submit"
+                      className="staff-search-icon-btn"
+                      aria-label="Execute search"
+                      title="Search"
+                    >
+                      <SearchIcon width={16} height={16} className="staff-search-icon" />
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="Search by track title, creator, or email..."
+                      value={modSearch}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setModSearch(e.target.value)}
+                      className="staff-search-input"
+                      aria-label="Search lyric proposals"
+                    />
+                    {modSearch ? (
+                      <button
+                        type="button"
+                        className="staff-search-clear-btn"
+                        onClick={handleClearModSearch}
+                        aria-label="Clear search query"
+                        title="Clear search"
+                      >
+                        <CloseIcon width={14} height={14} />
+                      </button>
+                    ) : null}
+                  </div>
+                  <button
+                    type="submit"
+                    className="button button-primary staff-search-submit-btn"
+                    aria-label="Search lyric proposals"
+                    title="Search"
+                  >
+                    <SearchIcon width={15} height={15} />
+                    <span>Search</span>
+                  </button>
+                </form>
               </div>
-            ) : null}
-          </div>
-        </div>
-      )}
+
+              {/* Content: Loading Skeleton / Error / Empty State / Queue Cards */}
+              {modLoading ? (
+                <div
+                  className="staff-skeletons-container"
+                  aria-busy="true"
+                  aria-label="Loading lyric submissions from server"
+                >
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="staff-skeleton-card">
+                      <div className="staff-skeleton-thumb" />
+                      <div className="staff-skeleton-meta">
+                        <div className="staff-skeleton-bar is-long" />
+                        <div className="staff-skeleton-bar is-short" />
+                      </div>
+                      <div className="staff-skeleton-pill" />
+                      <div className="staff-skeleton-btns" />
+                    </div>
+                  ))}
+                </div>
+              ) : !modPage || modPage.content.length === 0 ? (
+                <div className="staff-empty-box" role="status" aria-live="polite">
+                  <div className="staff-empty-circle">
+                    <CheckIcon width={36} height={36} />
+                  </div>
+                  <h3 className="staff-empty-title">
+                    {debouncedModSearch
+                      ? "No matching lyric proposals found."
+                      : modStatusFilter === "PENDING"
+                      ? "Lyric Moderation Queue Is Clear!"
+                      : "No lyric proposals recorded"}
+                  </h3>
+                  <p className="staff-empty-description">
+                    {debouncedModSearch
+                      ? `No lyric submissions matched "${debouncedModSearch}". Try adjusting keywords or clear the filter.`
+                      : modStatusFilter === "PENDING"
+                      ? "All creator lyric proposals have been reviewed and processed. Great job!"
+                      : `There are currently no proposals under the ${modStatusFilter.toLowerCase()} tab.`}
+                  </p>
+                  {debouncedModSearch ? (
+                    <button
+                      type="button"
+                      className="button button-secondary button-small"
+                      onClick={handleClearModSearch}
+                    >
+                      Reset / Clear
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button button-secondary button-small"
+                      onClick={() => void loadModQueue(true)}
+                    >
+                      Refresh Queue
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="staff-track-cards-list">
+                  {modPage.content.map((item) => (
+                    <article
+                      className={`staff-track-card ${item.status === "PENDING" ? "is-pending-track" : ""}`}
+                      key={item.id}
+                    >
+                      <div className="staff-track-primary-content">
+                        {/* Track artwork */}
+                        <div className="staff-thumb-container">
+                          <img
+                            src={
+                              item.coverUrl ||
+                              "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400"
+                            }
+                            alt={item.trackTitle}
+                            className="staff-thumb-image"
+                          />
+                          <button
+                            type="button"
+                            className="staff-thumb-inspect-btn"
+                            onClick={() => setSelectedSubmissionId(item.id)}
+                            title="Inspect proposed lyrics"
+                            aria-label={`Inspect ${item.trackTitle}`}
+                          >
+                            <EyeIcon width={17} height={17} />
+                          </button>
+                        </div>
+
+                        {/* Track & artist metadata */}
+                        <div
+                          className="staff-track-meta-section"
+                          onClick={() => setSelectedSubmissionId(item.id)}
+                        >
+                          <div className="staff-track-name-row">
+                            <button
+                              type="button"
+                              className="staff-track-title-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSubmissionId(item.id);
+                              }}
+                              title={`View details ${item.trackTitle}`}
+                            >
+                              {item.trackTitle}
+                            </button>
+
+                            {/* Lyric Update badge */}
+                            <span className="staff-tag-badge is-single" title="Proposed Lyric Update">
+                              <FileTextIcon width={12} height={12} />
+                              <span>Lyric Update</span>
+                            </span>
+
+                            {item.albumTitle ? (
+                              <span className="staff-meta-pill is-album">{item.albumTitle}</span>
+                            ) : null}
+
+                            {item.durationMs ? (
+                              <span className="staff-meta-pill is-duration">
+                                {formatDurationMs(item.durationMs)}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="staff-creator-row">
+                            <span className="staff-creator-label">
+                              <UserIcon width={13} height={13} />
+                              <b>{item.submitterDisplayName || "Unknown Creator"}</b>
+                              {item.submitterEmail ? (
+                                <span className="staff-creator-email">({item.submitterEmail})</span>
+                              ) : null}
+                            </span>
+
+                            <span className="staff-queue-time-chip">
+                              <ClockIcon width={12} height={12} />
+                              <span>{formatRelativeTime(item.submittedAt)}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="staff-track-secondary-content">
+                        {/* Moderation status */}
+                        <div className="staff-track-status-col">
+                          <span
+                            className={`staff-status-chip ${
+                              item.status === "APPROVED"
+                                ? "is-approved"
+                                : item.status === "REJECTED"
+                                ? "is-rejected"
+                                : "is-pending"
+                            }`}
+                          >
+                            <i />
+                            <span>
+                              {item.status === "APPROVED"
+                                ? "Approved"
+                                : item.status === "REJECTED"
+                                ? "Rejected"
+                                : "Pending"}
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Action Button */}
+                        <div className="staff-track-actions-col">
+                          <button
+                            type="button"
+                            className="staff-btn-review"
+                            onClick={() => setSelectedSubmissionId(item.id)}
+                            title="Review proposed lyrics"
+                          >
+                            <EyeIcon width={15} height={15} />
+                            <span>{item.status === "PENDING" ? "Review Lyrics" : "View Decision"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {modPage && modPage.totalPages > 1 ? (
+                <div className="staff-pagination-bar" aria-label="Queue pagination">
+                  <button
+                    type="button"
+                    disabled={modPage.first}
+                    onClick={() => setModPageIndex((p) => Math.max(0, p - 1))}
+                    className="staff-page-btn"
+                    aria-label="Previous page"
+                  >
+                    ← Previous
+                  </button>
+                  <span className="staff-page-indicator">
+                    Page <b>{modPage.number + 1}</b> of {modPage.totalPages} ({modPage.totalElements} submissions)
+                  </span>
+                  <button
+                    type="button"
+                    disabled={modPage.last}
+                    onClick={() => setModPageIndex((p) => p + 1)}
+                    className="staff-page-btn"
+                    aria-label="Next page"
+                  >
+                    Next →
+                  </button>
+                </div>
+              ) : null}
+            </section>
+          </>
+        )}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 2: OFFICIAL LYRICS CATALOG (UC-26) */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "CATALOG" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <section className="staff-queue-panel">
           {/* Filter & Search Toolbar */}
           <div className="staff-filter-toolbar">
-            <div className="staff-segmented-tabs" role="tablist">
+            <div className="staff-segmented-tabs" role="tablist" aria-label="Official lyrics catalog filters">
               <button
                 type="button"
                 role="tab"
@@ -986,6 +1710,7 @@ export function StaffLyricsManagementPage() {
                   setCatPageIndex(0);
                 }}
               >
+                <span className="staff-tab-dot is-green" />
                 <span>Published</span>
               </button>
               <button
@@ -998,6 +1723,7 @@ export function StaffLyricsManagementPage() {
                   setCatPageIndex(0);
                 }}
               >
+                <span className="staff-tab-dot is-amber" />
                 <span>Draft</span>
               </button>
               <button
@@ -1014,51 +1740,93 @@ export function StaffLyricsManagementPage() {
               </button>
             </div>
 
-            <div className="staff-search-box">
-              <SearchIcon width={15} height={15} />
-              <input
-                type="text"
-                placeholder="Search published tracks by title..."
-                value={catSearch}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setCatSearch(e.target.value)}
-                aria-label="Search tracks"
-              />
-              {catSearch ? (
+            {/* Search Box */}
+            <form className="staff-search-wrapper" onSubmit={handleCatSearchSubmit} role="search">
+              <div className="staff-search-input-box">
                 <button
-                  type="button"
-                  className="staff-search-clear"
-                  onClick={() => setCatSearch("")}
-                  title="Clear search"
+                  type="submit"
+                  className="staff-search-icon-btn"
+                  aria-label="Execute search"
+                  title="Search"
                 >
-                  <CloseIcon width={12} height={12} />
+                  <SearchIcon width={16} height={16} className="staff-search-icon" />
                 </button>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              className="staff-btn-refresh"
-              onClick={() => void loadCatTracks(true)}
-              disabled={catRefreshing || catLoading}
-              title="Refresh catalog"
-            >
-              <RefreshIcon width={14} height={14} className={catRefreshing ? "spin-icon" : ""} />
-              <span>{catRefreshing ? "Refreshing..." : "Refresh"}</span>
-            </button>
+                <input
+                  type="text"
+                  placeholder="Search published tracks by title..."
+                  value={catSearch}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCatSearch(e.target.value)}
+                  className="staff-search-input"
+                  aria-label="Search tracks"
+                />
+                {catSearch ? (
+                  <button
+                    type="button"
+                    className="staff-search-clear-btn"
+                    onClick={handleClearCatSearch}
+                    aria-label="Clear search query"
+                    title="Clear search"
+                  >
+                    <CloseIcon width={14} height={14} />
+                  </button>
+                ) : null}
+              </div>
+              <button
+                type="submit"
+                className="button button-primary staff-search-submit-btn"
+                aria-label="Search tracks"
+                title="Search"
+              >
+                <SearchIcon width={15} height={15} />
+                <span>Search</span>
+              </button>
+            </form>
           </div>
 
           {/* Catalog Data Table */}
           <div className="staff-table-wrap">
             {catLoading ? (
-              <div className="staff-empty-state" style={{ minHeight: 320 }}>
-                <span className="track-details-spinner" aria-hidden="true" />
-                <p>Loading tracks and lyrics...</p>
+              <div className="staff-skeletons-container" aria-busy="true">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="staff-skeleton-card">
+                    <div className="staff-skeleton-thumb" />
+                    <div className="staff-skeleton-meta">
+                      <div className="staff-skeleton-bar is-long" />
+                      <div className="staff-skeleton-bar is-short" />
+                    </div>
+                    <div className="staff-skeleton-pill" />
+                    <div className="staff-skeleton-btns" />
+                  </div>
+                ))}
               </div>
             ) : !catPage || catPage.content.length === 0 ? (
-              <div className="staff-empty-state" style={{ minHeight: 320 }}>
-                <FileTextIcon width={36} height={36} />
-                <strong>No tracks found</strong>
-                <span>Try adjusting your search query or filter settings.</span>
+              <div className="staff-empty-box" role="status" aria-live="polite">
+                <div className="staff-empty-circle">
+                  <FileTextIcon width={36} height={36} />
+                </div>
+                <h3 className="staff-empty-title">No tracks found</h3>
+                <p className="staff-empty-description">
+                  {debouncedCatSearch
+                    ? `No tracks matched "${debouncedCatSearch}". Try adjusting keywords or clear the filter.`
+                    : "Try adjusting your search query or filter settings."}
+                </p>
+                {debouncedCatSearch ? (
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={handleClearCatSearch}
+                  >
+                    Reset / Clear
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={() => void loadCatTracks(true)}
+                  >
+                    Refresh Catalog
+                  </button>
+                )}
               </div>
             ) : (
               <table className="staff-table">
@@ -1102,12 +1870,14 @@ export function StaffLyricsManagementPage() {
                         {/* Lyric status */}
                         <td>
                           {status === "PUBLISHED" ? (
-                            <span className="staff-status-pill is-approved">
-                              <CheckIcon width={12} height={12} /> Published
+                            <span className="staff-status-chip is-approved">
+                              <i />
+                              <span>Published</span>
                             </span>
                           ) : status === "DRAFT" ? (
-                            <span className="staff-status-pill is-pending">
-                              <ClockIcon width={12} height={12} /> Draft
+                            <span className="staff-status-chip is-pending">
+                              <i />
+                              <span>Draft</span>
                             </span>
                           ) : (
                             <span
@@ -1115,9 +1885,9 @@ export function StaffLyricsManagementPage() {
                                 display: "inline-flex",
                                 alignItems: "center",
                                 gap: 4,
-                                padding: "4px 8px",
-                                borderRadius: 6,
-                                fontSize: 11,
+                                padding: "4px 10px",
+                                borderRadius: 999,
+                                fontSize: 11.5,
                                 fontWeight: 600,
                                 background: "#f1f5f9",
                                 color: "#64748b",
@@ -1171,661 +1941,48 @@ export function StaffLyricsManagementPage() {
 
             {/* Catalog Pagination Controls */}
             {catPage && catPage.totalPages > 1 ? (
-              <div className="staff-pagination-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #E2E8F0" }}>
-                <span style={{ fontSize: 13, color: "#64748B" }}>
-                  Page {catPage.number + 1} of {catPage.totalPages} ({catPage.totalElements} tracks)
+              <div className="staff-pagination-bar" aria-label="Catalog pagination">
+                <button
+                  type="button"
+                  className="staff-page-btn"
+                  disabled={catPage.first}
+                  onClick={() => setCatPageIndex((p) => Math.max(0, p - 1))}
+                  aria-label="Previous page"
+                >
+                  ← Previous
+                </button>
+                <span className="staff-page-indicator">
+                  Page <b>{catPage.number + 1}</b> of {catPage.totalPages} ({catPage.totalElements} tracks)
                 </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    className="button button-secondary button-small"
-                    disabled={catPage.first}
-                    onClick={() => setCatPageIndex((p) => Math.max(0, p - 1))}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-secondary button-small"
-                    disabled={catPage.last}
-                    onClick={() => setCatPageIndex((p) => p + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="staff-page-btn"
+                  disabled={catPage.last}
+                  onClick={() => setCatPageIndex((p) => p + 1)}
+                  aria-label="Next page"
+                >
+                  Next →
+                </button>
               </div>
             ) : null}
           </div>
-        </div>
+        </section>
       )}
+    </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: INSPECT & DECIDE LYRIC SUBMISSION (Side-by-Side Diff & Audio) */}
+      {/* MODAL: INSPECT & DECIDE LYRIC SUBMISSION (ISOLATED COMPONENT) */}
       {/* ------------------------------------------------------------- */}
-      {selectedSubmissionId !== null &&
-        createPortal(
-          <div
-            className="modal-backdrop"
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(15, 23, 42, 0.65)",
-              backdropFilter: "blur(4px)",
-              zIndex: 9999,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px",
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !submittingDecision) {
-                handleCloseInspectModal();
-              }
-            }}
-          >
-            <div
-              className="modal-container"
-              style={{
-                background: "#FFFFFF",
-                borderRadius: "16px",
-                width: "100%",
-                maxWidth: "1080px",
-                maxHeight: "92vh",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-              }}
-            >
-              {/* Modal Header */}
-              <div
-                style={{
-                  padding: "18px 24px",
-                  borderBottom: "1px solid #E2E8F0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "#FAFAFA",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 10,
-                      background: "rgba(2, 132, 199, 0.1)",
-                      color: "#0284C7",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <FileTextIcon width={22} height={22} />
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <h2 style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: 0 }}>
-                        {inspectingDetail?.track.title || "Review Proposed Lyrics"}
-                      </h2>
-                      {inspectingDetail?.status === "PENDING" ? (
-                        <span className="staff-status-pill is-pending">Pending Review</span>
-                      ) : inspectingDetail?.status === "APPROVED" ? (
-                        <span className="staff-status-pill is-approved">Approved</span>
-                      ) : inspectingDetail?.status === "REJECTED" ? (
-                        <span className="staff-status-pill is-rejected">Rejected</span>
-                      ) : null}
-                    </div>
-                    <div style={{ fontSize: "12.5px", color: "#64748B", marginTop: 2 }}>
-                      Submitted by{" "}
-                      <strong style={{ color: "#334155" }}>
-                        {inspectingDetail?.submitter?.displayName || inspectingDetail?.submitter?.email || "Creator"}
-                      </strong>{" "}
-                      • {formatDate(inspectingDetail?.submittedAt)}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCloseInspectModal}
-                  disabled={submittingDecision}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#64748B",
-                    cursor: "pointer",
-                    padding: 8,
-                    borderRadius: 8,
-                  }}
-                  title="Close (Esc)"
-                >
-                  <CloseIcon width={18} height={18} />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div
-                style={{
-                  padding: "20px 24px",
-                  overflowY: "auto",
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 18,
-                }}
-              >
-                {loadingDetail ? (
-                  <div className="staff-empty-state" style={{ minHeight: 280 }}>
-                    <span className="track-details-spinner" aria-hidden="true" />
-                    <p>Loading submission details...</p>
-                  </div>
-                ) : detailError ? (
-                  <div className="staff-state-banner is-error">
-                    <AlertIcon width={24} height={24} />
-                    <b>Failed to load detail</b>
-                    <p>{detailError}</p>
-                  </div>
-                ) : inspectingDetail ? (
-                  <>
-                    {/* Audio Auditioning Player (UC-24.6 AF02) */}
-                    <div
-                      style={{
-                        background: "linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)",
-                        border: "1px solid #BAE6FD",
-                        borderRadius: "12px",
-                        padding: "14px 18px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10,
-                      }}
-                    >
-                      <audio
-                        ref={audioRef}
-                        src={inspectingDetail.track.audioUrl}
-                        preload="metadata"
-                        onTimeUpdate={handleAudioTimeUpdate}
-                        onLoadedMetadata={handleAudioLoadedMetadata}
-                        onEnded={() => setAudioPlaying(false)}
-                      />
-
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <button
-                            type="button"
-                            onClick={togglePlayAudio}
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: "50%",
-                              background: "#0284C7",
-                              color: "#FFFFFF",
-                              border: "none",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)",
-                              transition: "transform 0.1s ease",
-                            }}
-                            title={audioPlaying ? "Pause audio" : "Play audio to audition lyrics"}
-                          >
-                            {audioPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-                          </button>
-                          <div>
-                            <strong style={{ fontSize: "13.5px", color: "#0369A1", display: "block" }}>
-                              Audio Auditioning Player
-                            </strong>
-                            <span style={{ fontSize: "12px", color: "#0284C7" }}>
-                              {formatDurationSeconds(audioCurrentTime)} / {formatDurationSeconds(audioDuration || (inspectingDetail.track.durationMs / 1000))}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "#0369A1",
-                            background: "rgba(255, 255, 255, 0.7)",
-                            padding: "6px 12px",
-                            borderRadius: "20px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontWeight: 500,
-                          }}
-                        >
-                          <ClockIcon width={13} height={13} style={{ color: "#0284C7" }} />
-                          <span>Tip: Click any timestamp button below to jump audio directly to that line!</span>
-                        </div>
-                      </div>
-
-                      {/* Scrubber Range */}
-                      <input
-                        type="range"
-                        min={0}
-                        max={audioDuration || (inspectingDetail.track.durationMs / 1000) || 100}
-                        step={0.1}
-                        value={audioCurrentTime}
-                        onChange={handleAudioSeek}
-                        style={{
-                          width: "100%",
-                          cursor: "pointer",
-                          accentColor: "#0284C7",
-                        }}
-                      />
-                    </div>
-
-                    {/* Side-by-Side Diff Container */}
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: "16px",
-                        minHeight: "340px",
-                      }}
-                    >
-                      {/* Left: Current Official Lyric */}
-                      <div
-                        style={{
-                          background: "#F8FAFC",
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "12px",
-                          display: "flex",
-                          flexDirection: "column",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "10px 16px",
-                            background: "#F1F5F9",
-                            borderBottom: "1px solid #E2E8F0",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#475569" }}>
-                            CURRENT OFFICIAL LYRICS
-                          </span>
-                          <span style={{ fontSize: "11px", color: "#64748B" }}>
-                            {currentLines.length > 0 ? `${currentLines.length} lines` : "No lyrics"}
-                          </span>
-                        </div>
-
-                        <div
-                          style={{
-                            padding: "14px 16px",
-                            overflowY: "auto",
-                            flex: 1,
-                            maxHeight: "360px",
-                            fontFamily: "monospace",
-                            fontSize: "12.5px",
-                            lineHeight: "1.7",
-                          }}
-                        >
-                          {currentLines.length > 0 ? (
-                            currentLines.map((line, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: "flex",
-                                  gap: 12,
-                                  color: line.trim() ? "#334155" : "transparent",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    width: 28,
-                                    color: "#94A3B8",
-                                    userSelect: "none",
-                                    textAlign: "right",
-                                    fontSize: 11,
-                                  }}
-                                >
-                                  {idx + 1}
-                                </span>
-                                <span>{line || "\u00A0"}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                height: "100%",
-                                color: "#94A3B8",
-                                gap: 6,
-                                padding: 24,
-                                textAlign: "center",
-                              }}
-                            >
-                              <FileTextIcon width={32} height={32} />
-                              <strong style={{ fontSize: 13, color: "#64748B" }}>No Official Lyrics Published</strong>
-                              <span style={{ fontSize: 12 }}>This track currently has no official synchronized lyrics.</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right: Proposed Lyrics */}
-                      <div
-                        style={{
-                          background: "#FFFFFF",
-                          border: "1px solid #BAE6FD",
-                          borderRadius: "12px",
-                          display: "flex",
-                          flexDirection: "column",
-                          overflow: "hidden",
-                          boxShadow: "0 2px 4px rgba(2, 132, 199, 0.04)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "10px 16px",
-                            background: "#F0F9FF",
-                            borderBottom: "1px solid #BAE6FD",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#0369A1", display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0284C7" }} />
-                            PROPOSED LYRICS (NEW)
-                          </span>
-                          <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
-                            {proposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
-                          </span>
-                        </div>
-
-                        <div
-                          style={{
-                            padding: "14px 16px",
-                            overflowY: "auto",
-                            flex: 1,
-                            maxHeight: "360px",
-                            fontFamily: "monospace",
-                            fontSize: "12.5px",
-                            lineHeight: "1.7",
-                          }}
-                        >
-                          {proposedLines.length > 0 ? (
-                            proposedLines.map((line, idx) => {
-                              const tsSeconds = parseTimestampToSeconds(line);
-                              const tsMatch = line.match(/^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])(.*)$/);
-
-                              return (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    display: "flex",
-                                    gap: 10,
-                                    alignItems: "baseline",
-                                    background:
-                                      tsSeconds !== null &&
-                                      Math.abs(audioCurrentTime - tsSeconds) < 2
-                                        ? "rgba(2, 132, 199, 0.1)"
-                                        : "transparent",
-                                    borderRadius: 4,
-                                    padding: "1px 4px",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      width: 24,
-                                      color: "#94A3B8",
-                                      userSelect: "none",
-                                      textAlign: "right",
-                                      fontSize: 11,
-                                    }}
-                                  >
-                                    {idx + 1}
-                                  </span>
-
-                                  {tsMatch && tsSeconds !== null ? (
-                                    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleJumpToTimestamp(tsSeconds)}
-                                        style={{
-                                          background: "rgba(2, 132, 199, 0.12)",
-                                          border: "1px solid rgba(2, 132, 199, 0.25)",
-                                          color: "#0369A1",
-                                          padding: "1px 6px",
-                                          borderRadius: 4,
-                                          fontSize: 11,
-                                          fontWeight: 700,
-                                          cursor: "pointer",
-                                          fontFamily: "inherit",
-                                        }}
-                                        title={`Jump audio to ${formatDurationSeconds(tsSeconds)}`}
-                                      >
-                                        {tsMatch[1]}
-                                      </button>
-                                      <span style={{ color: "#0F172A" }}>{tsMatch[2]}</span>
-                                    </div>
-                                  ) : (
-                                    <span style={{ color: "#0F172A" }}>{line || "\u00A0"}</span>
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div style={{ color: "#94A3B8", padding: 16 }}>No proposed lyric content found.</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Submitter Note if any */}
-                    {inspectingDetail.submitterNote ? (
-                      <div
-                        style={{
-                          background: "#F8FAFC",
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "10px",
-                          padding: "12px 16px",
-                          fontSize: "13px",
-                        }}
-                      >
-                        <strong style={{ color: "#475569", display: "block", marginBottom: 2 }}>Creator Note:</strong>
-                        <span style={{ color: "#1E293B" }}>{inspectingDetail.submitterNote}</span>
-                      </div>
-                    ) : null}
-
-                    {/* Review Decision Info if already decided */}
-                    {inspectingDetail.status !== "PENDING" ? (
-                      <div
-                        style={{
-                          background: inspectingDetail.status === "APPROVED" ? "#F0FDF4" : "#FEF2F2",
-                          border: inspectingDetail.status === "APPROVED" ? "1px solid #BBF7D0" : "1px solid #FECACA",
-                          borderRadius: "10px",
-                          padding: "14px 18px",
-                          fontSize: "13px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          {inspectingDetail.status === "APPROVED" ? (
-                            <CheckIcon width={16} height={16} style={{ color: "#16A34A" }} />
-                          ) : (
-                            <CloseIcon width={16} height={16} style={{ color: "#DC2626" }} />
-                          )}
-                          <strong style={{ color: inspectingDetail.status === "APPROVED" ? "#166534" : "#991B1B" }}>
-                            Decision: {inspectingDetail.status}
-                          </strong>
-                          <span style={{ color: "#64748B" }}>
-                            by {inspectingDetail.reviewer?.displayName || inspectingDetail.reviewer?.email || "Staff"} on {formatDate(inspectingDetail.reviewedAt)}
-                          </span>
-                        </div>
-
-                        {inspectingDetail.rejectionReason ? (
-                          <div style={{ marginTop: 6, color: "#991B1B" }}>
-                            <strong>Rejection Reason:</strong> {inspectingDetail.rejectionReason}
-                          </div>
-                        ) : null}
-
-                        {inspectingDetail.reviewerNote ? (
-                          <div style={{ marginTop: 4, color: "#475569" }}>
-                            <strong>Internal Note:</strong> {inspectingDetail.reviewerNote}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {/* Action Error Banner */}
-                    {actionError ? (
-                      <div className="staff-state-banner is-error" style={{ margin: 0 }}>
-                        <AlertIcon width={18} height={18} />
-                        <span>{actionError}</span>
-                      </div>
-                    ) : null}
-
-                    {/* Decision Form for Pending Submissions */}
-                    {inspectingDetail.status === "PENDING" && (
-                      <div
-                        style={{
-                          background: "#F8FAFC",
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "12px",
-                          padding: "16px 20px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 12,
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
-                            Reviewer Internal Note (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Add internal notes for staff audit logs..."
-                            value={reviewerNote}
-                            onChange={(e) => setReviewerNote(e.target.value)}
-                            disabled={submittingDecision}
-                            style={{
-                              padding: "8px 12px",
-                              borderRadius: "8px",
-                              border: "1px solid #CBD5E1",
-                              fontSize: "13px",
-                            }}
-                          />
-                        </div>
-
-                        {showRejectForm ? (
-                          <div
-                            style={{
-                              background: "#FEF2F2",
-                              border: "1px solid #FECACA",
-                              borderRadius: "8px",
-                              padding: "14px",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 8,
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <strong style={{ fontSize: "13px", color: "#991B1B" }}>
-                                Reason for Rejection (Required, min 10 characters)
-                              </strong>
-                              <span style={{ fontSize: "11px", color: rejectionReason.trim().length >= 10 ? "#16A34A" : "#DC2626" }}>
-                                {rejectionReason.trim().length} / 10 chars minimum
-                              </span>
-                            </div>
-                            <textarea
-                              rows={3}
-                              placeholder="Explain clearly to the creator what is wrong (e.g. lyrics desynchronized after 00:45, offensive wording, wrong song)..."
-                              value={rejectionReason}
-                              onChange={(e) => setRejectionReason(e.target.value)}
-                              disabled={submittingDecision}
-                              style={{
-                                width: "100%",
-                                padding: "8px 12px",
-                                borderRadius: "6px",
-                                border: "1px solid #FCA5A5",
-                                fontSize: "13px",
-                                resize: "vertical",
-                              }}
-                            />
-                            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                              <button
-                                type="button"
-                                className="button button-secondary button-small"
-                                onClick={() => setShowRejectForm(false)}
-                                disabled={submittingDecision}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-danger button-small"
-                                onClick={handleRejectLyric}
-                                disabled={submittingDecision || rejectionReason.trim().length < 10}
-                                style={{ background: "#DC2626", color: "#FFFFFF" }}
-                              >
-                                {submittingDecision ? "Rejecting..." : "Confirm Reject"}
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </>
-                ) : null}
-              </div>
-
-              {/* Modal Footer */}
-              <div
-                style={{
-                  padding: "16px 24px",
-                  borderTop: "1px solid #E2E8F0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "#FAFAFA",
-                }}
-              >
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={handleCloseInspectModal}
-                  disabled={submittingDecision}
-                >
-                  Close
-                </button>
-
-                {inspectingDetail?.status === "PENDING" && !showRejectForm ? (
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={() => setShowRejectForm(true)}
-                      disabled={submittingDecision}
-                      style={{ color: "#DC2626", borderColor: "#FECACA" }}
-                    >
-                      Reject Lyric...
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      onClick={handleApproveLyric}
-                      disabled={submittingDecision}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      <CheckIcon width={16} height={16} />
-                      <span>{submittingDecision ? "Approving..." : "Approve & Publish Official Lyric"}</span>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {selectedSubmissionId !== null && (
+        <LyricInspectionModal
+          submissionId={selectedSubmissionId}
+          onClose={() => setSelectedSubmissionId(null)}
+          onDecisionSuccess={(message, type) => {
+            setNotification({ open: true, message, type });
+            void loadModQueue(true);
+          }}
+        />
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: CATALOG LRC EDITOR (UC-26) */}
@@ -1834,6 +1991,7 @@ export function StaffLyricsManagementPage() {
         createPortal(
           <div
             className="modal-backdrop"
+            role="presentation"
             style={{
               position: "fixed",
               inset: 0,
@@ -1853,6 +2011,9 @@ export function StaffLyricsManagementPage() {
           >
             <div
               className="modal-container"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="catalog-editor-title"
               style={{
                 background: "#FFFFFF",
                 borderRadius: "16px",
@@ -1877,7 +2038,7 @@ export function StaffLyricsManagementPage() {
                 }}
               >
                 <div>
-                  <h2 style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: 0 }}>
+                  <h2 id="catalog-editor-title" style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: 0 }}>
                     Official Lyric Editor
                   </h2>
                   <span style={{ fontSize: "13px", color: "#64748B" }}>

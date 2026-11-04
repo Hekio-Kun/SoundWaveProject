@@ -35,7 +35,6 @@ public class AlbumCatalogService {
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final UserAccountPublicService userAccountPublicService;
-
     /**
      * Lấy danh sách các Album đã xuất bản (PUBLISHED) có hỗ trợ tìm kiếm, sắp xếp và phân trang.
      */
@@ -195,10 +194,14 @@ public class AlbumCatalogService {
     private TrackResponse mapToTrackResponse(Track track) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
-            albumSummary = new TrackResponse.TrackAlbumSummary(
-                    track.getAlbum().getId(),
-                    track.getAlbum().getTitle()
-            );
+            try {
+                albumSummary = new TrackResponse.TrackAlbumSummary(
+                        track.getAlbum().getId(),
+                        track.getAlbum().getTitle()
+                );
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch album for track id {}: {}", track.getId(), ex.getMessage());
+            }
         }
 
         TrackResponse.TrackCreatorSummary creatorSummary = userAccountPublicService
@@ -214,6 +217,17 @@ public class AlbumCatalogService {
                         null
                 ));
 
+        String genreSlug = null;
+        String genreName = null;
+        if (track.getGenre() != null) {
+            try {
+                genreSlug = track.getGenre().getSlug();
+                genreName = track.getGenre().getName();
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch genre for track id {}: {}", track.getId(), ex.getMessage());
+            }
+        }
+
         return new TrackResponse(
                 track.getId(),
                 track.getTitle(),
@@ -224,8 +238,8 @@ public class AlbumCatalogService {
                 track.getDurationMs(),
                 track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L,
                 track.getPublicationStatus().name(),
-                track.getGenre() != null ? track.getGenre().getSlug() : null,
-                track.getGenre() != null ? track.getGenre().getName() : null,
+                genreSlug,
+                genreName,
                 albumSummary,
                 creatorSummary,
                 track.getCreatedAt()

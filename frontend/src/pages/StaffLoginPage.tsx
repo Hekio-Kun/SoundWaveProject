@@ -321,7 +321,7 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
               <button
                 type="button"
                 className={`ops-demo-btn ops-demo-btn--admin ${activeDemo === "admin" ? "is-active" : ""}`}
-                onClick={() => handleFillDemo("admin", "admin@soundwave.com", "Admin@123456")}
+                onClick={() => handleFillDemo("admin", "admin@soundwave.com", "Test@123456")}
                 title="Fill Administrator account"
               >
                 <span className="ops-demo-role-badge">Admin</span>
@@ -334,7 +334,7 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
               <button
                 type="button"
                 className={`ops-demo-btn ops-demo-btn--staff ${activeDemo === "staff" ? "is-active" : ""}`}
-                onClick={() => handleFillDemo("staff", "staff@soundwave.com", "Staff@123456")}
+                onClick={() => handleFillDemo("staff", "staff@soundwave.com", "Test@123456")}
                 title="Fill Moderation Staff account"
               >
                 <span className="ops-demo-role-badge">Staff</span>

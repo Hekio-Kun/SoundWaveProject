@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
 import { lyricsApi } from "../api/lyrics";
@@ -6,13 +6,17 @@ import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { parseLyricsToLines, formatTimeDisplay } from "../components/common/LyricSyncTab";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { ReportLyricModal } from "../components/modals/ReportLyricModal";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { downloadLrcFile } from "../utils/lyricsDownload";
 import {
   AlertIcon,
   CheckIcon,
+  DownloadIcon,
   EditIcon,
   FileTextIcon,
+  FlagIcon,
   HeadphonesIcon,
   HeartFillIcon,
   HeartIcon,
@@ -89,9 +93,11 @@ export function TrackDetailsPage({
   const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [personalEditorOpen, setPersonalEditorOpen] = useState(false);
   const [personalContent, setPersonalContent] = useState("");
+  const [personalType, setPersonalType] = useState<"CUSTOM" | "TRANSLATION">("CUSTOM");
   const [personalSaving, setPersonalSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Synchronous Playback Tracking (UC-16.1)
   const [currentTime, setCurrentTime] = useState(0);
@@ -128,24 +134,34 @@ export function TrackDetailsPage({
     };
   }, [trackId]);
 
-  // Load lyrics bundle (UC-16.1 & UC-18)
-  const loadTrackLyrics = async () => {
+  // Load lyrics bundle with race condition prevention (UC-16.1 & UC-18)
+  const lyricsRequestIdRef = useRef(0);
+
+  const loadTrackLyrics = useCallback(async () => {
+    const reqId = ++lyricsRequestIdRef.current;
     setLyricsLoading(true);
     setLyricsError(false);
+
     try {
       const bundle = await lyricsApi.getTrackLyrics(trackId);
-      setLyricsBundle(bundle);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsBundle(bundle);
+      }
     } catch {
-      setLyricsError(true);
-      setLyricsBundle(null);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsError(true);
+        setLyricsBundle(null);
+      }
     } finally {
-      setLyricsLoading(false);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsLoading(false);
+      }
     }
-  };
+  }, [trackId]);
 
   useEffect(() => {
     void loadTrackLyrics();
-  }, [trackId]);
+  }, [loadTrackLyrics]);
 
   // Track real-time playback position from audio element
   useEffect(() => {
@@ -258,7 +274,7 @@ export function TrackDetailsPage({
 
     setPersonalSaving(true);
     try {
-      const saved = await lyricsApi.savePersonalLyric(trackId, personalContent.trim(), "CUSTOM");
+      const saved = await lyricsApi.savePersonalLyric(trackId, personalContent.trim(), personalType);
       setLyricsBundle((prev) => ({
         officialLyric: prev?.officialLyric ?? null,
         userPersonalLyric: saved,
@@ -266,13 +282,13 @@ export function TrackDetailsPage({
       setPersonalEditorOpen(false);
       setNotification({
         open: true,
-        message: "Custom lyrics saved successfully.",
+        message: `${personalType === "TRANSLATION" ? "Translation" : "Custom lyrics"} saved successfully.`,
         type: "success",
       });
     } catch (err: any) {
       setNotification({
         open: true,
-        message: err.message || "Failed to save custom lyrics.",
+        message: err.message || "Failed to save lyrics.",
         type: "error",
       });
     } finally {
@@ -284,7 +300,7 @@ export function TrackDetailsPage({
   const handleDeletePersonalLyrics = async () => {
     setDeleteSaving(true);
     try {
-      await lyricsApi.deletePersonalLyric(trackId, "CUSTOM");
+      await lyricsApi.deletePersonalLyric(trackId, personalType);
       setLyricsBundle((prev) => ({
         officialLyric: prev?.officialLyric ?? null,
         userPersonalLyric: null,
@@ -292,13 +308,13 @@ export function TrackDetailsPage({
       setDeleteConfirmOpen(false);
       setNotification({
         open: true,
-        message: "Custom lyrics removed.",
+        message: `${personalType === "TRANSLATION" ? "Translation" : "Personal lyrics"} removed.`,
         type: "success",
       });
     } catch (err: any) {
       setNotification({
         open: true,
-        message: err.message || "Failed to delete custom lyrics.",
+        message: err.message || "Failed to delete personal lyrics.",
         type: "error",
       });
     } finally {
@@ -551,6 +567,37 @@ export function TrackDetailsPage({
                   <CheckIcon width={13} height={13} /> Verified Official
                 </span>
               ) : null}
+
+              {/* Download .LRC File */}
+              {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() => {
+                    const content = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
+                    downloadLrcFile(track.title, track.creator?.displayName, content);
+                  }}
+                  title="Download .LRC file"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <DownloadIcon width={13} height={13} />
+                  <span>Download .LRC</span>
+                </button>
+              )}
+
+              {/* Report Lyrics Issue */}
+              {lyricsTab === "OFFICIAL" && officialLyricContent && canManageLibrary ? (
+                <button
+                  type="button"
+                  className="button button-ghost button-small"
+                  onClick={() => setReportModalOpen(true)}
+                  title="Report inaccurate lyrics"
+                  style={{ color: "#64748B", display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  <FlagIcon width={13} height={13} />
+                  <span>Report</span>
+                </button>
+              ) : null}
             </div>
           </header>
 
@@ -577,7 +624,19 @@ export function TrackDetailsPage({
               >
                 <FileTextIcon width={14} height={14} />
                 <span>My Personal Lyrics</span>
-                {personalLyricContent ? <span className="tab-pill is-personal">Custom</span> : null}
+                {personalLyricContent ? (
+                  <span
+                    className={`tab-pill ${
+                      lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                        ? "is-translation"
+                        : "is-personal"
+                    }`}
+                  >
+                    {lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                      ? "Translation"
+                      : "Custom"}
+                  </span>
+                ) : null}
               </button>
             </div>
 
@@ -649,9 +708,17 @@ export function TrackDetailsPage({
                         ref={isActive ? activeLineRef : null}
                         className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
                         onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
                         title={
                           line.timeSec !== null
-                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            ? `Click or press Enter to jump audio to ${formatTimeDisplay(line.timeSec)}`
                             : undefined
                         }
                       >
@@ -721,9 +788,17 @@ export function TrackDetailsPage({
                         ref={isActive ? activeLineRef : null}
                         className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
                         onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
                         title={
                           line.timeSec !== null
-                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            ? `Click or press Enter to jump audio to ${formatTimeDisplay(line.timeSec)}`
                             : undefined
                         }
                       >
@@ -943,12 +1018,35 @@ export function TrackDetailsPage({
                   <div>
                     <small>PERSONAL LYRICS</small>
                     <h2 id="personal-lyrics-title">
-                      {personalLyricContent ? "Edit Custom Lyrics" : "Create Custom Lyrics"}
+                      {personalLyricContent
+                        ? `Edit ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`
+                        : `Create ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`}
                     </h2>
                   </div>
                 </div>
+
+                {/* Lyric Type Selector (UC-18.2 - 18.4) */}
+                <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setPersonalType("CUSTOM")}
+                    className={`button ${personalType === "CUSTOM" ? "button-primary" : "button-secondary"}`}
+                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
+                  >
+                    🎵 Custom Lyrics (Lời tự soạn)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPersonalType("TRANSLATION")}
+                    className={`button ${personalType === "TRANSLATION" ? "button-primary" : "button-secondary"}`}
+                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
+                  >
+                    🌐 Translation (Bản dịch nghĩa)
+                  </button>
+                </div>
+
                 <p>
-                  Write or paste your custom lyrics for <b>{track.title}</b>. Supports both standard LRC timestamps
+                  Write or paste your {personalType === "TRANSLATION" ? "translated" : "custom"} lyrics for <b>{track.title}</b>. Supports both standard LRC timestamps
                   (e.g. <code>[01:23.45] lyric line</code>) and plain text.
                 </p>
 
@@ -993,14 +1091,29 @@ export function TrackDetailsPage({
       {/* Delete Confirmation Modal for Personal Lyrics */}
       <DeleteConfirmationModal
         open={deleteConfirmOpen}
-        title="Delete Custom Lyrics"
-        message="Are you sure you want to remove your custom lyrics for this track? This action cannot be undone."
+        title="Delete Personal Lyrics"
+        message="Are you sure you want to remove your personal lyrics for this track? This action cannot be undone."
         confirmLabel="Delete Lyrics"
         submitting={deleteSaving}
         onConfirm={() => {
           void handleDeletePersonalLyrics();
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      {/* Report Inaccurate Lyrics Modal */}
+      <ReportLyricModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        trackId={trackId}
+        trackTitle={track.title}
+        onSuccess={(msg) =>
+          setNotification({
+            open: true,
+            message: msg,
+            type: "success",
+          })
+        }
       />
 
       {/* Central Feedback Toast Popup */}
