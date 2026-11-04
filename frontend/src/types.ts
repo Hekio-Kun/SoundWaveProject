@@ -213,3 +213,28 @@ export type StaffTrackLyricSummary = {
   lastUpdated?: string | null;
   updatedByStaffName?: string | null;
 };
+
+
+export type StaffSummaryItem = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: "STAFF" | "ADMIN" | string;
+  roleName: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  avatarUrl: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  totalTracksModerated: number;
+  totalReportsResolved: number;
+};
+
+export type StaffDirectoryResponse = {
+  content: StaffSummaryItem[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+};
