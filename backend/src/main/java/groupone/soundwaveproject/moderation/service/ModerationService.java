@@ -764,4 +764,27 @@ public class ModerationService {
                 trackSummaries
         );
     }
+
+    /**
+     * Thống kê số lượng bài hát đã được kiểm duyệt (Approved hoặc Rejected) theo danh sách ID nhân viên (UC-27.1).
+     *
+     * @param reviewerIds Tập hợp ID của nhân viên kiểm duyệt
+     * @return Map ánh xạ từ reviewerId sang số lượng bài đã duyệt
+     */
+    public java.util.Map<Long, Long> getModerationCountsByReviewerIds(java.util.Collection<Long> reviewerIds) {
+        if (reviewerIds == null || reviewerIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.List<Object[]> results = submissionRepository.countByReviewerUserIdsAndStatusIn(
+                reviewerIds,
+                java.util.List.of(SubmissionStatus.APPROVED, SubmissionStatus.REJECTED)
+        );
+        java.util.Map<Long, Long> counts = new java.util.HashMap<>();
+        for (Object[] row : results) {
+            Long reviewerId = (Long) row[0];
+            Long count = ((Number) row[1]).longValue();
+            counts.put(reviewerId, count);
+        }
+        return counts;
+    }
 }

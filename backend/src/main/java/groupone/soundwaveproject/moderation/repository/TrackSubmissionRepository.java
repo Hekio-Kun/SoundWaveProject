@@ -72,6 +72,20 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
             @Param("userIds") Collection<Long> userIds,
             Pageable pageable);
 
+    /**
+     * Đếm số lượng bài kiểm duyệt theo danh sách reviewer ID và trạng thái (UC-27.1).
+     *
+     * @param reviewerUserIds Tập hợp ID của nhân viên kiểm duyệt
+     * @param statuses        Tập hợp các trạng thái cần đếm (APPROVED, REJECTED)
+     * @return Danh sách [reviewerUserId, count]
+     */
+    @Query("SELECT s.reviewerUserId, COUNT(s) FROM TrackSubmission s WHERE s.reviewerUserId IN :reviewerUserIds AND s.status IN :statuses GROUP BY s.reviewerUserId")
+    java.util.List<Object[]> countByReviewerUserIdsAndStatusIn(
+            @Param("reviewerUserIds") Collection<Long> reviewerUserIds,
+            @Param("statuses") Collection<SubmissionStatus> statuses
+    );
+
+    long countByReviewerUserIdAndStatusIn(Long reviewerUserId, Collection<SubmissionStatus> statuses);
     @Query("SELECT s FROM TrackSubmission s WHERE (:status IS NULL OR s.status = :status) " +
            "AND (:submissionType IS NULL OR s.submissionType = :submissionType) " +
            "AND (s.trackId IN :trackIds OR s.submittedByUserId IN :userIds)")

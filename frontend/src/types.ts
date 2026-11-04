@@ -214,6 +214,23 @@ export type StaffTrackLyricSummary = {
   updatedByStaffName?: string | null;
 };
 
+
+export type StaffSummaryItem = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: "STAFF" | "ADMIN" | string;
+  roleName: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  avatarUrl: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  totalTracksModerated: number;
+  totalReportsResolved: number;
+};
+
+export type StaffDirectoryResponse = {
+  content: StaffSummaryItem[];
 export type CreatorSearchResult = {
   userId: number;
   username: string;
@@ -242,6 +259,8 @@ export type SearchPageResponse<T> = {
   totalPages: number;
   size: number;
   number: number;
+  first: boolean;
+  last: boolean;
 };
 
 export type UnifiedSearchResponse = {

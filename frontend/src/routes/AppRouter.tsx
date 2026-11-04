@@ -19,6 +19,7 @@ import { LibraryPage } from "../pages/LibraryPage";
 import { PlaylistDetailsPage } from "../pages/PlaylistDetailsPage";
 import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from "../pages/OperationsDashboardPage";
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
+import { AdminStaffManagementPage } from "../pages/AdminStaffManagementPage";
 import { StaffLyricsManagementPage } from "../pages/StaffLyricsManagementPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RankingBoardPage } from "../pages/RankingBoardPage";
@@ -544,6 +545,14 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   // 5. Operations & Administration Routes
+  if (pathname === "/admin/staffs" || pathname === "/admin/staff") {
+    return user?.role === "ADMIN" ? (
+      <AdminStaffManagementPage />
+    ) : (
+      <DashboardAccessDenied onNavigate={navigate} requiredRole="Administrator" />
+    );
+  }
+
   if (pathname === "/admin/genres") {
     return user?.role === "ADMIN" ? (
       <AdminGenreManagementPage />

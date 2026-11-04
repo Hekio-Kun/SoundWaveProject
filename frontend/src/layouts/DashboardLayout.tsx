@@ -10,6 +10,7 @@ import {
   MusicIcon,
   ShieldIcon,
   UserIcon,
+  UsersIcon,
 } from "../icons";
 import { NotificationDropdown } from "../components/layout/NotificationDropdown";
 import type { CurrentUser } from "../types";
@@ -109,6 +110,14 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
             >
               <ShieldIcon width={17} height={17} />
               <span>System Dashboard</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute === "/admin/staffs" ? "is-active" : ""}
+              onClick={() => handleNavClick("/admin/staffs")}
+            >
+              <UsersIcon width={17} height={17} />
+              <span>Staff Accounts</span>
             </button>
             <button
               type="button"
