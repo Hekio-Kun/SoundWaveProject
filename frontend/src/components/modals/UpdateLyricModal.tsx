@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { studioApi, type ApiTrack } from "../../api/track";
+import { studioApi, type ApiTrack, type PendingLyricSubmission } from "../../api/track";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
 import {
   AlertIcon,
@@ -33,15 +33,44 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
   const [lyricsText, setLyricsText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [pendingSubmission, setPendingSubmission] = useState<PendingLyricSubmission | null>(null);
+  const [submitterNote, setSubmitterNote] = useState<string>("");
+  const [withdrawing, setWithdrawing] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open || !track) return;
+    let isMounted = true;
     setLyricsText(track.lyrics || "");
     setErrorMessage(null);
+    setSuccessNotice(null);
     setFileName(null);
     setActiveTab("TEXT");
+    setPendingSubmission(null);
+    setSubmitterNote("");
+
+    const isPublished = track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED";
+    if (isPublished) {
+      void studioApi
+        .getPendingLyricsSubmission(track.id)
+        .then((pending) => {
+          if (isMounted && pending) {
+            setPendingSubmission(pending);
+            if (pending.proposedLyrics) {
+              setLyricsText(pending.proposedLyrics);
+            }
+          }
+        })
+        .catch(() => {
+          // If no pending submission found (404), keep track's default lyrics
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, [open, track]);
 
   useEffect(() => {
@@ -73,6 +102,22 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
     }
   };
 
+    const handleWithdraw = async () => {
+    if (!track) return;
+    setWithdrawing(true);
+    setErrorMessage(null);
+    try {
+      await studioApi.withdrawLyricsSubmission(track.id);
+      setPendingSubmission(null);
+      setLyricsText(track.lyrics || "");
+      setSuccessNotice("Lyric submission withdrawn. You can edit and submit again.");
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to withdraw lyric submission.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!lyricsText.trim()) {
       setErrorMessage("Lyrics content cannot be empty. Please enter or upload lyrics.");
@@ -82,11 +127,22 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
     setSubmitting(true);
     setErrorMessage(null);
 
+    const isPublished = track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED";
+
     try {
-      const updated = await studioApi.updateTrackLyrics(track.id, lyricsText.trim());
-      onSaved?.(updated);
-      onSuccess?.(updated);
-      onClose();
+      if (isPublished) {
+        const pending = await studioApi.submitLyricsForReview(track.id, lyricsText.trim(), submitterNote.trim() || undefined);
+        setPendingSubmission(pending);
+        setSuccessNotice("Your lyric update has been submitted for Staff review! The track remains published and streamable.");
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        const updated = await studioApi.updateTrackLyrics(track.id, lyricsText.trim());
+        onSaved?.(updated);
+        onSuccess?.(updated);
+        onClose();
+      }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Failed to update lyrics. Please try again.");
     } finally {
@@ -302,6 +358,66 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
 
           {activeTab === "TEXT" ? (
             <div>
+              {/* Pending Submission Notice Banner (UC-24.6) */}
+              {pendingSubmission && (
+                <div
+                  style={{
+                    marginBottom: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    padding: "12px 16px",
+                    borderRadius: "10px",
+                    backgroundColor: "#FEF3C7",
+                    border: "1px solid #FDE68A",
+                    color: "#92400E",
+                    fontSize: "13px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <ZapIcon width={18} height={18} style={{ color: "#D97706", flexShrink: 0 }} />
+                    <div>
+                      <strong>A lyric update is currently pending Staff review.</strong>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#B45309" }}>
+                        Submitted on {new Date(pendingSubmission.submittedAt).toLocaleDateString()}. You can withdraw to edit.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={handleWithdraw}
+                    disabled={withdrawing}
+                    style={{ color: "#B45309", borderColor: "#FCD34D" }}
+                  >
+                    {withdrawing ? "Withdrawing..." : "Withdraw Submission"}
+                  </button>
+                </div>
+              )}
+
+              {/* Submitter Note input for Published tracks */}
+              {(track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED") && (
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>
+                    Creator Note for Staff Review (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={submitterNote}
+                    onChange={(e) => setSubmitterNote(e.target.value)}
+                    placeholder="Briefly state what was changed (e.g. fixed timestamp synchronization, corrected chorus)..."
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #CBD5E1",
+                      fontSize: "12.5px",
+                    }}
+                  />
+                </div>
+              )}
+
               {/* File upload toolbar */}
               <div
                 style={{
@@ -446,7 +562,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
           <div style={{ fontSize: "12px", color: "#64748B" }}>
             {track.status === "PUBLISHED" || track.status === "APPROVED" ? (
               <span>
-                ● This track is live. Updating lyrics will be applied immediately without revoking publication.
+                ● This track is live. Lyric update will be queued for Staff moderation before going public; the song continues streaming without interruption.
               </span>
             ) : (
               <span>Lyrics will be attached to this track draft.</span>
@@ -484,7 +600,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
                 cursor: submitting || !lyricsText.trim() ? "not-allowed" : "pointer",
               }}
             >
-              {submitting ? "Saving Lyrics..." : "Save Lyrics"}
+              {submitting ? "Submitting..." : (track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED") ? "Submit for Review" : "Save Lyrics"}
             </button>
           </div>
         </div>

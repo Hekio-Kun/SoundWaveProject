@@ -50,6 +50,28 @@ function formatSeconds(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+// Parse timestamp [mm:ss.xx] or [mm:ss] into seconds
+function parseTimestampToSeconds(line: string): number | null {
+  const match = line.match(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/);
+  if (!match) return null;
+  const minutes = parseInt(match[1], 10);
+  const seconds = parseInt(match[2], 10);
+  const fractionStr = match[3];
+  let fraction = 0;
+  if (fractionStr) {
+    fraction = fractionStr.length === 2 ? parseInt(fractionStr, 10) / 100 : parseInt(fractionStr, 10) / 1000;
+  }
+  return minutes * 60 + seconds + fraction;
+}
+
+type ParsedLyricLine = {
+  lineNumber: number;
+  raw: string;
+  tsMatch: string | null;
+  tsSeconds: number | null;
+  text: string;
+};
+
 const PRESET_REASONS = [
   "Audio clipping or severe distortion detected in master stream.",
   "Incomplete or placeholder metadata (title, artist or artwork).",
@@ -105,18 +127,44 @@ export function PendingTrackDetailView({
     }
   };
 
-  const lyricLines = useMemo(() => {
+  const parsedLyricLines = useMemo<ParsedLyricLine[]>(() => {
     if (!detail?.track.lyrics) return [];
-    return detail.track.lyrics.split(/\r?\n/);
+    return detail.track.lyrics.split(/\r?\n/).map((line, idx) => {
+      const match = line.match(/^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])(.*)$/);
+      const tsSeconds = parseTimestampToSeconds(line);
+      return {
+        lineNumber: idx + 1,
+        raw: line,
+        tsMatch: match ? match[1] : null,
+        tsSeconds,
+        text: match ? match[2] : line,
+      };
+    });
   }, [detail?.track.lyrics]);
+
+  const hasSyncedLyrics = useMemo(() => {
+    return parsedLyricLines.some((l) => l.tsSeconds !== null);
+  }, [parsedLyricLines]);
+
+  const activeLineIndex = useMemo(() => {
+    if (!parsedLyricLines.length) return -1;
+    let foundIdx = -1;
+    for (let i = 0; i < parsedLyricLines.length; i++) {
+      const sec = parsedLyricLines[i].tsSeconds;
+      if (sec !== null && currentTime >= sec) {
+        foundIdx = i;
+      }
+    }
+    return foundIdx;
+  }, [parsedLyricLines, currentTime]);
 
   const lyricStats = useMemo(() => {
     if (!detail?.track.lyrics) return { lines: 0, words: 0, characters: 0 };
     const raw = detail.track.lyrics.trim();
-    const lines = lyricLines.filter((l) => l.trim().length > 0).length;
+    const lines = parsedLyricLines.filter((l) => l.raw.trim().length > 0).length;
     const words = raw.split(/\s+/).filter(Boolean).length;
     return { lines, words, characters: raw.length };
-  }, [detail?.track.lyrics, lyricLines]);
+  }, [detail?.track.lyrics, parsedLyricLines]);
 
   // Fetch track submission detail safely
   useEffect(() => {
@@ -233,6 +281,28 @@ export function PendingTrackDetailView({
     }
   };
 
+  const handleJumpToTimestamp = (seconds: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = seconds;
+    setCurrentTime(seconds);
+    if (!isPlaying) {
+      const promise = audioRef.current.play();
+      if (promise !== undefined) {
+        playPromiseRef.current = promise;
+        promise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err: Error) => {
+            if (err.name !== "AbortError") {
+              console.error("Audio playback error:", err);
+            }
+            setIsPlaying(false);
+          });
+      }
+    }
+  };
+
   const handleApprove = async () => {
     if (!detail) return;
     setSubmittingAction(true);
@@ -328,6 +398,25 @@ export function PendingTrackDetailView({
         </div>
       ) : detail ? (
         <div className="staff-detail-content-body">
+          {/* Lyric Update Notice Banner (UC-24.6) */}
+          {detail.submissionType === "LYRIC_UPDATE" ? (
+            <div style={{
+              padding: "14px 18px",
+              background: "#F0F9FF",
+              border: "1px solid #BAE6FD",
+              borderRadius: "14px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}>
+              <FileTextIcon width={22} height={22} style={{ color: "#0284C7", flexShrink: 0 }} />
+              <div style={{ fontSize: "13px", color: "#0369A1", lineHeight: "1.5" }}>
+                <strong>Lyric Update Moderation (UC-24.6):</strong> The creator submitted updated synchronized lyrics for this already published song. Making a decision here only modifies the song's official lyrics; the song remains published and streamable without interruption.
+              </div>
+            </div>
+          ) : null}
+
           {/* Status & Submission Metadata Banner */}
           <div className="staff-inspector-status-banner">
             <div className="staff-status-group">
@@ -631,6 +720,12 @@ export function PendingTrackDetailView({
               {detail.track.lyrics ? (
                 <div className="staff-lyrics-header-actions">
                   <div className="staff-lyrics-stats-badge">
+                    {hasSyncedLyrics ? (
+                      <>
+                        <span style={{ color: "#0284c7", fontWeight: 700 }}>Synced (.LRC)</span>
+                        <span>·</span>
+                      </>
+                    ) : null}
                     <span><b>{lyricStats.lines}</b> lines</span>
                     <span>·</span>
                     <span><b>{lyricStats.words}</b> words</span>
@@ -660,17 +755,43 @@ export function PendingTrackDetailView({
             {detail.track.lyrics ? (
               <div className="staff-lyrics-viewer-wrapper">
                 <div className="staff-lyrics-lines-container">
-                  {lyricLines.map((line, idx) => (
-                    <div key={idx} className="staff-lyrics-line-row">
-                      <span className="staff-lyrics-line-number" aria-hidden="true">
-                        {idx + 1}
-                      </span>
-                      <span className="staff-lyrics-line-content">
-                        {line || "\u00A0"}
-                      </span>
-                    </div>
-                  ))}
+                  {parsedLyricLines.map((item, idx) => {
+                    const isActive = idx === activeLineIndex && item.tsSeconds !== null;
+                    return (
+                      <div
+                        key={item.lineNumber}
+                        className={`staff-lyrics-line-row ${isActive ? "is-active" : ""}`}
+                      >
+                        <span className="staff-lyrics-line-number" aria-hidden="true">
+                          {item.lineNumber}
+                        </span>
+                        <span className="staff-lyrics-line-content">
+                          {item.tsMatch && item.tsSeconds !== null ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
+                                className="staff-lyric-ts-jump-btn"
+                                title={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
+                                aria-label={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
+                              >
+                                {item.tsMatch}
+                              </button>
+                              <span>{item.text || "\u00A0"}</span>
+                            </>
+                          ) : (
+                            item.raw || "\u00A0"
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
+                {hasSyncedLyrics ? (
+                  <div className="staff-lyrics-footer-guide">
+                    💡 <b>Tip:</b> Click any timestamp badge to audition the track starting at that specific line.
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="staff-lyrics-empty-state">
@@ -798,10 +919,10 @@ export function PendingTrackDetailView({
               {actionType === "APPROVE" ? (
                 <div className="staff-decision-panel is-approve">
                   <h4 className="staff-decision-panel-title text-success">
-                    Approve & Publish “{detail.track.title}”
+                    {detail.submissionType === "LYRIC_UPDATE" ? "Approve Lyric Update" : "Approve & Publish"} “{detail.track.title}”
                   </h4>
                   <p className="staff-decision-panel-desc">
-                    The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave.
+                    {detail.submissionType === "LYRIC_UPDATE" ? "The proposed lyrics will become the official published lyrics for this track. The track remains PUBLISHED and streamable." : "The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave."}
                   </p>
 
                   <label className="staff-input-group" htmlFor="detail-approve-note">
@@ -839,7 +960,7 @@ export function PendingTrackDetailView({
                       onClick={() => void handleApprove()}
                       disabled={submittingAction}
                     >
-                      {submittingAction ? "Publishing..." : "Confirm & Publish Track"}
+                      {submittingAction ? "Processing..." : detail.submissionType === "LYRIC_UPDATE" ? "Confirm & Approve Lyrics" : "Confirm & Publish Track"}
                     </button>
                   </div>
                 </div>

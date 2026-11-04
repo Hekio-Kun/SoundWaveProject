@@ -1,33 +1,14 @@
 package groupone.soundwaveproject.moderation.dto.response;
 
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
 
 import java.time.Instant;
 import java.util.List;
 
 /**
  * DTO phản hồi một mục tóm tắt trong danh sách hàng đợi kiểm duyệt (UC-24.1 View Moderation Queue).
- * Có thể là Track đơn (itemType = "SINGLE") hoặc Album (itemType = "ALBUM").
- *
- * @param id                   ID của bản ghi yêu cầu kiểm duyệt (hoặc ID Album nếu là mục Album)
- * @param itemType             Loại mục: "SINGLE" (Track đơn) hoặc "ALBUM" (Bộ sưu tập album)
- * @param trackId              ID của bài hát (null nếu là Album container)
- * @param trackTitle           Tựa đề bài hát (hoặc tựa đề Album nếu là Album container)
- * @param trackNumber          Thứ tự bài hát trong album (nếu có)
- * @param albumId              ID album chứa bài hát (nếu có)
- * @param albumTitle           Tên album chứa bài hát (nếu có)
- * @param genreName            Tên thể loại âm nhạc
- * @param coverUrl             Đường dẫn ảnh bìa
- * @param durationMs           Thời lượng tính theo mili-giây (tổng thời lượng nếu là Album)
- * @param submitterId          ID tài khoản người gửi
- * @param submitterDisplayName Tên hiển thị của người gửi
- * @param submitterEmail       Email của người gửi
- * @param status               Trạng thái kiểm duyệt
- * @param submittedAt          Thời điểm nộp vào hàng đợi
- * @param reviewedAt           Thời điểm kiểm duyệt (nếu đã xử lý)
- * @param reviewerDisplayName  Tên hiển thị của nhân viên kiểm duyệt đã xử lý
- * @param trackCount           Số lượng bài hát (nếu là Album)
- * @param albumTracks          Danh sách các bài hát trong album (nếu là Album)
+ * Có thể là Track đơn (itemType = "SINGLE"), Album (itemType = "ALBUM"), hoặc Cập nhật Lời bài hát (submissionType = "LYRIC_UPDATE").
  */
 public record SubmissionQueueItemResponse(
         Long id,
@@ -44,12 +25,63 @@ public record SubmissionQueueItemResponse(
         String submitterDisplayName,
         String submitterEmail,
         SubmissionStatus status,
+        SubmissionType submissionType,
+        String proposedLyrics,
         Instant submittedAt,
         Instant reviewedAt,
         String reviewerDisplayName,
         Integer trackCount,
         List<SubmissionQueueItemResponse> albumTracks
 ) {
+    /**
+     * Constructor tương thích ngược 19 tham số.
+     */
+    public SubmissionQueueItemResponse(
+            Long id,
+            String itemType,
+            Long trackId,
+            String trackTitle,
+            Integer trackNumber,
+            Long albumId,
+            String albumTitle,
+            String genreName,
+            String coverUrl,
+            Integer durationMs,
+            Long submitterId,
+            String submitterDisplayName,
+            String submitterEmail,
+            SubmissionStatus status,
+            Instant submittedAt,
+            Instant reviewedAt,
+            String reviewerDisplayName,
+            Integer trackCount,
+            List<SubmissionQueueItemResponse> albumTracks
+    ) {
+        this(
+                id,
+                itemType,
+                trackId,
+                trackTitle,
+                trackNumber,
+                albumId,
+                albumTitle,
+                genreName,
+                coverUrl,
+                durationMs,
+                submitterId,
+                submitterDisplayName,
+                submitterEmail,
+                status,
+                SubmissionType.TRACK_RELEASE,
+                null,
+                submittedAt,
+                reviewedAt,
+                reviewerDisplayName,
+                trackCount,
+                albumTracks
+        );
+    }
+
     /**
      * Constructor tương thích ngược 14 tham số ban đầu.
      */
@@ -84,6 +116,8 @@ public record SubmissionQueueItemResponse(
                 submitterDisplayName,
                 submitterEmail,
                 status,
+                SubmissionType.TRACK_RELEASE,
+                null,
                 submittedAt,
                 reviewedAt,
                 reviewerDisplayName,
@@ -111,6 +145,8 @@ public record SubmissionQueueItemResponse(
                 submitterDisplayName,
                 submitterEmail,
                 newStatus,
+                submissionType,
+                proposedLyrics,
                 submittedAt,
                 reviewedAt,
                 reviewerDisplayName,

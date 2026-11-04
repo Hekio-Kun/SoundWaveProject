@@ -112,6 +112,8 @@ class ModerationServiceTest {
         when(trackRepository.findById(100L)).thenReturn(Optional.of(testTrack));
         when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
         when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(20L)).thenReturn(java.util.List.of(testTrack));
+        when(submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(java.util.List.of(100L))).thenReturn(java.util.List.of(submission));
 
         ApproveTrackRequest request = new ApproveTrackRequest("Great track!");
         moderationService.approveSubmission(1L, request, "staff@soundwave.com");
@@ -125,8 +127,49 @@ class ModerationServiceTest {
         assertNotNull(draftAlbum.getPublishedAt());
 
         verify(albumRepository).save(draftAlbum);
-        verify(trackRepository).save(testTrack);
+        verify(trackRepository, atLeastOnce()).save(testTrack);
         verify(submissionRepository).save(submission);
+    }
+
+    @Test
+    void approveSubmission_AlbumWithMultipleTracks_WaitsUntilAllReviewedBeforePublishing() {
+        Album draftAlbum = Album.builder()
+                .createdByUserId(10L)
+                .title("Multi-track Album")
+                .slug("multi-track-album")
+                .status("DRAFT")
+                .build();
+        ReflectionTestUtils.setField(draftAlbum, "id", 50L);
+
+        Track track1 = Track.builder().uploaderUserId(10L).title("Track 1").slug("track-1").publicationStatus(TrackPublicationStatus.PENDING).build();
+        ReflectionTestUtils.setField(track1, "id", 101L);
+        track1.setAlbum(draftAlbum);
+
+        Track track2 = Track.builder().uploaderUserId(10L).title("Track 2").slug("track-2").publicationStatus(TrackPublicationStatus.PENDING).build();
+        ReflectionTestUtils.setField(track2, "id", 102L);
+        track2.setAlbum(draftAlbum);
+
+        TrackSubmission sub1 = TrackSubmission.builder().trackId(101L).submittedByUserId(10L).status(SubmissionStatus.PENDING).submittedAt(Instant.now()).build();
+        ReflectionTestUtils.setField(sub1, "id", 11L);
+
+        TrackSubmission sub2 = TrackSubmission.builder().trackId(102L).submittedByUserId(10L).status(SubmissionStatus.PENDING).submittedAt(Instant.now()).build();
+        ReflectionTestUtils.setField(sub2, "id", 12L);
+
+        when(submissionRepository.findById(11L)).thenReturn(Optional.of(sub1));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(101L)).thenReturn(Optional.of(track1));
+        when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(50L)).thenReturn(java.util.List.of(track1, track2));
+        when(submissionRepository.findByTrackIdInOrderBySubmittedAtDesc(java.util.List.of(101L, 102L))).thenReturn(java.util.List.of(sub1, sub2));
+
+        // Act: Approve Track 1 (Track 2 is still PENDING)
+        moderationService.approveSubmission(11L, new ApproveTrackRequest("Track 1 approved"), "staff@soundwave.com");
+
+        // Assert: Track 1's submission is APPROVED, but track 1 is NOT published yet and album is NOT published yet!
+        assertEquals(SubmissionStatus.APPROVED, sub1.getStatus());
+        assertNotEquals(TrackPublicationStatus.PUBLISHED, track1.getPublicationStatus());
+        assertNotEquals("PUBLISHED", draftAlbum.getStatus());
     }
 
     @Test
@@ -271,5 +314,83 @@ class ModerationServiceTest {
         assertEquals(1, nav.currentIndex());
         assertEquals(2, nav.totalTracks());
         assertEquals(2, nav.tracks().size());
+    }
+
+    @Test
+    void approveSubmission_LyricUpdate_KeepsTrackPublishedAndUpdatesOfficialLyric() {
+        Track publishedTrack = Track.builder()
+                .title("Echoes of Silence")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+        ReflectionTestUtils.setField(publishedTrack, "id", 200L);
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(200L)
+                .submittedByUserId(10L)
+                .submissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)
+                .proposedLyrics("[00:01.00]First line\n[00:04.00]Second line")
+                .status(SubmissionStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(submission, "id", 2L);
+
+        when(submissionRepository.findById(2L)).thenReturn(Optional.of(submission));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(200L)).thenReturn(Optional.of(publishedTrack));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+
+        ApproveTrackRequest request = new ApproveTrackRequest("Lyrics look great");
+        moderationService.approveSubmission(2L, request, "staff@soundwave.com");
+
+        assertEquals(SubmissionStatus.APPROVED, submission.getStatus());
+        assertEquals(TrackPublicationStatus.PUBLISHED, publishedTrack.getPublicationStatus());
+        verify(lyricService).saveOrUpdateOfficialLyric(200L, "[00:01.00]First line\n[00:04.00]Second line", "PUBLISHED", 99L);
+    }
+
+    @Test
+    void rejectSubmission_LyricUpdate_KeepsTrackPublishedWithoutChangingTrackStatus() {
+        Track publishedTrack = Track.builder()
+                .title("Echoes of Silence")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+        ReflectionTestUtils.setField(publishedTrack, "id", 200L);
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(200L)
+                .submittedByUserId(10L)
+                .submissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)
+                .proposedLyrics("[00:01.00]Desynced line")
+                .status(SubmissionStatus.PENDING)
+                .build();
+        ReflectionTestUtils.setField(submission, "id", 3L);
+
+        when(submissionRepository.findById(3L)).thenReturn(Optional.of(submission));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(200L)).thenReturn(Optional.of(publishedTrack));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+
+        RejectTrackRequest request = new RejectTrackRequest("Lyrics desynchronized after 00:30");
+        moderationService.rejectSubmission(3L, request, "staff@soundwave.com");
+
+        assertEquals(SubmissionStatus.REJECTED, submission.getStatus());
+        assertEquals("Lyrics desynchronized after 00:30", submission.getRejectionReason());
+        // Track must remain PUBLISHED!
+        assertEquals(TrackPublicationStatus.PUBLISHED, publishedTrack.getPublicationStatus());
+        verify(trackRepository, org.mockito.Mockito.never()).save(publishedTrack);
+    }
+
+    @Test
+    void getQueueStats_WithType_ReturnsStatsFilteredByType() {
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.PENDING, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(5L);
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.APPROVED, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(10L);
+        when(submissionRepository.countByStatusAndSubmissionType(SubmissionStatus.REJECTED, groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(2L);
+        when(submissionRepository.countBySubmissionType(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE)).thenReturn(17L);
+
+        groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse stats =
+                moderationService.getQueueStats(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE);
+
+        assertEquals(5L, stats.pendingCount());
+        assertEquals(10L, stats.approvedCount());
+        assertEquals(2L, stats.rejectedCount());
+        assertEquals(17L, stats.totalCount());
     }
 }

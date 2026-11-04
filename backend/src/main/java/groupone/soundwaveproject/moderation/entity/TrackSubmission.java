@@ -45,12 +45,26 @@ public class TrackSubmission {
     private Long reviewerUserId;
 
     /**
+     * Loại yêu cầu kiểm duyệt (TRACK_RELEASE hoặc LYRIC_UPDATE).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "submission_type", length = 30)
+    @Builder.Default
+    private SubmissionType submissionType = SubmissionType.TRACK_RELEASE;
+
+    /**
      * Trạng thái kiểm duyệt hiện tại của bài hát (PENDING, APPROVED, REJECTED).
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private SubmissionStatus status = SubmissionStatus.PENDING;
+
+    /**
+     * Nội dung lời bài hát đề xuất (sử dụng khi submissionType = LYRIC_UPDATE).
+     */
+    @Column(name = "proposed_lyrics", columnDefinition = "TEXT")
+    private String proposedLyrics;
 
     /**
      * Ghi chú hoặc lời nhắn từ tác giả khi nộp bài hát tới ban kiểm duyệt.

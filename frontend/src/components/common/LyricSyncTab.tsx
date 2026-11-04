@@ -68,7 +68,8 @@ export function parseLyricsToLines(rawText: string): LyricLine[] {
   if (!rawText.trim()) return [];
   const rawLines = rawText.split(/\r?\n/);
   const result: LyricLine[] = [];
-  for (const raw of rawLines) {
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i];
     const trimmed = raw.trim();
     if (!trimmed) continue;
     const match = trimmed.match(/^\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\](.*)$/);
@@ -77,13 +78,13 @@ export function parseLyricsToLines(rawText: string): LyricLine[] {
       const sec = parseFloat(match[2]);
       const timeSec = min * 60 + sec;
       result.push({
-        id: Math.random().toString(36).substring(2, 9),
+        id: `line-${i}-${min}-${sec}`,
         timeSec,
         text: match[3].trim(),
       });
     } else {
       result.push({
-        id: Math.random().toString(36).substring(2, 9),
+        id: `line-${i}-raw`,
         timeSec: null,
         text: trimmed,
       });
@@ -121,6 +122,8 @@ export function LyricSyncTab({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const currentTimeRef = useRef(0);
+  currentTimeRef.current = currentTime;
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
 
@@ -236,7 +239,7 @@ export function LyricSyncTab({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [subMode, lines, activeLineIndex, currentTime, duration]);
+  }, [subMode, lines, activeLineIndex, duration]);
 
   // Audio Playback Controls
   const togglePlayPause = () => {
@@ -285,7 +288,7 @@ export function LyricSyncTab({
 
   const handleStampCurrentLine = () => {
     if (activeLineIndex < 0 || activeLineIndex >= lines.length) return;
-    const time = currentTime;
+    const time = audioRef.current ? audioRef.current.currentTime : currentTimeRef.current;
 
     setLines((prev) => {
       const next = [...prev];

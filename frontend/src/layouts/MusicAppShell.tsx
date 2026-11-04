@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { AppTopBar } from "../components/layout/AppTopBar";
 import { MobileBottomNav } from "../components/layout/MobileBottomNav";
 import { QueueDrawer } from "../components/player/QueueDrawer";
+import { LyricsDrawer } from "../components/player/LyricsDrawer";
 import { Sidebar } from "../components/layout/Sidebar";
 import { SoundWaveFooter } from "../components/layout/SoundWaveFooter";
 import type { CurrentUser, LandingTrack } from "../types";
@@ -29,6 +30,12 @@ export type MusicAppShellProps = {
   queueOpen: boolean;
   /** Callback to dismiss the playback queue drawer */
   onCloseQueue: () => void;
+  /** Whether the synchronous lyrics drawer is open (UC-16.1) */
+  lyricsOpen?: boolean;
+  /** Callback to dismiss the lyrics drawer */
+  onCloseLyrics?: () => void;
+  /** Audio element for time synchronization */
+  audio?: HTMLAudioElement;
   /** Track currently being played */
   currentTrack: LandingTrack | null;
   /** Whether the player is currently playing */
@@ -65,6 +72,9 @@ export function MusicAppShell({
   onCreatePlaylist,
   queueOpen,
   onCloseQueue,
+  lyricsOpen,
+  onCloseLyrics,
+  audio,
   currentTrack,
   playing,
   queue,
@@ -129,6 +139,19 @@ export function MusicAppShell({
         onReorderQueue={onReorderQueue}
         playbackContext={playbackContext}
       />
+
+      {/* Synchronous Lyrics Drawer (UC-16.1) */}
+      {audio && (
+        <LyricsDrawer
+          isOpen={!!lyricsOpen}
+          onClose={onCloseLyrics || (() => {})}
+          currentTrack={currentTrack}
+          audio={audio}
+          playing={playing}
+          isAuthenticated={isAuthenticated}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* 4. Mobile Bottom Navigation */}
       <MobileBottomNav

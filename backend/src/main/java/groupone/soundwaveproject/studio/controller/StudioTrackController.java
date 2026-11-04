@@ -8,6 +8,8 @@ import groupone.soundwaveproject.studio.dto.response.GenreOptionResponse;
 import groupone.soundwaveproject.studio.dto.response.RejectionDetailsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioStatsResponse;
 import groupone.soundwaveproject.studio.dto.response.StudioTrackResponse;
+import groupone.soundwaveproject.studio.dto.request.SubmitTrackLyricsRequest;
+import groupone.soundwaveproject.studio.dto.response.PendingLyricSubmissionResponse;
 import groupone.soundwaveproject.studio.service.StudioTrackService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +70,43 @@ public class StudioTrackController {
             Authentication authentication
     ) {
         return studioTrackService.updateLyrics(id, request.lyrics(), authentication.getName());
+    }
+
+    /**
+     * Gửi đề xuất cập nhật lời bài hát đồng bộ chính thức cho bài hát đã xuất bản (UC-16.2).
+     */
+    @PostMapping("/tracks/{id}/lyrics/submit")
+    public ResponseEntity<PendingLyricSubmissionResponse> submitLyricsForReview(
+            @PathVariable Long id,
+            @RequestBody @Valid SubmitTrackLyricsRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(studioTrackService.submitLyricsForReview(id, request, authentication.getName()));
+    }
+
+    /**
+     * Tra cứu thông tin yêu cầu kiểm duyệt lyric đang chờ của bài hát (UC-16.2).
+     */
+    @GetMapping("/tracks/{id}/lyrics/pending")
+    public ResponseEntity<PendingLyricSubmissionResponse> getPendingLyricsSubmission(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        PendingLyricSubmissionResponse res = studioTrackService.getPendingLyricsSubmission(id, authentication.getName());
+        return res != null ? ResponseEntity.ok(res) : ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Rút lại yêu cầu kiểm duyệt lyric đang chờ của bài hát (UC-16.2 AF02).
+     */
+    @DeleteMapping("/tracks/{id}/lyrics/pending")
+    public ResponseEntity<Void> withdrawLyricsSubmission(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        studioTrackService.withdrawLyricsSubmission(id, authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/tracks/{id}")

@@ -25,6 +25,8 @@ public class CheckNotificationSchemaTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private groupone.soundwaveproject.catalog.repository.TrackRepository trackRepository;
 
     @Test
     void inspectDatabaseAndLogin() {
@@ -68,6 +70,20 @@ public class CheckNotificationSchemaTest {
         }
 
         System.out.println("=== 7. TEST MODERATION GET QUEUE PENDING ===");
+        try {
+            String unaccentResult = jdbcTemplate.queryForObject("SELECT unaccent('Tìm Em')", String.class);
+            System.out.println("POSTGRES UNACCENT RESULT: " + unaccentResult);
+        } catch (Throwable t) {
+            System.out.println("POSTGRES UNACCENT FAILED: " + t.getMessage());
+        }
+        try {
+            var page = trackRepository.searchPublishedTracks("tim em", "tim em", "tim-em", PageRequest.of(0, 5));
+            System.out.println("FOUND TRACKS FOR 'tim em' COUNT: " + page.getTotalElements());
+            page.getContent().forEach(t -> System.out.println("FOUND TRACK: " + t.getTitle() + " - slug: " + t.getSlug()));
+        } catch (Throwable t) {
+            System.out.println("SEARCH FAILED: " + t.getMessage());
+            t.printStackTrace(System.out);
+        }
         try {
             var queue = moderationService.getQueue(SubmissionStatus.PENDING, null, PageRequest.of(0, 10));
             System.out.println("GET QUEUE SUCCESS: totalElements=" + queue.getTotalElements());

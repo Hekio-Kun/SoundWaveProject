@@ -9,6 +9,7 @@ export interface PlayerContextType {
   playing: boolean;
   queue: LandingTrack[];
   queueOpen: boolean;
+  lyricsOpen: boolean;
   guestPromptOpen: boolean;
   pendingTrack: LandingTrack | null;
   playTrack: (
@@ -21,6 +22,8 @@ export interface PlayerContextType {
   setAudioPlaying: (shouldPlay: boolean) => void;
   toggleQueue: () => void;
   setQueueOpen: (open: boolean) => void;
+  toggleLyrics: () => void;
+  setLyricsOpen: (open: boolean) => void;
   removeFromQueue: (trackId: number) => void;
   clearQueue: () => void;
   handleGuestTrackEnded: (next: LandingTrack) => void;
@@ -56,6 +59,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playing, setPlaying] = useState(false);
   const [queue, setQueue] = useState<LandingTrack[]>(tracks);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [lyricsOpen, setLyricsOpen] = useState(false);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [pendingTrack, setPendingTrack] = useState<LandingTrack | null>(null);
 
@@ -223,7 +227,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleQueue = useCallback(() => {
-    setQueueOpen((prev) => !prev);
+    setQueueOpen((prev) => {
+      if (!prev) setLyricsOpen(false);
+      return !prev;
+    });
+  }, []);
+
+  const toggleLyrics = useCallback(() => {
+    setLyricsOpen((prev) => {
+      if (!prev) setQueueOpen(false);
+      return !prev;
+    });
   }, []);
 
   const removeFromQueue = useCallback((trackId: number) => {
@@ -253,6 +267,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         playing,
         queue,
         queueOpen,
+        lyricsOpen,
         guestPromptOpen,
         pendingTrack,
         playTrack,
@@ -260,6 +275,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setAudioPlaying,
         toggleQueue,
         setQueueOpen,
+        toggleLyrics,
+        setLyricsOpen,
         removeFromQueue,
         clearQueue,
         reorderQueue,

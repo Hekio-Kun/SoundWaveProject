@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
 import { lyricsApi } from "../api/lyrics";
@@ -6,19 +6,25 @@ import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { parseLyricsToLines, formatTimeDisplay } from "../components/common/LyricSyncTab";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { ReportLyricModal } from "../components/modals/ReportLyricModal";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
+import { downloadLrcFile } from "../utils/lyricsDownload";
 import {
   AlertIcon,
   CheckIcon,
+  DownloadIcon,
   EditIcon,
   FileTextIcon,
+  FlagIcon,
   HeadphonesIcon,
   HeartFillIcon,
   HeartIcon,
+  MusicIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  RefreshIcon,
   TrashIcon,
   UserIcon,
 } from "../icons";
@@ -35,6 +41,7 @@ type Props = {
   playlists: Playlist[];
   onAddToPlaylist: (playlistId: number, trackId: number) => Promise<void>;
   canManageLibrary: boolean;
+  audio?: HTMLAudioElement;
 };
 
 const formatPlays = (value: number) =>
@@ -65,6 +72,7 @@ export function TrackDetailsPage({
   playlists,
   onAddToPlaylist,
   canManageLibrary,
+  audio,
 }: Props) {
   const [track, setTrack] = useState<LandingTrack | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,12 +89,22 @@ export function TrackDetailsPage({
   // Dual-Tier Lyrics State (UC-16 & UC-18)
   const [lyricsBundle, setLyricsBundle] = useState<TrackLyricsBundle | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(true);
+  const [lyricsError, setLyricsError] = useState(false);
   const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [personalEditorOpen, setPersonalEditorOpen] = useState(false);
   const [personalContent, setPersonalContent] = useState("");
+  const [personalType, setPersonalType] = useState<"CUSTOM" | "TRANSLATION">("CUSTOM");
   const [personalSaving, setPersonalSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  // Synchronous Playback Tracking (UC-16.1)
+  const [currentTime, setCurrentTime] = useState(0);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
 
   // Center Notification State
   const [notification, setNotification] = useState<{
@@ -116,32 +134,46 @@ export function TrackDetailsPage({
     };
   }, [trackId]);
 
-  // Đồng bộ hóa playCount khi bài hát đang mở được phát và cập nhật lượt nghe từ PlayerContext
-  useEffect(() => {
-    if (currentTrack && track && Number(currentTrack.id) === Number(track.id)) {
-      if (currentTrack.playCount !== undefined && currentTrack.playCount !== track.playCount) {
-        setTrack((prev) => (prev ? { ...prev, playCount: currentTrack.playCount } : prev));
-      }
-    }
-  }, [currentTrack, track]);
+  // Load lyrics bundle with race condition prevention (UC-16.1 & UC-18)
+  const lyricsRequestIdRef = useRef(0);
 
-  // Load lyrics bundle
-  const loadTrackLyrics = async () => {
+  const loadTrackLyrics = useCallback(async () => {
+    const reqId = ++lyricsRequestIdRef.current;
     setLyricsLoading(true);
+    setLyricsError(false);
+
     try {
       const bundle = await lyricsApi.getTrackLyrics(trackId);
-      setLyricsBundle(bundle);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsBundle(bundle);
+      }
     } catch {
-      // ignore, fall back to null
-      setLyricsBundle(null);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsError(true);
+        setLyricsBundle(null);
+      }
     } finally {
-      setLyricsLoading(false);
+      if (reqId === lyricsRequestIdRef.current) {
+        setLyricsLoading(false);
+      }
     }
-  };
+  }, [trackId]);
 
   useEffect(() => {
     void loadTrackLyrics();
-  }, [trackId]);
+  }, [loadTrackLyrics]);
+
+  // Track real-time playback position from audio element
+  useEffect(() => {
+    if (!audio) return;
+    const handleTimeUpdate = () => {
+      if (currentTrack?.id === trackId) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [audio, currentTrack?.id, trackId]);
 
   useEffect(() => {
     let active = true;
@@ -242,7 +274,7 @@ export function TrackDetailsPage({
 
     setPersonalSaving(true);
     try {
-      const saved = await lyricsApi.savePersonalLyric(trackId, personalContent.trim(), "CUSTOM");
+      const saved = await lyricsApi.savePersonalLyric(trackId, personalContent.trim(), personalType);
       setLyricsBundle((prev) => ({
         officialLyric: prev?.officialLyric ?? null,
         userPersonalLyric: saved,
@@ -250,13 +282,13 @@ export function TrackDetailsPage({
       setPersonalEditorOpen(false);
       setNotification({
         open: true,
-        message: "Custom lyrics saved successfully.",
+        message: `${personalType === "TRANSLATION" ? "Translation" : "Custom lyrics"} saved successfully.`,
         type: "success",
       });
     } catch (err: any) {
       setNotification({
         open: true,
-        message: err.message || "Failed to save custom lyrics.",
+        message: err.message || "Failed to save lyrics.",
         type: "error",
       });
     } finally {
@@ -268,7 +300,7 @@ export function TrackDetailsPage({
   const handleDeletePersonalLyrics = async () => {
     setDeleteSaving(true);
     try {
-      await lyricsApi.deletePersonalLyric(trackId, "CUSTOM");
+      await lyricsApi.deletePersonalLyric(trackId, personalType);
       setLyricsBundle((prev) => ({
         officialLyric: prev?.officialLyric ?? null,
         userPersonalLyric: null,
@@ -276,17 +308,87 @@ export function TrackDetailsPage({
       setDeleteConfirmOpen(false);
       setNotification({
         open: true,
-        message: "Custom lyrics removed.",
+        message: `${personalType === "TRANSLATION" ? "Translation" : "Personal lyrics"} removed.`,
         type: "success",
       });
     } catch (err: any) {
       setNotification({
         open: true,
-        message: err.message || "Failed to delete custom lyrics.",
+        message: err.message || "Failed to delete personal lyrics.",
         type: "error",
       });
     } finally {
       setDeleteSaving(false);
+    }
+  };
+
+  // Active lyric resolution
+  const officialLyricContent = lyricsBundle?.officialLyric?.lyricContent ?? track?.lyrics ?? null;
+  const personalLyricContent = lyricsBundle?.userPersonalLyric?.lyricContent ?? null;
+  const activeLyricContent = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
+
+  // Parse lines using standard LRC parser (EX01: safe fallback on malformed syntax)
+  const parsedActiveLines = useMemo(() => {
+    if (!activeLyricContent) return [];
+    try {
+      return parseLyricsToLines(activeLyricContent);
+    } catch {
+      return [];
+    }
+  }, [activeLyricContent]);
+
+  const hasTimestamps = useMemo(
+    () => parsedActiveLines.some((l) => l.timeSec !== null),
+    [parsedActiveLines]
+  );
+
+  // Compute active line index for real-time highlighting (UC-16.1 NF01 Step 4)
+  const isPlayingThisTrack = currentTrack?.id === track?.id;
+  const activeLineIndex = useMemo(() => {
+    if (!hasTimestamps || parsedActiveLines.length === 0 || !isPlayingThisTrack) return -1;
+    let idx = -1;
+    for (let i = 0; i < parsedActiveLines.length; i++) {
+      const lineTime = parsedActiveLines[i].timeSec;
+      if (lineTime !== null && currentTime >= lineTime) {
+        idx = i;
+      }
+    }
+    return idx;
+  }, [parsedActiveLines, currentTime, hasTimestamps, isPlayingThisTrack]);
+
+  // Auto-scroll active line into center view
+  useEffect(() => {
+    if (activeLineRef.current && !isUserScrollingRef.current) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex]);
+
+  const handleLyricsScroll = () => {
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 2500);
+  };
+
+  // Click-to-seek (UC-16.1 NF01 Step 6)
+  const handleLineClick = (timeSec: number | null) => {
+    if (timeSec === null) return;
+    if (isPlayingThisTrack && audio) {
+      audio.currentTime = Math.max(0, timeSec);
+      if (!playing) {
+        void audio.play().catch(() => {});
+      }
+    } else if (track) {
+      onPlayTrack(track);
+      setTimeout(() => {
+        if (audio) {
+          audio.currentTime = Math.max(0, timeSec);
+        }
+      }, 150);
     }
   };
 
@@ -311,19 +413,10 @@ export function TrackDetailsPage({
     );
   }
 
-  const isPlayingThis = currentTrack?.id === track.id && playing;
+  const isPlayingThis = isPlayingThisTrack && playing;
   const creatorId = track.creator?.userId;
   const genreLabel = track.genreName ?? track.genreSlug ?? "Uncategorized";
   const publicationLabel = track.publicationStatus === "PUBLISHED" ? "Published" : track.publicationStatus ?? "Published";
-
-  // Official lyric resolution (from bundle or track fallback)
-  const officialLyricContent = lyricsBundle?.officialLyric?.lyricContent ?? track.lyrics ?? null;
-  const personalLyricContent = lyricsBundle?.userPersonalLyric?.lyricContent ?? null;
-
-  // Active lyric content based on selected tab
-  const activeLyricContent = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
-  const parsedActiveLines = activeLyricContent ? parseLyricsToLines(activeLyricContent) : [];
-  const hasTimestamps = parsedActiveLines.some((l) => l.timeSec !== null);
 
   return (
     <div className="track-page-v2">
@@ -438,7 +531,7 @@ export function TrackDetailsPage({
       </section>
 
       <div className="track-content-grid">
-        {/* Dual-Tier Lyrics Panel (UC-16 & UC-18) */}
+        {/* Dual-Tier Synchronous Lyrics Panel (UC-16.1 & UC-18) */}
         <section className="track-lyrics-panel" aria-label="Lyrics Section">
           <header>
             <div>
@@ -450,11 +543,62 @@ export function TrackDetailsPage({
                 <h2>{track.title}</h2>
               </span>
             </div>
-            {officialLyricContent && lyricsTab === "OFFICIAL" ? (
-              <span className="official-lyrics-badge">
-                <CheckIcon width={13} height={13} /> Verified Official
-              </span>
-            ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {isPlayingThisTrack && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 9px",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: "rgba(2, 132, 199, 0.12)",
+                    color: "#0284c7",
+                  }}
+                >
+                  <MusicIcon width={13} height={13} />
+                  <span>Now Playing</span>
+                </span>
+              )}
+              {officialLyricContent && lyricsTab === "OFFICIAL" ? (
+                <span className="official-lyrics-badge">
+                  <CheckIcon width={13} height={13} /> Verified Official
+                </span>
+              ) : null}
+
+              {/* Download .LRC File */}
+              {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() => {
+                    const content = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
+                    downloadLrcFile(track.title, track.creator?.displayName, content);
+                  }}
+                  title="Download .LRC file"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <DownloadIcon width={13} height={13} />
+                  <span>Download .LRC</span>
+                </button>
+              )}
+
+              {/* Report Lyrics Issue */}
+              {lyricsTab === "OFFICIAL" && officialLyricContent && canManageLibrary ? (
+                <button
+                  type="button"
+                  className="button button-ghost button-small"
+                  onClick={() => setReportModalOpen(true)}
+                  title="Report inaccurate lyrics"
+                  style={{ color: "#64748B", display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  <FlagIcon width={13} height={13} />
+                  <span>Report</span>
+                </button>
+              ) : null}
+            </div>
           </header>
 
           {/* Dual-Tab Navigation Bar */}
@@ -480,7 +624,19 @@ export function TrackDetailsPage({
               >
                 <FileTextIcon width={14} height={14} />
                 <span>My Personal Lyrics</span>
-                {personalLyricContent ? <span className="tab-pill is-personal">Custom</span> : null}
+                {personalLyricContent ? (
+                  <span
+                    className={`tab-pill ${
+                      lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                        ? "is-translation"
+                        : "is-personal"
+                    }`}
+                  >
+                    {lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                      ? "Translation"
+                      : "Custom"}
+                  </span>
+                ) : null}
               </button>
             </div>
 
@@ -518,24 +674,68 @@ export function TrackDetailsPage({
               <span className="track-details-spinner" aria-hidden="true" />
               <p>Loading lyrics...</p>
             </div>
+          ) : lyricsError ? (
+            /* EX02: Network / Loading Exception */
+            <div className="track-lyrics-empty">
+              <AlertIcon width={32} height={32} />
+              <strong>Unable to load lyrics</strong>
+              <span>A network issue prevented loading the lyric data.</span>
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ marginTop: 10 }}
+                onClick={() => void loadTrackLyrics()}
+              >
+                <RefreshIcon width={13} height={13} />
+                <span>Retry</span>
+              </button>
+            </div>
           ) : lyricsTab === "OFFICIAL" ? (
             /* Tab 1: Official Lyrics */
             officialLyricContent ? (
               hasTimestamps ? (
-                <div className="track-lyrics-synced-list">
-                  {parsedActiveLines.map((line) => (
-                    <div key={line.id} className="track-lyrics-synced-item">
-                      {line.timeSec !== null ? (
-                        <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
-                      ) : null}
-                      <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
-                    </div>
-                  ))}
+                /* NF01: Real-time Synchronized Scrolling Karaoke Lines with Click-to-seek */
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
+                    return (
+                      <div
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
+                        title={
+                          line.timeSec !== null
+                            ? `Click or press Enter to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
+                      >
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
+                /* AF02: Plain text lyrics */
                 <pre>{officialLyricContent}</pre>
               )
             ) : (
+              /* AF01: Empty state when track has no official lyrics */
               <div className="track-lyrics-empty">
                 <FileTextIcon width={32} height={32} />
                 <strong>No official lyrics available</strong>
@@ -575,15 +775,40 @@ export function TrackDetailsPage({
               </div>
             ) : personalLyricContent ? (
               hasTimestamps ? (
-                <div className="track-lyrics-synced-list">
-                  {parsedActiveLines.map((line) => (
-                    <div key={line.id} className="track-lyrics-synced-item">
-                      {line.timeSec !== null ? (
-                        <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
-                      ) : null}
-                      <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
-                    </div>
-                  ))}
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
+                    return (
+                      <div
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
+                        title={
+                          line.timeSec !== null
+                            ? `Click or press Enter to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
+                      >
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <pre>{personalLyricContent}</pre>
@@ -610,11 +835,9 @@ export function TrackDetailsPage({
           )}
 
           <footer>
-            {lyricsTab === "OFFICIAL"
-              ? hasTimestamps
-                ? "Time-synced official lyrics format (.lrc)"
-                : "Lyrics are displayed in plain text format."
-              : "Personal lyrics are saved privately to your Listener account."}
+            {hasTimestamps
+              ? "Time-synced lyrics (.lrc). Click any line to seek audio playback (Click-to-seek)."
+              : "Lyrics are displayed in plain text format."}
           </footer>
         </section>
 
@@ -795,12 +1018,35 @@ export function TrackDetailsPage({
                   <div>
                     <small>PERSONAL LYRICS</small>
                     <h2 id="personal-lyrics-title">
-                      {personalLyricContent ? "Edit Custom Lyrics" : "Create Custom Lyrics"}
+                      {personalLyricContent
+                        ? `Edit ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`
+                        : `Create ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`}
                     </h2>
                   </div>
                 </div>
+
+                {/* Lyric Type Selector (UC-18.2 - 18.4) */}
+                <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setPersonalType("CUSTOM")}
+                    className={`button ${personalType === "CUSTOM" ? "button-primary" : "button-secondary"}`}
+                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
+                  >
+                    🎵 Custom Lyrics (Lời tự soạn)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPersonalType("TRANSLATION")}
+                    className={`button ${personalType === "TRANSLATION" ? "button-primary" : "button-secondary"}`}
+                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
+                  >
+                    🌐 Translation (Bản dịch nghĩa)
+                  </button>
+                </div>
+
                 <p>
-                  Write or paste your custom lyrics for <b>{track.title}</b>. Supports both standard LRC timestamps
+                  Write or paste your {personalType === "TRANSLATION" ? "translated" : "custom"} lyrics for <b>{track.title}</b>. Supports both standard LRC timestamps
                   (e.g. <code>[01:23.45] lyric line</code>) and plain text.
                 </p>
 
@@ -845,14 +1091,29 @@ export function TrackDetailsPage({
       {/* Delete Confirmation Modal for Personal Lyrics */}
       <DeleteConfirmationModal
         open={deleteConfirmOpen}
-        title="Delete Custom Lyrics"
-        message="Are you sure you want to remove your custom lyrics for this track? This action cannot be undone."
+        title="Delete Personal Lyrics"
+        message="Are you sure you want to remove your personal lyrics for this track? This action cannot be undone."
         confirmLabel="Delete Lyrics"
         submitting={deleteSaving}
         onConfirm={() => {
           void handleDeletePersonalLyrics();
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      {/* Report Inaccurate Lyrics Modal */}
+      <ReportLyricModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        trackId={trackId}
+        trackTitle={track.title}
+        onSuccess={(msg) =>
+          setNotification({
+            open: true,
+            message: msg,
+            type: "success",
+          })
+        }
       />
 
       {/* Central Feedback Toast Popup */}

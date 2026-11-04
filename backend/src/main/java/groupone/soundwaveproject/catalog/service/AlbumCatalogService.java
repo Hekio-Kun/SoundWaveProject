@@ -10,10 +10,12 @@ import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,12 +35,14 @@ public class AlbumCatalogService {
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final UserAccountPublicService userAccountPublicService;
-
     /**
      * Lấy danh sách các Album đã xuất bản (PUBLISHED) có hỗ trợ tìm kiếm, sắp xếp và phân trang.
      */
     @Transactional(readOnly = true)
     public Page<PublicAlbumResponse> getPublishedAlbums(String search, String sort, Pageable pageable) {
+        boolean hasSearch = search != null && !search.isBlank();
+
+
         List<Album> publishedAlbums = albumRepository.findByStatusIgnoreCaseOrderByCreatedAtDesc("PUBLISHED");
 
         // Chuyển đổi sang danh sách PublicAlbumResponse
@@ -66,11 +70,13 @@ public class AlbumCatalogService {
         // Lọc theo từ khóa tìm kiếm (tiêu đề album, mô tả, tên nghệ sĩ/người tạo)
         if (search != null && !search.isBlank()) {
             String lowerSearch = search.trim().toLowerCase();
+            String unaccentedSearch = SearchNormalizeUtil.toUnaccented(lowerSearch);
             responses = responses.stream()
-                    .filter(a -> (a.getTitle() != null && a.getTitle().toLowerCase().contains(lowerSearch))
-                            || (a.getDescription() != null && a.getDescription().toLowerCase().contains(lowerSearch))
-                            || (a.getCreator() != null && a.getCreator().getDisplayName() != null
-                            && a.getCreator().getDisplayName().toLowerCase().contains(lowerSearch)))
+                    .filter(a -> a.getTitle() != null && (a.getTitle().toLowerCase().contains(lowerSearch) || SearchNormalizeUtil.toUnaccented(a.getTitle()).contains(unaccentedSearch)))
+
+
+
+
                     .toList();
         }
 
@@ -165,13 +171,37 @@ public class AlbumCatalogService {
                         .build());
     }
 
+    public PublicAlbumResponse mapToPublicAlbumResponse(Album album) {
+        int trackCount = (int) trackRepository.countByAlbum_IdAndPublicationStatus(
+                album.getId(), TrackPublicationStatus.PUBLISHED
+        );
+        PublicAlbumResponse.AlbumCreatorSummary creator = resolveCreatorSummary(album.getCreatedByUserId());
+
+        return PublicAlbumResponse.builder()
+                .id(album.getId())
+                .title(album.getTitle())
+                .slug(album.getSlug())
+                .description(album.getDescription())
+                .coverUrl(album.getCoverUrl())
+                .releaseDate(album.getReleaseDate())
+                .publishedAt(album.getPublishedAt())
+                .createdAt(album.getCreatedAt())
+                .trackCount(trackCount)
+                .creator(creator)
+                .build();
+    }
+
     private TrackResponse mapToTrackResponse(Track track) {
         TrackResponse.TrackAlbumSummary albumSummary = null;
         if (track.getAlbum() != null) {
-            albumSummary = new TrackResponse.TrackAlbumSummary(
-                    track.getAlbum().getId(),
-                    track.getAlbum().getTitle()
-            );
+            try {
+                albumSummary = new TrackResponse.TrackAlbumSummary(
+                        track.getAlbum().getId(),
+                        track.getAlbum().getTitle()
+                );
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch album for track id {}: {}", track.getId(), ex.getMessage());
+            }
         }
 
         TrackResponse.TrackCreatorSummary creatorSummary = userAccountPublicService
@@ -187,6 +217,17 @@ public class AlbumCatalogService {
                         null
                 ));
 
+        String genreSlug = null;
+        String genreName = null;
+        if (track.getGenre() != null) {
+            try {
+                genreSlug = track.getGenre().getSlug();
+                genreName = track.getGenre().getName();
+            } catch (Exception ex) {
+                log.warn("Could not lazily fetch genre for track id {}: {}", track.getId(), ex.getMessage());
+            }
+        }
+
         return new TrackResponse(
                 track.getId(),
                 track.getTitle(),
@@ -197,8 +238,8 @@ public class AlbumCatalogService {
                 track.getDurationMs(),
                 track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L,
                 track.getPublicationStatus().name(),
-                track.getGenre() != null ? track.getGenre().getSlug() : null,
-                track.getGenre() != null ? track.getGenre().getName() : null,
+                genreSlug,
+                genreName,
                 albumSummary,
                 creatorSummary,
                 track.getCreatedAt()

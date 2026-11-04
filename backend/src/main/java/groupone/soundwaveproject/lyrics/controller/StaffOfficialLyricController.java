@@ -15,6 +15,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import groupone.soundwaveproject.moderation.dto.request.ApproveTrackRequest;
+import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
+import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailResponse;
+import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
+import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
+import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
+import groupone.soundwaveproject.moderation.service.ModerationService;
+
 import java.security.Principal;
 import java.util.Map;
 
@@ -28,6 +37,7 @@ import java.util.Map;
 public class StaffOfficialLyricController {
 
     private final StaffOfficialLyricService staffOfficialLyricService;
+    private final ModerationService moderationService;
 
     /**
      * Tìm kiếm và xem danh sách bài hát cùng trạng thái lời bài hát chính thức.
@@ -83,5 +93,57 @@ public class StaffOfficialLyricController {
     ) {
         staffOfficialLyricService.deleteOfficialLyric(principal.getName(), trackId);
         return ResponseEntity.ok(Map.of("message", "Official lyric deleted successfully."));
+    }
+
+    /**
+     * Lấy danh sách yêu cầu cập nhật lời bài hát cần kiểm duyệt (UC-24.6).
+     */
+    @GetMapping("/submissions")
+    public ResponseEntity<Page<SubmissionQueueItemResponse>> getLyricSubmissions(
+            @RequestParam(required = false) SubmissionStatus status,
+            @RequestParam(required = false) String search,
+            @PageableDefault(sort = "submittedAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(moderationService.getQueue(status, SubmissionType.LYRIC_UPDATE, search, pageable));
+    }
+
+    /**
+     * Lấy thống kê số lượng yêu cầu cập nhật lời bài hát.
+     */
+    @GetMapping("/submissions/stats")
+    public ResponseEntity<SubmissionStatsResponse> getLyricSubmissionStats() {
+        return ResponseEntity.ok(moderationService.getQueueStats(SubmissionType.LYRIC_UPDATE));
+    }
+
+    /**
+     * Xem chi tiết yêu cầu cập nhật lời bài hát (kèm lời mới đề xuất, lời hiện tại, âm thanh).
+     */
+    @GetMapping("/submissions/{id}")
+    public ResponseEntity<SubmissionDetailResponse> getLyricSubmissionDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(moderationService.getSubmissionDetail(id));
+    }
+
+    /**
+     * Phê duyệt lời bài hát đề xuất (UC-24.6).
+     */
+    @PostMapping("/submissions/{id}/approve")
+    public ResponseEntity<SubmissionDetailResponse> approveLyricSubmission(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) ApproveTrackRequest request,
+            Principal principal
+    ) {
+        return ResponseEntity.ok(moderationService.approveSubmission(id, request, principal.getName()));
+    }
+
+    /**
+     * Từ chối lời bài hát đề xuất (UC-24.6).
+     */
+    @PostMapping("/submissions/{id}/reject")
+    public ResponseEntity<SubmissionDetailResponse> rejectLyricSubmission(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectTrackRequest request,
+            Principal principal
+    ) {
+        return ResponseEntity.ok(moderationService.rejectSubmission(id, request, principal.getName()));
     }
 }

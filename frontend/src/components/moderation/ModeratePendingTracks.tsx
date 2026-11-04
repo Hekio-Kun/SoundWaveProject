@@ -105,6 +105,7 @@ export function ModeratePendingTracks({
 
   // Filters & Pagination
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [page, setPage] = useState<number>(0);
@@ -147,7 +148,7 @@ export function ModeratePendingTracks({
 
   const loadStats = async () => {
     try {
-      const data = await moderationApi.getStats();
+      const data = await moderationApi.getStats("TRACK_RELEASE");
       setStats(data);
     } catch (err: unknown) {
       console.error("Error loading moderation stats:", err);
@@ -167,6 +168,7 @@ export function ModeratePendingTracks({
     try {
       const data = await moderationApi.getQueue({
         status: statusFilter,
+        type: "TRACK_RELEASE",
         search: searchQuery,
         page,
         size: pageSize,
@@ -195,7 +197,7 @@ export function ModeratePendingTracks({
 
   useEffect(() => {
     void loadQueue();
-  }, [statusFilter, searchQuery, page]);
+  }, [statusFilter, typeFilter, searchQuery, page]);
 
   const handleSearchSubmit = (event?: React.FormEvent) => {
     event?.preventDefault();

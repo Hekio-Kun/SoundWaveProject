@@ -74,7 +74,31 @@ public class LyricSchemaInitializer implements ApplicationRunner {
 
         try {
             jdbcTemplate.execute("ALTER TABLE IF EXISTS personal_lyrics DROP CONSTRAINT IF EXISTS fk_personal_lyrics_languages");
+            jdbcTemplate.execute("ALTER TABLE personal_lyrics ADD COLUMN IF NOT EXISTS lyric_type VARCHAR(20) NOT NULL DEFAULT 'CUSTOM'");
+            jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_personal_lyrics_user_track_type ON personal_lyrics (user_id, track_id, lyric_type)");
         } catch (Exception ignored) {
+        }
+
+        // Đảm bảo bảng content_reports (JPA Entity: ContentReport) tồn tại
+        try {
+            jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS content_reports (" +
+                            "    id BIGSERIAL PRIMARY KEY," +
+                            "    reporter_id BIGINT NOT NULL," +
+                            "    target_type VARCHAR(50) NOT NULL DEFAULT 'LYRICS'," +
+                            "    target_id BIGINT NOT NULL," +
+                            "    reason VARCHAR(100) NOT NULL," +
+                            "    description TEXT," +
+                            "    status VARCHAR(50) NOT NULL DEFAULT 'PENDING'," +
+                            "    reviewer_id BIGINT," +
+                            "    reviewer_note TEXT," +
+                            "    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP," +
+                            "    resolved_at TIMESTAMP WITH TIME ZONE" +
+                            ")"
+            );
+            log.info("Table content_reports verified/created successfully.");
+        } catch (Exception e) {
+            log.warn("Could not verify/create table content_reports: {}", e.getMessage());
         }
 
         // 3. Đảm bảo các bảng tương thích alias (official_lyric, custom_lyric) tồn tại

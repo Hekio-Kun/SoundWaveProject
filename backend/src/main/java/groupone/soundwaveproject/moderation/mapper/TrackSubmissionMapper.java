@@ -59,6 +59,8 @@ public class TrackSubmissionMapper {
                 submitterDisplayName,
                 submitterEmail,
                 submission.getStatus(),
+                submission.getSubmissionType() != null ? submission.getSubmissionType() : groupone.soundwaveproject.moderation.entity.SubmissionType.TRACK_RELEASE,
+                submission.getProposedLyrics(),
                 submission.getSubmittedAt(),
                 submission.getReviewedAt(),
                 reviewerDisplayName,
@@ -164,6 +166,8 @@ public class TrackSubmissionMapper {
         return new SubmissionDetailResponse(
                 submission.getId(),
                 submission.getStatus(),
+                submission.getSubmissionType() != null ? submission.getSubmissionType() : groupone.soundwaveproject.moderation.entity.SubmissionType.TRACK_RELEASE,
+                submission.getProposedLyrics(),
                 submission.getSubmitterNote(),
                 submission.getReviewerNote(),
                 submission.getRejectionReason(),
