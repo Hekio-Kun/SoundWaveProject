@@ -231,6 +231,14 @@ export type StaffSummaryItem = {
 
 export type StaffDirectoryResponse = {
   content: StaffSummaryItem[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+};
+
 export type CreatorSearchResult = {
   userId: number;
   username: string;
