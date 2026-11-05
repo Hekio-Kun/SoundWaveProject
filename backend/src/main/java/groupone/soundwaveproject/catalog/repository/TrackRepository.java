@@ -49,6 +49,20 @@ public interface TrackRepository extends JpaRepository<Track, Long> {
     @EntityGraph(attributePaths = {"album", "genre"})
     Optional<Track> findByIdAndUploaderUserId(Long id, Long uploaderUserId);
 
+    long countByPublicationStatus(TrackPublicationStatus publicationStatus);
+
+    long countByPublicationStatusAndCreatedAtAfter(TrackPublicationStatus publicationStatus, java.time.LocalDateTime after);
+
+    @Query("SELECT COALESCE(SUM(t.playCountCache), 0L) FROM Track t")
+    Long sumPlayCountCache();
+
+    @Query("SELECT COUNT(DISTINCT t.uploaderUserId) FROM Track t")
+    Long countDistinctUploaders();
+
+    @EntityGraph(attributePaths = {"album", "genre"})
+    @Query("SELECT t FROM Track t WHERE t.publicationStatus = groupone.soundwaveproject.catalog.entity.TrackPublicationStatus.PUBLISHED ORDER BY COALESCE(t.playCountCache, 0L) DESC, t.createdAt DESC")
+    List<Track> findTopPublishedTracks(Pageable pageable);
+
     long countByUploaderUserId(Long uploaderUserId);
 
     long countByUploaderUserIdAndPublicationStatus(Long uploaderUserId, TrackPublicationStatus publicationStatus);
