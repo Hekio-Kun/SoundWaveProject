@@ -301,6 +301,20 @@ export type CreateStaffResult = {
   createdAt: string;
 };
 
+export type DeactivateStaffInput = {
+  reason: string;
+};
+
+export type DeactivateStaffResult = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: string;
+  status: string;
+  reason: string;
+  deactivatedAt: string;
+};
+
 export type MetricOverview = {
   totalUsers: number;
   activeUsers: number;
