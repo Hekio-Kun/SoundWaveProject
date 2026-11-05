@@ -1,15 +1,21 @@
 package groupone.soundwaveproject.authentication.service;
 
 import groupone.soundwaveproject.authentication.dto.request.CreateStaffRequest;
+import groupone.soundwaveproject.authentication.dto.request.DeactivateStaffRequest;
 import groupone.soundwaveproject.authentication.dto.response.CreateStaffResponse;
+import groupone.soundwaveproject.authentication.dto.response.DeactivateStaffResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffDirectoryPageResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffSummaryResponse;
 import groupone.soundwaveproject.authentication.entity.Staff;
 import groupone.soundwaveproject.authentication.entity.StaffRole;
 import groupone.soundwaveproject.authentication.exception.EmailAlreadyExistsException;
+import groupone.soundwaveproject.authentication.repository.RefreshTokenRepository;
 import groupone.soundwaveproject.authentication.repository.StaffRepository;
 import groupone.soundwaveproject.authentication.repository.StaffRoleRepository;
 import groupone.soundwaveproject.authentication.repository.UserRepository;
+import groupone.soundwaveproject.exception.ConflictOperationException;
+import groupone.soundwaveproject.exception.ForbiddenOperationException;
+import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.service.ModerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 /**
@@ -34,6 +42,7 @@ public class AdminStaffService {
     private final StaffRepository staffRepository;
     private final StaffRoleRepository staffRoleRepository;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final ModerationService moderationService;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationMailService mailService;
@@ -141,6 +150,58 @@ public class AdminStaffService {
                 rawPassword,
                 emailDispatched,
                 savedStaff.getCreatedAt()
+        );
+    }
+
+    /**
+     * Vô hiệu hóa tài khoản nhân viên kiểm duyệt (UC-27.3: Deactivate Staff Account).
+     * <p>
+     * - PRE-2: Tài khoản phải ở trạng thái ACTIVE (EX02: nếu đã INACTIVE thì báo lỗi xung đột).
+     * - POST-1: Trạng thái tài khoản chuyển sang INACTIVE.
+     * - POST-2: Thu hồi (revoke) toàn bộ refresh token và phiên đăng nhập đang hoạt động của nhân viên.
+     * - POST-3: Ghi nhận lý do và thời điểm vô hiệu hóa vào nhật ký kiểm toán quản trị.
+     *
+     * @param staffId ID của tài khoản nhân viên
+     * @param request DTO chứa lý do vô hiệu hóa (bắt buộc theo EX01)
+     * @return DTO xác nhận kết quả vô hiệu hóa
+     */
+    @Transactional
+    public DeactivateStaffResponse deactivateStaff(Long staffId, DeactivateStaffRequest request) {
+        Staff staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff account not found with ID: " + staffId));
+
+        // Không cho phép vô hiệu hóa tài khoản Quản trị viên
+        if ("ADMIN".equalsIgnoreCase(staff.getRole().getCode())) {
+            throw new ForbiddenOperationException("Administrator accounts cannot be deactivated through staff management.");
+        }
+
+        // EX02: Xung đột trạng thái nếu tài khoản đã ở trạng thái INACTIVE
+        if ("INACTIVE".equalsIgnoreCase(staff.getStatus())) {
+            throw new ConflictOperationException("This staff account is already inactive.");
+        }
+
+        String trimmedReason = request.reason().trim();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        // 1. Chuyển trạng thái sang INACTIVE (POST-1)
+        staff.setStatus("INACTIVE");
+        Staff updatedStaff = staffRepository.save(staff);
+
+        // 2. Thu hồi toàn bộ phiên đăng nhập đang hoạt động (POST-2)
+        int revokedTokens = refreshTokenRepository.revokeAllActiveByStaffId(staffId, now);
+
+        // 3. Ghi log kiểm toán lý do và thời điểm vô hiệu hóa (POST-3)
+        log.warn("Staff account deactivated by Admin: staffId={}, email='{}', revokedTokens={}, reason='{}', timestamp={}",
+                staffId, updatedStaff.getEmail(), revokedTokens, trimmedReason, now);
+
+        return new DeactivateStaffResponse(
+                updatedStaff.getId(),
+                updatedStaff.getEmail(),
+                updatedStaff.getFullName(),
+                updatedStaff.getRole().getCode(),
+                updatedStaff.getStatus(),
+                trimmedReason,
+                now
         );
     }
 
