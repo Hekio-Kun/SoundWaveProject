@@ -5,6 +5,7 @@ import groupone.soundwaveproject.authentication.dto.request.DeactivateStaffReque
 import groupone.soundwaveproject.authentication.dto.response.CreateStaffResponse;
 import groupone.soundwaveproject.authentication.dto.response.DeactivateStaffResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffDirectoryPageResponse;
+import groupone.soundwaveproject.authentication.dto.response.StaffModerationActivityResponse;
 import groupone.soundwaveproject.authentication.service.AdminStaffService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +80,19 @@ public class AdminStaffController {
     ) {
         log.info("Admin deactivating staff account id={}: reason='{}'", id, request.reason());
         DeactivateStaffResponse response = adminStaffService.deactivateStaff(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Lấy lịch sử hoạt động kiểm duyệt chi tiết của nhân viên (UC-27.4: View Staff Moderation Activity).
+     *
+     * @param id ID của nhân viên cần tra cứu hoạt động
+     * @return Phản hồi chứa thống kê tổng hợp và danh sách bài hát duyệt, báo cáo giải quyết
+     */
+    @GetMapping("/{id}/activities")
+    public ResponseEntity<StaffModerationActivityResponse> getStaffModerationActivity(@PathVariable("id") Long id) {
+        log.info("Admin requesting moderation activities for staff id={}", id);
+        StaffModerationActivityResponse response = adminStaffService.getStaffModerationActivity(id);
         return ResponseEntity.ok(response);
     }
 }

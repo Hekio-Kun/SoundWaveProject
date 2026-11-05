@@ -315,6 +315,41 @@ export type DeactivateStaffResult = {
   deactivatedAt: string;
 };
 
+export type TrackModerationActivityItem = {
+  submissionId: number;
+  trackId: number;
+  trackTitle: string;
+  artistName: string;
+  action: string;
+  rejectionReason: string | null;
+  reviewerNote: string | null;
+  reviewedAt: string | null;
+};
+
+export type ReportResolutionActivityItem = {
+  reportId: number;
+  category: string;
+  targetType: string;
+  targetId: number;
+  targetTitle: string;
+  decision: string;
+  resolutionNote: string | null;
+  resolvedAt: string | null;
+};
+
+export type StaffModerationActivityResponse = {
+  staffId: number;
+  fullName: string;
+  email: string;
+  roleCode: string;
+  roleName: string;
+  status: string;
+  totalTracksModerated: number;
+  totalReportsResolved: number;
+  trackReviews: TrackModerationActivityItem[];
+  reportResolutions: ReportResolutionActivityItem[];
+};
+
 export type MetricOverview = {
   totalUsers: number;
   activeUsers: number;

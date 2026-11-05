@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -86,6 +87,12 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
     );
 
     long countByReviewerUserIdAndStatusIn(Long reviewerUserId, Collection<SubmissionStatus> statuses);
+
+    /**
+     * Lấy toàn bộ lịch sử các bài kiểm duyệt đã được xử lý bởi nhân viên (UC-27.4).
+     */
+    List<TrackSubmission> findByReviewerUserIdOrderByReviewedAtDesc(Long reviewerUserId);
+
     @Query("SELECT s FROM TrackSubmission s WHERE (:status IS NULL OR s.status = :status) " +
            "AND (:submissionType IS NULL OR s.submissionType = :submissionType) " +
            "AND (s.trackId IN :trackIds OR s.submittedByUserId IN :userIds)")
