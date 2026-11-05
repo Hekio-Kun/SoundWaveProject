@@ -301,7 +301,6 @@ export type CreateStaffResult = {
   createdAt: string;
 };
 
-
 export type DeactivateStaffInput = {
   reason: string;
 };
@@ -314,4 +313,76 @@ export type DeactivateStaffResult = {
   status: string;
   reason: string;
   deactivatedAt: string;
+};
+
+export type MetricOverview = {
+  totalUsers: number;
+  activeUsers: number;
+  newUsersInPeriod: number;
+  userGrowthPercentage: number;
+  publishedTracks: number;
+  newTracksInPeriod: number;
+  totalPlays: number;
+  pendingReviews: number;
+  pendingReports: number;
+  activeGenres: number;
+  totalCreators: number;
+};
+
+export type TopTrackStatistic = {
+  id: number;
+  title: string;
+  uploaderName: string;
+  genreName: string;
+  playCount: number;
+  coverUrl: string | null;
+  durationMs: number | null;
+};
+
+export type DailyGrowthStatistic = {
+  label: string;
+  date: string;
+  count: number;
+};
+
+export type RoleDistribution = {
+  listeners: number;
+  creators: number;
+  staffs: number;
+  admins: number;
+  listenerPercentage: number;
+  creatorPercentage: number;
+};
+
+export type RecentAccountStatistic = {
+  id: number;
+  email: string;
+  displayName: string;
+  role: string;
+  status: string;
+  joinedAt: string;
+  initials: string;
+  avatarUrl: string | null;
+};
+
+export type SystemHealth = {
+  restApiStatus: string;
+  databaseStatus: string;
+  cloudStorageStatus: string;
+  emailServiceStatus: string;
+  restApiLatencyMs: number;
+  databaseLatencyMs: number;
+  cloudStorageLatencyMs: number;
+  uptime: string;
+};
+
+export type SystemStatisticsResponse = {
+  overview: MetricOverview;
+  topTracks: TopTrackStatistic[];
+  userGrowth: DailyGrowthStatistic[];
+  roleDistribution: RoleDistribution;
+  recentAccounts: RecentAccountStatistic[];
+  systemHealth: SystemHealth;
+  period: string;
+  generatedAt: string;
 };
