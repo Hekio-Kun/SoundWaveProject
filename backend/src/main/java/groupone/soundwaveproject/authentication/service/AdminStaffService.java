@@ -6,16 +6,24 @@ import groupone.soundwaveproject.authentication.dto.response.CreateStaffResponse
 import groupone.soundwaveproject.authentication.dto.response.DeactivateStaffResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffDirectoryPageResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffSummaryResponse;
+import groupone.soundwaveproject.authentication.dto.response.*;
 import groupone.soundwaveproject.authentication.entity.Staff;
 import groupone.soundwaveproject.authentication.entity.StaffRole;
 import groupone.soundwaveproject.authentication.exception.EmailAlreadyExistsException;
 import groupone.soundwaveproject.authentication.repository.RefreshTokenRepository;
 import groupone.soundwaveproject.authentication.repository.StaffRepository;
 import groupone.soundwaveproject.authentication.repository.StaffRoleRepository;
+import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
 import groupone.soundwaveproject.authentication.repository.UserRepository;
+import groupone.soundwaveproject.catalog.entity.Track;
+import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.moderation.entity.ContentReport;
+import groupone.soundwaveproject.moderation.entity.TrackSubmission;
+import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
+import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.moderation.service.ModerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +38,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Service xử lý các nghiệp vụ quản trị danh bạ tài khoản Staff dành cho Admin (UC-27: Manage Staff Accounts).
@@ -46,6 +55,10 @@ public class AdminStaffService {
     private final ModerationService moderationService;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationMailService mailService;
+    private final TrackSubmissionRepository trackSubmissionRepository;
+    private final ContentReportRepository contentReportRepository;
+    private final TrackRepository trackRepository;
+    private final UserProfileRepository userProfileRepository;
 
     @Value("${app.staff.login-url:http://127.0.0.1:4174/#/staff/login}")
     private String staffLoginUrl;
@@ -202,6 +215,93 @@ public class AdminStaffService {
                 updatedStaff.getStatus(),
                 trimmedReason,
                 now
+        );
+    }
+
+    /**
+     * Lấy toàn bộ lịch sử hoạt động kiểm duyệt của một nhân viên (UC-27.4: View Staff Moderation Activity).
+     *
+     * @param staffId ID nhân viên cần xem hoạt động
+     * @return DTO tổng hợp thống kê và danh sách chi tiết các bài hát đã duyệt, báo cáo đã xử lý
+     */
+    @Transactional(readOnly = true)
+    public StaffModerationActivityResponse getStaffModerationActivity(Long staffId) {
+        Staff staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff account not found with ID: " + staffId));
+
+        log.info("Fetching moderation activities for staff: id={}, email='{}'", staff.getId(), staff.getEmail());
+
+        // 1. Lấy danh sách kiểm duyệt bài hát
+        List<TrackSubmission> submissions = trackSubmissionRepository.findByReviewerUserIdOrderByReviewedAtDesc(staffId);
+
+        Set<Long> trackIds = submissions.stream().map(TrackSubmission::getTrackId).collect(Collectors.toSet());
+        Set<Long> submitterUserIds = submissions.stream().map(TrackSubmission::getSubmittedByUserId).collect(Collectors.toSet());
+
+        Map<Long, Track> trackMap = trackIds.isEmpty() ? Collections.emptyMap() :
+                trackRepository.findAllById(trackIds).stream().collect(Collectors.toMap(Track::getId, t -> t));
+
+        Map<Long, String> artistMap = new HashMap<>();
+        for (Long userId : submitterUserIds) {
+            userProfileRepository.findByUserId(userId)
+                    .ifPresent(p -> artistMap.put(userId, p.getDisplayName() != null ? p.getDisplayName() : p.getUsername()));
+        }
+
+        List<TrackModerationActivityResponse> trackReviews = submissions.stream().map(s -> {
+            Track t = trackMap.get(s.getTrackId());
+            String trackTitle = t != null ? t.getTitle() : "Track #" + s.getTrackId();
+            String artistName = artistMap.getOrDefault(s.getSubmittedByUserId(), "User #" + s.getSubmittedByUserId());
+            return new TrackModerationActivityResponse(
+                    s.getId(),
+                    s.getTrackId(),
+                    trackTitle,
+                    artistName,
+                    s.getStatus() != null ? s.getStatus().name() : "UNKNOWN",
+                    s.getRejectionReason(),
+                    s.getReviewerNote(),
+                    s.getReviewedAt()
+            );
+        }).toList();
+
+        // 2. Lấy danh sách xử lý báo cáo vi phạm (Content Reports)
+        List<ContentReport> reports = contentReportRepository.findByReviewerIdOrderByResolvedAtDesc(staffId);
+        Set<Long> reportTrackIds = reports.stream()
+                .filter(r -> "TRACK".equalsIgnoreCase(r.getTargetType()) || "LYRICS".equalsIgnoreCase(r.getTargetType()))
+                .map(ContentReport::getTargetId)
+                .collect(Collectors.toSet());
+
+        Map<Long, Track> reportTrackMap = reportTrackIds.isEmpty() ? Collections.emptyMap() :
+                trackRepository.findAllById(reportTrackIds).stream().collect(Collectors.toMap(Track::getId, t -> t));
+
+        List<ReportResolutionActivityResponse> reportResolutions = reports.stream().map(r -> {
+            String targetTitle;
+            if (("TRACK".equalsIgnoreCase(r.getTargetType()) || "LYRICS".equalsIgnoreCase(r.getTargetType())) && reportTrackMap.containsKey(r.getTargetId())) {
+                targetTitle = reportTrackMap.get(r.getTargetId()).getTitle();
+            } else {
+                targetTitle = r.getTargetType() + " #" + r.getTargetId();
+            }
+            return new ReportResolutionActivityResponse(
+                    r.getId(),
+                    r.getReason(),
+                    r.getTargetType(),
+                    r.getTargetId(),
+                    targetTitle,
+                    r.getStatus(),
+                    r.getReviewerNote(),
+                    r.getResolvedAt()
+            );
+        }).toList();
+
+        return new StaffModerationActivityResponse(
+                staff.getId(),
+                staff.getFullName(),
+                staff.getEmail(),
+                staff.getRole() != null ? staff.getRole().getCode() : "STAFF",
+                staff.getRole() != null ? staff.getRole().getName() : "Staff",
+                staff.getStatus(),
+                trackReviews.size(),
+                reportResolutions.size(),
+                trackReviews,
+                reportResolutions
         );
     }
 

@@ -15,3 +15,4 @@ export const adminStatisticsApi = {
     return apiFetch<SystemStatisticsResponse>(`/admin/statistics?${query.toString()}`);
   },
 };
+

@@ -5,6 +5,7 @@ import { ApiError } from "../api/client";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { CreateStaffModal } from "../components/modals/CreateStaffModal";
 import { DeactivateStaffModal } from "../components/modals/DeactivateStaffModal";
+import { StaffActivityModal } from "../components/modals/StaffActivityModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -24,6 +25,7 @@ import type {
   CreateStaffResult,
   DeactivateStaffInput,
   StaffDirectoryResponse,
+  StaffModerationActivityResponse,
   StaffSummaryItem,
 } from "../types";
 
@@ -72,6 +74,11 @@ export function AdminStaffManagementPage({
   const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
   const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
   const [selectedStaffForDeactivate, setSelectedStaffForDeactivate] = useState<StaffSummaryItem | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [selectedStaffForActivity, setSelectedStaffForActivity] = useState<StaffSummaryItem | null>(null);
+  const [activityData, setActivityData] = useState<StaffModerationActivityResponse | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState("");
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -181,6 +188,24 @@ export function AdminStaffManagementPage({
       void loadStaffDirectory();
     } finally {
       setDeactivateSubmitting(false);
+    }
+  };
+
+  const handleOpenActivity = async (staff: StaffSummaryItem) => {
+    setSelectedStaffForActivity(staff);
+    setActivityModalOpen(true);
+    setActivityLoading(true);
+    setActivityError("");
+    setActivityData(null);
+    try {
+      const data = await adminStaffApi.getStaffActivity(staff.id);
+      setActivityData(data);
+    } catch (err) {
+      setActivityError(
+        err instanceof ApiError ? err.message : "Failed to load moderation activity data."
+      );
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -417,11 +442,7 @@ export function AdminStaffManagementPage({
                                 if (onViewActivityClick) {
                                   onViewActivityClick(staff);
                                 } else {
-                                  setNotification({
-                                    open: true,
-                                    type: "info",
-                                    message: `Audit history for ${staff.fullName} (UC-27.4) will be unlocked in Step 4.`,
-                                  });
+                                  void handleOpenActivity(staff);
                                 }
                               }}
                               title="View moderation activity audit"
@@ -518,6 +539,20 @@ export function AdminStaffManagementPage({
           }
         }}
         onConfirm={handleConfirmDeactivate}
+      />
+
+      <StaffActivityModal
+        open={activityModalOpen}
+        staff={selectedStaffForActivity}
+        activityData={activityData}
+        loading={activityLoading}
+        error={activityError}
+        onClose={() => {
+          setActivityModalOpen(false);
+          setSelectedStaffForActivity(null);
+          setActivityData(null);
+          setActivityError("");
+        }}
       />
 
       {createdResult &&
