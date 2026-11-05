@@ -4,6 +4,7 @@ import { adminStaffApi } from "../api/adminStaff";
 import { ApiError } from "../api/client";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { CreateStaffModal } from "../components/modals/CreateStaffModal";
+import { DeactivateStaffModal } from "../components/modals/DeactivateStaffModal";
 import {
   AlertIcon,
   CheckIcon,
@@ -21,6 +22,7 @@ import {
 import type {
   CreateStaffInput,
   CreateStaffResult,
+  DeactivateStaffInput,
   StaffDirectoryResponse,
   StaffSummaryItem,
 } from "../types";
@@ -67,6 +69,9 @@ export function AdminStaffManagementPage({
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createdResult, setCreatedResult] = useState<CreateStaffResult | null>(null);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
+  const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
+  const [selectedStaffForDeactivate, setSelectedStaffForDeactivate] = useState<StaffSummaryItem | null>(null);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -158,6 +163,25 @@ export function AdminStaffManagementPage({
     }).catch(() => {
       // Fallback
     });
+  };
+
+  const handleConfirmDeactivate = async (input: DeactivateStaffInput) => {
+    if (!selectedStaffForDeactivate) return;
+    setDeactivateSubmitting(true);
+    try {
+      await adminStaffApi.deactivateStaff(selectedStaffForDeactivate.id, input);
+      setDeactivateModalOpen(false);
+      const targetName = selectedStaffForDeactivate.fullName;
+      setSelectedStaffForDeactivate(null);
+      setNotification({
+        open: true,
+        type: "success",
+        message: `Account for ${targetName} has been deactivated and active sessions revoked.`,
+      });
+      void loadStaffDirectory();
+    } finally {
+      setDeactivateSubmitting(false);
+    }
   };
 
   const totalStaff = staffPage?.totalElements ?? 0;
@@ -416,11 +440,8 @@ export function AdminStaffManagementPage({
                                   if (onDeactivateClick) {
                                     onDeactivateClick(staff);
                                   } else {
-                                    setNotification({
-                                      open: true,
-                                      type: "info",
-                                      message: `Deactivate flow for ${staff.fullName} (UC-27.3) will be unlocked in Step 3.`,
-                                    });
+                                    setSelectedStaffForDeactivate(staff);
+                                    setDeactivateModalOpen(true);
                                   }
                                 }}
                                 style={{
@@ -484,6 +505,19 @@ export function AdminStaffManagementPage({
         submitting={createSubmitting}
         onClose={() => setCreateModalOpen(false)}
         onSubmit={handleCreateStaff}
+      />
+
+      <DeactivateStaffModal
+        open={deactivateModalOpen}
+        staff={selectedStaffForDeactivate}
+        submitting={deactivateSubmitting}
+        onClose={() => {
+          if (!deactivateSubmitting) {
+            setDeactivateModalOpen(false);
+            setSelectedStaffForDeactivate(null);
+          }
+        }}
+        onConfirm={handleConfirmDeactivate}
       />
 
       {createdResult &&

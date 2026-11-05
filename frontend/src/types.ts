@@ -300,3 +300,18 @@ export type CreateStaffResult = {
   emailDispatched: boolean;
   createdAt: string;
 };
+
+
+export type DeactivateStaffInput = {
+  reason: string;
+};
+
+export type DeactivateStaffResult = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: string;
+  status: string;
+  reason: string;
+  deactivatedAt: string;
+};

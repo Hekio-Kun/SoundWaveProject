@@ -1,5 +1,11 @@
 import { apiFetch } from "./client";
-import type { CreateStaffInput, CreateStaffResult, StaffDirectoryResponse } from "../types";
+import type {
+  CreateStaffInput,
+  CreateStaffResult,
+  DeactivateStaffInput,
+  DeactivateStaffResult,
+  StaffDirectoryResponse,
+} from "../types";
 
 export type GetStaffParams = {
   search?: string;
@@ -38,6 +44,15 @@ export const adminStaffApi = {
   createStaff: (input: CreateStaffInput) =>
     apiFetch<CreateStaffResult>("/admin/staffs", {
       method: "POST",
+      body: input,
+    }),
+
+  /**
+   * Vô hiệu hóa tài khoản nhân viên kiểm duyệt (UC-27.3: Deactivate Staff Account).
+   */
+  deactivateStaff: (id: number, input: DeactivateStaffInput) =>
+    apiFetch<DeactivateStaffResult>(`/admin/staffs/${id}/deactivate`, {
+      method: "PATCH",
       body: input,
     }),
 };
