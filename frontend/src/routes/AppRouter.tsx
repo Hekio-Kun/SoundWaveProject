@@ -21,6 +21,7 @@ import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from ".
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
 import { AdminStaffManagementPage } from "../pages/AdminStaffManagementPage";
 import { StaffLyricsManagementPage } from "../pages/StaffLyricsManagementPage";
+import { StaffContentReportsPage } from "../pages/StaffContentReportsPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RankingBoardPage } from "../pages/RankingBoardPage";
 import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
@@ -566,6 +567,14 @@ export function AppRouter(): React.ReactElement | null {
       <AdminDashboardPage onNavigate={navigate} />
     ) : (
       <DashboardAccessDenied onNavigate={navigate} requiredRole="Administrator" />
+    );
+  }
+
+  if (pathname === "/staff/reports" || pathname === "/staff/content-reports") {
+    return user?.role === "STAFF" ? (
+      <StaffContentReportsPage onNavigate={navigate} />
+    ) : (
+      <DashboardAccessDenied onNavigate={navigate} requiredRole="Moderation Staff" />
     );
   }
 

@@ -386,3 +386,46 @@ export type SystemStatisticsResponse = {
   period: string;
   generatedAt: string;
 };
+
+export type StaffContentReportResponse = {
+  id: number;
+  reportIds?: number[];
+  reporterCount?: number;
+  reporterId: number;
+  reporterName: string;
+  reporterEmail: string | null;
+  reporters?: Array<{
+    reporterId: number;
+    reporterName: string;
+    reporterEmail: string | null;
+    submittedAt: string;
+  }>;
+  targetType: string;
+  targetId: number;
+  trackId: number | null;
+  trackTitle: string;
+  artistName: string;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  trackPublicationStatus: string | null;
+  lyrics?: string | null;
+  reason: string;
+  status: "PENDING" | "RESOLVED" | "DISMISSED" | string;
+  reviewerId: number | null;
+  reviewerName: string | null;
+  staffNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+};
+
+export type ResolveContentReportRequest = {
+  decision: string;
+  staffNote: string;
+};
+
+export type TakeDownTrackRequest = {
+  takedownReason: string;
+  reviewerNote?: string;
+};
+
+
