@@ -97,11 +97,11 @@ public class AuthenticationMailService {
 
                 Account Details:
                 - Username / Email: %s
-                - Temporary Password: %s
+                - Account Password: %s
                 - Staff Login Portal: %s
 
                 Security Reminder:
-                For your account security, please log in through the staff portal and change your password immediately upon your first sign-in.
+                Please store your account password safely and keep it confidential. SoundWave administrators will never ask for your password. You can use these credentials to log in to the Content Moderation Portal.
 
                 Best regards,
                 SoundWave Operations Team
@@ -136,7 +136,7 @@ public class AuthenticationMailService {
                             <td style="padding: 6px 0; font-weight: 600; color: #0F172A;">%s</td>
                           </tr>
                           <tr>
-                            <td style="padding: 6px 0; color: #64748B;">Temporary Password:</td>
+                            <td style="padding: 6px 0; color: #64748B;">Account Password:</td>
                             <td style="padding: 6px 0;">
                               <code style="font-family: monospace; font-size: 16px; font-weight: 700; color: #0284C7; background-color: #E0F2FE; padding: 3px 8px; border-radius: 6px;">%s</code>
                             </td>
@@ -152,7 +152,7 @@ public class AuthenticationMailService {
 
                       <div style="border-top: 1px solid #F1F5F9; padding-top: 20px; margin-top: 24px;">
                         <p style="font-size: 12px; line-height: 1.5; color: #8D877F; margin: 0;">
-                          <strong style="color: #57534E;">Important Security Note:</strong> Please change your temporary password immediately upon your first sign-in to keep your account secure. SoundWave staff will never ask you for your password.
+                          <strong style="color: #57534E;">Important Security Note:</strong> Please store your account password safely and keep it confidential. These credentials grant access to the SoundWave Content Moderation Portal. SoundWave staff will never ask you for your password.
                         </p>
                       </div>
                     </div>

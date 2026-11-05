@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { StaffDirectoryResponse } from "../types";
+import type { CreateStaffInput, CreateStaffResult, StaffDirectoryResponse } from "../types";
 
 export type GetStaffParams = {
   search?: string;
@@ -31,5 +31,13 @@ export const adminStaffApi = {
 
     return apiFetch<StaffDirectoryResponse>(`/admin/staffs?${query.toString()}`);
   },
-};
 
+  /**
+   * Khởi tạo tài khoản nhân viên kiểm duyệt mới (UC-27.2: Create Staff Account).
+   */
+  createStaff: (input: CreateStaffInput) =>
+    apiFetch<CreateStaffResult>("/admin/staffs", {
+      method: "POST",
+      body: input,
+    }),
+};

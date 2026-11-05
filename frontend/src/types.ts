@@ -280,3 +280,23 @@ export type UnifiedSearchResponse = {
   creators: SearchPageResponse<CreatorSearchResult>;
   lyrics: SearchPageResponse<LyricSearchResult>;
 };
+
+
+export type CreateStaffInput = {
+  fullName: string;
+  email: string;
+  password?: string;
+  autoGeneratePassword?: boolean;
+};
+
+export type CreateStaffResult = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: string;
+  roleName: string;
+  status: string;
+  temporaryPassword: string;
+  emailDispatched: boolean;
+  createdAt: string;
+};

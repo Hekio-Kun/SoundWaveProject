@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { adminStaffApi } from "../api/adminStaff";
 import { ApiError } from "../api/client";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { CreateStaffModal } from "../components/modals/CreateStaffModal";
 import {
   AlertIcon,
   CheckIcon,
   CloseIcon,
   EyeIcon,
+  LockIcon,
+  MailIcon,
   PlusIcon,
   RefreshIcon,
   SearchIcon,
@@ -14,7 +18,12 @@ import {
   UserIcon,
   UsersIcon,
 } from "../icons";
-import type { StaffDirectoryResponse, StaffSummaryItem } from "../types";
+import type {
+  CreateStaffInput,
+  CreateStaffResult,
+  StaffDirectoryResponse,
+  StaffSummaryItem,
+} from "../types";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "Never";
@@ -54,6 +63,10 @@ export function AdminStaffManagementPage({
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [createdResult, setCreatedResult] = useState<CreateStaffResult | null>(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -124,6 +137,29 @@ export function AdminStaffManagementPage({
     }
   };
 
+  const handleCreateStaff = async (input: CreateStaffInput): Promise<CreateStaffResult> => {
+    setCreateSubmitting(true);
+    try {
+      const result = await adminStaffApi.createStaff(input);
+      setCreateModalOpen(false);
+      setCreatedResult(result);
+      void loadStaffDirectory();
+      return result;
+    } finally {
+      setCreateSubmitting(false);
+    }
+  };
+
+  const handleCopyPassword = (text: string) => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    }).catch(() => {
+      // Fallback
+    });
+  };
+
   const totalStaff = staffPage?.totalElements ?? 0;
 
   return (
@@ -146,12 +182,7 @@ export function AdminStaffManagementPage({
             onClick={
               onCreateStaffClick
                 ? onCreateStaffClick
-                : () =>
-                    setNotification({
-                      open: true,
-                      type: "info",
-                      message: "Create Staff Account form will be unlocked in Step 2 (UC-27.2).",
-                    })
+                : () => setCreateModalOpen(true)
             }
           >
             <PlusIcon width={17} height={17} />
@@ -447,6 +478,212 @@ export function AdminStaffManagementPage({
         message={notification.message}
         onClose={() => setNotification((prev) => ({ ...prev, open: false }))}
       />
+
+      <CreateStaffModal
+        open={createModalOpen}
+        submitting={createSubmitting}
+        onClose={() => setCreateModalOpen(false)}
+        onSubmit={handleCreateStaff}
+      />
+
+      {createdResult &&
+        createPortal(
+          <div className="modal-overlay" role="presentation" onClick={() => setCreatedResult(null)}>
+            <section
+              className="modal-card genre-form-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="created-staff-result-title"
+              onClick={(event) => event.stopPropagation()}
+              style={{ maxWidth: "520px" }}
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <ShieldIcon width={13} height={13} />
+                    STAFF ONBOARDING
+                  </span>
+                  <h2 id="created-staff-result-title" style={{ fontSize: "20px", fontWeight: 700, margin: "4px 0 0" }}>
+                    {createdResult.emailDispatched
+                      ? "Staff Account Created"
+                      : "Staff Created (Email Delivery Warning)"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setCreatedResult(null)}
+                  aria-label="Close modal"
+                >
+                  <CloseIcon width={16} height={16} />
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: "16px", padding: "8px 0" }}>
+                {createdResult.emailDispatched ? (
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      background: "#ECFDF5",
+                      border: "1px solid #A7F3D0",
+                      color: "#065F46",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                    }}
+                  >
+                    <CheckIcon width={18} height={18} style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <div>
+                      <strong>Welcome email dispatched successfully!</strong>
+                      <div style={{ marginTop: "2px", color: "#047857" }}>
+                        An automated onboarding email with login credentials has been sent directly to <strong>{createdResult.email}</strong>.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      background: "#FFFBEB",
+                      border: "1px solid #FDE68A",
+                      color: "#92400E",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                    }}
+                  >
+                    <AlertIcon width={18} height={18} style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <div>
+                      <strong>Email could not be delivered automatically (EX02)</strong>
+                      <div style={{ marginTop: "2px", color: "#B45309" }}>
+                        The staff account has been saved and is ACTIVE. Please provide the account password below to the staff member directly.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "10px",
+                    padding: "14px",
+                    display: "grid",
+                    gap: "10px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Full Name:</span>
+                    <strong style={{ color: "#1E293B" }}>{createdResult.fullName}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Work Email:</span>
+                    <strong style={{ color: "#1E293B" }}>{createdResult.email}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#64748B" }}>Assigned Role:</span>
+                    <span
+                      className="ops-role-chip"
+                      style={{
+                        background: "#f5ead8",
+                        color: "#8c5828",
+                        borderColor: "#e8dccb",
+                        fontWeight: 600,
+                        fontSize: "12px",
+                        padding: "2px 8px",
+                        borderRadius: "6px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <UserIcon width={12} height={12} />
+                      <span>{createdResult.roleName || "Staff"}</span>
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#64748B" }}>Initial Status:</span>
+                    <span className="ops-status is-success">
+                      <i />
+                      Active
+                    </span>
+                  </div>
+
+                  {/* CHỈ hiển thị mật khẩu khi gửi email thất bại (EX02) để Admin bàn giao thủ công */}
+                  {!createdResult.emailDispatched && (
+                    <div
+                      style={{
+                        marginTop: "6px",
+                        paddingTop: "10px",
+                        borderTop: "1px dashed #CBD5E1",
+                        display: "grid",
+                        gap: "6px",
+                      }}
+                    >
+                      <span style={{ color: "#475569", fontWeight: 600 }}>Account Password (Manual Handover):</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          background: "#FFFFFF",
+                          border: "1px solid #CBD5E1",
+                          borderRadius: "8px",
+                          padding: "8px 12px",
+                        }}
+                      >
+                        <code
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: "15px",
+                            fontWeight: 700,
+                            letterSpacing: "1px",
+                            color: "#0F172A",
+                            flex: 1,
+                          }}
+                        >
+                          {createdResult.temporaryPassword}
+                        </code>
+                        <button
+                          type="button"
+                          className="button button-small button-secondary"
+                          onClick={() => handleCopyPassword(createdResult.temporaryPassword)}
+                          style={{ fontSize: "12px", padding: "4px 10px" }}
+                        >
+                          {copiedPassword ? (
+                            <>
+                              <CheckIcon width={14} height={14} />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <span>Copy</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: "12px" }}>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => setCreatedResult(null)}
+                  style={{ width: "100%" }}
+                >
+                  Done
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
