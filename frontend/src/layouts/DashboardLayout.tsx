@@ -5,6 +5,7 @@ import {
   DashboardIcon,
   DiscIcon,
   FileTextIcon,
+  FlagIcon,
   LogoutIcon,
   MenuIcon,
   MusicIcon,
@@ -84,12 +85,21 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           <>
             <button
               type="button"
-              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" ? "is-active" : ""}
+              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" && activeRoute !== "/staff/reports" ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/dashboard")}
               title="Pending track submissions"
             >
               <DashboardIcon width={17} height={17} />
               <span>Pending Tracks</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute === "/staff/reports" ? "is-active" : ""}
+              onClick={() => handleNavClick("/staff/reports")}
+              title="Content violation reports"
+            >
+              <FlagIcon width={17} height={17} />
+              <span>Content Reports</span>
             </button>
             <button
               type="button"

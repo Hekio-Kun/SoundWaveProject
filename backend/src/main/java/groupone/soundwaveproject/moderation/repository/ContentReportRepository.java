@@ -16,4 +16,10 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, Lo
     Page<ContentReport> findByTargetTypeAndStatus(String targetType, String status, Pageable pageable);
 
     long countByStatus(String status);
+
+    List<ContentReport> findAllByOrderByCreatedAtDesc();
+
+    List<ContentReport> findByTargetIdAndStatus(Long targetId, String status);
+
+    List<ContentReport> findByTargetTypeAndTargetIdAndStatus(String targetType, Long targetId, String status);
 }
