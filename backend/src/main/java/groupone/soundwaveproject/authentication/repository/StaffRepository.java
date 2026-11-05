@@ -14,6 +14,10 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
     Optional<Staff> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
 
+    long countByRole_CodeIgnoreCase(String roleCode);
+
+    long countByRole_CodeIgnoreCaseAndStatusIgnoreCase(String roleCode, String status);
+
     /**
      * Lấy toàn bộ nhân viên có vai trò STAFF (loại trừ ADMIN) theo phân trang.
      */

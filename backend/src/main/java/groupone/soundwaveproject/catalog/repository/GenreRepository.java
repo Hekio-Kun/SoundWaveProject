@@ -19,6 +19,7 @@ public interface GenreRepository extends JpaRepository<Genre, Long> {
     Optional<Genre> findBySlug(String slug);
     List<Genre> findByIsActiveTrue();
     List<Genre> findByIsActiveTrueOrderByNameAsc();
+    long countByIsActiveTrue();
 
     /**
      * Finds a genre by its ID if it is currently active.
