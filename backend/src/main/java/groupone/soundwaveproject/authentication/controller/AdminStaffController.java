@@ -1,7 +1,9 @@
 package groupone.soundwaveproject.authentication.controller;
 
 import groupone.soundwaveproject.authentication.dto.request.CreateStaffRequest;
+import groupone.soundwaveproject.authentication.dto.request.DeactivateStaffRequest;
 import groupone.soundwaveproject.authentication.dto.response.CreateStaffResponse;
+import groupone.soundwaveproject.authentication.dto.response.DeactivateStaffResponse;
 import groupone.soundwaveproject.authentication.dto.response.StaffDirectoryPageResponse;
 import groupone.soundwaveproject.authentication.service.AdminStaffService;
 import jakarta.validation.Valid;
@@ -61,5 +63,22 @@ public class AdminStaffController {
                 request.email(), request.fullName(), request.autoGeneratePassword());
         CreateStaffResponse response = adminStaffService.createStaff(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Vô hiệu hóa tài khoản nhân viên kiểm duyệt (UC-27.3: Deactivate Staff Account).
+     *
+     * @param id      ID của nhân viên cần vô hiệu hóa
+     * @param request Dữ liệu chứa lý do vô hiệu hóa bắt buộc (EX01)
+     * @return Phản hồi xác nhận trạng thái INACTIVE và chi tiết ghi nhận
+     */
+    @PatchMapping("/{id}/deactivate")
+    public ResponseEntity<DeactivateStaffResponse> deactivateStaff(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody DeactivateStaffRequest request
+    ) {
+        log.info("Admin deactivating staff account id={}: reason='{}'", id, request.reason());
+        DeactivateStaffResponse response = adminStaffService.deactivateStaff(id, request);
+        return ResponseEntity.ok(response);
     }
 }
