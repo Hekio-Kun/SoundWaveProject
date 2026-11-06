@@ -84,19 +84,41 @@ public class LyricSchemaInitializer implements ApplicationRunner {
             jdbcTemplate.execute(
                     "CREATE TABLE IF NOT EXISTS content_reports (" +
                             "    id BIGSERIAL PRIMARY KEY," +
-                            "    reporter_id BIGINT NOT NULL," +
-                            "    target_type VARCHAR(50) NOT NULL DEFAULT 'LYRICS'," +
-                            "    target_id BIGINT NOT NULL," +
-                            "    reason VARCHAR(100) NOT NULL," +
+                            "    track_id BIGINT," +
+                            "    submitted_by_user_id BIGINT," +
+                            "    handled_by_user_id BIGINT," +
+                            "    category VARCHAR(50)," +
                             "    description TEXT," +
                             "    status VARCHAR(50) NOT NULL DEFAULT 'PENDING'," +
+                            "    resolution_note TEXT," +
+                            "    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP," +
+                            "    handled_at TIMESTAMP WITH TIME ZONE," +
+                            "    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP," +
+                            "    reporter_id BIGINT," +
+                            "    target_type VARCHAR(50) NOT NULL DEFAULT 'TRACK'," +
+                            "    target_id BIGINT," +
+                            "    reason VARCHAR(100)," +
                             "    reviewer_id BIGINT," +
                             "    reviewer_note TEXT," +
-                            "    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP," +
                             "    resolved_at TIMESTAMP WITH TIME ZONE" +
                             ")"
             );
-            log.info("Table content_reports verified/created successfully.");
+            // Đảm bảo các cột mới và cũ đều tồn tại đầy đủ bất kể bảng được tạo từ kịch bản nào
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS track_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS submitted_by_user_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS handled_by_user_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS category VARCHAR(50)");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS resolution_note TEXT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS handled_at TIMESTAMP WITH TIME ZONE");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reporter_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS target_type VARCHAR(50) DEFAULT 'TRACK'");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS target_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reason VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reviewer_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reviewer_note TEXT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP WITH TIME ZONE");
+            log.info("Table content_reports verified/created successfully with full schema compatibility.");
         } catch (Exception e) {
             log.warn("Could not verify/create table content_reports: {}", e.getMessage());
         }
