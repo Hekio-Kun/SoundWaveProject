@@ -301,6 +301,55 @@ export type CreateStaffResult = {
   createdAt: string;
 };
 
+export type DeactivateStaffInput = {
+  reason: string;
+};
+
+export type DeactivateStaffResult = {
+  id: number;
+  email: string;
+  fullName: string;
+  roleCode: string;
+  status: string;
+  reason: string;
+  deactivatedAt: string;
+};
+
+export type TrackModerationActivityItem = {
+  submissionId: number;
+  trackId: number;
+  trackTitle: string;
+  artistName: string;
+  action: string;
+  rejectionReason: string | null;
+  reviewerNote: string | null;
+  reviewedAt: string | null;
+};
+
+export type ReportResolutionActivityItem = {
+  reportId: number;
+  category: string;
+  targetType: string;
+  targetId: number;
+  targetTitle: string;
+  decision: string;
+  resolutionNote: string | null;
+  resolvedAt: string | null;
+};
+
+export type StaffModerationActivityResponse = {
+  staffId: number;
+  fullName: string;
+  email: string;
+  roleCode: string;
+  roleName: string;
+  status: string;
+  totalTracksModerated: number;
+  totalReportsResolved: number;
+  trackReviews: TrackModerationActivityItem[];
+  reportResolutions: ReportResolutionActivityItem[];
+};
+
 export type MetricOverview = {
   totalUsers: number;
   activeUsers: number;
@@ -372,4 +421,46 @@ export type SystemStatisticsResponse = {
   period: string;
   generatedAt: string;
 };
+
+export type StaffContentReportResponse = {
+  id: number;
+  reportIds?: number[];
+  reporterCount?: number;
+  reporterId: number;
+  reporterName: string;
+  reporterEmail: string | null;
+  reporters?: Array<{
+    reporterId: number;
+    reporterName: string;
+    reporterEmail: string | null;
+    submittedAt: string;
+  }>;
+  targetType: string;
+  targetId: number;
+  trackId: number | null;
+  trackTitle: string;
+  artistName: string;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  trackPublicationStatus: string | null;
+  lyrics?: string | null;
+  reason: string;
+  status: "PENDING" | "RESOLVED" | "DISMISSED" | string;
+  reviewerId: number | null;
+  reviewerName: string | null;
+  staffNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+};
+
+export type ResolveContentReportRequest = {
+  decision: string;
+  staffNote: string;
+};
+
+export type TakeDownTrackRequest = {
+  takedownReason: string;
+  reviewerNote?: string;
+};
+
 

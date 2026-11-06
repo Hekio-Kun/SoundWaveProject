@@ -17,6 +17,11 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, Lo
 
     Page<ContentReport> findByTargetTypeAndStatus(String targetType, String status, Pageable pageable);
 
+    /**
+     * Lấy danh sách các báo cáo vi phạm do nhân viên xử lý (UC-27.4).
+     */
+    List<ContentReport> findByReviewerIdOrderByResolvedAtDesc(Long reviewerId);
+
     long countByStatus(String status);
 
     List<ContentReport> findBySubmittedByUserIdOrderByCreatedAtDesc(Long submittedByUserId);
