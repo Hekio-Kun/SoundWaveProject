@@ -9,7 +9,9 @@ import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
+import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
+import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,6 +75,135 @@ class ContentReportServiceTest {
         );
         ReflectionTestUtils.setField(mockTrack, "id", 100L);
     }
+
+    // =========================================================================
+    // UC-22.1: submitTrackReport Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("submitTrackReport - Successfully creates track report when valid (UC-22.1)")
+    void submitTrackReport_Success() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+        when(contentReportRepository.hasPendingReportForTrack(100L, 10L, "PENDING")).thenReturn(false);
+
+        when(contentReportRepository.save(any(ContentReport.class))).thenAnswer(invocation -> {
+            ContentReport report = invocation.getArgument(0);
+            report.setId(1L);
+            report.setCreatedAt(Instant.now());
+            return report;
+        });
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "COPYRIGHT"
+        );
+
+        TrackReportResponse response = contentReportService.submitTrackReport("listener@example.com", request);
+
+        assertNotNull(response);
+        assertEquals(1L, response.id());
+        assertEquals(100L, response.trackId());
+        assertEquals("Test Song", response.trackTitle());
+        assertEquals("COPYRIGHT", response.category());
+        assertEquals("Copyright Infringement", response.categoryLabel());
+        assertEquals("Copyright Infringement", response.description());
+        assertEquals("PENDING", response.status());
+
+        verify(contentReportRepository, times(1)).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("submitTrackReport - Throws exception when track is not PUBLISHED (BR-30, EX02)")
+    void submitTrackReport_TrackNotPublished() {
+        mockTrack.setPublicationStatus(TrackPublicationStatus.REJECTED);
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "COPYRIGHT",
+                "Infringement description"
+        );
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.submitTrackReport("listener@example.com", request)
+        );
+
+        assertEquals("TRACK_NOT_ELIGIBLE", ex.getCode());
+        verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("submitTrackReport - Throws exception when duplicate PENDING report exists (EX01)")
+    void submitTrackReport_DuplicatePendingReport() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+        when(contentReportRepository.hasPendingReportForTrack(100L, 10L, "PENDING")).thenReturn(true);
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "INAPPROPRIATE_CONTENT",
+                "Offensive lyrics"
+        );
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.submitTrackReport("listener@example.com", request)
+        );
+
+        assertEquals("REPORT_ALREADY_EXISTS", ex.getCode());
+        verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("submitTrackReport - Throws exception when category is invalid (BR-31)")
+    void submitTrackReport_InvalidCategory() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "UNKNOWN_CATEGORY",
+                "Description"
+        );
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.submitTrackReport("listener@example.com", request)
+        );
+
+        assertEquals("INVALID_REPORT_CATEGORY", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("submitTrackReport - Throws exception when track is not found")
+    void submitTrackReport_TrackNotFound() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(999L)).thenReturn(Optional.empty());
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                999L,
+                "COPYRIGHT",
+                "Description"
+        );
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                contentReportService.submitTrackReport("listener@example.com", request)
+        );
+    }
+
+    @Test
+    @DisplayName("checkPendingReport - Returns true when pending report exists")
+    void checkPendingReport_True() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(contentReportRepository.hasPendingReportForTrack(100L, 10L, "PENDING")).thenReturn(true);
+
+        boolean result = contentReportService.checkPendingReport("listener@example.com", 100L);
+        assertTrue(result);
+    }
+
+    // =========================================================================
+    // UC-31.1: submitLyricReport Tests (Legacy / Existing)
+    // =========================================================================
 
     @Test
     @DisplayName("submitLyricReport - Successfully creates report when valid")

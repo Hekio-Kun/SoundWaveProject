@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { lyricsApi } from "../../api/lyrics";
 import { parseLyricsToLines, formatTimeDisplay, LyricLine } from "../common/LyricSyncTab";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
-import { ReportLyricModal } from "../modals/ReportLyricModal";
 import { downloadLrcFile } from "../../utils/lyricsDownload";
 import {
   AlertIcon,
@@ -47,7 +46,6 @@ export function LyricsDrawer({
   const [activeSource, setActiveSource] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [toastNotification, setToastNotification] = useState<{
     open: boolean;
     message: string;
@@ -295,19 +293,6 @@ export function LyricsDrawer({
                 aria-label="Download lyrics as .lrc file"
               >
                 <DownloadIcon width={16} height={16} />
-              </button>
-            )}
-
-            {/* Report Lyrics Issue */}
-            {activeSource === "OFFICIAL" && officialContent && isAuthenticated && (
-              <button
-                type="button"
-                className="queue-close-btn"
-                onClick={() => setReportModalOpen(true)}
-                title="Report lyrics issue"
-                aria-label="Report lyrics issue"
-              >
-                <FlagIcon width={15} height={15} />
               </button>
             )}
 
@@ -772,23 +757,6 @@ export function LyricsDrawer({
           <span style={{ fontSize: 11, fontWeight: 600 }}>UC-16.1</span>
         </div>
       </aside>
-
-      {/* Report Lyric Modal */}
-      {currentTrack && (
-        <ReportLyricModal
-          isOpen={reportModalOpen}
-          onClose={() => setReportModalOpen(false)}
-          trackId={currentTrack.id}
-          trackTitle={currentTrack.title}
-          onSuccess={(msg) =>
-            setToastNotification({
-              open: true,
-              message: msg,
-              type: "success",
-            })
-          }
-        />
-      )}
 
       {/* Central Feedback Toast Popup */}
       <CenterNotificationPopup

@@ -6,7 +6,7 @@ import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { parseLyricsToLines, formatTimeDisplay } from "../components/common/LyricSyncTab";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
-import { ReportLyricModal } from "../components/modals/ReportLyricModal";
+import { ReportTrackModal } from "../components/modals/ReportTrackModal";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { downloadLrcFile } from "../utils/lyricsDownload";
@@ -20,6 +20,7 @@ import {
   HeadphonesIcon,
   HeartFillIcon,
   HeartIcon,
+  MoreIcon,
   MusicIcon,
   PauseIcon,
   PlayIcon,
@@ -97,7 +98,8 @@ export function TrackDetailsPage({
   const [personalSaving, setPersonalSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTrackModalOpen, setReportTrackModalOpen] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
   // Synchronous Playback Tracking (UC-16.1)
   const [currentTime, setCurrentTime] = useState(0);
@@ -133,6 +135,13 @@ export function TrackDetailsPage({
       active = false;
     };
   }, [trackId]);
+
+  useEffect(() => {
+    if (!contextMenuOpen) return;
+    const handleClickOutside = () => setContextMenuOpen(false);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [contextMenuOpen]);
 
   // Load lyrics bundle with race condition prevention (UC-16.1 & UC-18)
   const lyricsRequestIdRef = useRef(0);
@@ -491,7 +500,7 @@ export function TrackDetailsPage({
               <small>release</small>
             </span>
           </div>
-          <div className="track-primary-actions">
+          <div className="track-primary-actions" style={{ position: "relative" }}>
             <button className="button button-primary button-large" onClick={() => onPlayTrack(track)}>
               {isPlayingThis ? <PauseIcon /> : <PlayIcon />}
               <span>{isPlayingThis ? "Pause" : "Play track"}</span>
@@ -516,6 +525,75 @@ export function TrackDetailsPage({
             >
               <PlusIcon />
             </button>
+
+            {/* Context menu (...) for Track Operations (UC-22.1) */}
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                className="track-round-action"
+                title="More options (...)"
+                aria-label="More options"
+                aria-haspopup="true"
+                aria-expanded={contextMenuOpen}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setContextMenuOpen((prev) => !prev);
+                }}
+              >
+                <MoreIcon width={18} height={18} />
+              </button>
+
+              {contextMenuOpen && (
+                <div
+                  className="track-context-menu"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    zIndex: 30,
+                    background: "#FFFFFF",
+                    borderRadius: "12px",
+                    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.14)",
+                    border: "1px solid #E2E8F0",
+                    minWidth: "170px",
+                    padding: "6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "8px 12px",
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "0.875rem",
+                      color: "#DC2626",
+                      fontWeight: 500,
+                      textAlign: "left",
+                      width: "100%",
+                      transition: "background 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#FEE2E2")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    onClick={() => {
+                      setContextMenuOpen(false);
+                      requestLibraryAccess(() => setReportTrackModalOpen(true));
+                    }}
+                  >
+                    <FlagIcon width={16} height={16} />
+                    <span>Report Track</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           {actionMessage ? (
             <p className="track-action-message is-success" role="status">
@@ -584,20 +662,6 @@ export function TrackDetailsPage({
                   <span>Download .LRC</span>
                 </button>
               )}
-
-              {/* Report Lyrics Issue */}
-              {lyricsTab === "OFFICIAL" && officialLyricContent && canManageLibrary ? (
-                <button
-                  type="button"
-                  className="button button-ghost button-small"
-                  onClick={() => setReportModalOpen(true)}
-                  title="Report inaccurate lyrics"
-                  style={{ color: "#64748B", display: "inline-flex", alignItems: "center", gap: 4 }}
-                >
-                  <FlagIcon width={13} height={13} />
-                  <span>Report</span>
-                </button>
-              ) : null}
             </div>
           </header>
 
@@ -1101,12 +1165,14 @@ export function TrackDetailsPage({
         onCancel={() => setDeleteConfirmOpen(false)}
       />
 
-      {/* Report Inaccurate Lyrics Modal */}
-      <ReportLyricModal
-        isOpen={reportModalOpen}
-        onClose={() => setReportModalOpen(false)}
+      {/* UC-22.1: Report Track Violation Modal */}
+      <ReportTrackModal
+        open={reportTrackModalOpen}
+        onClose={() => setReportTrackModalOpen(false)}
         trackId={trackId}
         trackTitle={track.title}
+        trackArtist={track.creator?.displayName || "Unknown Creator"}
+        trackCoverUrl={track.coverUrl}
         onSuccess={(msg) =>
           setNotification({
             open: true,
