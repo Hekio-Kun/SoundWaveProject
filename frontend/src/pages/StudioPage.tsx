@@ -34,7 +34,7 @@ import {
   TrashIcon,
   UploadIcon,
 } from "../icons";
-import type { StudioAlbum, StudioTrack } from "../types";
+import type { CurrentUser, StudioAlbum, StudioTrack } from "../types";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -58,6 +58,7 @@ type Props = {
   playing?: boolean;
   onPlayingChange?: (playing: boolean) => void;
   initialTab?: "TRACKS" | "ALBUMS";
+  currentUser?: CurrentUser | null;
 };
 
 export function StudioPage({
@@ -67,10 +68,13 @@ export function StudioPage({
   playing = false,
   onPlayingChange,
   initialTab = "TRACKS",
+  currentUser,
 }: Props) {
   const [filterStatus, setFilterStatus] = useState<
     "ALL" | "DRAFT" | "PENDING" | "APPROVED" | "REJECTED"
   >("ALL");
+
+  const artistName = currentUser?.displayName || currentUser?.username || "You";
 
   // Server state
   const [trackList, setTrackList] = useState<StudioTrack[]>(fallbackTracks);
@@ -469,20 +473,22 @@ export function StudioPage({
                 return (
                   <tr key={album.id}>
                     <td>
-                      <div className="table-track-cell">
+                      <div className="table-track-cell" style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                         <img
                           src={album.coverUrl || "/pics/album.png"}
                           alt={album.title}
                           style={{
-                            width: "42px",
-                            height: "42px",
+                            width: "44px",
+                            height: "44px",
                             objectFit: "cover",
-                            borderRadius: "6px",
+                            borderRadius: "10px",
                             flexShrink: 0,
                             display: "block",
+                            background: "#F1F5F9",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
                           }}
                         />
-                        <div>
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                           <button
                             type="button"
                             onClick={() => onNavigate(`/album/submission/${album.id}`)}
@@ -491,15 +497,34 @@ export function StudioPage({
                               border: "none",
                               padding: 0,
                               font: "inherit",
-                              fontWeight: "bold",
-                              color: "var(--sw-text, #1e293b)",
+                              fontSize: "14px",
+                              fontWeight: 700,
+                              color: "var(--sw-text, #0F172A)",
                               cursor: "pointer",
                               textAlign: "left",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              transition: "color 0.15s ease",
                             }}
-                            title="Click to view album details"
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-ocean-primary, #0284C7)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--sw-text, #0F172A)")}
+                            title={`Click to view album details for "${album.title}"`}
                           >
                             {album.title}
                           </button>
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 500,
+                              color: "var(--sw-muted, #64748B)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {artistName} • {album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -637,7 +662,7 @@ export function StudioPage({
       )}
 
       {/* [FEATURE]: Thanh tab Content Studio (My Tracks vs My Albums) - Tự động cập nhật URL /track hoặc /album */}
-      <div className="library-tabs-bar" style={{ marginBottom: "20px" }}>
+      <div className="library-tabs-bar" style={{ marginBottom: "2px" }}>
         <div className="library-nav-tabs">
           <button
             type="button"
@@ -667,7 +692,7 @@ export function StudioPage({
       {activeStudioTab === "TRACKS" ? (
         <>
           {/* Status Filter Bar without Search & Overview */}
-          <div className="studio-tabs-bar" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "18px" }}>
+          <div className="studio-tabs-bar" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px" }}>
             <button
               className={`filter-pill ${filterStatus === "ALL" ? "filter-pill--active" : ""}`}
               onClick={() => setFilterStatus("ALL")}
@@ -738,12 +763,20 @@ export function StudioPage({
                 filtered.map((t) => (
                   <tr key={t.id}>
                     <td>
-                      <div className="table-track-cell">
-                        <div style={{ position: "relative", width: "42px", height: "42px", flexShrink: 0 }}>
+                      <div className="table-track-cell" style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                        <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
                           <img
                             src={t.coverUrl ?? "/pics/album.png"}
                             alt={t.title}
-                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "6px", display: "block" }}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              borderRadius: "10px",
+                              display: "block",
+                              background: "#F1F5F9",
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+                            }}
                           />
                           {t.audioUrl && (
                             <button
@@ -757,12 +790,13 @@ export function StudioPage({
                                 justifyContent: "center",
                                 background: previewAudioUrl === t.audioUrl && previewAudioPlaying ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)",
                                 border: "none",
-                                borderRadius: "6px",
+                                borderRadius: "10px",
                                 color: "#fff",
                                 cursor: "pointer",
-                                opacity: previewAudioUrl === t.audioUrl && previewAudioPlaying ? 1 : 0.8,
-                                transition: "opacity 0.2s",
+                                opacity: previewAudioUrl === t.audioUrl && previewAudioPlaying ? 1 : 0,
+                                transition: "opacity 0.18s ease",
                               }}
+                              className="track-preview-hover-btn"
                               title={previewAudioUrl === t.audioUrl && previewAudioPlaying ? "Pause audio preview" : "Play audio preview"}
                               aria-label={previewAudioUrl === t.audioUrl && previewAudioPlaying ? `Pause ${t.title}` : `Play ${t.title}`}
                             >
@@ -774,7 +808,8 @@ export function StudioPage({
                             </button>
                           )}
                         </div>
-                        <div>
+
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <button
                               type="button"
@@ -784,12 +819,19 @@ export function StudioPage({
                                 border: "none",
                                 padding: 0,
                                 font: "inherit",
-                                fontWeight: "bold",
-                                color: "var(--sw-text, #1e293b)",
+                                fontSize: "14px",
+                                fontWeight: 700,
+                                color: "var(--sw-text, #0F172A)",
                                 cursor: "pointer",
                                 textAlign: "left",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                transition: "color 0.15s ease",
                               }}
-                              title="Click to view details"
+                              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-ocean-primary, #0284C7)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--sw-text, #0F172A)")}
+                              title={`Click to view details for ${t.title}`}
                             >
                               {t.title}
                             </button>
@@ -807,12 +849,27 @@ export function StudioPage({
                                   color: "#0891b2",
                                   borderRadius: "4px",
                                   border: "1px solid #cffafe",
+                                  flexShrink: 0,
                                 }}
                               >
                                 <FileTextIcon width={10} height={10} /> Lyrics
                               </span>
                             )}
                           </div>
+
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 500,
+                              color: "var(--sw-muted, #64748B)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {artistName}
+                            {t.albumTitle ? ` • ${t.albumTitle}` : ""}
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -897,7 +954,7 @@ export function StudioPage({
               alignItems: "center",
               flexWrap: "wrap",
               gap: "12px",
-              marginBottom: "18px",
+              marginBottom: "14px",
             }}
           >
             {/* Status Filter Bar - RDS AF01: Draft, Pending Review, Published, Rejected */}

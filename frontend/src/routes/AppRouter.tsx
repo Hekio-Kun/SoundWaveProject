@@ -566,13 +566,13 @@ export function AppRouter(): React.ReactElement | null {
   // [FEATURE]: Trang danh sách bài hát của Creator - My Tracks (/track hoặc /tracks)
   if (pathname === "/track" || pathname === "/tracks" || pathname === "/studio") {
     if (!authReady || !isAuthenticated) return null;
-    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="TRACKS" />;
+    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="TRACKS" currentUser={user} />;
   }
 
   // [FEATURE]: Trang danh sách album của Creator - My Albums (/album)
   if (pathname === "/album" || pathname === "/studio/albums") {
     if (!authReady || !isAuthenticated) return null;
-    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="ALBUMS" />;
+    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="ALBUMS" currentUser={user} />;
   }
 
 
