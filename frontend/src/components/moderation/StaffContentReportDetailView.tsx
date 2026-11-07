@@ -17,12 +17,15 @@ import { lyricsApi } from "../../api/lyrics";
 import { ApiError } from "../../api/client";
 import type { StaffContentReportResponse } from "../../types";
 import { TakeDownConfirmationModal } from "../modals/TakeDownConfirmationModal";
+import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
+import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
 
 type Props = {
   reportId: number;
   initialReport?: StaffContentReportResponse;
   onBack: () => void;
   onRefreshQueue: () => void;
+  onNotify?: (message: string, type?: "success" | "info" | "warning" | "error") => void;
 };
 
 function formatSeconds(totalSeconds: number): string {
@@ -48,38 +51,21 @@ function formatDate(isoString?: string | null): string {
   }
 }
 
-// Parse timestamp [mm:ss.xx] or [mm:ss] into seconds
-function parseTimestampToSeconds(line: string): number | null {
-  const match = line.match(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/);
-  if (!match) return null;
-  const minutes = parseInt(match[1], 10);
-  const seconds = parseInt(match[2], 10);
-  const fractionStr = match[3];
-  let fraction = 0;
-  if (fractionStr) {
-    fraction = fractionStr.length === 2 ? parseInt(fractionStr, 10) / 100 : parseInt(fractionStr, 10) / 1000;
-  }
-  return minutes * 60 + seconds + fraction;
-}
-
-type ParsedLyricLine = {
-  lineNumber: number;
-  raw: string;
-  tsMatch: string | null;
-  tsSeconds: number | null;
-  text: string;
-};
-
 export function StaffContentReportDetailView({
   reportId,
   initialReport,
   onBack,
   onRefreshQueue,
+  onNotify,
 }: Props) {
   const [report, setReport] = useState<StaffContentReportResponse | null>(initialReport ?? null);
   const [loading, setLoading] = useState<boolean>(!initialReport);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [toastNotification, setToastNotification] = useState<{
+    open: boolean;
+    message: string;
+    type: "success" | "info" | "warning" | "error";
+  }>({ open: false, message: "", type: "success" });
 
   // Audio player state
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -101,50 +87,36 @@ export function StaffContentReportDetailView({
   // Lyrics state
   const [trackLyrics, setTrackLyrics] = useState<string | null>(initialReport?.lyrics || null);
   const [copiedLyrics, setCopiedLyrics] = useState<boolean>(false);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrollingRef = useRef<boolean>(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const tid = report?.trackId || report?.targetId;
+    if (!tid) return;
+
     if (report?.lyrics) {
       setTrackLyrics(report.lyrics);
-      return;
     }
-    const tid = report?.trackId || report?.targetId;
-    if (tid) {
-      lyricsApi
-        .getStaffOfficialLyric(tid)
-        .then((res) => {
-          if (res?.lyricContent) setTrackLyrics(res.lyricContent);
-        })
-        .catch(() => {
-          lyricsApi
-            .getTrackLyrics(tid)
-            .then((bundle) => {
-              if (bundle?.officialLyric?.lyricContent) {
-                setTrackLyrics(bundle.officialLyric.lyricContent);
-              }
-            })
-            .catch(() => {});
-        });
-    }
-  }, [report?.lyrics, report?.trackId, report?.targetId]);
 
-  const handleJumpToTimestamp = (seconds: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = seconds;
-    setCurrentTime(seconds);
-    if (!isPlaying) {
-      const promise = audioRef.current.play();
-      if (promise !== undefined) {
-        playPromiseRef.current = promise;
-        promise
-          .then(() => setIsPlaying(true))
-          .catch((err: Error) => {
-            if (err.name !== "AbortError") {
-              console.error("Audio playback error:", err);
-            }
-          });
-      }
-    }
-  };
+    lyricsApi
+      .getTrackLyrics(tid)
+      .then((bundle) => {
+        const content = bundle?.officialLyric?.lyricContent || bundle?.userPersonalLyric?.lyricContent;
+        if (content) {
+          setTrackLyrics(content);
+        }
+      })
+      .catch(() => {
+        lyricsApi
+          .getStaffOfficialLyric(tid)
+          .then((res) => {
+            if (res?.lyricContent) setTrackLyrics(res.lyricContent);
+          })
+          .catch(() => {});
+      });
+  }, [report?.trackId, report?.targetId, report?.lyrics]);
 
   const handleCopyLyrics = async (text: string) => {
     try {
@@ -156,44 +128,74 @@ export function StaffContentReportDetailView({
     }
   };
 
-  const parsedLyricLines = useMemo<ParsedLyricLine[]>(() => {
+  const parsedActiveLines = useMemo(() => {
     if (!trackLyrics) return [];
-    return trackLyrics.split(/\r?\n/).map((line, idx) => {
-      const match = line.match(/^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])(.*)$/);
-      const tsSeconds = parseTimestampToSeconds(line);
-      return {
-        lineNumber: idx + 1,
-        raw: line,
-        tsMatch: match ? match[1] : null,
-        tsSeconds,
-        text: match ? match[2] : line,
-      };
-    });
+    try {
+      return parseLyricsToLines(trackLyrics);
+    } catch {
+      return [];
+    }
   }, [trackLyrics]);
 
-  const hasSyncedLyrics = useMemo(() => {
-    return parsedLyricLines.some((l) => l.tsSeconds !== null);
-  }, [parsedLyricLines]);
+  const hasTimestamps = useMemo(
+    () => parsedActiveLines.some((l) => l.timeSec !== null),
+    [parsedActiveLines]
+  );
 
   const activeLineIndex = useMemo(() => {
-    if (!parsedLyricLines.length) return -1;
-    let foundIdx = -1;
-    for (let i = 0; i < parsedLyricLines.length; i++) {
-      const sec = parsedLyricLines[i].tsSeconds;
-      if (sec !== null && currentTime >= sec) {
-        foundIdx = i;
+    if (!hasTimestamps || parsedActiveLines.length === 0) return -1;
+    let idx = -1;
+    for (let i = 0; i < parsedActiveLines.length; i++) {
+      const lineTime = parsedActiveLines[i].timeSec;
+      if (lineTime !== null && currentTime >= lineTime) {
+        idx = i;
       }
     }
-    return foundIdx;
-  }, [parsedLyricLines, currentTime]);
+    return idx;
+  }, [parsedActiveLines, currentTime, hasTimestamps]);
 
-  const lyricStats = useMemo(() => {
-    if (!trackLyrics) return { lines: 0, words: 0, characters: 0 };
-    const raw = trackLyrics.trim();
-    const lines = parsedLyricLines.filter((l) => l.raw.trim().length > 0).length;
-    const words = raw.split(/\s+/).filter(Boolean).length;
-    return { lines, words, characters: raw.length };
-  }, [trackLyrics, parsedLyricLines]);
+  // Auto-scroll active line strictly within lyrics container without scrolling whole page
+  useEffect(() => {
+    if (
+      activeLineRef.current &&
+      scrollContainerRef.current &&
+      !isUserScrollingRef.current
+    ) {
+      const container = scrollContainerRef.current;
+      const activeLine = activeLineRef.current;
+      const targetScrollTop =
+        activeLine.offsetTop -
+        container.clientHeight / 2 +
+        activeLine.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth",
+      });
+    }
+  }, [activeLineIndex]);
+
+  const handleLyricsScroll = () => {
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 2000);
+  };
+
+  const handleLineClick = (timeSec: number | null) => {
+    if (timeSec === null || !audioRef.current) return;
+    audioRef.current.currentTime = timeSec;
+    setCurrentTime(timeSec);
+    if (!isPlaying) {
+      const promise = audioRef.current.play();
+      if (promise !== undefined) {
+        playPromiseRef.current = promise;
+        promise
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
+      }
+    }
+  };
 
   // Fetch report details
   const fetchReport = async () => {
@@ -316,13 +318,25 @@ export function StaffContentReportDetailView({
     setActionError(null);
 
     if (!decision) {
-      setActionError("Please select a resolution decision: Confirm Violation or Dismiss Report.");
+      const err = "Please select a resolution decision: Confirm Violation or Dismiss Report.";
+      setActionError(err);
+      setToastNotification({
+        open: true,
+        message: "Please select a resolution decision.",
+        type: "warning",
+      });
       return;
     }
 
     const trimmedNote = staffNote.trim();
     if (!trimmedNote) {
-      setActionError("Please provide resolution feedback in the Staff Note field.");
+      const err = "Please provide resolution feedback in the Staff Note field.";
+      setActionError(err);
+      setToastNotification({
+        open: true,
+        message: "Please enter a staff note.",
+        type: "warning",
+      });
       return;
     }
 
@@ -350,20 +364,46 @@ export function StaffContentReportDetailView({
       }
 
       setReport(updated);
-      setSuccessBanner("Report resolved successfully.");
+      const successMsg =
+        decision === "RESOLVED"
+          ? "Violation confirmed successfully."
+          : "Report dismissed successfully.";
+      setToastNotification({
+        open: true,
+        message: successMsg,
+        type: "success",
+      });
+      if (onNotify) {
+        onNotify(successMsg, "success");
+      }
       onRefreshQueue();
-      setTimeout(() => setSuccessBanner(null), 4000);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.code === "REPORT_ALREADY_ADJUDICATED" || err.message.includes("already been adjudicated")) {
-          alert("This report has already been adjudicated");
+          setToastNotification({
+            open: true,
+            message: "This report has already been adjudicated.",
+            type: "warning",
+          });
           onRefreshQueue();
           fetchReport();
           return;
         }
-        setActionError(err.message || "Failed to resolve report.");
+        const errorMsg = err.message || "Failed to resolve report.";
+        setActionError(errorMsg);
+        setToastNotification({
+          open: true,
+          message: errorMsg,
+          type: "error",
+        });
       } else {
-        setActionError("An unexpected error occurred. Please try again.");
+        const errorMsg = "An unexpected error occurred. Please try again.";
+        setActionError(errorMsg);
+        setToastNotification({
+          open: true,
+          message: errorMsg,
+          type: "error",
+        });
       }
     } finally {
       setSubmitting(false);
@@ -372,8 +412,15 @@ export function StaffContentReportDetailView({
 
   const handleTakedownSuccess = (message: string) => {
     setIsTakedownModalOpen(false);
-    setSuccessBanner(message);
-    setTimeout(() => setSuccessBanner(null), 4000);
+    const msg = message || "Track taken down successfully.";
+    setToastNotification({
+      open: true,
+      message: msg,
+      type: "success",
+    });
+    if (onNotify) {
+      onNotify(msg, "success");
+    }
     fetchReport();
     onRefreshQueue();
   };
@@ -402,28 +449,6 @@ export function StaffContentReportDetailView({
           <span className="staff-crumb-active">Report #{reportId}</span>
         </div>
       </div>
-
-      {/* Success Notification Banner */}
-      {successBanner && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "12px 18px",
-            backgroundColor: "#ECFDF5",
-            border: "1px solid #A7F3D0",
-            color: "#065F46",
-            borderRadius: "10px",
-            marginBottom: "16px",
-            fontSize: "0.92rem",
-            fontWeight: 500,
-          }}
-        >
-          <CheckIcon width={18} height={18} />
-          <span>{successBanner}</span>
-        </div>
-      )}
 
       {/* Loading State */}
       {loading ? (
@@ -602,130 +627,135 @@ export function StaffContentReportDetailView({
             </div>
           </div>
 
-          {/* Lyrics Section */}
-          <div className="staff-lyrics-card" style={{ marginBottom: "20px" }}>
-            <div className="staff-lyrics-header">
-              <div className="staff-lyrics-title-group">
-                <span className="staff-lyrics-icon-badge">
-                  <FileTextIcon width={17} height={17} />
-                </span>
-                <h4 className="staff-lyrics-heading">Lyrics</h4>
+          {/* Synchronous Lyrics Section (Matching Track Details Page) */}
+          <section className="track-lyrics-panel" style={{ marginBottom: "20px" }}>
+            <header
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "16px",
+                padding: "16px 22px",
+                borderBottom: "1px solid #f0f2f5",
+                background: "linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%)",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div className="track-section-icon">
+                  <FileTextIcon width={18} height={18} />
+                </div>
+                <div>
+                  <small style={{ color: "#0284c7", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    Synchronous Audio & Lyric Review
+                  </small>
+                  <h3 style={{ margin: "2px 0 0 0", fontSize: "1.05rem", fontWeight: 700, color: "#1c1917" }}>
+                    Lyrics
+                  </h3>
+                </div>
               </div>
 
               {trackLyrics ? (
-                <div className="staff-lyrics-header-actions">
-                  <div className="staff-lyrics-stats-badge">
-                    {hasSyncedLyrics ? (
-                      <>
-                        <span style={{ color: "#0284c7", fontWeight: 700 }}>Synced (.LRC)</span>
-                        <span>·</span>
-                      </>
-                    ) : null}
-                    <span><b>{lyricStats.lines}</b> lines</span>
-                    <span>·</span>
-                    <span><b>{lyricStats.words}</b> words</span>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {hasTimestamps && (
+                    <span className="official-lyrics-badge">
+                      <CheckIcon width={11} height={11} />
+                      <span>Synchronized (.LRC)</span>
+                    </span>
+                  )}
                   <button
                     type="button"
-                    className="staff-lyrics-copy-btn"
+                    className="button button-ghost button-small"
                     onClick={() => void handleCopyLyrics(trackLyrics)}
                     title="Copy lyrics"
                   >
-                    {copiedLyrics ? (
-                      <>
-                        <CheckIcon width={13} height={13} />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileTextIcon width={13} height={13} />
-                        <span>Copy Lyrics</span>
-                      </>
-                    )}
+                    {copiedLyrics ? "Copied!" : "Copy Lyrics"}
                   </button>
                 </div>
               ) : null}
-            </div>
+            </header>
 
             {trackLyrics ? (
-              <div className="staff-lyrics-viewer-wrapper">
-                <div className="staff-lyrics-lines-container">
-                  {parsedLyricLines.map((item, idx) => {
-                    const isActive = idx === activeLineIndex && item.tsSeconds !== null;
+              hasTimestamps ? (
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                  style={{ maxHeight: "380px", overflowY: "auto" }}
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
                     return (
                       <div
-                        key={item.lineNumber}
-                        className={`staff-lyrics-line-row ${isActive ? "is-active" : ""}`}
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
+                        title={
+                          line.timeSec !== null
+                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
                       >
-                        <span className="staff-lyrics-line-number" aria-hidden="true">
-                          {item.lineNumber}
-                        </span>
-                        <span className="staff-lyrics-line-content">
-                          {item.tsMatch && item.tsSeconds !== null ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
-                                className="staff-lyric-ts-jump-btn"
-                                title={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
-                                aria-label={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
-                              >
-                                {item.tsMatch}
-                              </button>
-                              <span>{item.text || "\u00A0"}</span>
-                            </>
-                          ) : (
-                            item.raw || "\u00A0"
-                          )}
-                        </span>
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
                       </div>
                     );
                   })}
                 </div>
-                {hasSyncedLyrics ? (
-                  <div className="staff-lyrics-footer-guide">
-                    💡 <b>Tip:</b> Click any timestamp badge to audition the track starting at that specific line.
-                  </div>
-                ) : null}
-              </div>
+              ) : (
+                <pre style={{ margin: 0, padding: "24px", whiteSpace: "pre-wrap", color: "#344054", fontSize: "0.95rem", lineHeight: 1.8 }}>
+                  {trackLyrics}
+                </pre>
+              )
             ) : (
-              <div className="staff-lyrics-empty-state">
-                <FileTextIcon width={28} height={28} />
-                <div className="staff-lyrics-empty-text">
-                  <strong>No lyrics provided</strong>
-                  <span>No official lyrics attached to this track.</span>
-                </div>
+              <div className="track-lyrics-empty" style={{ minHeight: "180px", padding: "28px 20px" }}>
+                <FileTextIcon width={32} height={32} />
+                <strong>No official lyrics available</strong>
+                <span>No synchronized lyrics have been attached to this track yet.</span>
               </div>
             )}
-          </div>
+          </section>
 
-          {/* Report Evidence & Reporter Information Section */}
+          {/* Unified Moderation & Adjudication Card */}
           <div
             style={{
-              padding: "20px 24px",
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
               border: "1px solid #E8DCCB",
-              marginBottom: "20px",
+              overflow: "hidden",
+              marginBottom: "24px",
+              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
             }}
           >
+            {/* Unified Card Header: Reason & Report Count */}
             <div
               style={{
+                padding: "16px 24px",
+                backgroundColor: "#FAF6F0",
+                borderBottom: "1px solid #E8DCCB",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 flexWrap: "wrap",
                 gap: "12px",
-                marginBottom: "18px",
-                paddingBottom: "14px",
-                borderBottom: "1px solid #F3ECE1",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div
                   style={{
-                    width: "38px",
-                    height: "38px",
+                    width: "36px",
+                    height: "36px",
                     borderRadius: "50%",
                     background: "#FEF2F2",
                     color: "#DC2626",
@@ -734,13 +764,13 @@ export function StaffContentReportDetailView({
                     flexShrink: 0,
                   }}
                 >
-                  <FlagIcon width={18} height={18} />
+                  <FlagIcon width={17} height={17} />
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1C1917" }}>
+                  <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1C1917" }}>
                     Violation Option: {report.reason}
                   </h4>
-                  <span style={{ fontSize: "0.82rem", color: "#57534E" }}>
+                  <span style={{ fontSize: "0.8rem", color: "#57534E" }}>
                     Selected policy option submitted by listeners
                   </span>
                 </div>
@@ -751,20 +781,20 @@ export function StaffContentReportDetailView({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
-                  padding: "6px 14px",
+                  padding: "5px 12px",
                   backgroundColor: "#FFF1F2",
                   border: "1px solid #FECDD3",
                   borderRadius: "20px",
                   color: "#BE123C",
-                  fontSize: "0.84rem",
+                  fontSize: "0.82rem",
                   fontWeight: 700,
                   boxShadow: "0 1px 2px rgba(190, 18, 60, 0.05)",
                 }}
               >
                 <span
                   style={{
-                    width: "7px",
-                    height: "7px",
+                    width: "6px",
+                    height: "6px",
                     borderRadius: "50%",
                     backgroundColor: "#E11D48",
                   }}
@@ -777,265 +807,192 @@ export function StaffContentReportDetailView({
               </div>
             </div>
 
-            {/* Reporter Meta 4-Column Balanced Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-                gap: "12px",
-                marginBottom: report.reporters && report.reporters.length > 1 ? "16px" : "0",
-              }}
-            >
-              <div className="staff-matrix-cell" style={{ margin: 0 }}>
-                <small>Reporting Listener</small>
-                <strong>
-                  {report.reporterName}
-                  {report.reporterCount && report.reporterCount > 1
-                    ? ` (+${report.reporterCount - 1} more)`
-                    : ""}
-                </strong>
-              </div>
-              <div className="staff-matrix-cell" style={{ margin: 0 }}>
-                <small>Reporter Email</small>
-                <strong style={{ wordBreak: "break-all" }}>{report.reporterEmail || "--"}</strong>
-              </div>
-              <div className="staff-matrix-cell" style={{ margin: 0 }}>
-                <small>Latest Submission</small>
-                <strong>{formatDate(report.createdAt)}</strong>
-              </div>
-              <div className="staff-matrix-cell" style={{ margin: 0 }}>
-                <small>Target Track</small>
-                <strong>#{report.targetId} · {report.trackTitle}</strong>
-              </div>
-            </div>
+            {/* Unified Card Body: Form or Resolution Record */}
+            <div style={{ padding: "24px" }}>
+              {isPending ? (
+                <>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1C1917", margin: "0 0 16px 0" }}>
+                    Adjudicate Content Report
+                  </h3>
 
-            {/* All Reporting Listeners List (when multiple listeners reported the same option) */}
-            {report.reporters && report.reporters.length > 1 && (
-              <div style={{ marginTop: "16px" }}>
-                <small style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#57534E", marginBottom: "8px" }}>
-                  All Reporting Listeners in this Group ({report.reporters.length}):
-                </small>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {report.reporters.map((rep, idx) => (
+                  {actionError && (
                     <div
-                      key={idx}
                       style={{
-                        padding: "6px 12px",
-                        backgroundColor: "#F6EFE3",
+                        padding: "10px 14px",
+                        backgroundColor: "#FEF2F2",
+                        border: "1px solid #FCA5A5",
+                        color: "#B42318",
+                        borderRadius: "8px",
+                        fontSize: "0.85rem",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      {actionError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleConfirmResolution}>
+                    {/* Decision choices */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ display: "block", fontSize: "0.88rem", fontWeight: 600, color: "#1C1917", marginBottom: "8px" }}>
+                        Resolution Decision <span style={{ color: "#DC2626" }}>*</span>
+                      </label>
+                      <div style={{ display: "flex", gap: "12px", maxWidth: "520px" }}>
+                        <button
+                          type="button"
+                          onClick={() => setDecision("RESOLVED")}
+                          disabled={submitting}
+                          style={{
+                            flex: 1,
+                            padding: "12px 16px",
+                            borderRadius: "10px",
+                            border: decision === "RESOLVED" ? "2px solid #DC2626" : "1px solid #E8DCCB",
+                            backgroundColor: decision === "RESOLVED" ? "#FEF2F2" : "#FFFFFF",
+                            color: decision === "RESOLVED" ? "#B42318" : "#1C1917",
+                            fontWeight: 600,
+                            fontSize: "0.92rem",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Confirm Violation
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDecision("DISMISSED")}
+                          disabled={submitting}
+                          style={{
+                            flex: 1,
+                            padding: "12px 16px",
+                            borderRadius: "10px",
+                            border: decision === "DISMISSED" ? "2px solid #57534E" : "1px solid #E8DCCB",
+                            backgroundColor: decision === "DISMISSED" ? "#F5F5F4" : "#FFFFFF",
+                            color: decision === "DISMISSED" ? "#1C1917" : "#57534E",
+                            fontWeight: 600,
+                            fontSize: "0.92rem",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Dismiss Report
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mandatory Staff Note */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label
+                        htmlFor="staff-note-input"
+                        style={{ display: "block", fontSize: "0.88rem", fontWeight: 600, color: "#1C1917", marginBottom: "6px" }}
+                      >
+                        Staff Note <span style={{ color: "#DC2626" }}>*</span>
+                      </label>
+                      <textarea
+                        id="staff-note-input"
+                        rows={4}
+                        value={staffNote}
+                        onChange={(e) => setStaffNote(e.target.value)}
+                        placeholder="Enter note..."
+                        disabled={submitting}
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: "10px",
+                          border: "1px solid #E8DCCB",
+                          fontSize: "0.9rem",
+                          fontFamily: "inherit",
+                          resize: "vertical",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px" }}>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={onBack}
+                        disabled={submitting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="button button-primary"
+                        disabled={submitting}
+                      >
+                        {submitting ? "Processing..." : "Confirm Resolution"}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                /* Already Adjudicated Information Box */
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                    <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1C1917" }}>
+                      Resolution Record
+                    </h4>
+                    {report.status?.toUpperCase() === "RESOLVED" && isPublished && (
+                      <button
+                        type="button"
+                        className="button"
+                        style={{
+                          backgroundColor: "#DC2626",
+                          borderColor: "#DC2626",
+                          color: "#FFFFFF",
+                          padding: "8px 16px",
+                          fontSize: "0.85rem",
+                        }}
+                        onClick={() => setIsTakedownModalOpen(true)}
+                      >
+                        Take Down
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="staff-specs-matrix" style={{ marginBottom: "16px" }}>
+                    <div className="staff-matrix-cell">
+                      <small>Adjudicated By Staff</small>
+                      <strong>{report.reviewerName || "Staff Member"}</strong>
+                    </div>
+                    <div className="staff-matrix-cell">
+                      <small>Resolution Decision</small>
+                      <strong style={{ color: report.status === "RESOLVED" ? "#B42318" : "#57534E" }}>
+                        {report.status === "RESOLVED" ? "Confirmed Violation" : "Dismissed"}
+                      </strong>
+                    </div>
+                    <div className="staff-matrix-cell">
+                      <small>Status</small>
+                      <strong>{report.status}</strong>
+                    </div>
+                    <div className="staff-matrix-cell">
+                      <small>Resolved At</small>
+                      <strong>{formatDate(report.resolvedAt)}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <small style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#57534E", marginBottom: "4px" }}>
+                      Staff Note:
+                    </small>
+                    <p
+                      style={{
+                        margin: 0,
+                        padding: "10px 14px",
+                        backgroundColor: "#FAFAF9",
                         borderRadius: "8px",
                         border: "1px solid #E8DCCB",
-                        fontSize: "0.82rem",
+                        fontSize: "0.88rem",
                         color: "#1C1917",
+                        lineHeight: "1.5",
                       }}
                     >
-                      <b>{rep.reporterName}</b>
-                      {rep.reporterEmail && <span style={{ color: "#57534E", marginLeft: "4px" }}>({rep.reporterEmail})</span>}
-                      <span style={{ color: "#8D877F", marginLeft: "6px" }}>· {formatDate(rep.submittedAt)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Adjudication Decision Panel */}
-          {isPending ? (
-            <div
-              style={{
-                padding: "24px",
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
-                border: "1px solid #E8DCCB",
-                marginBottom: "24px",
-              }}
-            >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1C1917", margin: "0 0 4px 0" }}>
-                Adjudicate Content Report
-              </h3>
-              <p style={{ fontSize: "0.85rem", color: "#57534E", margin: "0 0 16px 0" }}>
-                Investigate target track audio and evidence. Select a resolution decision and provide a mandatory Staff Note.
-              </p>
-
-              {actionError && (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    backgroundColor: "#FEF2F2",
-                    border: "1px solid #FCA5A5",
-                    color: "#B42318",
-                    borderRadius: "8px",
-                    fontSize: "0.85rem",
-                    marginBottom: "16px",
-                  }}
-                >
-                  {actionError}
-                </div>
-              )}
-
-              <form onSubmit={handleConfirmResolution}>
-                {/* Decision choices */}
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontSize: "0.88rem", fontWeight: 600, color: "#1C1917", marginBottom: "8px" }}>
-                    Resolution Decision <span style={{ color: "#DC2626" }}>*</span>
-                  </label>
-                  <div style={{ display: "flex", gap: "12px", maxWidth: "520px" }}>
-                    <button
-                      type="button"
-                      onClick={() => setDecision("RESOLVED")}
-                      disabled={submitting}
-                      style={{
-                        flex: 1,
-                        padding: "12px 16px",
-                        borderRadius: "10px",
-                        border: decision === "RESOLVED" ? "2px solid #DC2626" : "1px solid #E8DCCB",
-                        backgroundColor: decision === "RESOLVED" ? "#FEF2F2" : "#FFFFFF",
-                        color: decision === "RESOLVED" ? "#B42318" : "#1C1917",
-                        fontWeight: 600,
-                        fontSize: "0.92rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Confirm Violation
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDecision("DISMISSED")}
-                      disabled={submitting}
-                      style={{
-                        flex: 1,
-                        padding: "12px 16px",
-                        borderRadius: "10px",
-                        border: decision === "DISMISSED" ? "2px solid #57534E" : "1px solid #E8DCCB",
-                        backgroundColor: decision === "DISMISSED" ? "#F5F5F4" : "#FFFFFF",
-                        color: decision === "DISMISSED" ? "#1C1917" : "#57534E",
-                        fontWeight: 600,
-                        fontSize: "0.92rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Dismiss Report
-                    </button>
+                      {report.staffNote || "No resolution note provided."}
+                    </p>
                   </div>
-                </div>
-
-                {/* Mandatory Staff Note */}
-                <div style={{ marginBottom: "20px" }}>
-                  <label
-                    htmlFor="staff-note-input"
-                    style={{ display: "block", fontSize: "0.88rem", fontWeight: 600, color: "#1C1917", marginBottom: "6px" }}
-                  >
-                    Staff Note <span style={{ color: "#DC2626" }}>*</span>
-                  </label>
-                  <textarea
-                    id="staff-note-input"
-                    rows={4}
-                    value={staffNote}
-                    onChange={(e) => setStaffNote(e.target.value)}
-                    placeholder="Enter note..."
-                    disabled={submitting}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: "10px",
-                      border: "1px solid #E8DCCB",
-                      fontSize: "0.9rem",
-                      fontFamily: "inherit",
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px" }}>
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    onClick={onBack}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="button button-primary"
-                    disabled={submitting}
-                  >
-                    {submitting ? "Processing..." : "Confirm Resolution"}
-                  </button>
-                </div>
-              </form>
+                </>
+              )}
             </div>
-          ) : (
-            /* Already Adjudicated Information Box */
-            <div
-              style={{
-                padding: "20px 24px",
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
-                border: "1px solid #E8DCCB",
-                marginBottom: "24px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1C1917" }}>
-                  Resolution Record
-                </h4>
-                {report.status?.toUpperCase() === "RESOLVED" && isPublished && (
-                  <button
-                    type="button"
-                    className="button"
-                    style={{
-                      backgroundColor: "#DC2626",
-                      borderColor: "#DC2626",
-                      color: "#FFFFFF",
-                      padding: "8px 16px",
-                      fontSize: "0.85rem",
-                    }}
-                    onClick={() => setIsTakedownModalOpen(true)}
-                  >
-                    Take Down
-                  </button>
-                )}
-              </div>
-
-              <div className="staff-specs-matrix" style={{ marginBottom: "12px" }}>
-                <div className="staff-matrix-cell">
-                  <small>Adjudicated By Staff</small>
-                  <strong>{report.reviewerName || "Staff Member"}</strong>
-                </div>
-                <div className="staff-matrix-cell">
-                  <small>Resolution Decision</small>
-                  <strong style={{ color: report.status === "RESOLVED" ? "#B42318" : "#57534E" }}>
-                    {report.status === "RESOLVED" ? "Confirmed Violation" : "Dismissed"}
-                  </strong>
-                </div>
-                <div className="staff-matrix-cell">
-                  <small>Resolved At</small>
-                  <strong>{formatDate(report.resolvedAt)}</strong>
-                </div>
-              </div>
-
-              <div>
-                <small style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#57534E", marginBottom: "4px" }}>
-                  Staff Note:
-                </small>
-                <p
-                  style={{
-                    margin: 0,
-                    padding: "10px 14px",
-                    backgroundColor: "#FAFAF9",
-                    borderRadius: "8px",
-                    border: "1px solid #E8DCCB",
-                    fontSize: "0.88rem",
-                    color: "#1C1917",
-                    lineHeight: "1.5",
-                  }}
-                >
-                  {report.staffNote || "No resolution note provided."}
-                </p>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       ) : null}
 
@@ -1048,9 +1005,26 @@ export function StaffContentReportDetailView({
           artistName={report.artistName}
           coverUrl={report.coverUrl}
           onSuccess={handleTakedownSuccess}
+          onNotify={(msg, type) => {
+            setToastNotification({
+              open: true,
+              message: msg,
+              type: type || "warning",
+            });
+            if (onNotify) onNotify(msg, type || "warning");
+          }}
           onCancel={() => setIsTakedownModalOpen(false)}
         />
       )}
+
+      {/* Synchronized Center Notification Popup (agent/AGENTS_FRONTEND.md Section 4.9) */}
+      <CenterNotificationPopup
+        open={toastNotification.open}
+        message={toastNotification.message}
+        type={toastNotification.type}
+        durationMs={3000}
+        onClose={() => setToastNotification((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

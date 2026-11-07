@@ -47,7 +47,7 @@ public class StaffContentReportController {
             Principal principal
     ) {
         staffContentReportService.takeDownPublishedTrack(trackId, request, principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }
 

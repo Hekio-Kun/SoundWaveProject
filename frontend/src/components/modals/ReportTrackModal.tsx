@@ -53,7 +53,6 @@ export function ReportTrackModal({
   onSuccess,
 }: ReportTrackModalProps) {
   const [selectedReason, setSelectedReason] = useState<ReportCategoryType | "">("");
-  const [customDetails, setCustomDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -62,7 +61,6 @@ export function ReportTrackModal({
   useEffect(() => {
     if (!open) {
       setSelectedReason("");
-      setCustomDetails("");
       setErrorMessage(null);
       setSubmitting(false);
       return;
@@ -83,7 +81,7 @@ export function ReportTrackModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // EX01: Validate that a reason option was selected
+    // Validate that a reason option was selected
     if (!selectedReason) {
       setErrorMessage("Please select a violation reason option to proceed.");
       return;
@@ -93,9 +91,9 @@ export function ReportTrackModal({
     setErrorMessage(null);
 
     const selectedOption = PREDEFINED_REASONS.find((r) => r.value === selectedReason);
-    const reportContent = customDetails.trim()
-      ? (selectedOption ? `${selectedOption.title} - ${customDetails.trim()}` : customDetails.trim())
-      : (selectedOption ? `${selectedOption.title} - ${selectedOption.description}` : selectedReason);
+    const reportContent = selectedOption
+      ? `${selectedOption.title} - ${selectedOption.description}`
+      : selectedReason;
 
     try {
       await reportsApi.reportTrack({
@@ -104,11 +102,10 @@ export function ReportTrackModal({
         description: reportContent,
       });
 
-      // NF01 Step 7: Close modal & notify listener
+      // Close modal & notify listener
       onSuccess("Report submitted for review. Our moderation team will investigate this track.");
       onClose();
     } catch (err: any) {
-      // EX01: Duplicate pending report or EX02: Track no longer eligible
       const msg = err?.message || "Failed to submit report. Please try again.";
       setErrorMessage(msg);
     } finally {
@@ -467,43 +464,6 @@ export function ReportTrackModal({
                   </div>
                 );
               })}
-            </div>
-
-            {/* Optional Additional Details */}
-            <div style={{ marginTop: "16px" }}>
-              <label
-                htmlFor="report-custom-details"
-                style={{
-                  display: "block",
-                  fontSize: "0.8125rem",
-                  fontWeight: 600,
-                  color: "#475569",
-                  marginBottom: "6px",
-                }}
-              >
-                Additional Details (Optional):
-              </label>
-              <textarea
-                id="report-custom-details"
-                rows={3}
-                value={customDetails}
-                onChange={(e) => setCustomDetails(e.target.value)}
-                placeholder="Describe details, evidence, or timestamps (e.g. at 01:23) to assist moderation..."
-                disabled={submitting}
-                maxLength={1000}
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  borderRadius: "10px",
-                  border: "1px solid #CBD5E1",
-                  padding: "10px 12px",
-                  fontSize: "0.875rem",
-                  color: "#0F172A",
-                  fontFamily: "inherit",
-                  resize: "vertical",
-                  outline: "none",
-                }}
-              />
             </div>
           </div>
 
