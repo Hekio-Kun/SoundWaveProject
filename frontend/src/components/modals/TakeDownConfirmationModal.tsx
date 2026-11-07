@@ -12,6 +12,7 @@ type Props = {
   artistName?: string;
   coverUrl?: string | null;
   onSuccess: (message: string) => void;
+  onNotify?: (message: string, type?: "success" | "info" | "warning" | "error") => void;
   onCancel: () => void;
 };
 
@@ -22,6 +23,7 @@ export function TakeDownConfirmationModal({
   artistName,
   coverUrl,
   onSuccess,
+  onNotify,
   onCancel,
 }: Props) {
   useModalScrollLock(open);
@@ -62,7 +64,9 @@ export function TakeDownConfirmationModal({
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.code === "TRACK_NOT_PUBLISHED" || err.message.includes("published")) {
-          alert("Track is not in an active published state");
+          if (onNotify) {
+            onNotify("Track is not in an active published state.", "warning");
+          }
           onCancel();
           return;
         }

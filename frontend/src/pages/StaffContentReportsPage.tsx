@@ -4,6 +4,7 @@ import { staffReportsApi } from "../api/staffReports";
 import { ApiError } from "../api/client";
 import type { StaffContentReportResponse } from "../types";
 import { StaffContentReportDetailView } from "../components/moderation/StaffContentReportDetailView";
+import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 
 type Props = {
   onNavigate: (route: string) => void;
@@ -13,7 +14,11 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
   const [reports, setReports] = useState<StaffContentReportResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [toastNotification, setToastNotification] = useState<{
+    open: boolean;
+    message: string;
+    type: "success" | "info" | "warning" | "error";
+  }>({ open: false, message: "", type: "success" });
 
   // Selected report ID for dedicated full-page Review Detail View
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
@@ -79,6 +84,9 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
           fetchReports();
         }}
         onRefreshQueue={fetchReports}
+        onNotify={(msg, type = "success") => {
+          setToastNotification({ open: true, message: msg, type });
+        }}
       />
     );
   }
@@ -184,27 +192,14 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
         </div>
       </header>
 
-      {/* Success Notification */}
-      {successBanner && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "12px 18px",
-            backgroundColor: "#ECFDF5",
-            border: "1px solid #A7F3D0",
-            color: "#065F46",
-            borderRadius: "10px",
-            marginBottom: "20px",
-            fontSize: "0.92rem",
-            fontWeight: 500,
-          }}
-        >
-          <CheckIcon width={18} height={18} />
-          <span>{successBanner}</span>
-        </div>
-      )}
+      {/* Center Toast Popup for Feedback (AGENTS_FRONTEND.md) */}
+      <CenterNotificationPopup
+        open={toastNotification.open}
+        message={toastNotification.message}
+        type={toastNotification.type}
+        durationMs={3000}
+        onClose={() => setToastNotification((prev) => ({ ...prev, open: false }))}
+      />
 
       {/* Exception Notice (EX02: Data retrieval failure) */}
       {errorMessage && (
