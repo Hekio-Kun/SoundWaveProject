@@ -649,6 +649,34 @@ public class ModerationService {
         track.setLatestRejectionReason(reason);
         trackRepository.save(track);
 
+        // If track belongs to an album, check whether the album has any remaining PUBLISHED tracks.
+        // If this track was the last published track (remaining published count is 0), take down the album as well (BR-18).
+        Album album = track.getAlbum();
+        if (album == null && track.getAlbumId() != null) {
+            album = albumRepository.findById(track.getAlbumId()).orElse(null);
+        }
+        if (album != null) {
+            long remainingPublished = trackRepository.countByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.PUBLISHED
+            );
+            if (remainingPublished == 0) {
+                album.setStatus("REJECTED");
+                albumRepository.save(album);
+
+                if (album.getCreatedByUserId() != null) {
+                    notificationService.createNotification(
+                            album.getCreatedByUserId(),
+                            reviewer.getId(),
+                            NotificationType.TRACK_REJECTED,
+                            "Album taken down",
+                            "Album \"" + album.getTitle() + "\" has been taken down because its remaining published track was removed.",
+                            "ALBUM",
+                            String.valueOf(album.getId())
+                    );
+                }
+            }
+        }
+
         User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
         UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
 
