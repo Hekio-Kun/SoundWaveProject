@@ -45,25 +45,209 @@ body { overflow-x: hidden; }
 .app-scroll-region::-webkit-scrollbar { width: 8px; }
 .app-scroll-region::-webkit-scrollbar-track { background: transparent; }
 .app-scroll-region::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 10px; background: #dec3a6; background-clip: padding-box; }
-.app-sidebar { width: 236px; background: #fdfaf4; border-color: #e8dcba; box-shadow: 8px 0 28px rgba(180, 140, 90, .035); }
-.music-app-shell--with-player .app-sidebar { height: 100% !important; position: relative; top: auto; overflow: hidden; }
-.sidebar-brand { height: 72px; padding-inline: 22px; border-bottom: 1px solid #ede3d2; }
-.sidebar-brand .brand-mark { width: 36px; height: 36px; border-radius: 11px; }
-.sidebar-brand .brand { font-size: 19px; }
-.sidebar-nav { padding: 20px 13px; gap: 26px; overflow: hidden; }
-.nav-group-title { padding: 0 12px 8px; font-size: 10px; letter-spacing: .13em; }
-.nav-item { min-height: 44px; padding: 10px 13px; border-radius: 12px; font-size: 13px; }
-.nav-item:hover { background: #f5ead8; color: #784e25; }
-.nav-item--active { position: relative; background: linear-gradient(90deg, #e0f2fe, #fbf3e5) !important; box-shadow: inset 0 0 0 1px rgba(2, 132, 199, .14); }
-.nav-item--active::before { content: ""; position: absolute; left: -1px; width: 3px; height: 22px; border-radius: 0 4px 4px 0; background: var(--sw-primary); }
-.sidebar-playlist-cta { padding-inline: 14px; }
-.create-playlist-btn { width: 100%; border-style: dashed; }
-.sidebar-guest-card { margin: 12px 14px 16px; padding: 14px; border: 1px solid #e6d5b8; border-radius: 15px; background: linear-gradient(145deg, #f0f9ff, #fbf3e5); box-shadow: 0 4px 16px rgba(212, 163, 115, .12); }
-.sidebar-guest-card .guest-card-title { margin: 0 0 6px; color: var(--sw-text); font-size: 11px; font-weight: 800; line-height: 1.4; }
-.sidebar-guest-card .guest-card-text { margin: 0 0 11px; color: var(--sw-muted); font-size: 9.5px; line-height: 1.55; }
-.sidebar-guest-card .button { width: 100%; min-height: 34px; padding-inline: 10px; font-size: 9.5px; }
+/* Sidebar Modern Architecture (SoundWave Warm Sand & Ocean Blue) - Compact & Non-scrollable */
+.app-sidebar {
+  width: 230px;
+  height: 100vh;
+  height: 100dvh;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  background: #fdfaf4;
+  border-right: 1px solid #ede3d2;
+  box-shadow: 4px 0 24px rgba(180, 140, 90, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  user-select: none;
+  z-index: 40;
+}
 
-.app-topbar { height: 72px; padding: 0 32px; background: rgba(253, 250, 244, .92); border-bottom: 1px solid #e8dccb; backdrop-filter: blur(18px); }
+.music-app-shell--with-player .app-sidebar {
+  height: calc(100vh - 86px) !important;
+  height: calc(100dvh - 86px) !important;
+  position: sticky !important;
+  top: 0 !important;
+  overflow: hidden !important;
+}
+
+.sidebar-brand {
+  height: 68px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #ede3d2;
+  background: #fdfaf4;
+}
+.sidebar-brand .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #101828;
+  font-size: 16.5px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  cursor: pointer;
+}
+.sidebar-brand .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.18);
+}
+
+/* Nav Area - Strictly Non-scrollable and Perfectly Fitted */
+.sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden !important;
+  padding: 20px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 22px;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-group-title {
+  padding: 0 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #718096;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  width: 100%;
+  min-height: 33px;
+  height: 33px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0 !important;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.nav-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-item:hover {
+  background: #f5ead8;
+  color: #784e25;
+}
+
+.nav-item svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: #64748b;
+  transition: color 0.14s ease;
+}
+.nav-item:hover svg {
+  color: #784e25;
+}
+
+.nav-item--active {
+  position: relative;
+  background: linear-gradient(90deg, #e0f2fe 0%, #fbf3e5 100%) !important;
+  color: #0284c7 !important;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.14);
+}
+.nav-item--active svg {
+  color: #0284c7 !important;
+}
+.nav-item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #0284c7;
+}
+
+/* Pinned Bottom Action / Create Playlist */
+.sidebar-playlist-cta {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid #ede3d2;
+  background: #fdfaf4;
+}
+
+.create-playlist-btn {
+  width: 100%;
+  min-height: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #d4a373 !important;
+  border-radius: 8px;
+  background: #fdf8ee;
+  color: #8c5828;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.create-playlist-btn:hover {
+  background: #faeedb;
+  border-color: #b88757 !important;
+  color: #73451b;
+  box-shadow: 0 2px 8px rgba(212, 163, 115, 0.18);
+}
+
+.sidebar-guest-card {
+  margin: 4px 8px 8px;
+  padding: 8px 10px;
+  border: 1px solid #e6d5b8;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #f0f9ff, #fbf3e5);
+}
+.sidebar-guest-card .guest-card-title {
+  margin: 0 0 2px;
+  color: var(--sw-text);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.sidebar-guest-card .guest-card-text {
+  display: none;
+}
+.sidebar-guest-card .button {
+  width: 100%;
+  min-height: 26px;
+  padding-inline: 8px;
+  font-size: 9.5px;
+}
+
+.app-topbar { height: 68px; padding: 0 32px; background: rgba(253, 250, 244, .92); border-bottom: 1px solid #ede3d2; backdrop-filter: blur(18px); }
 .topbar-search { height: 44px; max-width: 520px; border-radius: 13px; background: #fff; border: 1px solid #e6d8c5; box-shadow: 0 3px 14px rgba(180, 140, 90, .04); }
 .topbar-nav-btn, .topbar-icon-btn { border-radius: 11px; }
 .topbar-upload-btn { border-radius: 11px; border: 1px solid #e6d5b8 !important; background: #fdf5e8; color: #8c5828; }
@@ -75,11 +259,128 @@ body { overflow-x: hidden; }
 .app-shell-footer .container { width: min(calc(100% - 72px), 1378px); }
 .app-shell-footer .footer-grid { padding-block: 44px 32px; }
 
-@media (max-height: 760px) and (min-width: 681px) {
-  .sidebar-guest-card { display: none; }
-  .sidebar-nav { gap: 15px; padding-block: 14px; }
-  .nav-item { min-height: 39px; padding-block: 8px; }
-  .sidebar-playlist-cta { padding-bottom: 14px; }
+/* Compact Responsive Scaling for Short Laptop Screens */
+@media (max-height: 750px) and (min-width: 681px) {
+  .app-topbar {
+    height: 64px;
+    padding: 0 24px;
+    border-bottom: 1px solid #ede3d2;
+  }
+  .topbar-search {
+    height: 40px;
+  }
+  .topbar-user-btn {
+    min-height: 38px;
+  }
+  .sidebar-brand {
+    height: 64px;
+    padding: 0 14px;
+    border-bottom: 1px solid #ede3d2;
+  }
+  .sidebar-brand .brand {
+    font-size: 16px;
+  }
+  .sidebar-brand .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+  .sidebar-nav {
+    padding: 14px 8px 4px;
+    gap: 16px;
+    justify-content: flex-start;
+  }
+  .nav-group {
+    gap: 1.5px;
+  }
+  .nav-group-title {
+    padding: 0 8px 3px;
+    font-size: 10.5px;
+    color: #718096;
+  }
+  .nav-item {
+    min-height: 29px;
+    height: 29px;
+    padding: 0 9px;
+    font-size: 13px;
+    gap: 9px;
+  }
+  .nav-item svg {
+    width: 16px;
+    height: 16px;
+  }
+  .nav-item--active::before {
+    top: 5px;
+    bottom: 5px;
+    width: 3px;
+  }
+  .sidebar-playlist-cta {
+    padding: 5px 10px;
+  }
+  .create-playlist-btn {
+    min-height: 32px;
+    height: 32px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-height: 600px) and (min-width: 681px) {
+  .sidebar-guest-card {
+    display: none;
+  }
+  .app-topbar {
+    height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid #ede3d2;
+  }
+  .sidebar-brand {
+    height: 48px;
+    padding: 0 12px;
+    border-bottom: 1px solid #ede3d2;
+  }
+  .sidebar-brand .brand {
+    font-size: 15px;
+  }
+  .sidebar-brand .brand-mark {
+    width: 24px;
+    height: 24px;
+  }
+  .sidebar-nav {
+    gap: 10px;
+    padding: 12px 6px 3px;
+    justify-content: flex-start;
+  }
+  .nav-group {
+    gap: 1px;
+  }
+  .nav-group-title {
+    padding: 0 6px 2px;
+    font-size: 10px;
+    color: #718096;
+  }
+  .nav-item {
+    min-height: 28px;
+    height: 28px;
+    padding: 0 8px;
+    font-size: 12.5px;
+    gap: 8px;
+  }
+  .nav-item svg {
+    width: 15px;
+    height: 15px;
+  }
+  .nav-item--active::before {
+    top: 4px;
+    bottom: 4px;
+    width: 2.5px;
+  }
+  .sidebar-playlist-cta {
+    padding: 4px 8px;
+  }
+  .create-playlist-btn {
+    min-height: 29px;
+    height: 29px;
+    font-size: 12px;
+  }
 }
 
 /* Explore home */
