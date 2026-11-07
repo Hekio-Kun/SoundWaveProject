@@ -3,6 +3,7 @@ import { lyricsApi } from "../../api/lyrics";
 import { parseLyricsToLines, formatTimeDisplay, LyricLine } from "../common/LyricSyncTab";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 import { downloadLrcFile } from "../../utils/lyricsDownload";
+import { usePlayer } from "../../context/PlayerContext";
 import {
   AlertIcon,
   CheckIcon,
@@ -46,7 +47,15 @@ export function LyricsDrawer({
   const [error, setError] = useState(false);
   const [activeSource, setActiveSource] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [currentTime, setCurrentTime] = useState(0);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const { lyricsFullScreen, setLyricsFullScreen, lyricsSource } = usePlayer();
+  const isFullScreen = lyricsFullScreen;
+  const setIsFullScreen = setLyricsFullScreen;
+
+  useEffect(() => {
+    if (lyricsSource) {
+      setActiveSource(lyricsSource);
+    }
+  }, [lyricsSource]);
 
   const [fontSize, setFontSize] = useState<"NORMAL" | "LARGE" | "XLARGE">("NORMAL");
   const [duration, setDuration] = useState(0);
@@ -435,7 +444,7 @@ export function LyricsDrawer({
             <button
               type="button"
               className="queue-close-btn"
-              onClick={() => setIsFullScreen((prev) => !prev)}
+              onClick={() => setIsFullScreen(!isFullScreen)}
               aria-label={isFullScreen ? "Exit Fullscreen" : "Fullscreen Karaoke"}
               title={isFullScreen ? "Exit Fullscreen" : "Fullscreen Karaoke View"}
               style={{
@@ -457,7 +466,10 @@ export function LyricsDrawer({
             <button
               type="button"
               className="queue-close-btn"
-              onClick={onClose}
+              onClick={() => {
+                if (isFullScreen) setLyricsFullScreen(false);
+                onClose();
+              }}
               aria-label="Close Lyrics Drawer"
               title="Close Lyrics"
               style={{

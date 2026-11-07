@@ -24,6 +24,11 @@ export interface PlayerContextType {
   setQueueOpen: (open: boolean) => void;
   toggleLyrics: () => void;
   setLyricsOpen: (open: boolean) => void;
+  lyricsFullScreen: boolean;
+  setLyricsFullScreen: React.Dispatch<React.SetStateAction<boolean>>;
+  lyricsSource: "OFFICIAL" | "PERSONAL";
+  setLyricsSource: (source: "OFFICIAL" | "PERSONAL") => void;
+  openLyricsFullscreen: (trackToPlay?: LandingTrack, source?: "OFFICIAL" | "PERSONAL") => void;
   removeFromQueue: (trackId: number) => void;
   clearQueue: () => void;
   handleGuestTrackEnded: (next: LandingTrack) => void;
@@ -60,6 +65,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [queue, setQueue] = useState<LandingTrack[]>(tracks);
   const [queueOpen, setQueueOpen] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
+  const [lyricsFullScreen, setLyricsFullScreen] = useState(false);
+  const [lyricsSource, setLyricsSource] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
+
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [pendingTrack, setPendingTrack] = useState<LandingTrack | null>(null);
 
@@ -236,9 +244,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const toggleLyrics = useCallback(() => {
     setLyricsOpen((prev) => {
       if (!prev) setQueueOpen(false);
+      if (prev) setLyricsFullScreen(false);
       return !prev;
     });
   }, []);
+
+  const handleSetLyricsOpen = useCallback((open: boolean) => {
+    setLyricsOpen(open);
+    if (!open) setLyricsFullScreen(false);
+  }, []);
+
+const openLyricsFullscreen = useCallback((trackToPlay?: LandingTrack, source: "OFFICIAL" | "PERSONAL" = "OFFICIAL") => {
+    if (trackToPlay && (!currentTrack || currentTrack.id !== trackToPlay.id)) {
+      playTrack(trackToPlay);
+    } else if (!playing) {
+      setAudioPlaying(true);
+      void audio.play().catch(() => {});
+    }
+    setQueueOpen(false);
+    setLyricsSource(source);
+    setLyricsFullScreen(true);
+    setLyricsOpen(true);
+  }, [currentTrack, playTrack, playing, audio]);
 
   const removeFromQueue = useCallback((trackId: number) => {
     setQueue((prev) => prev.filter((t) => t.id !== trackId));
@@ -276,7 +303,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleQueue,
         setQueueOpen,
         toggleLyrics,
-        setLyricsOpen,
+        setLyricsOpen: handleSetLyricsOpen,
+        lyricsFullScreen,
+        setLyricsFullScreen,
+        lyricsSource,
+        setLyricsSource,
+        openLyricsFullscreen,
         removeFromQueue,
         clearQueue,
         reorderQueue,

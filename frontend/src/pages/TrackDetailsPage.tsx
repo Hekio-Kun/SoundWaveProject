@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
 import { useAuth } from "../context/AuthContext";
+import { usePlayer } from "../context/PlayerContext";
 import { lyricsApi } from "../api/lyrics";
 import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { parseLyricsToLines, formatTimeDisplay } from "../components/common/LyricSyncTab";
@@ -94,6 +95,7 @@ export function TrackDetailsPage({
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { user } = useAuth();
+  const { openLyricsFullscreen } = usePlayer();
   const isTrackCreator = Boolean(
     user && track && (user.id === track.creator?.userId || (user as any).userId === track.creator?.userId)
   );
@@ -124,8 +126,7 @@ export function TrackDetailsPage({
   // More Creator Tracks & Karaoke Fullscreen
   const [moreCreatorTracks, setMoreCreatorTracks] = useState<LandingTrack[]>([]);
   const [moreCreatorLoading, setMoreCreatorLoading] = useState(false);
-  const [isKaraokeFullscreen, setIsKaraokeFullscreen] = useState(false);
-  const karaokeActiveLineRef = useRef<HTMLParagraphElement | null>(null);
+
 
   // Synchronous Playback Tracking (UC-16.1)
   const [currentTime, setCurrentTime] = useState(0);
@@ -273,8 +274,7 @@ export function TrackDetailsPage({
     playlistModalOpen ||
     authPromptOpen ||
     deleteConfirmOpen ||
-    reportTrackModalOpen ||
-    isKaraokeFullscreen;
+    reportTrackModalOpen;
   useModalScrollLock(anyModalOpen);
 
   const goToCreatorProfile = (targetCreatorId?: number) => {
@@ -294,7 +294,6 @@ export function TrackDetailsPage({
         setPlaylistModalOpen(false);
         setAuthPromptOpen(false);
         setReportTrackModalOpen(false);
-        setIsKaraokeFullscreen(false);
         
         if (!deleteSaving) setDeleteConfirmOpen(false);
       }
@@ -462,14 +461,6 @@ export function TrackDetailsPage({
     }
   }, [activeLineIndex]);
 
-  useEffect(() => {
-    if (isKaraokeFullscreen && karaokeActiveLineRef.current) {
-      karaokeActiveLineRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [activeLineIndex, isKaraokeFullscreen]);
 
   const handleLyricsScroll = () => {
     isUserScrollingRef.current = true;
@@ -668,14 +659,18 @@ export function TrackDetailsPage({
             </div>
 
             <div className="track-lyrics-tools-group">
-              {/* Karaoke Fullscreen Mode */}
+              {/* Karaoke Fullscreen Mode (UC-16.1) */}
               {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
                 <button
                   type="button"
                   className="track-lyrics-tool-btn"
-                  onClick={() => setIsKaraokeFullscreen(true)}
-                  title="Karaoke Mode (Fullscreen)"
-                  aria-label="Karaoke Mode"
+                  onClick={() => {
+                    if (track) {
+                      openLyricsFullscreen(track, lyricsTab);
+                    }
+                  }}
+                  title="Fullscreen Karaoke View"
+                  aria-label="Fullscreen Karaoke"
                 >
                   <MaximizeIcon width={16} height={16} />
                 </button>
@@ -1215,82 +1210,7 @@ export function TrackDetailsPage({
         onClose={() => setNotification((prev) => ({ ...prev, open: false }))}
       />
 
-      {/* Karaoke Fullscreen View */}
-      {isKaraokeFullscreen
-        ? createPortal(
-            <div
-              className="track-karaoke-overlay"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Karaoke Mode"
-            >
-              <div className="track-karaoke-header">
-                <div className="track-karaoke-track-info">
-                  <img
-                    src={track.coverUrl ?? covers.dawn}
-                    alt={track.title}
-                    className="track-karaoke-cover"
-                  />
-                  <div>
-                    <h2 className="track-karaoke-title">{track.title}</h2>
-                    <p className="track-karaoke-artist">
-                      {track.creator?.displayName ?? "Unknown Artist"}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="track-karaoke-actions">
-                  <button
-                    type="button"
-                    className="button button-primary button-small"
-                    onClick={() => onPlayTrack(track)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  >
-                    {isPlayingThis ? <PauseIcon width={14} height={14} /> : <PlayIcon width={14} height={14} />}
-                    <span>{isPlayingThis ? "Pause" : "Play"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="track-karaoke-close-btn"
-                    onClick={() => setIsKaraokeFullscreen(false)}
-                    title="Exit Karaoke Mode (Esc)"
-                    aria-label="Exit Karaoke Mode"
-                  >
-                    <MinimizeIcon width={20} height={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="track-karaoke-body">
-                <div className="track-karaoke-lyrics-container">
-                  {parsedActiveLines.length === 0 ? (
-                    <p className="track-karaoke-empty">No lyrics available to display.</p>
-                  ) : (
-                    parsedActiveLines.map((line, idx) => {
-                      const isActive = idx === activeLineIndex;
-                      return (
-                        <p
-                          key={`${line.timeSec ?? idx}-${idx}`}
-                          ref={isActive ? karaokeActiveLineRef : null}
-                          className={`track-karaoke-line ${isActive ? "is-active" : ""}`}
-                          onClick={() => {
-                            if (line.timeSec !== null) {
-                              handleLineClick(line.timeSec);
-                            }
-                          }}
-                        >
-                          {line.text}
-                        </p>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
     </div>
   );
 }

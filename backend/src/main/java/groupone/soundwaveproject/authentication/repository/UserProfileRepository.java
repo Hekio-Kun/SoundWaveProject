@@ -15,7 +15,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
     boolean existsByUsername(String username);
     boolean existsByUsernameIgnoreCaseAndUserIdNot(String username, Long userId);
 
-    @EntityGraph(attributePaths = {"user", "user.role"})
+    @EntityGraph(attributePaths = {"user"})
     Optional<UserProfile> findByUser_EmailIgnoreCase(String email);
 
     @Query(value = "SELECT p FROM UserProfile p JOIN p.user u " +
