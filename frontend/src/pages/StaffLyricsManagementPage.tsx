@@ -10,20 +10,22 @@ import {
   CheckIcon,
   ClockIcon,
   CloseIcon,
+  CopyIcon,
   DiscIcon,
+  DownloadIcon,
   EditIcon,
   EyeIcon,
   FileTextIcon,
   MusicIcon,
   PauseIcon,
   PlayIcon,
-  PlusIcon,
-  RefreshIcon,
   SearchIcon,
   ShieldIcon,
   TrashIcon,
   UserIcon,
+  VolumeIcon,
 } from "../icons";
+import { downloadLrcFile } from "../utils/lyricsDownload";
 import type { StaffTrackLyricSummary } from "../types";
 
 function formatDurationSeconds(seconds?: number | null): string {
@@ -99,6 +101,21 @@ type ParsedProposedLine = {
   text: string;
 };
 
+const REJECT_PRESETS = [
+  {
+    label: "⏱️ Desynchronized timestamps",
+    text: "Timestamps are desynchronized with the track audio playback, especially after the intro/chorus sections. Please re-align timestamps.",
+  },
+  {
+    label: "📝 Wrong song / Inaccurate lyrics",
+    text: "The submitted lyrics do not match the audio recording of this track. Please verify and provide the correct lyrics.",
+  },
+  {
+    label: "⚠️ Inappropriate language / Formatting",
+    text: "The lyrics contain formatting errors or unverified text that does not meet SoundWave public catalog standards.",
+  },
+];
+
 // =========================================================================
 // ISOLATED SUB-COMPONENT: LyricInspectionModal (Shields Parent from Re-renders)
 // =========================================================================
@@ -127,6 +144,15 @@ function LyricInspectionModal({
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [volume, setVolume] = useState<number>(1);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [copiedProposal, setCopiedProposal] = useState(false);
+
+  // Auto-scroll synchronization
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
 
   // Cleanup audio playback on modal unmount
   useEffect(() => {
@@ -206,11 +232,64 @@ function LyricInspectionModal({
     if (audioRef.current) {
       audioRef.current.currentTime = seconds;
       setAudioCurrentTime(seconds);
+      isUserScrollingRef.current = false;
       if (!audioPlaying) {
         audioRef.current.play().catch((e) => console.warn("Playback prevented:", e));
         setAudioPlaying(true);
       }
     }
+  };
+
+  const cyclePlaybackRate = () => {
+    const rates = [1, 1.25, 1.5, 2];
+    const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
+    const nextRate = rates[nextIdx];
+    setPlaybackRate(nextRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    }
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    audioRef.current.muted = nextMuted;
+  };
+
+  const handleVolumeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    setIsMuted(val === 0);
+    if (audioRef.current) {
+      audioRef.current.volume = val;
+      audioRef.current.muted = val === 0;
+    }
+  };
+
+  const handleProposedScroll = () => {
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 2500);
+  };
+
+  const handleCopyProposed = () => {
+    if (!inspectingDetail?.proposedLyrics) return;
+    void navigator.clipboard.writeText(inspectingDetail.proposedLyrics).then(() => {
+      setCopiedProposal(true);
+      setTimeout(() => setCopiedProposal(false), 2000);
+    });
+  };
+
+  const handleDownloadProposed = () => {
+    if (!inspectingDetail?.proposedLyrics || !inspectingDetail.track) return;
+    downloadLrcFile(
+      inspectingDetail.track.title,
+      inspectingDetail.submitter?.displayName || "Creator",
+      inspectingDetail.proposedLyrics
+    );
   };
 
   // Pre-parse proposed lyrics with useMemo to eliminate repetitive Regex executions during audio playback
@@ -233,6 +312,28 @@ function LyricInspectionModal({
       };
     });
   }, [inspectingDetail?.proposedLyrics]);
+
+  const activeLineIndex = useMemo(() => {
+    if (parsedProposedLines.length === 0) return -1;
+    let idx = -1;
+    for (let i = 0; i < parsedProposedLines.length; i++) {
+      const sec = parsedProposedLines[i].tsSeconds;
+      if (sec !== null && audioCurrentTime >= sec) {
+        idx = i;
+      }
+    }
+    return idx;
+  }, [parsedProposedLines, audioCurrentTime]);
+
+  // Smooth auto-scroll active line into view during auditioning
+  useEffect(() => {
+    if (audioPlaying && activeLineRef.current && !isUserScrollingRef.current) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex, audioPlaying]);
 
   // Approve Proposed Lyric
   const handleApproveLyric = async () => {
@@ -434,7 +535,7 @@ function LyricInspectionModal({
                   onEnded={() => setAudioPlaying(false)}
                 />
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <button
                       type="button"
@@ -465,6 +566,56 @@ function LyricInspectionModal({
                         {formatDurationSeconds(audioCurrentTime)} / {formatDurationSeconds(audioDuration || (inspectingDetail.track.durationMs / 1000))}
                       </span>
                     </div>
+
+                    {/* Playback Speed Pill */}
+                    <button
+                      type="button"
+                      onClick={cyclePlaybackRate}
+                      style={{
+                        background: "rgba(2, 132, 199, 0.15)",
+                        border: "1px solid rgba(2, 132, 199, 0.3)",
+                        color: "#0369A1",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        marginLeft: 6,
+                      }}
+                      title="Adjust playback speed for faster verification"
+                    >
+                      Speed: {playbackRate}x
+                    </button>
+
+                    {/* Volume Slider */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 10 }}>
+                      <button
+                        type="button"
+                        onClick={toggleMute}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: isMuted ? "#94A3B8" : "#0284C7",
+                          cursor: "pointer",
+                          padding: 4,
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        title={isMuted ? "Unmute" : "Mute"}
+                      >
+                        <VolumeIcon width={15} height={15} />
+                      </button>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        style={{ width: 68, cursor: "pointer", accentColor: "#0284C7" }}
+                        title="Volume"
+                      />
+                    </div>
                   </div>
 
                   <div
@@ -481,7 +632,7 @@ function LyricInspectionModal({
                     }}
                   >
                     <ClockIcon width={13} height={13} style={{ color: "#0284C7" }} />
-                    <span>Tip: Click any timestamp button below to jump audio directly to that line!</span>
+                    <span>Auto-scrolling synchronized with audio playback. Click any timestamp to jump!</span>
                   </div>
                 </div>
 
@@ -622,12 +773,57 @@ function LyricInspectionModal({
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0284C7" }} />
                       PROPOSED LYRICS (NEW)
                     </span>
-                    <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
-                      {parsedProposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
+                        {parsedProposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyProposed}
+                        style={{
+                          background: "rgba(255, 255, 255, 0.8)",
+                          border: "1px solid #BAE6FD",
+                          borderRadius: 6,
+                          padding: "3px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#0369A1",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                        title="Copy proposed lyrics to clipboard"
+                      >
+                        <CopyIcon width={12} height={12} />
+                        <span>{copiedProposal ? "Copied!" : "Copy"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadProposed}
+                        style={{
+                          background: "rgba(255, 255, 255, 0.8)",
+                          border: "1px solid #BAE6FD",
+                          borderRadius: 6,
+                          padding: "3px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#0369A1",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                        title="Download proposed lyrics as .lrc file"
+                      >
+                        <DownloadIcon width={12} height={12} />
+                        <span>.LRC</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div
+                    onScroll={handleProposedScroll}
                     style={{
                       padding: "14px 16px",
                       overflowY: "auto",
@@ -639,21 +835,22 @@ function LyricInspectionModal({
                     }}
                   >
                     {parsedProposedLines.length > 0 ? (
-                      parsedProposedLines.map((item) => {
-                        const isCloseToCurrent =
-                          item.tsSeconds !== null &&
-                          Math.abs(audioCurrentTime - item.tsSeconds) < 2;
+                      parsedProposedLines.map((item, idx) => {
+                        const isActive = idx === activeLineIndex;
 
                         return (
                           <div
                             key={item.lineNumber}
+                            ref={isActive ? activeLineRef : null}
                             style={{
                               display: "flex",
                               gap: 10,
                               alignItems: "baseline",
-                              background: isCloseToCurrent ? "rgba(2, 132, 199, 0.1)" : "transparent",
+                              background: isActive ? "rgba(2, 132, 199, 0.14)" : "transparent",
+                              borderLeft: isActive ? "3px solid #0284C7" : "3px solid transparent",
                               borderRadius: 4,
-                              padding: "1px 4px",
+                              padding: "2px 6px",
+                              transition: "all 0.15s ease",
                             }}
                           >
                             <span
@@ -817,6 +1014,30 @@ function LyricInspectionModal({
                         <span style={{ fontSize: "11px", color: rejectionReason.trim().length >= 10 ? "#16A34A" : "#DC2626" }}>
                           {rejectionReason.trim().length} / 10 chars minimum
                         </span>
+                      </div>
+
+                      {/* Quick Reason Presets */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "#991B1B", fontWeight: 600 }}>Quick presets:</span>
+                        {REJECT_PRESETS.map((p, pIdx) => (
+                          <button
+                            key={pIdx}
+                            type="button"
+                            onClick={() => setRejectionReason(p.text)}
+                            style={{
+                              fontSize: "11px",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              background: "#FFFFFF",
+                              border: "1px solid #FECACA",
+                              color: "#991B1B",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
                       </div>
                       <textarea
                         rows={3}
@@ -1224,7 +1445,7 @@ export function StaffLyricsManagementPage() {
             </div>
 
             <p className="staff-hero-description">
-              Review creator proposals to add or update synchronized lyrics (UC-24.6), and manage the catalog of verified official lyrics (UC-26).
+              Review creator proposals to add or update synchronized lyrics, and manage the catalog of verified official lyrics.
             </p>
           </div>
 
@@ -1264,105 +1485,6 @@ export function StaffLyricsManagementPage() {
         {/* ------------------------------------------------------------- */}
         {activeTab === "MODERATION" && (
           <>
-            {/* Top Interactive KPI Metric Cards (Semantic Buttons) */}
-            <section className="staff-kpi-grid" aria-label="Lyric moderation throughput statistics">
-              {/* 1. Pending */}
-              <button
-                type="button"
-                className={`staff-metric-card is-amber ${
-                  modStatusFilter === "PENDING" ? "is-selected-filter" : ""
-                }`}
-                onClick={() => {
-                  setModStatusFilter("PENDING");
-                  setModPageIndex(0);
-                }}
-                aria-pressed={modStatusFilter === "PENDING"}
-                title="Filter: Pending review"
-              >
-                <div className="staff-metric-header">
-                  <span className="staff-metric-icon is-amber">
-                    <ClockIcon width={18} height={18} />
-                  </span>
-                </div>
-                <div className="staff-metric-body">
-                  <span className="staff-metric-value">{modStats ? modStats.pendingCount : "--"}</span>
-                  <strong className="staff-metric-title">Pending</strong>
-                </div>
-              </button>
-
-              {/* 2. Approved */}
-              <button
-                type="button"
-                className={`staff-metric-card is-green ${
-                  modStatusFilter === "APPROVED" ? "is-selected-filter" : ""
-                }`}
-                onClick={() => {
-                  setModStatusFilter("APPROVED");
-                  setModPageIndex(0);
-                }}
-                aria-pressed={modStatusFilter === "APPROVED"}
-                title="Filter: Approved catalog"
-              >
-                <div className="staff-metric-header">
-                  <span className="staff-metric-icon is-green">
-                    <CheckIcon width={18} height={18} />
-                  </span>
-                </div>
-                <div className="staff-metric-body">
-                  <span className="staff-metric-value">{modStats ? modStats.approvedCount : "--"}</span>
-                  <strong className="staff-metric-title">Approved</strong>
-                </div>
-              </button>
-
-              {/* 3. Rejected */}
-              <button
-                type="button"
-                className={`staff-metric-card is-red ${
-                  modStatusFilter === "REJECTED" ? "is-selected-filter" : ""
-                }`}
-                onClick={() => {
-                  setModStatusFilter("REJECTED");
-                  setModPageIndex(0);
-                }}
-                aria-pressed={modStatusFilter === "REJECTED"}
-                title="Filter: Rejected"
-              >
-                <div className="staff-metric-header">
-                  <span className="staff-metric-icon is-red">
-                    <AlertIcon width={18} height={18} />
-                  </span>
-                </div>
-                <div className="staff-metric-body">
-                  <span className="staff-metric-value">{modStats ? modStats.rejectedCount : "--"}</span>
-                  <strong className="staff-metric-title">Rejected</strong>
-                </div>
-              </button>
-
-              {/* 4. Total History */}
-              <button
-                type="button"
-                className={`staff-metric-card is-cyan ${
-                  modStatusFilter === "ALL" ? "is-selected-filter" : ""
-                }`}
-                onClick={() => {
-                  setModStatusFilter("ALL");
-                  setModPageIndex(0);
-                }}
-                aria-pressed={modStatusFilter === "ALL"}
-                title="Filter: All records"
-              >
-                <div className="staff-metric-header">
-                  <span className="staff-metric-icon is-cyan">
-                    <DiscIcon width={18} height={18} />
-                  </span>
-                </div>
-                <div className="staff-metric-body">
-                  <span className="staff-metric-value">{modStats ? modStats.totalCount : "--"}</span>
-                  <strong className="staff-metric-title">Total Tickets</strong>
-                </div>
-              </button>
-            </section>
-
             {/* Main Review Workspace Panel */}
             <section className="staff-queue-panel">
               {/* Toolbar: Segmented Filter Tabs & Instant Search */}
@@ -1460,15 +1582,6 @@ export function StaffLyricsManagementPage() {
                       </button>
                     ) : null}
                   </div>
-                  <button
-                    type="submit"
-                    className="button button-primary staff-search-submit-btn"
-                    aria-label="Search lyric proposals"
-                    title="Search"
-                  >
-                    <SearchIcon width={15} height={15} />
-                    <span>Search</span>
-                  </button>
                 </form>
               </div>
 
@@ -1771,15 +1884,6 @@ export function StaffLyricsManagementPage() {
                   </button>
                 ) : null}
               </div>
-              <button
-                type="submit"
-                className="button button-primary staff-search-submit-btn"
-                aria-label="Search tracks"
-                title="Search"
-              >
-                <SearchIcon width={15} height={15} />
-                <span>Search</span>
-              </button>
             </form>
           </div>
 

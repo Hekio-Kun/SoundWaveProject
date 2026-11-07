@@ -114,7 +114,7 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--sw-border, #E2E8F0)", paddingBottom: "16px" }}>
           <div>
             <span className="eyebrow" style={{ color: "var(--color-ocean-primary, #0284C7)" }}>
-              MODERATION SUBMISSION REVIEW · UC-21.2
+              MODERATION SUBMISSION REVIEW
             </span>
             <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)", margin: "4px 0 0" }}>
               Submit Album For Review
