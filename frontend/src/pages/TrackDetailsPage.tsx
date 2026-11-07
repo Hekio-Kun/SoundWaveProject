@@ -526,6 +526,18 @@ export function TrackDetailsPage({
               <PlusIcon />
             </button>
 
+            {/* Direct Report Track Action Button (UC-22.1) */}
+            <button
+              type="button"
+              className="track-round-action track-round-action--report"
+              disabled={submittingAction}
+              onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
+              title="Report Track"
+              aria-label="Report Track"
+            >
+              <FlagIcon width={18} height={18} />
+            </button>
+
             {/* Context menu (...) for Track Operations (UC-22.1) */}
             <div style={{ position: "relative" }}>
               <button
@@ -662,6 +674,18 @@ export function TrackDetailsPage({
                   <span>Download .LRC</span>
                 </button>
               )}
+
+              {/* Report Track / Lyrics Violation */}
+              <button
+                type="button"
+                className="button button-ghost button-small"
+                onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
+                title="Report track or lyrics violation"
+                style={{ color: "#DC2626", display: "inline-flex", alignItems: "center", gap: 5 }}
+              >
+                <FlagIcon width={13} height={13} />
+                <span>Report Track</span>
+              </button>
             </div>
           </header>
 
@@ -947,7 +971,16 @@ export function TrackDetailsPage({
             <p>Explore more music and albums from this creator.</p>
             <button onClick={() => goToCreatorProfile(creatorId)}>View profile</button>
           </section>
-          <p className="track-report-unavailable">Track reporting is not available in this release.</p>
+          {/* UC-22.1: Report Track Action in Release Information Sidebar */}
+          <button
+            type="button"
+            className="track-report-button"
+            onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
+            title="Report this track for violation"
+          >
+            <FlagIcon width={16} height={16} />
+            <span>Report this track</span>
+          </button>
         </aside>
       </div>
 
