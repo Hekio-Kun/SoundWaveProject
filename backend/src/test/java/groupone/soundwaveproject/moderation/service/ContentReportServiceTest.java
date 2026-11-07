@@ -11,6 +11,7 @@ import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
+import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
@@ -199,6 +200,63 @@ class ContentReportServiceTest {
 
         boolean result = contentReportService.checkPendingReport("listener@example.com", 100L);
         assertTrue(result);
+    }
+
+    // =========================================================================
+    // UC-22.2: getMyReports Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("getMyReports - Successfully retrieves list of reports for authenticated listener (UC-22.2)")
+    void getMyReports_Success() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport report1 = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .description("Copyright Infringement")
+                .status("PENDING")
+                .createdAt(Instant.now())
+                .build();
+
+        ContentReport report2 = ContentReport.builder()
+                .id(2L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("INAPPROPRIATE_CONTENT")
+                .description("Inappropriate or Offensive Content")
+                .status("RESOLVED")
+                .resolutionNote("Track taken down by moderation team.")
+                .createdAt(Instant.now().minusSeconds(3600))
+                .handledAt(Instant.now())
+                .build();
+
+        when(contentReportRepository.findMyReports(10L)).thenReturn(List.of(report1, report2));
+        when(trackRepository.findAllById(any())).thenReturn(List.of(mockTrack));
+
+        List<MyReportHistoryResponse> reports = contentReportService.getMyReports("listener@example.com");
+
+        assertNotNull(reports);
+        assertEquals(2, reports.size());
+        assertEquals("Test Song", reports.get(0).trackTitle());
+        assertEquals("Copyright Infringement", reports.get(0).categoryLabel());
+        assertEquals("PENDING", reports.get(0).status());
+        assertEquals("RESOLVED", reports.get(1).status());
+        assertEquals("Track taken down by moderation team.", reports.get(1).resolutionNote());
+    }
+
+    @Test
+    @DisplayName("getMyReports - Returns empty list when user has submitted no reports (AF01)")
+    void getMyReports_Empty() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(contentReportRepository.findMyReports(10L)).thenReturn(Collections.emptyList());
+
+        List<MyReportHistoryResponse> reports = contentReportService.getMyReports("listener@example.com");
+
+        assertNotNull(reports);
+        assertTrue(reports.isEmpty());
     }
 
     // =========================================================================

@@ -3,6 +3,7 @@ package groupone.soundwaveproject.moderation.controller;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
+import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
 import groupone.soundwaveproject.moderation.service.ContentReportService;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,6 +43,16 @@ public class ContentReportController {
                 request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Lấy toàn bộ lịch sử các báo cáo vi phạm nội dung do người nghe gửi (UC-22.2).
+     */
+    @GetMapping("/my-reports")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<MyReportHistoryResponse>> getMyReports(Authentication authentication) {
+        List<MyReportHistoryResponse> response = contentReportService.getMyReports(authentication.getName());
+        return ResponseEntity.ok(response);
     }
 
     /**

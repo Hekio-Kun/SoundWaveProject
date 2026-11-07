@@ -25,6 +25,19 @@ export interface TrackReportResponse {
   createdAt: string;
 }
 
+export interface MyReportHistoryResponse {
+  id: number;
+  trackId: number;
+  trackTitle: string;
+  trackCoverUrl?: string | null;
+  category: string;
+  categoryLabel: string;
+  status: "PENDING" | "RESOLVED" | "DISMISSED" | "REJECTED" | string;
+  resolutionNote?: string | null;
+  createdAt: string;
+  handledAt?: string | null;
+}
+
 export interface CreateContentReportPayload {
   trackId: number;
   reason: string;
@@ -51,6 +64,13 @@ export const reportsApi = {
       method: "POST",
       body: payload,
     });
+  },
+
+  /**
+   * Lấy lịch sử các báo cáo vi phạm do người nghe hiện tại đã gửi (UC-22.2).
+   */
+  getMyReports: (): Promise<MyReportHistoryResponse[]> => {
+    return apiFetch<MyReportHistoryResponse[]>("/reports/my-reports");
   },
 
   /**
