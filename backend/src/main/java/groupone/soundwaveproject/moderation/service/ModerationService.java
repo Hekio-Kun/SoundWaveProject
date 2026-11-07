@@ -401,6 +401,10 @@ public class ModerationService {
             track.setLatestRejectionReason(null);
             trackRepository.save(track);
 
+            if (lyricService != null) {
+                lyricService.publishOfficialLyric(track.getId());
+            }
+
             if (submitter != null) {
                 notificationService.createNotification(
                         submitter.getId(),
@@ -570,6 +574,9 @@ public class ModerationService {
                 t.setPublicationStatus(TrackPublicationStatus.PUBLISHED);
                 t.setApprovedAt(nowUtc);
                 t.setLatestRejectionReason(null);
+                if (lyricService != null) {
+                    lyricService.publishOfficialLyric(t.getId());
+                }
                 approvedTracks.add(t);
             } else {
                 t.setPublicationStatus(TrackPublicationStatus.REJECTED);

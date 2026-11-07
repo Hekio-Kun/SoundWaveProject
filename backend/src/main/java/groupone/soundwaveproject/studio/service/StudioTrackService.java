@@ -500,10 +500,11 @@ public class StudioTrackService {
             log.warn("Failed to create submission notification for staff: {}", e.getMessage());
         }
 
-        Genre genre = genreRepository.findById(track.getGenreId()).orElse(null);
+        Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
-        return studioTrackMapper.toStudioTrackResponse(track, genre, album, savedSubmission);
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, savedSubmission, lyrics);
     }
 
     @Transactional
@@ -526,10 +527,11 @@ public class StudioTrackService {
                     }
                 });
 
-        Genre genre = genreRepository.findById(track.getGenreId()).orElse(null);
+        Genre genre = track.getGenreId() != null ? genreRepository.findById(track.getGenreId()).orElse(null) : null;
         Album album = track.getAlbumId() != null ? albumRepository.findById(track.getAlbumId()).orElse(null) : null;
+        String lyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
 
-        return studioTrackMapper.toStudioTrackResponse(track, genre, album, null);
+        return studioTrackMapper.toStudioTrackResponse(track, genre, album, null, lyrics);
     }
 
         /**
