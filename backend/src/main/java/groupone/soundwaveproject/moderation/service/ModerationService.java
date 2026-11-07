@@ -14,7 +14,6 @@ import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.ApproveTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
-import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
 import groupone.soundwaveproject.moderation.dto.response.AlbumTrackNavigationResponse;
 import groupone.soundwaveproject.moderation.dto.response.AlbumTrackSummaryResponse;
 import groupone.soundwaveproject.moderation.dto.response.*;
@@ -621,87 +620,6 @@ public class ModerationService {
                 );
             }
         }
-    }
-
-    /**
-     * Gỡ bỏ một bài hát đã được phê duyệt và xuất bản trước đó (UC-24.2 Take Down Track).
-     */
-    @Transactional
-    public SubmissionDetailResponse takeDownSubmission(Long id, TakeDownTrackRequest request, String reviewerEmail) {
-        TrackSubmission submission = submissionRepository.findById(id)
-                .orElseThrow(() -> new SubmissionNotFoundException(id));
-
-        if (submission.getStatus() != SubmissionStatus.APPROVED) {
-            throw new InvalidSubmissionStateException("Only approved tracks can be taken down. Current status: " + submission.getStatus());
-        }
-
-        Staff reviewer = staffRepository.findByEmailIgnoreCase(reviewerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("REVIEWER_NOT_FOUND", "Reviewer staff account not found."));
-
-        Instant nowInstant = Instant.now();
-        String reason = request.takedownReason().trim();
-        String reviewerNote = request.reviewerNote();
-
-        submission.setStatus(SubmissionStatus.REJECTED);
-        submission.setReviewerUserId(reviewer.getId());
-        submission.setReviewerNote(reviewerNote);
-        submission.setRejectionReason(reason);
-        submission.setReviewedAt(nowInstant);
-        submissionRepository.save(submission);
-
-        Track track = trackRepository.findById(submission.getTrackId())
-                .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + submission.getTrackId()));
-
-        track.setPublicationStatus(TrackPublicationStatus.TAKEN_DOWN);
-        track.setLatestRejectionReason(reason);
-        trackRepository.save(track);
-
-        // If track belongs to an album, check whether the album has any remaining PUBLISHED tracks.
-        // If this track was the last published track (remaining published count is 0), take down the album as well (BR-18).
-        Album album = track.getAlbum();
-        if (album == null && track.getAlbumId() != null) {
-            album = albumRepository.findById(track.getAlbumId()).orElse(null);
-        }
-        if (album != null) {
-            long remainingPublished = trackRepository.countByAlbum_IdAndPublicationStatus(
-                    album.getId(), TrackPublicationStatus.PUBLISHED
-            );
-            if (remainingPublished == 0) {
-                album.setStatus("REJECTED");
-                albumRepository.save(album);
-
-                if (album.getCreatedByUserId() != null) {
-                    notificationService.createNotification(
-                            album.getCreatedByUserId(),
-                            reviewer.getId(),
-                            NotificationType.TRACK_REJECTED,
-                            "Album taken down",
-                            "Album \"" + album.getTitle() + "\" has been taken down because its remaining published track was removed.",
-                            "ALBUM",
-                            String.valueOf(album.getId())
-                    );
-                }
-            }
-        }
-
-        User submitter = userRepository.findById(submission.getSubmittedByUserId()).orElse(null);
-        UserProfile submitterProfile = profileRepository.findByUserId(submission.getSubmittedByUserId()).orElse(null);
-
-        if (submitter != null) {
-            notificationService.createNotification(
-                    submitter.getId(),
-                    reviewer.getId(),
-                    NotificationType.TRACK_REJECTED,
-                    "Track taken down",
-                    "\"" + track.getTitle() + "\" has been taken down: " + reason,
-                    "TRACK",
-                    String.valueOf(track.getId())
-            );
-        }
-
-        String lyrics = resolveTrackLyrics(track);
-        AlbumTrackNavigationResponse albumNavigation = buildAlbumNavigation(submission, track);
-        return mapper.toDetailResponse(submission, track, submitter, submitterProfile, reviewer, lyrics, albumNavigation);
     }
 
     /**

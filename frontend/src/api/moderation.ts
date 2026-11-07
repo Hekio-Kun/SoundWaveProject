@@ -160,26 +160,4 @@ export const moderationApi = {
       },
     });
   },
-
-  takeDownSubmission: (
-    id: number,
-    reasonOrRequest: string | { takedownReason: string; reviewerNote?: string },
-    reviewerNoteParam?: string
-  ) => {
-    const reason =
-      typeof reasonOrRequest === "string"
-        ? reasonOrRequest
-        : reasonOrRequest.takedownReason;
-    const note =
-      typeof reasonOrRequest === "string"
-        ? reviewerNoteParam
-        : reasonOrRequest.reviewerNote;
-    return apiFetch<SubmissionDetail>(`/moderation/submissions/${id}/takedown`, {
-      method: "POST",
-      body: {
-        takedownReason: reason,
-        reviewerNote: note || undefined,
-      },
-    });
-  },
 };

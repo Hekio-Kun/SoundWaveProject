@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import groupone.soundwaveproject.moderation.dto.request.ApproveTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
-import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
 import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
@@ -102,21 +101,5 @@ public class ModerationController {
             @Valid @RequestBody RejectTrackRequest request,
             Principal principal) {
         return ResponseEntity.ok(moderationService.rejectSubmission(id, request, principal.getName()));
-    }
-
-    /**
-     * Gỡ bỏ bài hát đã phát hành công khai trước đó do phát hiện vi phạm bản quyền hoặc tiêu chuẩn (UC-24.2 Take Down Track).
-     *
-     * @param id        ID của bản ghi yêu cầu kiểm duyệt
-     * @param request   DTO chứa lý do gỡ bài bắt buộc và ghi chú
-     * @param principal Thông tin tài khoản người thực hiện gỡ bài
-     * @return DTO thông tin chi tiết bài hát sau khi gỡ bỏ
-     */
-    @PostMapping("/{id}/takedown")
-    public ResponseEntity<SubmissionDetailResponse> takeDownSubmission(
-            @PathVariable Long id,
-            @Valid @RequestBody TakeDownTrackRequest request,
-            Principal principal) {
-        return ResponseEntity.ok(moderationService.takeDownSubmission(id, request, principal.getName()));
     }
 }
