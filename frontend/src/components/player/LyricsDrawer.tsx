@@ -8,6 +8,7 @@ import {
   AlertIcon,
   CheckIcon,
   CloseIcon,
+  CopyIcon,
   DownloadIcon,
   FileTextIcon,
   FlagIcon,
@@ -48,6 +49,8 @@ export function LyricsDrawer({
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [fontSize, setFontSize] = useState<"NORMAL" | "LARGE" | "XLARGE">("NORMAL");
+  const [duration, setDuration] = useState(0);
   const [toastNotification, setToastNotification] = useState<{
     open: boolean;
     message: string;
@@ -97,14 +100,29 @@ export function LyricsDrawer({
     }
   }, [isOpen, currentTrack?.id]);
 
-  // Track real-time audio playback position
+  // Track real-time audio playback position and duration
   useEffect(() => {
     if (!audio) return;
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+    const handleLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
     audio.addEventListener("timeupdate", handleTimeUpdate);
-    return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    if (audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
+    }
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    };
   }, [audio]);
 
   // Determine active lyric content
@@ -156,7 +174,7 @@ export function LyricsDrawer({
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = window.setTimeout(() => {
       isUserScrollingRef.current = false;
-    }, 2200);
+    }, 2500);
   };
 
   // Click-to-seek (UC-16.1 NF01 Step 6)
@@ -168,36 +186,63 @@ export function LyricsDrawer({
     }
   };
 
+  const handleCopyLyrics = () => {
+    if (!rawContent) return;
+    const cleanText = rawContent
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*/, ""))
+      .join("\n");
+    void navigator.clipboard.writeText(cleanText).then(() => {
+      setToastNotification({
+        open: true,
+        message: "Lyrics copied to clipboard!",
+        type: "success",
+      });
+    });
+  };
+
+  const handleCreateCustom = () => {
+    if (!currentTrack?.id) return;
+    if (onCreateCustomLyrics) {
+      onCreateCustomLyrics(currentTrack.id);
+    } else if (onNavigate) {
+      onClose();
+      onNavigate(`/tracks/${currentTrack.id}`);
+    }
+  };
+
+  const cycleFontSize = () => {
+    setFontSize((prev) => (prev === "NORMAL" ? "LARGE" : prev === "LARGE" ? "XLARGE" : "NORMAL"));
+  };
+
+  const getLineFontSize = (isActive: boolean) => {
+    if (isFullScreen) {
+      if (fontSize === "XLARGE") return isActive ? "32px" : "24px";
+      if (fontSize === "LARGE") return isActive ? "28px" : "22px";
+      return isActive ? "25px" : "19px";
+    }
+    if (fontSize === "XLARGE") return isActive ? "18.5px" : "16px";
+    if (fontSize === "LARGE") return isActive ? "17px" : "15px";
+    return isActive ? "16px" : "14px";
+  };
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="queue-drawer-backdrop queue-drawer-backdrop--open"
-        onClick={onClose}
-        aria-hidden="true"
-        style={{ zIndex: isFullScreen ? 99 : 54 }}
-      />
+      {/* Backdrop: only active in standard drawer mode */}
+      {!isFullScreen && (
+        <div
+          className="queue-drawer-backdrop queue-drawer-backdrop--open"
+          onClick={onClose}
+          aria-hidden="true"
+          style={{ zIndex: 54 }}
+        />
+      )}
 
       {/* Main Drawer or Fullscreen Karaoke Container */}
       <aside
-        className={`queue-drawer queue-drawer--open ${
-          isFullScreen ? "lyrics-drawer--fullscreen" : ""
-        }`}
-        style={
-          isFullScreen
-            ? {
-                width: "100vw",
-                height: "100vh",
-                zIndex: 100,
-                background: "linear-gradient(170deg, #fdfaf4 0%, #f6efe3 100%)",
-                boxShadow: "none",
-                position: "relative",
-                overflow: "hidden",
-              }
-            : { zIndex: 55 }
-        }
+        className={`queue-drawer queue-drawer--open ${isFullScreen ? "lyrics-drawer--fullscreen" : ""}`}
         aria-label="Synchronous Lyrics Viewer"
       >
         {/* Ambient Glow Background Reflection (Fullscreen Theater Mode) */}
@@ -221,28 +266,64 @@ export function LyricsDrawer({
           />
         )}
 
-        {/* Header Bar */}
-        <div className="queue-drawer-header" style={{ padding: "0 20px", position: "relative", zIndex: 1 }}>
-          <div className="queue-drawer-tabs">
+        {/* Pinned Top Lyrics Toolbar & Track Info Header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            background: "rgba(253, 250, 244, 0.98)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderBottom: "1px solid #e8dcba",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
+            flexShrink: 0,
+          }}
+        >
+          {/* Header Bar */}
+        <div
+          className="queue-drawer-header"
+          style={{
+            padding: isFullScreen ? "0 28px" : "0 12px",
+            borderBottom: currentTrack ? "1px solid rgba(232, 220, 203, 0.6)" : "none",
+            background: "transparent",
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 6,
+          }}
+        >
+          {/* Tabs: compact in drawer mode to guarantee all buttons fit */}
+          <div className="queue-drawer-tabs" style={{ display: "flex", gap: 4, minWidth: 0, flexShrink: 1 }}>
             <button
               type="button"
               className={`queue-tab ${activeSource === "OFFICIAL" ? "queue-tab--active" : ""}`}
               onClick={() => setActiveSource("OFFICIAL")}
+              style={{
+                padding: isFullScreen ? "6px 14px" : "5px 8px",
+                fontSize: isFullScreen ? "12.5px" : "11.5px",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+              title="Official Verified Lyrics"
             >
-              Official Lyrics
+              <span>{isFullScreen ? "Official Lyrics" : "Official"}</span>
               {officialContent && (
                 <span
                   style={{
-                    marginLeft: 6,
-                    padding: "1px 6px",
+                    marginLeft: 4,
+                    padding: isFullScreen ? "1px 6px" : "1px 4px",
                     borderRadius: 999,
-                    fontSize: 10,
+                    fontSize: isFullScreen ? 10 : 9,
                     fontWeight: 700,
                     background: "#ecfdf3",
                     color: "#027a48",
                   }}
                 >
-                  Verified
+                  {isFullScreen ? "Verified" : "✓"}
                 </span>
               )}
             </button>
@@ -250,15 +331,23 @@ export function LyricsDrawer({
               type="button"
               className={`queue-tab ${activeSource === "PERSONAL" ? "queue-tab--active" : ""}`}
               onClick={() => setActiveSource("PERSONAL")}
+              style={{
+                padding: isFullScreen ? "6px 14px" : "5px 8px",
+                fontSize: isFullScreen ? "12.5px" : "11.5px",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+              title="My Personal Custom Lyrics"
             >
-              My Lyrics
+              <span>{isFullScreen ? "My Lyrics" : "Custom"}</span>
               {personalContent && (
                 <span
                   style={{
-                    marginLeft: 6,
-                    padding: "1px 6px",
+                    marginLeft: 4,
+                    padding: isFullScreen ? "1px 6px" : "1px 4px",
                     borderRadius: 999,
-                    fontSize: 10,
+                    fontSize: isFullScreen ? 10 : 9,
                     fontWeight: 700,
                     background:
                       lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
@@ -270,15 +359,56 @@ export function LyricsDrawer({
                         : "#b45309",
                   }}
                 >
-                  {lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
-                    ? "Translation"
-                    : "Custom"}
+                  {isFullScreen
+                    ? lyricsBundle?.userPersonalLyric?.lyricType === "TRANSLATION"
+                      ? "Translation"
+                      : "Custom"
+                    : "★"}
                 </span>
               )}
             </button>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Action Toolbar: Guaranteed visible with flexShrink: 0 and compact sizing */}
+          <div style={{ display: "flex", alignItems: "center", gap: isFullScreen ? 6 : 3, flexShrink: 0 }}>
+            {/* Font Size Toggle Button */}
+            {rawContent && (
+              <button
+                type="button"
+                className="queue-close-btn"
+                onClick={cycleFontSize}
+                title={`Font Size: ${fontSize === "NORMAL" ? "Standard" : fontSize === "LARGE" ? "Large" : "Extra Large"}`}
+                aria-label="Adjust font size"
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  width: isFullScreen ? "auto" : "26px",
+                  height: isFullScreen ? "34px" : "28px",
+                  padding: isFullScreen ? "0 8px" : "0",
+                  borderRadius: "6px",
+                }}
+              >
+                <span>A{fontSize === "NORMAL" ? "" : fontSize === "LARGE" ? "+" : "++"}</span>
+              </button>
+            )}
+
+            {/* Copy Lyrics Text */}
+            {rawContent && (
+              <button
+                type="button"
+                className="queue-close-btn"
+                onClick={handleCopyLyrics}
+                title="Copy lyrics to clipboard"
+                aria-label="Copy lyrics to clipboard"
+                style={{
+                  width: isFullScreen ? "34px" : "28px",
+                  height: isFullScreen ? "34px" : "28px",
+                }}
+              >
+                <CopyIcon width={isFullScreen ? 16 : 14} height={isFullScreen ? 16 : 14} />
+              </button>
+            )}
+
             {/* Download .LRC */}
             {rawContent && (
               <button
@@ -293,8 +423,12 @@ export function LyricsDrawer({
                 }}
                 title="Download lyrics as .lrc file"
                 aria-label="Download lyrics as .lrc file"
+                style={{
+                  width: isFullScreen ? "34px" : "28px",
+                  height: isFullScreen ? "34px" : "28px",
+                }}
               >
-                <DownloadIcon width={16} height={16} />
+                <DownloadIcon width={isFullScreen ? 16 : 14} height={isFullScreen ? 16 : 14} />
               </button>
             )}
 
@@ -306,23 +440,34 @@ export function LyricsDrawer({
                 onClick={() => setReportModalOpen(true)}
                 title="Report lyrics issue"
                 aria-label="Report lyrics issue"
+                style={{
+                  width: isFullScreen ? "34px" : "28px",
+                  height: isFullScreen ? "34px" : "28px",
+                }}
               >
-                <FlagIcon width={15} height={15} />
+                <FlagIcon width={isFullScreen ? 15 : 13} height={isFullScreen ? 15 : 13} />
               </button>
             )}
 
-            {/* Toggle Fullscreen / Karaoke Mode */}
+            {/* Toggle Fullscreen / Karaoke Mode - PROMINENT & NEVER HIDDEN */}
             <button
               type="button"
               className="queue-close-btn"
               onClick={() => setIsFullScreen((prev) => !prev)}
               aria-label={isFullScreen ? "Exit Fullscreen" : "Fullscreen Karaoke"}
               title={isFullScreen ? "Exit Fullscreen" : "Fullscreen Karaoke View"}
+              style={{
+                width: isFullScreen ? "34px" : "30px",
+                height: isFullScreen ? "34px" : "30px",
+                color: "#0284c7",
+                background: isFullScreen ? "rgba(2, 132, 199, 0.14)" : "rgba(2, 132, 199, 0.08)",
+                borderRadius: "8px",
+              }}
             >
               {isFullScreen ? (
-                <MinimizeIcon width={16} height={16} />
+                <MinimizeIcon width={isFullScreen ? 16 : 15} height={isFullScreen ? 16 : 15} />
               ) : (
-                <MaximizeIcon width={16} height={16} />
+                <MaximizeIcon width={isFullScreen ? 16 : 15} height={isFullScreen ? 16 : 15} />
               )}
             </button>
 
@@ -333,8 +478,12 @@ export function LyricsDrawer({
               onClick={onClose}
               aria-label="Close Lyrics Drawer"
               title="Close Lyrics"
+              style={{
+                width: isFullScreen ? "34px" : "28px",
+                height: isFullScreen ? "34px" : "28px",
+              }}
             >
-              <CloseIcon width={16} height={16} />
+              <CloseIcon width={isFullScreen ? 16 : 14} height={isFullScreen ? 16 : 14} />
             </button>
           </div>
         </div>
@@ -424,6 +573,7 @@ export function LyricsDrawer({
             )}
           </div>
         )}
+        </div>
 
         {/* Scrollable Synchronous Lyrics Body */}
         <div
@@ -433,7 +583,7 @@ export function LyricsDrawer({
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: isFullScreen ? "48px 15%" : "28px 20px 80px",
+            padding: isFullScreen ? "40px 15% 90px" : "24px 20px 80px",
             textAlign: isFullScreen ? "center" : "left",
           }}
         >
@@ -515,13 +665,7 @@ export function LyricsDrawer({
                               : "scale(1.02)"
                             : "scale(1)",
                           fontWeight: isActive ? 700 : 500,
-                          fontSize: isFullScreen
-                            ? isActive
-                              ? "26px"
-                              : "20px"
-                            : isActive
-                            ? "16.5px"
-                            : "14.5px",
+                          fontSize: getLineFontSize(isActive),
                           lineHeight: 1.6,
                           display: "flex",
                           alignItems: isFullScreen ? "center" : "baseline",
@@ -555,7 +699,9 @@ export function LyricsDrawer({
                 <pre
                   style={{
                     fontFamily: "inherit",
-                    fontSize: isFullScreen ? 18 : 14.5,
+                    fontSize: isFullScreen
+                      ? fontSize === "XLARGE" ? 22 : fontSize === "LARGE" ? 19 : 17
+                      : fontSize === "XLARGE" ? 17 : fontSize === "LARGE" ? 15.5 : 14,
                     lineHeight: 2.1,
                     color: "#344054",
                     whiteSpace: "pre-wrap",
@@ -594,7 +740,7 @@ export function LyricsDrawer({
                     style={{ marginTop: 14 }}
                     onClick={() => {
                       setActiveSource("PERSONAL");
-                      onCreateCustomLyrics?.(currentTrack.id);
+                      handleCreateCustom();
                     }}
                   >
                     <PlusIcon width={14} height={14} />
@@ -667,13 +813,7 @@ export function LyricsDrawer({
                               : "scale(1.02)"
                             : "scale(1)",
                           fontWeight: isActive ? 700 : 500,
-                          fontSize: isFullScreen
-                            ? isActive
-                              ? "26px"
-                              : "20px"
-                            : isActive
-                            ? "16.5px"
-                            : "14.5px",
+                          fontSize: getLineFontSize(isActive),
                           lineHeight: 1.6,
                           display: "flex",
                           alignItems: isFullScreen ? "center" : "baseline",
@@ -701,7 +841,9 @@ export function LyricsDrawer({
                 <pre
                   style={{
                     fontFamily: "inherit",
-                    fontSize: isFullScreen ? 18 : 14.5,
+                    fontSize: isFullScreen
+                      ? fontSize === "XLARGE" ? 22 : fontSize === "LARGE" ? 19 : 17
+                      : fontSize === "XLARGE" ? 17 : fontSize === "LARGE" ? 15.5 : 14,
                     lineHeight: 2.1,
                     color: "#344054",
                     whiteSpace: "pre-wrap",
@@ -738,7 +880,7 @@ export function LyricsDrawer({
                     className="button button-primary"
                     style={{ marginTop: 14 }}
                     onClick={() => {
-                      onCreateCustomLyrics?.(currentTrack.id);
+                      handleCreateCustom();
                     }}
                   >
                     <PlusIcon width={14} height={14} />
@@ -748,28 +890,6 @@ export function LyricsDrawer({
               </div>
             )
           )}
-        </div>
-
-        {/* Footer Click-To-Seek Notice */}
-        <div
-          style={{
-            padding: "10px 20px",
-            borderTop: "1px solid #e8dccb",
-            background: "rgba(253, 250, 244, 0.98)",
-            color: "#8d877f",
-            fontSize: 11.5,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexShrink: 0,
-          }}
-        >
-          <span>
-            {hasTimestamps
-              ? "Tip: Click any lyric line to jump playback to that section."
-              : "Plain text lyric format."}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600 }}>UC-16.1</span>
         </div>
       </aside>
 
