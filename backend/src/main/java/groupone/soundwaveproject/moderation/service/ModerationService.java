@@ -17,15 +17,15 @@ import groupone.soundwaveproject.moderation.dto.request.RejectTrackRequest;
 import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
 import groupone.soundwaveproject.moderation.dto.response.AlbumTrackNavigationResponse;
 import groupone.soundwaveproject.moderation.dto.response.AlbumTrackSummaryResponse;
-import groupone.soundwaveproject.moderation.dto.response.SubmissionDetailResponse;
-import groupone.soundwaveproject.moderation.dto.response.SubmissionQueueItemResponse;
-import groupone.soundwaveproject.moderation.dto.response.SubmissionStatsResponse;
+import groupone.soundwaveproject.moderation.dto.response.*;
+import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.SubmissionType;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.exception.InvalidSubmissionStateException;
 import groupone.soundwaveproject.moderation.exception.SubmissionNotFoundException;
 import groupone.soundwaveproject.moderation.mapper.TrackSubmissionMapper;
+import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.notification.entity.NotificationType;
 import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
@@ -64,6 +64,7 @@ public class ModerationService {
     private final UserProfileRepository profileRepository;
     private final NotificationService notificationService;
     private final groupone.soundwaveproject.lyrics.service.LyricService lyricService;
+    private final ContentReportRepository contentReportRepository;
 
     public ModerationService(
             TrackSubmissionRepository submissionRepository,
@@ -76,7 +77,7 @@ public class ModerationService {
             NotificationService notificationService
     ) {
         this(submissionRepository, trackRepository, albumRepository, mapper,
-                userRepository, staffRepository, profileRepository, notificationService, null);
+                userRepository, staffRepository, profileRepository, notificationService, null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -89,7 +90,8 @@ public class ModerationService {
             StaffRepository staffRepository,
             UserProfileRepository profileRepository,
             NotificationService notificationService,
-            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService,
+            ContentReportRepository contentReportRepository
     ) {
         this.submissionRepository = submissionRepository;
         this.trackRepository = trackRepository;
@@ -100,6 +102,7 @@ public class ModerationService {
         this.profileRepository = profileRepository;
         this.notificationService = notificationService;
         this.lyricService = lyricService;
+        this.contentReportRepository = contentReportRepository;
     }
 
     /**
@@ -762,6 +765,95 @@ public class ModerationService {
                 currentIndex + 1,
                 trackSummaries.size(),
                 trackSummaries
+        );
+    }
+
+    /**
+     * Thống kê số lượng bài hát đã được kiểm duyệt (Approved hoặc Rejected) theo danh sách ID nhân viên (UC-27.1).
+     *
+     * @param reviewerIds Tập hợp ID của nhân viên kiểm duyệt
+     * @return Map ánh xạ từ reviewerId sang số lượng bài đã duyệt
+     */
+    public java.util.Map<Long, Long> getModerationCountsByReviewerIds(java.util.Collection<Long> reviewerIds) {
+        if (reviewerIds == null || reviewerIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.List<Object[]> results = submissionRepository.countByReviewerUserIdsAndStatusIn(
+                reviewerIds,
+                java.util.List.of(SubmissionStatus.APPROVED, SubmissionStatus.REJECTED)
+        );
+        java.util.Map<Long, Long> counts = new java.util.HashMap<>();
+        for (Object[] row : results) {
+            Long reviewerId = (Long) row[0];
+            Long count = ((Number) row[1]).longValue();
+            counts.put(reviewerId, count);
+        }
+        return counts;
+    }
+
+    /**
+     * Lấy toàn bộ lịch sử hoạt động kiểm duyệt (bài hát và báo cáo vi phạm) do một nhân viên thực hiện (UC-27.4).
+     * Cung cấp DTO tổng hợp cho module quản trị mà không làm rò rỉ Repository nội bộ ra ngoài.
+     *
+     * @param reviewerId ID nhân viên kiểm duyệt
+     * @return DTO tổng hợp lịch sử bài hát đã duyệt và báo cáo đã xử lý
+     */
+    @Transactional(readOnly = true)
+    public ModerationActivityBundleResponse getModerationActivitiesByReviewerId(Long reviewerId) {
+        if (reviewerId == null) {
+            return new ModerationActivityBundleResponse(0, 0, Collections.emptyList(), Collections.emptyList());
+        }
+
+        // 1. Lấy danh sách kiểm duyệt bài hát
+        List<TrackSubmission> submissions = submissionRepository.findByReviewerUserIdOrderByReviewedAtDesc(reviewerId);
+
+        Set<Long> trackIds = submissions.stream().map(TrackSubmission::getTrackId).collect(Collectors.toSet());
+        Set<Long> submitterUserIds = submissions.stream().map(TrackSubmission::getSubmittedByUserId).collect(Collectors.toSet());
+
+        Map<Long, Track> trackMap = trackIds.isEmpty() ? Collections.emptyMap() :
+                trackRepository.findAllById(trackIds).stream().collect(Collectors.toMap(Track::getId, t -> t));
+
+        Map<Long, String> artistMap = new HashMap<>();
+        for (Long userId : submitterUserIds) {
+            profileRepository.findByUserId(userId)
+                    .ifPresent(p -> artistMap.put(userId, p.getDisplayName() != null ? p.getDisplayName() : p.getUsername()));
+        }
+
+        List<TrackModerationActivityResponse> trackReviews = submissions.stream().map(s -> {
+            Track t = trackMap.get(s.getTrackId());
+            String trackTitle = t != null ? t.getTitle() : "Track #" + s.getTrackId();
+            String artistName = artistMap.getOrDefault(s.getSubmittedByUserId(), "User #" + s.getSubmittedByUserId());
+            return mapper.toTrackModerationActivityResponse(s, trackTitle, artistName);
+        }).toList();
+
+        // 2. Lấy danh sách xử lý báo cáo vi phạm (Content Reports)
+        List<ReportResolutionActivityResponse> reportResolutions = Collections.emptyList();
+        if (contentReportRepository != null) {
+            List<ContentReport> reports = contentReportRepository.findByReviewerIdOrderByResolvedAtDesc(reviewerId);
+            Set<Long> reportTrackIds = reports.stream()
+                    .filter(r -> "TRACK".equalsIgnoreCase(r.getTargetType()) || "LYRICS".equalsIgnoreCase(r.getTargetType()))
+                    .map(ContentReport::getTargetId)
+                    .collect(Collectors.toSet());
+
+            Map<Long, Track> reportTrackMap = reportTrackIds.isEmpty() ? Collections.emptyMap() :
+                    trackRepository.findAllById(reportTrackIds).stream().collect(Collectors.toMap(Track::getId, t -> t));
+
+            reportResolutions = reports.stream().map(r -> {
+                String targetTitle;
+                if (("TRACK".equalsIgnoreCase(r.getTargetType()) || "LYRICS".equalsIgnoreCase(r.getTargetType())) && reportTrackMap.containsKey(r.getTargetId())) {
+                    targetTitle = reportTrackMap.get(r.getTargetId()).getTitle();
+                } else {
+                    targetTitle = r.getTargetType() + " #" + r.getTargetId();
+                }
+                return mapper.toReportResolutionActivityResponse(r, targetTitle);
+            }).toList();
+        }
+
+        return new ModerationActivityBundleResponse(
+                trackReviews.size(),
+                reportResolutions.size(),
+                trackReviews,
+                reportResolutions
         );
     }
 }

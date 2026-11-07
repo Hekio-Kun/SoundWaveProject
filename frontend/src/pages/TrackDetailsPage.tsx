@@ -8,7 +8,7 @@ import { parseLyricsToLines, formatTimeDisplay } from "../components/common/Lyri
 import { studioApi, type PendingLyricSubmission } from "../api/track";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
-import { ReportLyricModal } from "../components/modals/ReportLyricModal";
+import { ReportTrackModal } from "../components/modals/ReportTrackModal";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { downloadLrcFile } from "../utils/lyricsDownload";
@@ -119,7 +119,8 @@ export function TrackDetailsPage({
   const [withdrawingSub, setWithdrawingSub] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTrackModalOpen, setReportTrackModalOpen] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
   // More Creator Tracks & Karaoke Fullscreen
   const [moreCreatorTracks, setMoreCreatorTracks] = useState<LandingTrack[]>([]);
@@ -593,7 +594,7 @@ export function TrackDetailsPage({
               <small>release</small>
             </span>
           </div>
-          <div className="track-primary-actions">
+          <div className="track-primary-actions" style={{ position: "relative" }}>
             <button className="button button-primary button-large" onClick={() => onPlayTrack(track)}>
               {isPlayingThis ? <PauseIcon /> : <PlayIcon />}
               <span>{isPlayingThis ? "Pause" : "Play track"}</span>
@@ -1191,12 +1192,14 @@ export function TrackDetailsPage({
         onCancel={() => setDeleteConfirmOpen(false)}
       />
 
-      {/* Report Inaccurate Lyrics Modal */}
-      <ReportLyricModal
-        isOpen={reportModalOpen}
-        onClose={() => setReportModalOpen(false)}
+      {/* UC-22.1: Report Track Violation Modal */}
+      <ReportTrackModal
+        open={reportTrackModalOpen}
+        onClose={() => setReportTrackModalOpen(false)}
         trackId={trackId}
         trackTitle={track.title}
+        trackArtist={track.creator?.displayName || "Unknown Creator"}
+        trackCoverUrl={track.coverUrl}
         onSuccess={(msg) =>
           setNotification({
             open: true,

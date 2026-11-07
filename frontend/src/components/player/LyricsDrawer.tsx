@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { lyricsApi } from "../../api/lyrics";
 import { parseLyricsToLines, formatTimeDisplay, LyricLine } from "../common/LyricSyncTab";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
-import { ReportLyricModal } from "../modals/ReportLyricModal";
 import { downloadLrcFile } from "../../utils/lyricsDownload";
 import {
   AlertIcon,
@@ -432,24 +431,7 @@ export function LyricsDrawer({
               </button>
             )}
 
-            {/* Report Lyrics Issue */}
-            {activeSource === "OFFICIAL" && officialContent && isAuthenticated && (
-              <button
-                type="button"
-                className="queue-close-btn"
-                onClick={() => setReportModalOpen(true)}
-                title="Report lyrics issue"
-                aria-label="Report lyrics issue"
-                style={{
-                  width: isFullScreen ? "34px" : "28px",
-                  height: isFullScreen ? "34px" : "28px",
-                }}
-              >
-                <FlagIcon width={isFullScreen ? 15 : 13} height={isFullScreen ? 15 : 13} />
-              </button>
-            )}
-
-            {/* Toggle Fullscreen / Karaoke Mode - PROMINENT & NEVER HIDDEN */}
+            {/* Toggle Fullscreen / Karaoke Mode */}
             <button
               type="button"
               className="queue-close-btn"
@@ -892,23 +874,6 @@ export function LyricsDrawer({
           )}
         </div>
       </aside>
-
-      {/* Report Lyric Modal */}
-      {currentTrack && (
-        <ReportLyricModal
-          isOpen={reportModalOpen}
-          onClose={() => setReportModalOpen(false)}
-          trackId={currentTrack.id}
-          trackTitle={currentTrack.title}
-          onSuccess={(msg) =>
-            setToastNotification({
-              open: true,
-              message: msg,
-              type: "success",
-            })
-          }
-        />
-      )}
 
       {/* Central Feedback Toast Popup */}
       <CenterNotificationPopup

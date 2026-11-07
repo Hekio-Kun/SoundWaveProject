@@ -5,11 +5,13 @@ import {
   DashboardIcon,
   DiscIcon,
   FileTextIcon,
+  FlagIcon,
   LogoutIcon,
   MenuIcon,
   MusicIcon,
   ShieldIcon,
   UserIcon,
+  UsersIcon,
 } from "../icons";
 import { NotificationDropdown } from "../components/layout/NotificationDropdown";
 import type { CurrentUser } from "../types";
@@ -83,12 +85,21 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           <>
             <button
               type="button"
-              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" ? "is-active" : ""}
+              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" && activeRoute !== "/staff/reports" ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/dashboard")}
               title="Pending track submissions"
             >
               <DashboardIcon width={17} height={17} />
               <span>Pending Tracks</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute === "/staff/reports" ? "is-active" : ""}
+              onClick={() => handleNavClick("/staff/reports")}
+              title="Content violation reports"
+            >
+              <FlagIcon width={17} height={17} />
+              <span>Content Reports</span>
             </button>
             <button
               type="button"
@@ -109,6 +120,14 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
             >
               <ShieldIcon width={17} height={17} />
               <span>System Dashboard</span>
+            </button>
+            <button
+              type="button"
+              className={activeRoute === "/admin/staffs" ? "is-active" : ""}
+              onClick={() => handleNavClick("/admin/staffs")}
+            >
+              <UsersIcon width={17} height={17} />
+              <span>Staff Accounts</span>
             </button>
             <button
               type="button"

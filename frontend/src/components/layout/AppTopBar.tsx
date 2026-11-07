@@ -4,6 +4,7 @@ import {
   ChevronRightIcon,
   CloseIcon,
   DashboardIcon,
+  FlagIcon,
   LogoutIcon,
   PauseIcon,
   PlayIcon,
@@ -785,6 +786,42 @@ export function AppTopBar({
                 >
                   <UserIcon width={16} height={16} />
                   <span>Your profile</span>
+                </button>
+
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate("/reports");
+                  }}
+                  role="menuitem"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 12px",
+                    border: "none",
+                    background: "transparent",
+                    borderRadius: "8px",
+                    fontSize: "13.5px",
+                    fontWeight: 500,
+                    color: "#334155",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0F9FF";
+                    e.currentTarget.style.color = "#0284C7";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#334155";
+                  }}
+                >
+                  <FlagIcon width={16} height={16} />
+                  <span>Reports history</span>
                 </button>
 
                 <button

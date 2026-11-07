@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import type { FeaturedAlbum, FeaturedCreator, LandingTrack } from "../../types";
-import { ArrowIcon, HeadphonesIcon, HeartFillIcon, HeartIcon, PauseIcon, PlayIcon, PlusIcon } from "../../icons";
+import { ArrowIcon, FlagIcon, HeadphonesIcon, HeartFillIcon, HeartIcon, MoreIcon, PauseIcon, PlayIcon, PlusIcon } from "../../icons";
 
 const compactNumber = (value: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -17,6 +18,7 @@ type TrackCardProps = {
   isFavorited?: boolean;
   onToggleFavorite?: (trackId: number) => void;
   onAddToPlaylist?: (trackId: number) => void;
+  onReportTrack?: (track: LandingTrack) => void;
   canManageLibrary?: boolean;
 };
 
@@ -30,8 +32,17 @@ export function TrackCard({
   isFavorited = false,
   onToggleFavorite,
   onAddToPlaylist,
+  onReportTrack,
   canManageLibrary = false,
 }: TrackCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = () => setMenuOpen(false);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [menuOpen]);
   return (
     <article className={`sw-track-card ${active ? "sw-track-card--active" : ""}`} style={{ position: "relative" }}>
       <button
@@ -123,6 +134,77 @@ export function TrackCard({
             >
               <PlusIcon width={15} height={15} />
             </button>
+          )}
+
+          {onReportTrack && (
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                title="More options (...)"
+                aria-label="More options"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "2px",
+                  cursor: "pointer",
+                  color: "#FFFFFF",
+                  display: "grid",
+                  placeItems: "center",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <MoreIcon width={15} height={15} />
+              </button>
+
+              {menuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    right: 0,
+                    zIndex: 25,
+                    background: "#FFFFFF",
+                    borderRadius: "8px",
+                    boxShadow: "0 8px 20px rgba(0, 0, 0, 0.18)",
+                    border: "1px solid #E2E8F0",
+                    minWidth: "140px",
+                    padding: "4px",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "6px 10px",
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "0.8125rem",
+                      color: "#DC2626",
+                      fontWeight: 500,
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#FEE2E2")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onReportTrack(track);
+                    }}
+                  >
+                    <FlagIcon width={14} height={14} />
+                    <span>Report Track</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

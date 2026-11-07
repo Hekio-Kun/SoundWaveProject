@@ -19,9 +19,12 @@ import { LibraryPage } from "../pages/LibraryPage";
 import { PlaylistDetailsPage } from "../pages/PlaylistDetailsPage";
 import { AdminDashboardPage, DashboardAccessDenied, StaffDashboardPage } from "../pages/OperationsDashboardPage";
 import { AdminGenreManagementPage } from "../pages/AdminGenreManagementPage";
+import { AdminStaffManagementPage } from "../pages/AdminStaffManagementPage";
 import { StaffLyricsManagementPage } from "../pages/StaffLyricsManagementPage";
+import { StaffContentReportsPage } from "../pages/StaffContentReportsPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RankingBoardPage } from "../pages/RankingBoardPage";
+import { ReportsHistoryPage } from "../pages/ReportsHistoryPage";
 import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
 import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
@@ -425,6 +428,24 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // Reports History Route (UC-22.2)
+  if (pathname === "/reports" || pathname === "/reports-history") {
+    if (!authReady) return null;
+    if (!isAuthenticated) {
+      return (
+        <div className="state-page" style={{ padding: "80px 20px", textAlign: "center" }}>
+          <span className="state-icon">!</span>
+          <h1>Log in to view reports history</h1>
+          <p>You need to be logged in to inspect your submitted reports.</p>
+          <button className="button button-primary" onClick={() => navigate("/login")}>
+            Go to login
+          </button>
+        </div>
+      );
+    }
+    return <ReportsHistoryPage onNavigate={navigate} />;
+  }
+
   // 4. Creator Studio Routes
   // [FEATURE]: Đã loại bỏ luồng chỉnh sửa bài hát - Tự động điều hướng về trang chi tiết hoặc danh sách bài hát
   if (
@@ -564,6 +585,14 @@ export function AppRouter(): React.ReactElement | null {
   }
 
   // 5. Operations & Administration Routes
+  if (pathname === "/admin/staffs" || pathname === "/admin/staff") {
+    return user?.role === "ADMIN" ? (
+      <AdminStaffManagementPage />
+    ) : (
+      <DashboardAccessDenied onNavigate={navigate} requiredRole="Administrator" />
+    );
+  }
+
   if (pathname === "/admin/genres") {
     return user?.role === "ADMIN" ? (
       <AdminGenreManagementPage />
@@ -577,6 +606,14 @@ export function AppRouter(): React.ReactElement | null {
       <AdminDashboardPage onNavigate={navigate} />
     ) : (
       <DashboardAccessDenied onNavigate={navigate} requiredRole="Administrator" />
+    );
+  }
+
+  if (pathname === "/staff/reports" || pathname === "/staff/content-reports") {
+    return user?.role === "STAFF" ? (
+      <StaffContentReportsPage onNavigate={navigate} />
+    ) : (
+      <DashboardAccessDenied onNavigate={navigate} requiredRole="Moderation Staff" />
     );
   }
 
