@@ -3,6 +3,7 @@ import {
   moderationApi,
   type SubmissionDetail,
 } from "../../api/moderation";
+import { lyricsApi } from "../../api/lyrics";
 import {
   AlertIcon,
   ArrowIcon,
@@ -19,6 +20,7 @@ import {
   UserIcon,
   VolumeIcon,
 } from "../../icons";
+import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
 
 function formatDuration(ms?: number | null): string {
   if (!ms || ms <= 0) return "0:00";
@@ -115,7 +117,42 @@ export function PendingTrackDetailView({
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Lyrics inspection state
+  const [trackLyrics, setTrackLyrics] = useState<string | null>(null);
   const [copiedLyrics, setCopiedLyrics] = useState(false);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrollingRef = useRef<boolean>(false);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
+
+  // Sync lyrics from submission or lyricsApi
+  useEffect(() => {
+    const tid = detail?.track?.id;
+    if (!tid) return;
+
+    if (detail.track.lyrics) {
+      setTrackLyrics(detail.track.lyrics);
+    }
+
+    lyricsApi
+      .getTrackLyrics(tid)
+      .then((bundle) => {
+        const content =
+          bundle?.officialLyric?.lyricContent ||
+          bundle?.userPersonalLyric?.lyricContent;
+        if (content) {
+          setTrackLyrics(content);
+        }
+      })
+      .catch(() => {
+        lyricsApi
+          .getStaffOfficialLyric(tid)
+          .then((res) => {
+            if (res?.lyricContent) setTrackLyrics(res.lyricContent);
+          })
+          .catch(() => {});
+      });
+  }, [detail?.track?.id, detail?.track?.lyrics]);
 
   const handleCopyLyrics = async (text: string) => {
     try {
@@ -127,44 +164,88 @@ export function PendingTrackDetailView({
     }
   };
 
-  const parsedLyricLines = useMemo<ParsedLyricLine[]>(() => {
-    if (!detail?.track.lyrics) return [];
-    return detail.track.lyrics.split(/\r?\n/).map((line, idx) => {
-      const match = line.match(/^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\])(.*)$/);
-      const tsSeconds = parseTimestampToSeconds(line);
-      return {
-        lineNumber: idx + 1,
-        raw: line,
-        tsMatch: match ? match[1] : null,
-        tsSeconds,
-        text: match ? match[2] : line,
-      };
-    });
-  }, [detail?.track.lyrics]);
+  const parsedActiveLines = useMemo(() => {
+    if (!trackLyrics) return [];
+    try {
+      return parseLyricsToLines(trackLyrics);
+    } catch {
+      return [];
+    }
+  }, [trackLyrics]);
 
-  const hasSyncedLyrics = useMemo(() => {
-    return parsedLyricLines.some((l) => l.tsSeconds !== null);
-  }, [parsedLyricLines]);
+  const hasTimestamps = useMemo(
+    () => parsedActiveLines.some((l) => l.timeSec !== null),
+    [parsedActiveLines]
+  );
 
   const activeLineIndex = useMemo(() => {
-    if (!parsedLyricLines.length) return -1;
-    let foundIdx = -1;
-    for (let i = 0; i < parsedLyricLines.length; i++) {
-      const sec = parsedLyricLines[i].tsSeconds;
-      if (sec !== null && currentTime >= sec) {
-        foundIdx = i;
+    if (!hasTimestamps || parsedActiveLines.length === 0) return -1;
+    let idx = -1;
+    for (let i = 0; i < parsedActiveLines.length; i++) {
+      const lineTime = parsedActiveLines[i].timeSec;
+      if (lineTime !== null && currentTime >= lineTime) {
+        idx = i;
       }
     }
-    return foundIdx;
-  }, [parsedLyricLines, currentTime]);
+    return idx;
+  }, [parsedActiveLines, currentTime, hasTimestamps]);
 
-  const lyricStats = useMemo(() => {
-    if (!detail?.track.lyrics) return { lines: 0, words: 0, characters: 0 };
-    const raw = detail.track.lyrics.trim();
-    const lines = parsedLyricLines.filter((l) => l.raw.trim().length > 0).length;
-    const words = raw.split(/\s+/).filter(Boolean).length;
-    return { lines, words, characters: raw.length };
-  }, [detail?.track.lyrics, parsedLyricLines]);
+  // Auto-scroll active line strictly within lyrics container without scrolling whole page
+  useEffect(() => {
+    if (
+      activeLineIndex >= 0 &&
+      activeLineRef.current &&
+      scrollContainerRef.current &&
+      !isUserScrollingRef.current
+    ) {
+      const container = scrollContainerRef.current;
+      const activeLine = activeLineRef.current;
+
+      const lineRect = activeLine.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const relativeTop = lineRect.top - containerRect.top;
+      const targetScrollTop =
+        container.scrollTop +
+        relativeTop -
+        container.clientHeight / 2 +
+        lineRect.height / 2;
+
+      isProgrammaticScrollRef.current = true;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth",
+      });
+
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = window.setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 450);
+    }
+  }, [activeLineIndex]);
+
+  const handleLyricsScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 2500);
+  };
+
+  const handleLineClick = (timeSec: number | null) => {
+    if (timeSec === null || !audioRef.current) return;
+    audioRef.current.currentTime = timeSec;
+    setCurrentTime(timeSec);
+    if (!isPlaying) {
+      const promise = audioRef.current.play();
+      if (promise !== undefined) {
+        playPromiseRef.current = promise;
+        promise
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
+      }
+    }
+  };
 
   // Fetch track submission detail safely
   useEffect(() => {
@@ -542,32 +623,55 @@ export function PendingTrackDetailView({
             </div>
 
             <div className="staff-hero-info-col">
-              <div className="staff-hero-badge-row">
-                <span className="staff-meta-pill is-genre">
+              <div className="staff-hero-badge-row" style={{ gap: "10px", marginBottom: "14px" }}>
+                <span
+                  className="staff-meta-pill is-genre"
+                  style={{ padding: "6px 14px", fontSize: "0.85rem", fontWeight: 700, borderRadius: "8px" }}
+                >
                   {detail.track.genre?.name || "Music"}
                 </span>
                 {detail.track.album ? (
-                  <span className="staff-meta-pill is-album">
-                    <DiscIcon width={12} height={12} />
+                  <span
+                    className="staff-meta-pill is-album"
+                    style={{ padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, borderRadius: "8px", gap: "6px" }}
+                  >
+                    <DiscIcon width={14} height={14} />
                     Album: {detail.track.album.title}
                   </span>
                 ) : (
-                  <span className="staff-meta-pill is-single">Single Release</span>
+                  <span
+                    className="staff-meta-pill is-single"
+                    style={{ padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, borderRadius: "8px" }}
+                  >
+                    Single Release
+                  </span>
                 )}
-                <span className="staff-meta-pill is-format">
+                <span
+                  className="staff-meta-pill is-format"
+                  style={{ padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, borderRadius: "8px" }}
+                >
                   {detail.track.audioFormat.toUpperCase()} · {formatDuration(detail.track.durationMs)}
                 </span>
               </div>
 
-              <h2 className="staff-hero-track-title staff-detail-track-title">
+              <h2
+                className="staff-hero-track-title staff-detail-track-title"
+                style={{ fontSize: "1.9rem", fontWeight: 800, margin: "0 0 12px 0", letterSpacing: "-0.025em" }}
+              >
                 {detail.track.title}
               </h2>
 
-              <p className="staff-hero-creator-line">
-                <UserIcon width={14} height={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 4 }} />
-                Submitted by: <b>{detail.submitter?.displayName || detail.submitter?.email}</b>
+              <p
+                className="staff-hero-creator-line"
+                style={{ fontSize: "1rem", margin: "0 0 18px 0", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}
+              >
+                <UserIcon width={16} height={16} style={{ display: "inline", verticalAlign: "middle", color: "var(--color-ocean-primary, #0284C7)" }} />
+                <span>Submitted by:</span>
+                <b style={{ color: "#0F172A" }}>{detail.submitter?.displayName || detail.submitter?.email}</b>
                 {detail.submitter?.email ? (
-                  <span className="staff-creator-email">({detail.submitter.email})</span>
+                  <span className="staff-creator-email" style={{ color: "#64748B", fontWeight: 400, marginLeft: "4px" }}>
+                    ({detail.submitter.email})
+                  </span>
                 ) : null}
               </p>
 
@@ -654,51 +758,6 @@ export function PendingTrackDetailView({
             </div>
           </div>
 
-          {/* Submitter Note Highlight Box */}
-          <div className="staff-note-box">
-            <div className="staff-note-header">
-              <FileTextIcon width={14} height={14} />
-              <span>Creator Note</span>
-            </div>
-            <p className="staff-note-content">
-              {detail.submitterNote ? (
-                `“${detail.submitterNote}”`
-              ) : (
-                <span className="staff-text-muted">
-                  No creator note attached for this submission.
-                </span>
-              )}
-            </p>
-          </div>
-
-          {/* Technical Specifications Grid */}
-          <div className="staff-specs-matrix">
-            <div className="staff-matrix-cell">
-              <small>Artist / Submitter</small>
-              <strong>{detail.submitter?.displayName || "--"}</strong>
-            </div>
-            <div className="staff-matrix-cell">
-              <small>Account Email</small>
-              <strong>{detail.submitter?.email || "--"}</strong>
-            </div>
-            <div className="staff-matrix-cell">
-              <small>Artist Username</small>
-              <strong>@{detail.submitter?.username || "--"}</strong>
-            </div>
-            <div className="staff-matrix-cell">
-              <small>Catalog Slug</small>
-              <code>{detail.track.slug}</code>
-            </div>
-            <div className="staff-matrix-cell">
-              <small>Track Number</small>
-              <strong>{detail.track.trackNumber ?? "Single"}</strong>
-            </div>
-            <div className="staff-matrix-cell">
-              <small>Master Audio Format</small>
-              <strong>{detail.track.audioFormat.toUpperCase()}</strong>
-            </div>
-          </div>
-
           {/* Description if provided */}
           {detail.track.description ? (
             <div className="staff-desc-box">
@@ -707,102 +766,98 @@ export function PendingTrackDetailView({
             </div>
           ) : null}
 
-          {/* Lyrics Section */}
-          <div className="staff-lyrics-card">
-            <div className="staff-lyrics-header">
-              <div className="staff-lyrics-title-group">
-                <span className="staff-lyrics-icon-badge">
-                  <FileTextIcon width={17} height={17} />
-                </span>
-                <h4 className="staff-lyrics-heading">Lyrics</h4>
+          {/* Synchronous Lyrics Section */}
+          <section className="track-lyrics-panel" style={{ marginBottom: "20px" }}>
+            <header
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "16px",
+                padding: "16px 22px",
+                borderBottom: "1px solid #f0f2f5",
+                background: "linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%)",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div className="track-section-icon">
+                  <FileTextIcon width={18} height={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1c1917" }}>
+                    Lyrics
+                  </h3>
+                </div>
               </div>
 
-              {detail.track.lyrics ? (
-                <div className="staff-lyrics-header-actions">
-                  <div className="staff-lyrics-stats-badge">
-                    {hasSyncedLyrics ? (
-                      <>
-                        <span style={{ color: "#0284c7", fontWeight: 700 }}>Synced (.LRC)</span>
-                        <span>·</span>
-                      </>
-                    ) : null}
-                    <span><b>{lyricStats.lines}</b> lines</span>
-                    <span>·</span>
-                    <span><b>{lyricStats.words}</b> words</span>
-                  </div>
+              {trackLyrics ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <button
                     type="button"
-                    className="staff-lyrics-copy-btn"
-                    onClick={() => void handleCopyLyrics(detail.track.lyrics!)}
+                    className="button button-ghost button-small"
+                    onClick={() => void handleCopyLyrics(trackLyrics)}
                     title="Copy lyrics"
                   >
-                    {copiedLyrics ? (
-                      <>
-                        <CheckIcon width={13} height={13} />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileTextIcon width={13} height={13} />
-                        <span>Copy Lyrics</span>
-                      </>
-                    )}
+                    {copiedLyrics ? "Copied!" : "Copy Lyrics"}
                   </button>
                 </div>
               ) : null}
-            </div>
+            </header>
 
-            {detail.track.lyrics ? (
-              <div className="staff-lyrics-viewer-wrapper">
-                <div className="staff-lyrics-lines-container">
-                  {parsedLyricLines.map((item, idx) => {
-                    const isActive = idx === activeLineIndex && item.tsSeconds !== null;
+            {trackLyrics ? (
+              hasTimestamps ? (
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleLyricsScroll}
+                  onWheel={handleLyricsScroll}
+                  onTouchMove={handleLyricsScroll}
+                  className="track-lyrics-synced-list"
+                  style={{ maxHeight: "420px", overflowY: "auto", position: "relative" }}
+                >
+                  {parsedActiveLines.map((line, idx) => {
+                    const isActive = idx === activeLineIndex;
                     return (
                       <div
-                        key={item.lineNumber}
-                        className={`staff-lyrics-line-row ${isActive ? "is-active" : ""}`}
+                        key={line.id}
+                        ref={isActive ? activeLineRef : null}
+                        className={`track-lyrics-synced-item ${isActive ? "is-active-line" : ""}`}
+                        onClick={() => handleLineClick(line.timeSec)}
+                        role={line.timeSec !== null ? "button" : undefined}
+                        tabIndex={line.timeSec !== null ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (line.timeSec !== null && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            handleLineClick(line.timeSec);
+                          }
+                        }}
+                        title={
+                          line.timeSec !== null
+                            ? `Click to jump audio to ${formatTimeDisplay(line.timeSec)}`
+                            : undefined
+                        }
                       >
-                        <span className="staff-lyrics-line-number" aria-hidden="true">
-                          {item.lineNumber}
-                        </span>
-                        <span className="staff-lyrics-line-content">
-                          {item.tsMatch && item.tsSeconds !== null ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
-                                className="staff-lyric-ts-jump-btn"
-                                title={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
-                                aria-label={`Jump audio to ${formatSeconds(item.tsSeconds!)}`}
-                              >
-                                {item.tsMatch}
-                              </button>
-                              <span>{item.text || "\u00A0"}</span>
-                            </>
-                          ) : (
-                            item.raw || "\u00A0"
-                          )}
-                        </span>
+                        {line.timeSec !== null ? (
+                          <span className="track-lyrics-time-chip">{formatTimeDisplay(line.timeSec)}</span>
+                        ) : null}
+                        <span className="track-lyrics-text">{line.text || "\u00A0"}</span>
                       </div>
                     );
                   })}
                 </div>
-                {hasSyncedLyrics ? (
-                  <div className="staff-lyrics-footer-guide">
-                    💡 <b>Tip:</b> Click any timestamp badge to audition the track starting at that specific line.
-                  </div>
-                ) : null}
-              </div>
+              ) : (
+                <pre style={{ margin: 0, padding: "24px", whiteSpace: "pre-wrap", color: "#344054", fontSize: "0.95rem", lineHeight: 1.8 }}>
+                  {trackLyrics}
+                </pre>
+              )
             ) : (
-              <div className="staff-lyrics-empty-state">
-                <FileTextIcon width={28} height={28} />
-                <div className="staff-lyrics-empty-text">
-                  <strong>No lyrics provided</strong>
-                  <span>The uploader did not attach lyrics for this release.</span>
-                </div>
+              <div className="track-lyrics-empty" style={{ minHeight: "180px", padding: "28px 20px" }}>
+                <FileTextIcon width={32} height={32} />
+                <strong>No official lyrics available</strong>
+                <span>No synchronized lyrics have been attached to this track yet.</span>
               </div>
             )}
-          </div>
+          </section>
 
           {/* Previous Review History (if already reviewed) */}
           {detail.status !== "PENDING" ? (

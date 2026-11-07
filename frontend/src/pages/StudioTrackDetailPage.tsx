@@ -689,7 +689,7 @@ export function StudioTrackDetailPage({
 
                 <p className="staff-hero-creator-line">
                   <UserIcon width={14} height={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 4 }} />
-                  Submitted by: <b>{submitterName}</b>
+                  Submitted by: <b>{submitterName}</b>{" "}
                   <span className="staff-creator-email">({submitterEmail})</span>
                 </p>
 
