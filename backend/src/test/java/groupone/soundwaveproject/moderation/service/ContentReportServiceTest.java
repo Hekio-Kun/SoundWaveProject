@@ -472,4 +472,80 @@ class ContentReportServiceTest {
         );
         verify(contentReportRepository, never()).save(any());
     }
+
+    // =========================================================================
+    // UC-22.4: withdrawTrackReport Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("withdrawTrackReport - Successfully withdraws and deletes pending report (UC-22.4 NF01)")
+    void withdrawTrackReport_Success() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .status("PENDING")
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        contentReportService.withdrawTrackReport(1L, "listener@example.com");
+
+        verify(contentReportRepository, times(1)).delete(existing);
+    }
+
+    @Test
+    @DisplayName("withdrawTrackReport - Throws ResourceNotFoundException when report does not exist")
+    void withdrawTrackReport_ReportNotFound() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(contentReportRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                contentReportService.withdrawTrackReport(999L, "listener@example.com")
+        );
+        verify(contentReportRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("withdrawTrackReport - Throws ForbiddenOperationException when report belongs to another user")
+    void withdrawTrackReport_UnauthorizedUser() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(999L) // Another user
+                .category("COPYRIGHT")
+                .status("PENDING")
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        assertThrows(ForbiddenOperationException.class, () ->
+                contentReportService.withdrawTrackReport(1L, "listener@example.com")
+        );
+        verify(contentReportRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("withdrawTrackReport - Throws BadRequestOperationException when status is not PENDING (UC-22.4 EX01)")
+    void withdrawTrackReport_StatusNotPending_EX01() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .status("RESOLVED") // Already reviewed
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.withdrawTrackReport(1L, "listener@example.com")
+        );
+        assertTrue(ex.getMessage().contains("This report has already been reviewed and cannot be withdrawn"));
+        verify(contentReportRepository, never()).delete(any());
+    }
 }

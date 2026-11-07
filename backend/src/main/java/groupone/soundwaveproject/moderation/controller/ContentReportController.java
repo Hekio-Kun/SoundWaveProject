@@ -66,6 +66,26 @@ public class ContentReportController {
     }
 
     /**
+     * Rút lại (hủy và xóa) báo cáo vi phạm nội dung đang ở trạng thái PENDING (UC-22.4).
+     * Yêu cầu người nghe đã đăng nhập (BR-36) và là chủ sở hữu của báo cáo.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> withdrawTrackReport(
+            @PathVariable("id") Long id,
+            Authentication authentication
+    ) {
+        contentReportService.withdrawTrackReport(
+                id,
+                authentication.getName()
+        );
+        return ResponseEntity.ok(Map.of(
+                "reportId", id,
+                "message", "Report has been withdrawn successfully"
+        ));
+    }
+
+    /**
      * Lấy toàn bộ lịch sử các báo cáo vi phạm nội dung do người nghe gửi (UC-22.2).
      */
     @GetMapping("/my-reports")

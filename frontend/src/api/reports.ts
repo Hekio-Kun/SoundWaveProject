@@ -89,6 +89,15 @@ export const reportsApi = {
   },
 
   /**
+   * Rút lại và xóa báo cáo vi phạm đang PENDING (UC-22.4).
+   */
+  withdrawReport: (reportId: number): Promise<{ reportId: number; message: string }> => {
+    return apiFetch<{ reportId: number; message: string }>(`/reports/${reportId}`, {
+      method: "DELETE",
+    });
+  },
+
+  /**
    * Kiểm tra xem người dùng hiện tại đã có báo cáo PENDING cho bài hát hay chưa.
    */
   checkPendingReport: (trackId: number): Promise<{ trackId: number; hasPendingReport: boolean }> => {

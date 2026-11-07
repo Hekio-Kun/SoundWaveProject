@@ -56,6 +56,7 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
   // Confirmation modal, edit modal, and toast states
   const [editingReport, setEditingReport] = useState<MyReportHistoryResponse | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<MyReportHistoryResponse | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [toastNotification, setToastNotification] = useState<{
     open: boolean;
     message: string;
@@ -79,22 +80,46 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
     void loadReports();
   }, [loadReports]);
 
-  const handleActionNotice = (actionName: string) => {
-    setToastNotification({
-      open: true,
-      message: `${actionName} will be available in the next use-case update.`,
-      type: "info",
-    });
-  };
-
-  const handleConfirmWithdraw = () => {
+  // NF01: Withdraw report (UC-22.4)
+  const handleConfirmWithdraw = async () => {
     if (!withdrawTarget) return;
-    setToastNotification({
-      open: true,
-      message: `Withdraw Report (UC-22.4) for "${withdrawTarget.trackTitle}" will be handled in UC-22.4.`,
-      type: "info",
-    });
-    setWithdrawTarget(null);
+    setWithdrawing(true);
+    try {
+      await reportsApi.withdrawReport(withdrawTarget.id);
+      // NF01 Step 6: notification ("Report has been withdrawn successfully") and removes entry from user's report history
+      setReports((prev) => prev.filter((r) => r.id !== withdrawTarget.id));
+      setToastNotification({
+        open: true,
+        message: "Report has been withdrawn successfully",
+        type: "success",
+      });
+      setWithdrawTarget(null);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to withdraw report. Please try again.";
+      // EX01: Unauthorized or ineligible deletion (already resolved or dismissed by Staff)
+      if (
+        msg.includes("already been reviewed") ||
+        err?.code === "REPORT_ALREADY_REVIEWED"
+      ) {
+        setToastNotification({
+          open: true,
+          message: "This report has already been reviewed and cannot be withdrawn",
+          type: "error",
+        });
+        setWithdrawTarget(null);
+        void loadReports();
+      } else {
+        // EX02: Database operation failure
+        setToastNotification({
+          open: true,
+          message: msg,
+          type: "error",
+        });
+        setWithdrawTarget(null);
+      }
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   // Counts by status
@@ -562,14 +587,22 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
         />
       )}
 
-      {/* Confirmation Modal for Withdrawing Report (UC-22.4) */}
+      {/* Confirmation Modal for Withdrawing Report (UC-22.4 NF01 Step 2) */}
       <DeleteConfirmationModal
         open={Boolean(withdrawTarget)}
-        title="Withdraw report"
-        message={`Are you sure you want to withdraw your report against "${withdrawTarget?.trackTitle}"? This will cancel the pending moderation review.`}
+        title="Withdraw Content Report"
+        message={
+          withdrawTarget
+            ? `Are you sure you want to withdraw this content report for "${withdrawTarget.trackTitle}"?`
+            : "Are you sure you want to withdraw this content report?"
+        }
         confirmLabel="Withdraw"
+        submittingLabel="Withdrawing..."
+        submitting={withdrawing}
         onConfirm={handleConfirmWithdraw}
-        onCancel={() => setWithdrawTarget(null)}
+        onCancel={() => {
+          if (!withdrawing) setWithdrawTarget(null);
+        }}
       />
 
       {/* Center Toast Popup for Feedback */}

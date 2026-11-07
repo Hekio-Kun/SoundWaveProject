@@ -229,6 +229,45 @@ public class ContentReportService {
     }
 
     /**
+     * Rút lại (hủy và xóa) báo cáo vi phạm nội dung đang ở trạng thái PENDING (UC-22.4).
+     *
+     * @param reportId ID của báo cáo cần rút
+     * @param userEmail Email của người nghe đăng nhập
+     */
+    @Transactional
+    public void withdrawTrackReport(Long reportId, String userEmail) {
+        // 1. Xác thực người dùng (PRE-1, BR-36)
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
+
+        // 2. Tìm kiếm báo cáo vi phạm
+        ContentReport report = contentReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("REPORT_NOT_FOUND", "Content report not found with id: " + reportId));
+
+        // 3. Kiểm tra quyền sở hữu (PRE-2): Báo cáo phải thuộc về người dùng hiện tại
+        Long ownerId = report.getSubmittedByUserId() != null ? report.getSubmittedByUserId() : report.getReporterId();
+        if (ownerId == null || !ownerId.equals(user.getId())) {
+            throw new ForbiddenOperationException(
+                    "UNAUTHORIZED_REPORT_ACCESS",
+                    "You do not have permission to withdraw this report."
+            );
+        }
+
+        // 4. Kiểm tra trạng thái báo cáo (PRE-2, EX01): Chỉ cho phép rút khi còn PENDING
+        if (!"PENDING".equalsIgnoreCase(report.getStatus())) {
+            throw new BadRequestOperationException(
+                    "REPORT_ALREADY_REVIEWED",
+                    "This report has already been reviewed and cannot be withdrawn"
+            );
+        }
+
+        // 5. Xóa bản ghi báo cáo khỏi cơ sở dữ liệu (NF01 Step 5, POST-1)
+        contentReportRepository.delete(report);
+        log.info("Content report #{} on trackId {} successfully withdrawn and deleted by user {}",
+                reportId, report.getTrackId() != null ? report.getTrackId() : report.getTargetId(), user.getEmail());
+    }
+
+    /**
      * Lấy toàn bộ lịch sử báo cáo vi phạm nội dung do người nghe hiện tại đã gửi (UC-22.2).
      * Sắp xếp theo ngày tạo mới nhất lên trước.
      */
