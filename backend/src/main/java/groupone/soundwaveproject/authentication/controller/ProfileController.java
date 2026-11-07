@@ -53,7 +53,7 @@ public class ProfileController {
     @PatchMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProfileResponse updateCurrentProfileWithAvatar(Authentication authentication,
                                                           @Valid @RequestPart("profile") UpdateProfileRequest request,
-                                                          @RequestPart("avatar") MultipartFile avatar) {
+                                                          @RequestPart(value = "avatar", required = false) MultipartFile avatar) {
         return profileService.updateCurrentProfile(authentication.getName(), request, avatar);
     }
 }

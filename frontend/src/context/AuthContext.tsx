@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username: profile.username,
         displayName: profile.displayName,
         avatarUrl: profile.avatarUrl,
-        role: profile.role,
+        role: current.role || profile.role,
         bio: profile.bio ?? undefined,
         dateOfBirth: profile.dateOfBirth ?? undefined,
         countryCode: profile.countryCode ?? undefined,
