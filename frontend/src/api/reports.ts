@@ -12,6 +12,11 @@ export interface CreateTrackReportPayload {
   description?: string;
 }
 
+export interface UpdateTrackReportPayload {
+  category: ReportCategoryType | string;
+  description?: string;
+}
+
 export interface TrackReportResponse {
   id: number;
   trackId: number;
@@ -71,6 +76,16 @@ export const reportsApi = {
    */
   getMyReports: (): Promise<MyReportHistoryResponse[]> => {
     return apiFetch<MyReportHistoryResponse[]>("/reports/my-reports");
+  },
+
+  /**
+   * Cập nhật danh mục lý do vi phạm của báo cáo đang PENDING (UC-22.3).
+   */
+  updateReport: (reportId: number, payload: UpdateTrackReportPayload): Promise<TrackReportResponse> => {
+    return apiFetch<TrackReportResponse>(`/reports/${reportId}`, {
+      method: "PUT",
+      body: payload,
+    });
   },
 
   /**

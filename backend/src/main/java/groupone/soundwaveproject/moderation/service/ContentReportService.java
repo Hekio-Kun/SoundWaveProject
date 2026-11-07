@@ -6,9 +6,11 @@ import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
+import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
+import groupone.soundwaveproject.moderation.dto.request.UpdateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
 import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
@@ -117,6 +119,112 @@ public class ContentReportService {
                 saved.getDescription(),
                 saved.getStatus(),
                 saved.getCreatedAt()
+        );
+    }
+
+    /**
+     * Cập nhật danh mục lý do vi phạm của báo cáo vi phạm bài hát đang PENDING (UC-22.3).
+     *
+     * @param reportId ID của báo cáo cần cập nhật
+     * @param userEmail Email của người dùng đăng nhập
+     * @param request DTO chứa danh mục vi phạm mới
+     * @return Thông tin báo cáo sau khi cập nhật
+     */
+    @Transactional
+    public TrackReportResponse updateTrackReport(Long reportId, String userEmail, UpdateTrackReportRequest request) {
+        // 1. Xác thực người dùng (PRE-1, BR-36)
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
+
+        // 2. Tìm kiếm báo cáo vi phạm
+        ContentReport report = contentReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("REPORT_NOT_FOUND", "Content report not found with id: " + reportId));
+
+        // 3. Kiểm tra quyền sở hữu (PRE-2): Báo cáo phải thuộc về người dùng hiện tại
+        Long ownerId = report.getSubmittedByUserId() != null ? report.getSubmittedByUserId() : report.getReporterId();
+        if (ownerId == null || !ownerId.equals(user.getId())) {
+            throw new ForbiddenOperationException(
+                    "UNAUTHORIZED_REPORT_ACCESS",
+                    "You do not have permission to modify this report."
+            );
+        }
+
+        // 4. Kiểm tra trạng thái báo cáo:
+        // - Đã được duyệt (RESOLVED): Không cho sửa (Read-only)
+        // - Đang chờ duyệt (PENDING): Không cho sửa nữa (đã vào pending thì chờ staff duyệt)
+        // - Bị từ chối (DISMISSED / REJECTED): Được phép chỉnh sửa lý do và gửi lại (chuyển về PENDING)
+        String currentStatus = report.getStatus() != null ? report.getStatus().toUpperCase() : "";
+        if ("RESOLVED".equals(currentStatus)) {
+            throw new BadRequestOperationException(
+                    "REPORT_RESOLVED",
+                    "This report has already been resolved and cannot be modified."
+            );
+        }
+        if ("PENDING".equals(currentStatus)) {
+            throw new BadRequestOperationException(
+                    "REPORT_PENDING",
+                    "This report is currently pending review and cannot be modified."
+            );
+        }
+        if (!"DISMISSED".equals(currentStatus) && !"REJECTED".equals(currentStatus)) {
+            throw new BadRequestOperationException(
+                    "REPORT_NOT_MODIFIABLE",
+                    "Only rejected or dismissed reports can be modified and resubmitted."
+            );
+        }
+
+        // 5. Kiểm tra tính hợp lệ của danh mục vi phạm (BR-31)
+        if (!ReportCategory.isValid(request.category())) {
+            throw new BadRequestOperationException(
+                    "INVALID_REPORT_CATEGORY",
+                    "Invalid report category. Must be one of COPYRIGHT, INAPPROPRIATE_CONTENT, INCORRECT_METADATA, OTHER."
+            );
+        }
+        ReportCategory newCategory = ReportCategory.fromString(request.category());
+
+        // 6. Cập nhật reason, category, description và chuyển trạng thái về PENDING
+        String description = (request.description() != null && !request.description().isBlank())
+                ? request.description().trim()
+                : newCategory.getDisplayName();
+
+        report.setCategory(newCategory.name());
+        report.setReason(newCategory.name());
+        report.setDescription(description);
+        report.setStatus("PENDING");
+        report.setResolutionNote(null);
+        report.setReviewerNote(null);
+
+        ContentReport updated = contentReportRepository.save(report);
+        log.info("Content report #{} updated with new category: {} and resubmitted as PENDING by user: {}",
+                updated.getId(), newCategory.name(), user.getEmail());
+
+        Long trackId = updated.getTrackId() != null ? updated.getTrackId() : updated.getTargetId();
+        Track track = trackId != null ? trackRepository.findById(trackId).orElse(null) : null;
+        return mapToTrackReportResponse(updated, track);
+    }
+
+    private TrackReportResponse mapToTrackReportResponse(ContentReport report, Track track) {
+        Long trackId = report.getTrackId() != null ? report.getTrackId() : report.getTargetId();
+        String trackTitle = track != null ? track.getTitle() : "Track #" + trackId;
+        String coverUrl = track != null ? track.getCoverUrl() : null;
+        String cat = report.getCategory() != null ? report.getCategory() : report.getReason();
+        String catLabel = ReportCategory.isValid(cat)
+                ? ReportCategory.fromString(cat).getDisplayName()
+                : (cat != null ? cat : "Other");
+
+        Long ownerId = report.getSubmittedByUserId() != null ? report.getSubmittedByUserId() : report.getReporterId();
+
+        return new TrackReportResponse(
+                report.getId(),
+                trackId,
+                trackTitle,
+                coverUrl,
+                ownerId,
+                cat,
+                catLabel,
+                report.getDescription(),
+                report.getStatus(),
+                report.getCreatedAt()
         );
     }
 

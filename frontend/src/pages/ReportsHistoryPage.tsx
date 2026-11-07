@@ -3,6 +3,7 @@ import { reportsApi, type MyReportHistoryResponse } from "../api/reports";
 import { covers } from "../data";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
+import { ChangeReportReasonModal } from "../components/modals/ChangeReportReasonModal";
 import {
   AlertIcon,
   ClockIcon,
@@ -52,7 +53,8 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ReportFilterTab>("ALL");
 
-  // Confirmation modal and toast states
+  // Confirmation modal, edit modal, and toast states
+  const [editingReport, setEditingReport] = useState<MyReportHistoryResponse | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<MyReportHistoryResponse | null>(null);
   const [toastNotification, setToastNotification] = useState<{
     open: boolean;
@@ -482,44 +484,45 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
                           )}
                         </div>
 
-                        {/* Action Buttons (NF01 Step 4) */}
+                        {/* Action Buttons */}
                         <div className="row-actions" style={{ justifyContent: "flex-end" }}>
-                          {isPending ? (
-                            <div style={{ display: "inline-flex", gap: "6px" }}>
-                              <button
-                                type="button"
-                                className="button button-ghost button-small"
-                                onClick={() => handleActionNotice("Change Reason (UC-22.3)")}
-                                title="Update violation reason"
-                                style={{
-                                  fontSize: "11.5px",
-                                  padding: "3px 8px",
-                                  borderRadius: "6px",
-                                  color: "var(--brand, #0284c7)",
-                                  border: "1px solid #bae6fd",
-                                  background: "#f0f9ff",
-                                }}
-                              >
-                                Change
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-ghost button-small"
-                                onClick={() => setWithdrawTarget(item)}
-                                title="Withdraw this pending report"
-                                style={{
-                                  fontSize: "11.5px",
-                                  padding: "3px 8px",
-                                  borderRadius: "6px",
-                                  color: "#b42318",
-                                  border: "1px solid #fecdca",
-                                  background: "#fff5f5",
-                                }}
-                              >
-                                Withdraw
-                              </button>
-                            </div>
-                          ) : (
+                          {isDismissed && (
+                            <button
+                              type="button"
+                              className="button button-ghost button-small"
+                              onClick={() => setEditingReport(item)}
+                              title="Change Reason and resubmit report (UC-22.3)"
+                              style={{
+                                fontSize: "11.5px",
+                                padding: "3px 8px",
+                                borderRadius: "6px",
+                                color: "var(--brand, #0284c7)",
+                                border: "1px solid #bae6fd",
+                                background: "#f0f9ff",
+                              }}
+                            >
+                              Change
+                            </button>
+                          )}
+                          {isPending && (
+                            <button
+                              type="button"
+                              className="button button-ghost button-small"
+                              onClick={() => setWithdrawTarget(item)}
+                              title="Withdraw this pending report"
+                              style={{
+                                fontSize: "11.5px",
+                                padding: "3px 8px",
+                                borderRadius: "6px",
+                                color: "#b42318",
+                                border: "1px solid #fecdca",
+                                background: "#fff5f5",
+                              }}
+                            >
+                              Withdraw
+                            </button>
+                          )}
+                          {isResolved && (
                             <span style={{ fontSize: "11.5px", color: "#94a3b8", fontStyle: "italic" }}>
                               Read-only
                             </span>
@@ -533,6 +536,30 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Modal for Changing Report Violation Reason (UC-22.3) */}
+      {editingReport && (
+        <ChangeReportReasonModal
+          open={Boolean(editingReport)}
+          onClose={() => setEditingReport(null)}
+          reportId={editingReport.id}
+          trackId={editingReport.trackId}
+          trackTitle={editingReport.trackTitle}
+          trackCoverUrl={editingReport.trackCoverUrl}
+          currentCategory={editingReport.category}
+          onSuccess={(msg) => {
+            setToastNotification({
+              open: true,
+              message: msg,
+              type: "success",
+            });
+            void loadReports();
+          }}
+          onReloadRequested={() => {
+            void loadReports();
+          }}
+        />
       )}
 
       {/* Confirmation Modal for Withdrawing Report (UC-22.4) */}
