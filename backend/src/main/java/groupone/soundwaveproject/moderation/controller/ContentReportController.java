@@ -2,6 +2,7 @@ package groupone.soundwaveproject.moderation.controller;
 
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
+import groupone.soundwaveproject.moderation.dto.request.UpdateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
 import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
@@ -43,6 +44,25 @@ public class ContentReportController {
                 request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Cập nhật danh mục lý do vi phạm của báo cáo vi phạm nội dung đang chờ duyệt (UC-22.3).
+     * Yêu cầu người nghe đã đăng nhập (BR-36) và là chủ sở hữu của báo cáo.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<TrackReportResponse> updateTrackReport(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody UpdateTrackReportRequest request,
+            Authentication authentication
+    ) {
+        TrackReportResponse response = contentReportService.updateTrackReport(
+                id,
+                authentication.getName(),
+                request
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**

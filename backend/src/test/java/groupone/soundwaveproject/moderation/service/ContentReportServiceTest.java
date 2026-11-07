@@ -7,9 +7,11 @@ import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
+import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
+import groupone.soundwaveproject.moderation.dto.request.UpdateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
 import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
@@ -346,5 +348,128 @@ class ContentReportServiceTest {
         );
 
         verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    // =========================================================================
+    // UC-22.3: updateTrackReport Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("updateTrackReport - Successfully updates rejected report and resubmits as PENDING")
+    void updateTrackReport_Success() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .description("Copyright Infringement")
+                .status("DISMISSED") // Rejected report
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+
+        when(contentReportRepository.save(any(ContentReport.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateTrackReportRequest request = new UpdateTrackReportRequest("INAPPROPRIATE_CONTENT");
+        TrackReportResponse response = contentReportService.updateTrackReport(1L, "listener@example.com", request);
+
+        assertNotNull(response);
+        assertEquals("INAPPROPRIATE_CONTENT", response.category());
+        assertEquals("Inappropriate or Offensive Content", response.categoryLabel());
+        assertEquals("PENDING", response.status());
+        verify(contentReportRepository, times(1)).save(existing);
+    }
+
+    @Test
+    @DisplayName("updateTrackReport - Throws BadRequestOperationException when status is PENDING (cannot edit pending)")
+    void updateTrackReport_WhenPending_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .description("Copyright Infringement")
+                .status("PENDING")
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        UpdateTrackReportRequest request = new UpdateTrackReportRequest("OTHER");
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.updateTrackReport(1L, "listener@example.com", request)
+        );
+        assertTrue(ex.getMessage().contains("pending review"));
+        verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("updateTrackReport - Throws ForbiddenOperationException when report belongs to another user")
+    void updateTrackReport_UnauthorizedUser() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(999L) // Another user
+                .category("COPYRIGHT")
+                .status("DISMISSED")
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        UpdateTrackReportRequest request = new UpdateTrackReportRequest("OTHER");
+
+        assertThrows(ForbiddenOperationException.class, () ->
+                contentReportService.updateTrackReport(1L, "listener@example.com", request)
+        );
+        verify(contentReportRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateTrackReport - Throws BadRequestOperationException when status is RESOLVED")
+    void updateTrackReport_WhenResolved_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .status("RESOLVED") // Reviewed and resolved
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        UpdateTrackReportRequest request = new UpdateTrackReportRequest("OTHER");
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.updateTrackReport(1L, "listener@example.com", request)
+        );
+        assertTrue(ex.getMessage().contains("resolved"));
+        verify(contentReportRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateTrackReport - Throws BadRequestOperationException when category option is invalid")
+    void updateTrackReport_InvalidCategory() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+
+        ContentReport existing = ContentReport.builder()
+                .id(1L)
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .category("COPYRIGHT")
+                .status("DISMISSED")
+                .build();
+        when(contentReportRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        UpdateTrackReportRequest request = new UpdateTrackReportRequest("NOT_A_VALID_CATEGORY");
+
+        assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.updateTrackReport(1L, "listener@example.com", request)
+        );
+        verify(contentReportRepository, never()).save(any());
     }
 }
