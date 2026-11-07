@@ -274,7 +274,7 @@ export function TrackDetailsPage({
     playlistModalOpen ||
     authPromptOpen ||
     deleteConfirmOpen ||
-    reportModalOpen ||
+    reportTrackModalOpen ||
     isKaraokeFullscreen;
   useModalScrollLock(anyModalOpen);
 
@@ -294,7 +294,7 @@ export function TrackDetailsPage({
       if (event.key === "Escape") {
         setPlaylistModalOpen(false);
         setAuthPromptOpen(false);
-        setReportModalOpen(false);
+        setReportTrackModalOpen(false);
         setIsKaraokeFullscreen(false);
         
         if (!deleteSaving) setDeleteConfirmOpen(false);
@@ -718,7 +718,7 @@ export function TrackDetailsPage({
                 <button
                   type="button"
                   className="track-lyrics-tool-btn"
-                  onClick={() => setReportModalOpen(true)}
+                  onClick={() => setReportTrackModalOpen(true)}
                   title="Report inaccurate lyrics"
                   aria-label="Report inaccurate lyrics"
                 >
