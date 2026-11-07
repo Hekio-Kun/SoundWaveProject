@@ -485,16 +485,20 @@ export function TrackDetailsPage({
     if (timeSec === null) return;
     if (isPlayingThisTrack && audio) {
       audio.currentTime = Math.max(0, timeSec);
-      if (!playing) {
+      if (audio.paused) {
         void audio.play().catch(() => {});
       }
     } else if (track) {
       onPlayTrack(track);
-      setTimeout(() => {
+      const applySeek = () => {
         if (audio) {
           audio.currentTime = Math.max(0, timeSec);
         }
-      }, 150);
+      };
+      if (audio) {
+        audio.addEventListener("loadedmetadata", applySeek, { once: true });
+        setTimeout(applySeek, 200);
+      }
     }
   };
 

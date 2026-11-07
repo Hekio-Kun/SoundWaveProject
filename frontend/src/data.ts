@@ -56,9 +56,9 @@ export const projectTracks: LandingTrack[] = [
     publicationStatus: "PUBLISHED",
     genreSlug: "pop",
     genreName: "Pop",
-    description: "Bản tình ca Pop ngọt ngào, lãng mạn đình đám của Sơn Tùng M-TP do Hekio phát hành.",
+    description: "Bản tình ca Pop ngọt ngào, lãng mạn đình đám của Sơn Tùng M-TP.",
     lyrics: `Em là ai từ đâu bước đến nơi đây dịu dàng chân phương\nCầm tay anh đi qua bao giông tố cuộc đời...\nCầm tay anh, dựa vai anh\nĐừng buông tay anh nhé!`,
-    creator: creators.hekio,
+    creator: creators.sontung,
     album: { id: 1, title: "Nơi Này Có Anh" },
   },
   {
