@@ -17,6 +17,10 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, Lo
 
     Page<ContentReport> findByTargetTypeAndStatus(String targetType, String status, Pageable pageable);
 
+    List<ContentReport> findAllByOrderByCreatedAtDesc();
+
+    List<ContentReport> findByTargetIdAndStatus(Long targetId, String status);
+
     /**
      * Lấy danh sách các báo cáo vi phạm do nhân viên xử lý (UC-27.4).
      */
@@ -27,6 +31,13 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, Lo
     List<ContentReport> findBySubmittedByUserIdOrderByCreatedAtDesc(Long submittedByUserId);
 
     List<ContentReport> findByTrackIdAndStatusIgnoreCase(Long trackId, String status);
+
+    /**
+     * Lấy danh sách toàn bộ báo cáo vi phạm do người dùng chỉ định gửi lên (UC-22.2).
+     * Hỗ trợ cả submittedByUserId và reporterId (legacy).
+     */
+    @Query("SELECT c FROM ContentReport c WHERE c.submittedByUserId = :userId OR c.reporterId = :userId ORDER BY c.createdAt DESC")
+    List<ContentReport> findMyReports(@Param("userId") Long userId);
 
     /**
      * Kiểm tra xem người dùng đã có báo cáo đang chờ xử lý (PENDING) cho bài hát này hay chưa (EX01).

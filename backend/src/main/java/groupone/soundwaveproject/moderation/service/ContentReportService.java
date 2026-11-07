@@ -10,6 +10,7 @@ import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.response.ContentReportResponse;
+import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse;
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.entity.ReportCategory;
@@ -19,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Service xử lý các nghiệp vụ liên quan đến báo cáo nội dung (UC-22.1)
@@ -115,6 +118,55 @@ public class ContentReportService {
                 saved.getStatus(),
                 saved.getCreatedAt()
         );
+    }
+
+    /**
+     * Lấy toàn bộ lịch sử báo cáo vi phạm nội dung do người nghe hiện tại đã gửi (UC-22.2).
+     * Sắp xếp theo ngày tạo mới nhất lên trước.
+     */
+    @Transactional(readOnly = true)
+    public List<MyReportHistoryResponse> getMyReports(String userEmail) {
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
+
+        List<ContentReport> reports = contentReportRepository.findMyReports(user.getId());
+        if (reports.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Lấy thông tin chi tiết bài hát tương ứng
+        Set<Long> trackIds = reports.stream()
+                .map(r -> r.getTrackId() != null ? r.getTrackId() : r.getTargetId())
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, Track> trackMap = trackRepository.findAllById(trackIds).stream()
+                .collect(Collectors.toMap(Track::getId, Function.identity()));
+
+        return reports.stream().map(r -> {
+            Long trackId = r.getTrackId() != null ? r.getTrackId() : r.getTargetId();
+            Track track = trackId != null ? trackMap.get(trackId) : null;
+            String trackTitle = track != null ? track.getTitle() : "Track #" + trackId;
+            String coverUrl = track != null ? track.getCoverUrl() : null;
+
+            String cat = r.getCategory() != null ? r.getCategory() : r.getReason();
+            String catLabel = ReportCategory.isValid(cat)
+                    ? ReportCategory.fromString(cat).getDisplayName()
+                    : (cat != null ? cat : "Other");
+
+            return new MyReportHistoryResponse(
+                    r.getId(),
+                    trackId,
+                    trackTitle,
+                    coverUrl,
+                    cat,
+                    catLabel,
+                    r.getStatus(),
+                    r.getResolutionNote() != null ? r.getResolutionNote() : r.getReviewerNote(),
+                    r.getCreatedAt(),
+                    r.getHandledAt() != null ? r.getHandledAt() : r.getResolvedAt()
+            );
+        }).toList();
     }
 
     /**
