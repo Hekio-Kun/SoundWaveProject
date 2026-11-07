@@ -120,7 +120,6 @@ export function TrackDetailsPage({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [reportTrackModalOpen, setReportTrackModalOpen] = useState(false);
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
   // More Creator Tracks & Karaoke Fullscreen
   const [moreCreatorTracks, setMoreCreatorTracks] = useState<LandingTrack[]>([]);
@@ -621,6 +620,15 @@ export function TrackDetailsPage({
               <PlusIcon />
             </button>
 
+            <button
+              className="track-round-action"
+              onClick={handleShareTrack}
+              aria-label="Share track"
+              title="Share track & copy link"
+            >
+              <ShareIcon />
+            </button>
+
             {/* Direct Report Track Action Button (UC-22.1) */}
             <button
               type="button"
@@ -632,75 +640,6 @@ export function TrackDetailsPage({
             >
               <FlagIcon width={18} height={18} />
             </button>
-
-            {/* Context menu (...) for Track Operations (UC-22.1) */}
-            <div style={{ position: "relative" }}>
-              <button
-                type="button"
-                className="track-round-action"
-                title="More options (...)"
-                aria-label="More options"
-                aria-haspopup="true"
-                aria-expanded={contextMenuOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setContextMenuOpen((prev) => !prev);
-                }}
-              >
-                <MoreIcon width={18} height={18} />
-              </button>
-
-              {contextMenuOpen && (
-                <div
-                  className="track-context-menu"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    zIndex: 30,
-                    background: "#FFFFFF",
-                    borderRadius: "12px",
-                    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.14)",
-                    border: "1px solid #E2E8F0",
-                    minWidth: "170px",
-                    padding: "6px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2px",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "8px 12px",
-                      background: "transparent",
-                      border: "none",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "0.875rem",
-                      color: "#DC2626",
-                      fontWeight: 500,
-                      textAlign: "left",
-                      width: "100%",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#FEE2E2")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    onClick={() => {
-                      setContextMenuOpen(false);
-                      requestLibraryAccess(() => setReportTrackModalOpen(true));
-                    }}
-                  >
-                    <FlagIcon width={16} height={16} />
-                    <span>Report Track</span>
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
           {actionMessage ? (
             <p className="track-action-message is-success" role="status">
@@ -785,18 +724,6 @@ export function TrackDetailsPage({
                   <DownloadIcon width={15} height={15} />
                 </button>
               )}
-
-              {/* Report Track / Lyrics Violation */}
-              <button
-                type="button"
-                className="button button-ghost button-small"
-                onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
-                title="Report track or lyrics violation"
-                style={{ color: "#DC2626", display: "inline-flex", alignItems: "center", gap: 5 }}
-              >
-                <FlagIcon width={13} height={13} />
-                <span>Report Track</span>
-              </button>
             </div>
           </header>
 
@@ -1095,16 +1022,51 @@ export function TrackDetailsPage({
             <p>Explore more music and albums from this creator.</p>
             <button onClick={() => goToCreatorProfile(creatorId)}>View profile</button>
           </section>
-          {/* UC-22.1: Report Track Action in Release Information Sidebar */}
-          <button
-            type="button"
-            className="track-report-button"
-            onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
-            title="Report this track for violation"
-          >
-            <FlagIcon width={16} height={16} />
-            <span>Report this track</span>
-          </button>
+          {/* More from this Creator */}
+          <section className="track-context-card track-more-tracks-card">
+            <h4 style={{ margin: "0 0 10px", fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              More from this Creator
+            </h4>
+            {moreCreatorLoading ? (
+              <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>Loading songs...</p>
+            ) : moreCreatorTracks.length > 0 ? (
+              <div className="track-more-list">
+                {moreCreatorTracks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="track-more-item"
+                    onClick={() => onNavigate(`/tracks/${item.id}`)}
+                    title={`Go to ${item.title}`}
+                  >
+                    <img
+                      src={item.coverUrl || covers.dawn}
+                      alt={item.title}
+                      className="track-more-thumb"
+                    />
+                    <div className="track-more-info">
+                      <span className="track-more-title">{item.title}</span>
+                      <span className="track-more-meta">{formatDuration(item.durationMs)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="track-more-play-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayTrack(item);
+                      }}
+                      title={`Play ${item.title}`}
+                    >
+                      <PlayIcon width={12} height={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                No other songs found for this creator.
+              </p>
+            )}
+          </section>
         </aside>
       </div>
 

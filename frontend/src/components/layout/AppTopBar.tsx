@@ -225,9 +225,9 @@ export function AppTopBar({
         ref={searchContainerRef}
         style={{
           flex: 1,
-          minWidth: "320px",
-          maxWidth: "820px",
-          margin: "0 20px",
+          minWidth: "260px",
+          maxWidth: "480px",
+          margin: "0 16px",
           position: "relative",
           display: "flex",
           alignItems: "center",
@@ -256,7 +256,7 @@ export function AppTopBar({
             aria-label="Search catalog"
             style={{
               width: "100%",
-              height: "46px",
+              height: "42px",
               padding: "0 46px 0 50px",
               borderRadius: "9999px",
               border: searchWarning ? "1.5px solid #EF4444" : "1px solid var(--sw-border, #E2E8F0)",

@@ -69,7 +69,7 @@ body { overflow-x: hidden; }
 .topbar-upload-btn { border-radius: 11px; border: 1px solid #e6d5b8 !important; background: #fdf5e8; color: #8c5828; }
 .topbar-upload-btn:hover { background: #d4a373; color: #fff; border-color: #d4a373 !important; box-shadow: 0 4px 14px rgba(212, 163, 115, 0.28); }
 .topbar-user-btn { min-height: 42px; border: 1px solid #e6d5b8; border-radius: 13px; padding: 4px 9px 4px 5px; background: #fffdfa; }
-.app-content-body { max-width: 1450px; padding: 30px 36px 62px; }
+.app-content-body { max-width: 1450px; padding: 22px 36px 62px; }
 .app-shell-footer { margin-top: 10px; }
 .app-shell-footer .site-footer { position: relative; display: block; padding-bottom: 0; background: #fff; }
 .app-shell-footer .container { width: min(calc(100% - 72px), 1378px); }
@@ -211,7 +211,7 @@ body { overflow-x: hidden; }
 @keyframes sw-page-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Track detail */
-.track-page-v2 { display: flex; flex-direction: column; gap: 28px; animation: sw-page-in .32s ease-out both; }
+.track-page-v2 { display: flex; flex-direction: column; gap: 16px; animation: sw-page-in .32s ease-out both; }
 .track-breadcrumb { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #98a2b3; font-size: 10px; }
 .track-breadcrumb button { overflow: hidden; max-width: 190px; padding: 0; border: 0; background: transparent; color: var(--sw-muted); font-size: inherit; text-overflow: ellipsis; white-space: nowrap; }
 .track-breadcrumb button:hover { color: var(--sw-primary); }.track-breadcrumb b { overflow: hidden; color: #475467; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
