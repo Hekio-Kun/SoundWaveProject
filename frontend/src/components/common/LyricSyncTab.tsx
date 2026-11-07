@@ -18,10 +18,11 @@ import {
   RefreshIcon,
   RewindIcon,
   RotateCcwIcon,
+  SlidersIcon,
   TrashIcon,
   ZapIcon,
 } from "../../icons";
-import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
+import { CenterNotificationPopup, type CenterNotificationType } from "../modals/CenterNotificationPopup";
 
 export interface LyricLine {
   id: string;
@@ -135,7 +136,12 @@ export function LyricSyncTab({
   const [dictationInput, setDictationInput] = useState("");
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
-  const [feedbackNotice, setFeedbackNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedbackNotice, setFeedbackNotice] = useState<{ type: CenterNotificationType; message: string } | null>(null);
+
+  // Timing & Nudge Rules state
+  const [nudgeStep, setNudgeStep] = useState<0.1 | 0.2 | 0.5>(0.2);
+  const [nudgeMode, setNudgeMode] = useState<"single" | "ripple">("single");
+  const [history, setHistory] = useState<LyricLine[][]>([]);
 
   // Auto-scroll refs
   const lineListRef = useRef<HTMLDivElement | null>(null);
@@ -214,12 +220,37 @@ export function LyricSyncTab({
     }
   }, [activeLineIndex, subMode]);
 
-  // Keyboard shortcut: Space to stamp when not typing
+  // Push current lines to Undo history (max 20 steps)
+  const pushHistory = (currentLines: LyricLine[]) => {
+    setHistory((prev) => {
+      const next = [...prev, currentLines.map((l) => ({ ...l }))];
+      if (next.length > 20) return next.slice(next.length - 20);
+      return next;
+    });
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const last = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, prev.length - 1));
+    setLines(last);
+    setFeedbackNotice({ type: "info", message: "Reverted to previous lyric timing." });
+  };
+
+  // Keyboard shortcut: Space to stamp, [ / ] to nudge, Ctrl+Z to undo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
 
+      // Undo: Ctrl+Z / Cmd+Z
+      if (!isInput && (e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Space to stamp or toggle preview
       if (e.code === "Space" && !isInput) {
         e.preventDefault();
         if (subMode === "sync" && lines.length > 0) {
@@ -230,16 +261,33 @@ export function LyricSyncTab({
         return;
       }
 
-      if (!isInput && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      // Nudge active line: [ or Alt+Left for backward, ] or Alt+Right for forward
+      if (!isInput && subMode === "sync" && lines[activeLineIndex]?.timeSec !== null) {
+        if (e.key === "[" || (e.altKey && e.key === "ArrowLeft")) {
+          e.preventDefault();
+          const step = e.shiftKey ? 0.5 : nudgeStep;
+          handleAdjustLineTime(activeLineIndex, -step);
+          return;
+        }
+        if (e.key === "]" || (e.altKey && e.key === "ArrowRight")) {
+          e.preventDefault();
+          const step = e.shiftKey ? 0.5 : nudgeStep;
+          handleAdjustLineTime(activeLineIndex, step);
+          return;
+        }
+      }
+
+      // Seek audio playback: ArrowLeft / ArrowRight
+      if (!isInput && !e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
-        const step = e.shiftKey ? 3 : 0.2;
+        const step = e.shiftKey ? 3 : 0.5;
         seekRelative(e.key === "ArrowLeft" ? -step : step);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [subMode, lines, activeLineIndex, duration]);
+  }, [subMode, lines, activeLineIndex, duration, nudgeStep, nudgeMode, history]);
 
   // Audio Playback Controls
   const togglePlayPause = () => {
@@ -289,12 +337,15 @@ export function LyricSyncTab({
   const handleStampCurrentLine = () => {
     if (activeLineIndex < 0 || activeLineIndex >= lines.length) return;
     const time = audioRef.current ? audioRef.current.currentTime : currentTimeRef.current;
+    const roundedTime = Math.round(time * 100) / 100;
+
+    pushHistory(lines);
 
     setLines((prev) => {
       const next = [...prev];
       next[activeLineIndex] = {
         ...next[activeLineIndex],
-        timeSec: time,
+        timeSec: roundedTime,
       };
       return next;
     });
@@ -305,18 +356,196 @@ export function LyricSyncTab({
   };
 
   const handleAdjustLineTime = (index: number, delta: number) => {
+    const line = lines[index];
+    if (!line || line.timeSec === null) {
+      setFeedbackNotice({
+        type: "error",
+        message: "Please stamp this line first before adjusting its timing.",
+      });
+      return;
+    }
+
+    const maxDuration = duration > 0 ? Math.round(duration * 100) / 100 : 3600;
+    const MIN_GAP = 0.10;
+
+    pushHistory(lines);
+
+    if (nudgeMode === "ripple") {
+      // Ripple mode: shift line[index] and all subsequent stamped lines
+      let prevStamped: { timeSec: number; index: number } | null = null;
+      for (let i = index - 1; i >= 0; i--) {
+        if (lines[i].timeSec !== null) {
+          prevStamped = { timeSec: lines[i].timeSec!, index: i };
+          break;
+        }
+      }
+
+      let effectiveDelta = delta;
+      if (effectiveDelta < 0 && prevStamped) {
+        const minAllowed = prevStamped.timeSec + MIN_GAP;
+        if (line.timeSec + effectiveDelta < minAllowed) {
+          effectiveDelta = minAllowed - line.timeSec;
+          if (effectiveDelta >= 0) {
+            setFeedbackNotice({
+              type: "warning",
+              message: `Cannot shift earlier: Blocked by line #${prevStamped.index + 1} (${formatTimeDisplay(prevStamped.timeSec)}).`,
+            });
+            return;
+          }
+        }
+      }
+
+      if (line.timeSec + effectiveDelta < 0) {
+        effectiveDelta = -line.timeSec;
+      }
+
+      const roundedDelta = Math.round(effectiveDelta * 100) / 100;
+      if (roundedDelta === 0) {
+        setFeedbackNotice({
+          type: "warning",
+          message: "Reached minimum boundary constraint.",
+        });
+        return;
+      }
+
+      setLines((prev) => {
+        const next = [...prev];
+        for (let i = index; i < next.length; i++) {
+          if (next[i].timeSec !== null) {
+            const shifted = Math.round((next[i].timeSec! + roundedDelta) * 100) / 100;
+            next[i] = {
+              ...next[i],
+              timeSec: Math.max(0, Math.min(maxDuration, shifted)),
+            };
+          }
+        }
+        return next;
+      });
+
+      setFeedbackNotice({
+        type: "success",
+        message: `Ripple shifted line #${index + 1} and following lines by ${roundedDelta > 0 ? "+" : ""}${roundedDelta}s.`,
+      });
+    } else {
+      // Single line mode: check adjacent stamped boundaries
+      let prevStamped: { timeSec: number; index: number } | null = null;
+      for (let i = index - 1; i >= 0; i--) {
+        if (lines[i].timeSec !== null) {
+          prevStamped = { timeSec: lines[i].timeSec!, index: i };
+          break;
+        }
+      }
+
+      let nextStamped: { timeSec: number; index: number } | null = null;
+      for (let i = index + 1; i < lines.length; i++) {
+        if (lines[i].timeSec !== null) {
+          nextStamped = { timeSec: lines[i].timeSec!, index: i };
+          break;
+        }
+      }
+
+      const minBound = prevStamped ? prevStamped.timeSec + MIN_GAP : 0;
+      const maxBound = nextStamped ? nextStamped.timeSec - MIN_GAP : maxDuration;
+
+      const currentSec = line.timeSec;
+      const candidateSec = Math.round((currentSec + delta) * 100) / 100;
+
+      if (delta < 0 && candidateSec < minBound) {
+        if (currentSec <= minBound) {
+          setFeedbackNotice({
+            type: "warning",
+            message: `Cannot shift earlier: Minimum gap is 0.10s after line #${prevStamped!.index + 1} (${formatTimeDisplay(prevStamped!.timeSec)}).`,
+          });
+          return;
+        }
+        const clamped = Math.round(minBound * 100) / 100;
+        setLines((prev) => {
+          const next = [...prev];
+          next[index] = { ...next[index], timeSec: clamped };
+          return next;
+        });
+        setFeedbackNotice({
+          type: "info",
+          message: `Line #${index + 1} clamped to boundary after line #${prevStamped!.index + 1} (${formatTimeDisplay(clamped)}).`,
+        });
+        return;
+      }
+
+      if (delta > 0 && candidateSec > maxBound) {
+        if (currentSec >= maxBound) {
+          setFeedbackNotice({
+            type: "warning",
+            message: `Cannot shift later: Minimum gap is 0.10s before line #${nextStamped!.index + 1} (${formatTimeDisplay(nextStamped!.timeSec)}).`,
+          });
+          return;
+        }
+        const clamped = Math.round(maxBound * 100) / 100;
+        setLines((prev) => {
+          const next = [...prev];
+          next[index] = { ...next[index], timeSec: clamped };
+          return next;
+        });
+        setFeedbackNotice({
+          type: "info",
+          message: `Line #${index + 1} clamped to boundary before line #${nextStamped!.index + 1} (${formatTimeDisplay(clamped)}).`,
+        });
+        return;
+      }
+
+      const finalSec = Math.max(0, Math.min(maxDuration, candidateSec));
+      setLines((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], timeSec: finalSec };
+        return next;
+      });
+    }
+  };
+
+  const handleGlobalShift = (delta: number) => {
+    const stampedCount = lines.filter((l) => l.timeSec !== null).length;
+    if (stampedCount === 0) {
+      setFeedbackNotice({
+        type: "warning",
+        message: "No stamped lines to shift.",
+      });
+      return;
+    }
+
+    const maxDuration = duration > 0 ? Math.round(duration * 100) / 100 : 3600;
+    pushHistory(lines);
+
     setLines((prev) => {
-      const next = [...prev];
-      const currentSec = next[index].timeSec ?? currentTime;
-      next[index] = {
-        ...next[index],
-        timeSec: Math.max(0, Math.round((currentSec + delta) * 100) / 100),
-      };
-      return next;
+      return prev.map((line) => {
+        if (line.timeSec === null) return line;
+        const shifted = Math.round((line.timeSec + delta) * 100) / 100;
+        return {
+          ...line,
+          timeSec: Math.max(0, Math.min(maxDuration, shifted)),
+        };
+      });
+    });
+
+    setFeedbackNotice({
+      type: "success",
+      message: `Shifted all ${stampedCount} stamped lines by ${delta > 0 ? "+" : ""}${delta}s.`,
+    });
+  };
+
+  const handleAutoSortLines = () => {
+    pushHistory(lines);
+    setLines((prev) => {
+      const stamped = prev.filter((l) => l.timeSec !== null).sort((a, b) => a.timeSec! - b.timeSec!);
+      const unstamped = prev.filter((l) => l.timeSec === null);
+      return [...stamped, ...unstamped];
+    });
+    setFeedbackNotice({
+      type: "success",
+      message: "Lines re-sorted chronologically by timestamps.",
     });
   };
 
   const handleClearLineTime = (index: number) => {
+    pushHistory(lines);
     setLines((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], timeSec: null };
@@ -358,9 +587,26 @@ export function LyricSyncTab({
 
   // Save & Apply Actions
   const handleApply = () => {
-    const lrcContent = compileLinesToLrc(lines);
+    let currentLines = lines;
+    if (currentLines.length === 0 && rawText.trim()) {
+      currentLines = parseLyricsToLines(rawText);
+      setLines(currentLines);
+    }
+
+    if (currentLines.length === 0) {
+      setFeedbackNotice({ type: "error", message: "Please enter or paste your lyrics text before applying." });
+      return;
+    }
+
+    if (orderConflictsCount > 0) {
+      if (window.confirm(`There are ${orderConflictsCount} line(s) with timestamps out of chronological order. Would you like to auto-sort them by time before applying?`)) {
+        handleAutoSortLines();
+      }
+    }
+
+    const lrcContent = compileLinesToLrc(currentLines);
     if (!lrcContent.trim()) {
-      setFeedbackNotice({ type: "error", message: "Please enter and timestamp at least one lyric line before applying." });
+      setFeedbackNotice({ type: "error", message: "Please enter lyric lines before applying." });
       return;
     }
 
@@ -374,7 +620,7 @@ export function LyricSyncTab({
     onApplyLyrics(lrcContent, virtualFile);
     setFeedbackNotice({
       type: "success",
-      message: `Successfully applied ${lines.length} lyric lines to the track!`,
+      message: `Successfully applied ${currentLines.length} lyric lines to the track!`,
     });
   };
 
@@ -464,6 +710,20 @@ export function LyricSyncTab({
     );
   }
 
+  // Calculate order conflicts count
+  const orderConflictsCount = lines.reduce((count, line, idx) => {
+    if (line.timeSec === null || idx === 0) return count;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (lines[i].timeSec !== null) {
+        if (line.timeSec < lines[i].timeSec!) {
+          return count + 1;
+        }
+        break;
+      }
+    }
+    return count;
+  }, 0);
+
   return (
     <div
       className="lyric-sync-tab-container"
@@ -530,7 +790,7 @@ export function LyricSyncTab({
       {feedbackNotice && (
         <CenterNotificationPopup
           open={Boolean(feedbackNotice)}
-          type={feedbackNotice.type === "success" ? "success" : "error"}
+          type={feedbackNotice.type}
           message={feedbackNotice.message}
           onClose={() => setFeedbackNotice(null)}
         />
@@ -896,6 +1156,201 @@ export function LyricSyncTab({
                 </div>
               </div>
 
+              {/* Timing Tools & Nudge Rules Toolbar */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  background: "#FBF7EF",
+                  border: "1px solid #E8DCCB",
+                  borderRadius: "10px",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Left: Step preset & Mode selector */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#57534E", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      Step:
+                    </span>
+                    <div style={{ display: "inline-flex", borderRadius: "6px", overflow: "hidden", border: "1px solid #E2D7C3", background: "#FFF" }}>
+                      {([0.1, 0.2, 0.5] as const).map((step) => {
+                        const isSelected = nudgeStep === step;
+                        return (
+                          <button
+                            key={step}
+                            type="button"
+                            onClick={() => setNudgeStep(step)}
+                            style={{
+                              padding: "3px 8px",
+                              border: "none",
+                              background: isSelected ? "#0284C7" : "transparent",
+                              color: isSelected ? "#FFF" : "#57534E",
+                              fontSize: "11px",
+                              fontWeight: isSelected ? 800 : 600,
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {step}s
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#57534E", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      Mode:
+                    </span>
+                    <div style={{ display: "inline-flex", borderRadius: "6px", overflow: "hidden", border: "1px solid #E2D7C3", background: "#FFF" }}>
+                      <button
+                        type="button"
+                        onClick={() => setNudgeMode("single")}
+                        title="Adjust only the active line (preserves boundaries)"
+                        style={{
+                          padding: "3px 9px",
+                          border: "none",
+                          background: nudgeMode === "single" ? "#0284C7" : "transparent",
+                          color: nudgeMode === "single" ? "#FFF" : "#57534E",
+                          fontSize: "11px",
+                          fontWeight: nudgeMode === "single" ? 800 : 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Single
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNudgeMode("ripple")}
+                        title="Shift active line and all following lines together"
+                        style={{
+                          padding: "3px 9px",
+                          border: "none",
+                          background: nudgeMode === "ripple" ? "#0284C7" : "transparent",
+                          color: nudgeMode === "ripple" ? "#FFF" : "#57534E",
+                          fontSize: "11px",
+                          fontWeight: nudgeMode === "ripple" ? 800 : 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Ripple Down
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Global Shift & Undo */}
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#8D877F" }}>Global:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleGlobalShift(-0.5)}
+                    title="Shift all stamped lines back by 0.5s"
+                    style={{
+                      padding: "2px 7px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      borderRadius: "4px",
+                      border: "1px solid #E2D7C3",
+                      background: "#FFF",
+                      color: "#475569",
+                      cursor: "pointer",
+                    }}
+                  >
+                    All -0.5s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGlobalShift(0.5)}
+                    title="Shift all stamped lines forward by 0.5s"
+                    style={{
+                      padding: "2px 7px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      borderRadius: "4px",
+                      border: "1px solid #E2D7C3",
+                      background: "#FFF",
+                      color: "#475569",
+                      cursor: "pointer",
+                    }}
+                  >
+                    All +0.5s
+                  </button>
+
+                  <div style={{ width: "1px", height: "14px", background: "#E2D7C3", margin: "0 2px" }} />
+
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={history.length === 0}
+                    title="Undo last timing adjustment (Ctrl+Z)"
+                    style={{
+                      padding: "2px 8px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      borderRadius: "4px",
+                      border: "1px solid #E2D7C3",
+                      background: history.length > 0 ? "#FFF" : "#F5F5F4",
+                      color: history.length > 0 ? "#1C1917" : "#A8A29E",
+                      cursor: history.length > 0 ? "pointer" : "not-allowed",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <RotateCcwIcon width={11} height={11} />
+                    <span>Undo</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Order Conflict Alert Banner */}
+              {orderConflictsCount > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    color: "#991B1B",
+                    fontSize: "12px",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertIcon width={15} height={15} style={{ color: "#DC2626", flexShrink: 0 }} />
+                    <span>
+                      <strong>Order issue detected:</strong> {orderConflictsCount} line(s) have timestamps earlier than previous lines.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAutoSortLines}
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: "5px",
+                      border: "1px solid #DC2626",
+                      background: "#DC2626",
+                      color: "#FFF",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Auto-sort by time
+                  </button>
+                </div>
+              )}
+
               {/* Scrollable List */}
               <div
                 ref={lineListRef}
@@ -913,6 +1368,22 @@ export function LyricSyncTab({
                   const isEditing = editingLineId === line.id;
                   const hasTimestamp = line.timeSec !== null;
 
+                  // Conflict & Minimum Gap checks
+                  let prevStamped: { timeSec: number; index: number } | null = null;
+                  for (let i = idx - 1; i >= 0; i--) {
+                    if (lines[i].timeSec !== null) {
+                      prevStamped = { timeSec: lines[i].timeSec!, index: i };
+                      break;
+                    }
+                  }
+
+                  const isOrderConflict = hasTimestamp && prevStamped !== null && line.timeSec! < prevStamped.timeSec;
+                  const isTooClose =
+                    hasTimestamp &&
+                    prevStamped !== null &&
+                    !isOrderConflict &&
+                    line.timeSec! - prevStamped.timeSec < 0.15;
+
                   return (
                     <div
                       key={line.id}
@@ -925,13 +1396,21 @@ export function LyricSyncTab({
                         gap: "10px",
                         padding: "7px 12px",
                         borderRadius: "8px",
-                        border: isActive
+                        border: isOrderConflict
+                          ? "2px solid #EF4444"
+                          : isActive
                           ? "2px solid #0284C7"
+                          : isTooClose
+                          ? "1px solid #F59E0B"
                           : hasTimestamp
                           ? "1px solid #D5E7B5"
                           : "1px solid #EDE3D2",
-                        background: isActive
+                        background: isOrderConflict
+                          ? "#FEF2F2"
+                          : isActive
                           ? "#F0F9FF"
+                          : isTooClose
+                          ? "#FFFBEB"
                           : hasTimestamp
                           ? "#F9FCF3"
                           : "#FFFFFF",
@@ -956,8 +1435,8 @@ export function LyricSyncTab({
                               border: "none",
                               padding: "2px 7px",
                               borderRadius: "5px",
-                              background: "#E0F2FE",
-                              color: "#0284C7",
+                              background: isOrderConflict ? "#FEE2E2" : "#E0F2FE",
+                              color: isOrderConflict ? "#DC2626" : "#0284C7",
                               fontFamily: "monospace",
                               fontSize: "11.5px",
                               fontWeight: 700,
@@ -973,7 +1452,7 @@ export function LyricSyncTab({
                         )}
                       </div>
 
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "6px" }}>
                         {isEditing ? (
                           <input
                             type="text"
@@ -996,24 +1475,59 @@ export function LyricSyncTab({
                             }}
                           />
                         ) : (
-                          <p
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              handleStartEditLine(line);
-                            }}
-                            title="Double-click to edit text"
-                            style={{
-                              margin: 0,
-                              fontSize: "13px",
-                              fontWeight: isActive ? 700 : 500,
-                              color: isActive ? "#0284C7" : "#1C1917",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {line.text}
-                          </p>
+                          <>
+                            <p
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                handleStartEditLine(line);
+                              }}
+                              title="Double-click to edit text"
+                              style={{
+                                margin: 0,
+                                fontSize: "13px",
+                                fontWeight: isActive ? 700 : 500,
+                                color: isOrderConflict ? "#991B1B" : isActive ? "#0284C7" : "#1C1917",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flex: 1,
+                              }}
+                            >
+                              {line.text}
+                            </p>
+                            {isOrderConflict && (
+                              <span
+                                title={`Timestamp earlier than line #${prevStamped!.index + 1} (${formatTimeDisplay(prevStamped!.timeSec)})`}
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 800,
+                                  padding: "1px 6px",
+                                  borderRadius: "4px",
+                                  background: "#FEE2E2",
+                                  color: "#DC2626",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Order conflict
+                              </span>
+                            )}
+                            {isTooClose && (
+                              <span
+                                title={`Gap with line #${prevStamped!.index + 1} is only ${Math.round((line.timeSec! - prevStamped!.timeSec) * 100) / 100}s`}
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  padding: "1px 6px",
+                                  borderRadius: "4px",
+                                  background: "#FEF3C7",
+                                  color: "#D97706",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Gap &lt; 0.15s
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -1025,8 +1539,12 @@ export function LyricSyncTab({
                           <>
                             <button
                               type="button"
-                              onClick={() => handleAdjustLineTime(idx, -0.2)}
-                              title="Shift -0.2s"
+                              onClick={() => handleAdjustLineTime(idx, -nudgeStep)}
+                              title={
+                                nudgeMode === "ripple"
+                                  ? `Ripple shift -${nudgeStep}s (this and all following lines)`
+                                  : `Shift -${nudgeStep}s`
+                              }
                               style={{
                                 padding: "2px 6px",
                                 fontSize: "11px",
@@ -1042,12 +1560,16 @@ export function LyricSyncTab({
                               }}
                             >
                               <ChevronLeftIcon width={10} height={10} style={{ color: "#0284C7" }} />
-                              <span>0.2s</span>
+                              <span>{nudgeStep}s</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleAdjustLineTime(idx, 0.2)}
-                              title="Shift +0.2s"
+                              onClick={() => handleAdjustLineTime(idx, nudgeStep)}
+                              title={
+                                nudgeMode === "ripple"
+                                  ? `Ripple shift +${nudgeStep}s (this and all following lines)`
+                                  : `Shift +${nudgeStep}s`
+                              }
                               style={{
                                 padding: "2px 6px",
                                 fontSize: "11px",
@@ -1062,7 +1584,7 @@ export function LyricSyncTab({
                                 gap: "2px",
                               }}
                             >
-                              <span>0.2s</span>
+                              <span>{nudgeStep}s</span>
                               <ChevronRightIcon width={10} height={10} style={{ color: "#0284C7" }} />
                             </button>
                             <button
@@ -1081,6 +1603,7 @@ export function LyricSyncTab({
                               setActiveLineIndex(idx);
                               handleStampCurrentLine();
                             }}
+                            title="Stamp current playback time onto this line"
                             style={{
                               padding: "2px 7px",
                               borderRadius: "5px",
@@ -1107,6 +1630,27 @@ export function LyricSyncTab({
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Keyboard Shortcuts Hint Bar */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "4px 8px",
+                  fontSize: "10.5px",
+                  color: "#8D877F",
+                  flexWrap: "wrap",
+                  gap: "6px",
+                }}
+              >
+                <span>
+                  💡 <strong>Shortcuts:</strong> <code>[Space]</code> Stamp line &nbsp;|&nbsp; <code>[ / ]</code> Nudge ±{nudgeStep}s &nbsp;|&nbsp; <code>Shift + [ / ]</code> Nudge ±0.5s &nbsp;|&nbsp; <code>Ctrl+Z</code> Undo
+                </span>
+                <span>
+                  Mode: <strong style={{ color: "#0284C7" }}>{nudgeMode === "single" ? "Single Line" : "Ripple Down"}</strong>
+                </span>
               </div>
             </div>
           )}
@@ -1315,7 +1859,7 @@ export function LyricSyncTab({
           type="button"
           className="button button-primary"
           onClick={handleApply}
-          disabled={lines.length === 0}
+          disabled={lines.length === 0 && !rawText.trim()}
           style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
         >
           <CheckIcon width={15} height={15} />

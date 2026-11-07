@@ -27,6 +27,7 @@ import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
 
 import { TrackDetailsPage } from "../pages/TrackDetailsPage";
+import { TrackLyricsEditorPage } from "../pages/TrackLyricsEditorPage";
 import { CreateMyTrack } from "../pages/UploadTrackPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
 import { SearchPage } from "../pages/SearchPage";
@@ -242,6 +243,24 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
+  // [FEATURE]: Dedicated Lyric Studio Workspace (UC-16.2 & UC-18)
+  if (
+    pathname.match(/^\/tracks?\/(\d+)\/lyrics(?:\/edit)?$/) ||
+    pathname.match(/^\/track\/(\d+)\/lyrics/)
+  ) {
+    const segments = pathname.split('/');
+    const trackId = Number(segments[2]) || 1;
+    const mode = queryParams.get('mode') === 'personal' ? 'personal' : 'official';
+    return (
+      <TrackLyricsEditorPage
+        key={`${trackId}-${mode}`}
+        trackId={trackId}
+        initialMode={mode}
+        onNavigate={navigate}
+      />
+    );
+  }
+
   // [FEATURE]: Định tuyến trang chi tiết bài hát công khai (Public Catalog) cho Listener
   // Loại trừ các tiền tố Creator Studio (/track/submission, /track/create, /track/edit,...) để tránh xung đột
   if (
@@ -251,7 +270,8 @@ export function AppRouter(): React.ReactElement | null {
     !pathname.startsWith("/track/manage") &&
     !pathname.startsWith("/track/create") &&
     !pathname.startsWith("/track/upload") &&
-    !pathname.startsWith("/track/edit")
+    !pathname.startsWith("/track/edit") &&
+    !pathname.includes("/lyrics")
   ) {
     const parsedId = Number(pathname.split("/")[2]);
     const trackId = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : 1;
