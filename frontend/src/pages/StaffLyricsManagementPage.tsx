@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { lyricsApi, type PageResponse } from "../api/lyrics";
 import type { SubmissionDetail, SubmissionQueueItem, SubmissionStats } from "../api/moderation";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
-import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   AlertIcon,
@@ -11,9 +10,7 @@ import {
   ClockIcon,
   CloseIcon,
   CopyIcon,
-  DiscIcon,
   DownloadIcon,
-  EditIcon,
   EyeIcon,
   FileTextIcon,
   MusicIcon,
@@ -21,12 +18,10 @@ import {
   PlayIcon,
   SearchIcon,
   ShieldIcon,
-  TrashIcon,
   UserIcon,
   VolumeIcon,
 } from "../icons";
 import { downloadLrcFile } from "../utils/lyricsDownload";
-import type { StaffTrackLyricSummary } from "../types";
 
 function formatDurationSeconds(seconds?: number | null): string {
   if (!seconds || seconds <= 0) return "--:--";
@@ -89,9 +84,7 @@ function parseTimestampToSeconds(line: string): number | null {
   return minutes * 60 + seconds + fraction;
 }
 
-type MainTab = "MODERATION" | "CATALOG";
 type ModStatusFilter = "PENDING" | "APPROVED" | "REJECTED" | "ALL";
-type CatStatusFilter = "ALL" | "PUBLISHED" | "DRAFT" | "NO_LYRICS";
 
 type ParsedProposedLine = {
   lineNumber: number;
@@ -1135,8 +1128,6 @@ function LyricInspectionModal({
 // MAIN PAGE COMPONENT: StaffLyricsManagementPage
 // =========================================================================
 export function StaffLyricsManagementPage() {
-  const [activeTab, setActiveTab] = useState<MainTab>("MODERATION");
-
   // Notification State
   const [notification, setNotification] = useState<{
     open: boolean;
@@ -1145,7 +1136,7 @@ export function StaffLyricsManagementPage() {
   }>({ open: false, message: "", type: "success" });
 
   // -------------------------------------------------------------
-  // TAB 1: LYRIC MODERATION QUEUE STATE (UC-24.6)
+  // LYRIC MODERATION QUEUE STATE (UC-24.6)
   // -------------------------------------------------------------
   const [modStats, setModStats] = useState<SubmissionStats | null>(null);
   const [modPage, setModPage] = useState<PageResponse<SubmissionQueueItem> | null>(null);
@@ -1160,32 +1151,7 @@ export function StaffLyricsManagementPage() {
   // Inspection Modal ID
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
 
-  // -------------------------------------------------------------
-  // TAB 2: OFFICIAL LYRICS CATALOG STATE (UC-26)
-  // -------------------------------------------------------------
-  const [catPage, setCatPage] = useState<PageResponse<StaffTrackLyricSummary> | null>(null);
-  const [catStatusFilter, setCatStatusFilter] = useState<CatStatusFilter>("ALL");
-  const [catSearch, setCatSearch] = useState("");
-  const [debouncedCatSearch, setDebouncedCatSearch] = useState("");
-  const [catPageIndex, setCatPageIndex] = useState(0);
-  const [catLoading, setCatLoading] = useState(false);
-  const [catRefreshing, setCatRefreshing] = useState(false);
-  const catRequestIdRef = useRef(0);
-
-  // Editor Modal State (Catalog Tab)
-  const [editingTrack, setEditingTrack] = useState<StaffTrackLyricSummary | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorLyricContent, setEditorLyricContent] = useState("");
-  const [editorStatus, setEditorStatus] = useState<"DRAFT" | "PUBLISHED">("PUBLISHED");
-  const [loadingLyricDetail, setLoadingLyricDetail] = useState(false);
-  const [savingLyric, setSavingLyric] = useState(false);
-
-  // Delete Confirmation Modal State
-  const [deleteTargetTrack, setDeleteTargetTrack] = useState<StaffTrackLyricSummary | null>(null);
-  const [deletingLyric, setDeletingLyric] = useState(false);
-
-  const anyModalOpen =
-    selectedSubmissionId !== null || editorOpen || deleteTargetTrack !== null;
+  const anyModalOpen = selectedSubmissionId !== null;
   useModalScrollLock(anyModalOpen);
 
   // Global escape key listener
@@ -1194,15 +1160,13 @@ export function StaffLyricsManagementPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (selectedSubmissionId !== null) setSelectedSubmissionId(null);
-        if (!savingLyric && editorOpen) setEditorOpen(false);
-        if (!deletingLyric && deleteTargetTrack !== null) setDeleteTargetTrack(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [anyModalOpen, selectedSubmissionId, savingLyric, editorOpen, deletingLyric, deleteTargetTrack]);
+  }, [anyModalOpen, selectedSubmissionId]);
 
-  // Debounce search inputs
+  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedModSearch(modSearch);
@@ -1210,14 +1174,6 @@ export function StaffLyricsManagementPage() {
     }, 350);
     return () => clearTimeout(timer);
   }, [modSearch]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedCatSearch(catSearch);
-      setCatPageIndex(0);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [catSearch]);
 
   const handleModSearchSubmit = (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -1237,27 +1193,6 @@ export function StaffLyricsManagementPage() {
     } else {
       setDebouncedModSearch("");
       setModPageIndex(0);
-    }
-  };
-
-  const handleCatSearchSubmit = (event?: React.FormEvent) => {
-    event?.preventDefault();
-    const trimmed = catSearch.trim();
-    if (trimmed === debouncedCatSearch && catPageIndex === 0) {
-      void loadCatTracks(true);
-    } else {
-      setDebouncedCatSearch(trimmed);
-      setCatPageIndex(0);
-    }
-  };
-
-  const handleClearCatSearch = () => {
-    setCatSearch("");
-    if (debouncedCatSearch === "" && catPageIndex === 0) {
-      void loadCatTracks(true);
-    } else {
-      setDebouncedCatSearch("");
-      setCatPageIndex(0);
     }
   };
 
@@ -1307,129 +1242,8 @@ export function StaffLyricsManagementPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "MODERATION") {
-      void loadModQueue();
-    }
-  }, [activeTab, modStatusFilter, debouncedModSearch, modPageIndex]);
-
-  // Load Catalog Tracks
-  const loadCatTracks = async (isManual = false) => {
-    const reqId = ++catRequestIdRef.current;
-    if (isManual) setCatRefreshing(true);
-    else setCatLoading(true);
-
-    try {
-      const result = await lyricsApi.getStaffLyricsTracks({
-        search: debouncedCatSearch,
-        status: catStatusFilter,
-        page: catPageIndex,
-        size: 15,
-      });
-      if (reqId === catRequestIdRef.current) {
-        setCatPage(result);
-      }
-    } catch (err: any) {
-      if (reqId === catRequestIdRef.current) {
-        setNotification({
-          open: true,
-          message: err.message || "Failed to load tracks for lyrics management.",
-          type: "error",
-        });
-      }
-    } finally {
-      if (reqId === catRequestIdRef.current) {
-        setCatLoading(false);
-        setCatRefreshing(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === "CATALOG") {
-      void loadCatTracks();
-    }
-  }, [activeTab, catStatusFilter, debouncedCatSearch, catPageIndex]);
-
-  // Open Catalog Editor
-  const handleOpenCatalogEditor = async (trackItem: StaffTrackLyricSummary) => {
-    setEditingTrack(trackItem);
-    setEditorOpen(true);
-    setEditorLyricContent("");
-    setEditorStatus(trackItem.lyricStatus === "DRAFT" ? "DRAFT" : "PUBLISHED");
-    setLoadingLyricDetail(true);
-
-    try {
-      const detail = await lyricsApi.getStaffOfficialLyric(trackItem.trackId);
-      if (detail && detail.lyricContent) {
-        setEditorLyricContent(detail.lyricContent);
-        setEditorStatus(detail.status as "DRAFT" | "PUBLISHED");
-      }
-    } catch {
-      // If none exists yet, editor starts blank
-    } finally {
-      setLoadingLyricDetail(false);
-    }
-  };
-
-  const handleSaveCatalogLyric = async () => {
-    if (!editingTrack) return;
-    if (!editorLyricContent.trim()) {
-      setNotification({
-        open: true,
-        message: "Lyric content cannot be blank.",
-        type: "error",
-      });
-      return;
-    }
-
-    setSavingLyric(true);
-    try {
-      await lyricsApi.saveStaffOfficialLyric({
-        trackId: editingTrack.trackId,
-        lyricContent: editorLyricContent.trim(),
-        status: editorStatus,
-      });
-
-      setNotification({
-        open: true,
-        message: `Official lyrics saved and marked as ${editorStatus}.`,
-        type: "success",
-      });
-      setEditorOpen(false);
-      void loadCatTracks(true);
-    } catch (err: any) {
-      setNotification({
-        open: true,
-        message: err.message || "Failed to save official lyric.",
-        type: "error",
-      });
-    } finally {
-      setSavingLyric(false);
-    }
-  };
-
-  const handleDeleteCatalogLyric = async () => {
-    if (!deleteTargetTrack) return;
-    setDeletingLyric(true);
-    try {
-      await lyricsApi.deleteStaffOfficialLyric(deleteTargetTrack.trackId);
-      setNotification({
-        open: true,
-        message: `Official lyric for "${deleteTargetTrack.title}" deleted successfully.`,
-        type: "success",
-      });
-      setDeleteTargetTrack(null);
-      void loadCatTracks(true);
-    } catch (err: any) {
-      setNotification({
-        open: true,
-        message: err.message || "Failed to delete official lyric.",
-        type: "error",
-      });
-    } finally {
-      setDeletingLyric(false);
-    }
-  };
+    void loadModQueue();
+  }, [modStatusFilter, debouncedModSearch, modPageIndex]);
 
   return (
     <div className="ops-dashboard ops-dashboard--staff">
@@ -1439,62 +1253,42 @@ export function StaffLyricsManagementPage() {
           <div className="staff-hero-copy">
             <div className="staff-hero-title-row">
               <span className="staff-hero-title-icon" aria-hidden="true">
-                <FileTextIcon width={18} height={18} />
+                <ShieldIcon width={18} height={18} />
               </span>
-              <h1 className="staff-hero-title">Official Lyrics Hub</h1>
+              <h1 className="staff-hero-title">Proposed Lyrics Queue</h1>
+              {modStats?.pendingCount ? (
+                <span
+                  className="staff-tab-count"
+                  style={{
+                    background: "var(--ops-amber, #F59E0B)",
+                    color: "#FFFFFF",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "3px 9px",
+                    borderRadius: "12px",
+                  }}
+                >
+                  {modStats.pendingCount} pending
+                </span>
+              ) : null}
             </div>
 
             <p className="staff-hero-description">
-              Review creator proposals to add or update synchronized lyrics, and manage the catalog of verified official lyrics.
+              Review and approve or reject track lyric update proposals submitted by creators.
             </p>
-          </div>
-
-          {/* Top-Level Mode Switcher Tabs */}
-          <div className="staff-segmented-tabs" role="tablist" aria-label="Lyrics management section">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "MODERATION"}
-              className={`staff-segment-btn ${activeTab === "MODERATION" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("MODERATION")}
-            >
-              <ShieldIcon width={15} height={15} />
-              <span>Proposed Lyrics Queue</span>
-              {modStats?.pendingCount ? (
-                <span className="staff-tab-count" style={{ background: "var(--ops-amber)", color: "#FFFFFF" }}>
-                  {modStats.pendingCount}
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "CATALOG"}
-              className={`staff-segment-btn ${activeTab === "CATALOG" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("CATALOG")}
-            >
-              <DiscIcon width={15} height={15} />
-              <span>Official Lyrics Catalog</span>
-            </button>
           </div>
         </header>
 
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 1: LYRIC MODERATION QUEUE (UC-24.6) */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === "MODERATION" && (
-          <>
-            {/* Main Review Workspace Panel */}
-            <section className="staff-queue-panel">
-              {/* Toolbar: Segmented Filter Tabs & Instant Search */}
-              <div className="staff-filter-toolbar">
-                <div className="staff-segmented-tabs" role="tablist" aria-label="Lyric submission status tabs">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={modStatusFilter === "PENDING"}
-                    className={`staff-segment-btn ${modStatusFilter === "PENDING" ? "is-active" : ""}`}
+        {/* Main Review Workspace Panel */}
+        <section className="staff-queue-panel">
+          {/* Toolbar: Segmented Filter Tabs & Instant Search */}
+          <div className="staff-filter-toolbar">
+            <div className="staff-segmented-tabs" role="tablist" aria-label="Lyric submission status tabs">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={modStatusFilter === "PENDING"}
+                className={`staff-segment-btn ${modStatusFilter === "PENDING" ? "is-active" : ""}`}
                     onClick={() => {
                       setModStatusFilter("PENDING");
                       setModPageIndex(0);
@@ -1790,288 +1584,6 @@ export function StaffLyricsManagementPage() {
                 </div>
               ) : null}
             </section>
-          </>
-        )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 2: OFFICIAL LYRICS CATALOG (UC-26) */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === "CATALOG" && (
-        <section className="staff-queue-panel">
-          {/* Filter & Search Toolbar */}
-          <div className="staff-filter-toolbar">
-            <div className="staff-segmented-tabs" role="tablist" aria-label="Official lyrics catalog filters">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={catStatusFilter === "ALL"}
-                className={`staff-segment-btn ${catStatusFilter === "ALL" ? "is-active" : ""}`}
-                onClick={() => {
-                  setCatStatusFilter("ALL");
-                  setCatPageIndex(0);
-                }}
-              >
-                <span>All Tracks</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={catStatusFilter === "PUBLISHED"}
-                className={`staff-segment-btn ${catStatusFilter === "PUBLISHED" ? "is-active" : ""}`}
-                onClick={() => {
-                  setCatStatusFilter("PUBLISHED");
-                  setCatPageIndex(0);
-                }}
-              >
-                <span className="staff-tab-dot is-green" />
-                <span>Published</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={catStatusFilter === "DRAFT"}
-                className={`staff-segment-btn ${catStatusFilter === "DRAFT" ? "is-active" : ""}`}
-                onClick={() => {
-                  setCatStatusFilter("DRAFT");
-                  setCatPageIndex(0);
-                }}
-              >
-                <span className="staff-tab-dot is-amber" />
-                <span>Draft</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={catStatusFilter === "NO_LYRICS"}
-                className={`staff-segment-btn ${catStatusFilter === "NO_LYRICS" ? "is-active" : ""}`}
-                onClick={() => {
-                  setCatStatusFilter("NO_LYRICS");
-                  setCatPageIndex(0);
-                }}
-              >
-                <span>Missing Lyrics</span>
-              </button>
-            </div>
-
-            {/* Search Box */}
-            <form className="staff-search-wrapper" onSubmit={handleCatSearchSubmit} role="search">
-              <div className="staff-search-input-box">
-                <button
-                  type="submit"
-                  className="staff-search-icon-btn"
-                  aria-label="Execute search"
-                  title="Search"
-                >
-                  <SearchIcon width={16} height={16} className="staff-search-icon" />
-                </button>
-                <input
-                  type="text"
-                  placeholder="Search published tracks by title..."
-                  value={catSearch}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCatSearch(e.target.value)}
-                  className="staff-search-input"
-                  aria-label="Search tracks"
-                />
-                {catSearch ? (
-                  <button
-                    type="button"
-                    className="staff-search-clear-btn"
-                    onClick={handleClearCatSearch}
-                    aria-label="Clear search query"
-                    title="Clear search"
-                  >
-                    <CloseIcon width={14} height={14} />
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </div>
-
-          {/* Catalog Data Table */}
-          <div className="staff-table-wrap">
-            {catLoading ? (
-              <div className="staff-skeletons-container" aria-busy="true">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="staff-skeleton-card">
-                    <div className="staff-skeleton-thumb" />
-                    <div className="staff-skeleton-meta">
-                      <div className="staff-skeleton-bar is-long" />
-                      <div className="staff-skeleton-bar is-short" />
-                    </div>
-                    <div className="staff-skeleton-pill" />
-                    <div className="staff-skeleton-btns" />
-                  </div>
-                ))}
-              </div>
-            ) : !catPage || catPage.content.length === 0 ? (
-              <div className="staff-empty-box" role="status" aria-live="polite">
-                <div className="staff-empty-circle">
-                  <FileTextIcon width={36} height={36} />
-                </div>
-                <h3 className="staff-empty-title">No tracks found</h3>
-                <p className="staff-empty-description">
-                  {debouncedCatSearch
-                    ? `No tracks matched "${debouncedCatSearch}". Try adjusting keywords or clear the filter.`
-                    : "Try adjusting your search query or filter settings."}
-                </p>
-                {debouncedCatSearch ? (
-                  <button
-                    type="button"
-                    className="button button-secondary button-small"
-                    onClick={handleClearCatSearch}
-                  >
-                    Reset / Clear
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="button button-secondary button-small"
-                    onClick={() => void loadCatTracks(true)}
-                  >
-                    Refresh Catalog
-                  </button>
-                )}
-              </div>
-            ) : (
-              <table className="staff-table">
-                <thead>
-                  <tr>
-                    <th>TRACK</th>
-                    <th>ALBUM</th>
-                    <th>DURATION</th>
-                    <th>OFFICIAL LYRICS STATUS</th>
-                    <th>LAST UPDATED</th>
-                    <th style={{ textAlign: "right" }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catPage.content.map((trackItem) => {
-                    const status = trackItem.lyricStatus;
-                    return (
-                      <tr key={trackItem.trackId}>
-                        {/* Track info */}
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <strong style={{ color: "#0f172a", fontSize: 13.5 }}>{trackItem.title}</strong>
-                            <span style={{ color: "#64748b", fontSize: 12 }}>{trackItem.artistName}</span>
-                          </div>
-                        </td>
-
-                        {/* Album */}
-                        <td>
-                          <span style={{ color: "#334155", fontSize: 13 }}>
-                            {trackItem.albumTitle || "Single"}
-                          </span>
-                        </td>
-
-                        {/* Duration */}
-                        <td>
-                          <span style={{ color: "#64748b", fontSize: 13, fontFamily: "monospace" }}>
-                            {formatDurationSeconds(trackItem.durationSeconds)}
-                          </span>
-                        </td>
-
-                        {/* Lyric status */}
-                        <td>
-                          {status === "PUBLISHED" ? (
-                            <span className="staff-status-chip is-approved">
-                              <i />
-                              <span>Published</span>
-                            </span>
-                          ) : status === "DRAFT" ? (
-                            <span className="staff-status-chip is-pending">
-                              <i />
-                              <span>Draft</span>
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                padding: "4px 10px",
-                                borderRadius: 999,
-                                fontSize: 11.5,
-                                fontWeight: 600,
-                                background: "#f1f5f9",
-                                color: "#64748b",
-                              }}
-                            >
-                              No Lyrics
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Updated at */}
-                        <td>
-                          <span style={{ color: "#64748b", fontSize: 12 }}>
-                            {formatDate(trackItem.lastUpdated)}
-                          </span>
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", gap: 6 }}>
-                            <button
-                              type="button"
-                              className="button button-secondary button-small"
-                              onClick={() => handleOpenCatalogEditor(trackItem)}
-                              title={status ? "Edit official lyrics" : "Add official lyrics"}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                            >
-                              <EditIcon width={13} height={13} />
-                              <span>{status ? "Edit Lyrics" : "Add Lyrics"}</span>
-                            </button>
-
-                            {status ? (
-                              <button
-                                type="button"
-                                className="button button-secondary button-small"
-                                onClick={() => setDeleteTargetTrack(trackItem)}
-                                title="Delete official lyric"
-                                style={{ color: "#ef4444" }}
-                              >
-                                <TrashIcon width={13} height={13} />
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-
-            {/* Catalog Pagination Controls */}
-            {catPage && catPage.totalPages > 1 ? (
-              <div className="staff-pagination-bar" aria-label="Catalog pagination">
-                <button
-                  type="button"
-                  className="staff-page-btn"
-                  disabled={catPage.first}
-                  onClick={() => setCatPageIndex((p) => Math.max(0, p - 1))}
-                  aria-label="Previous page"
-                >
-                  ← Previous
-                </button>
-                <span className="staff-page-indicator">
-                  Page <b>{catPage.number + 1}</b> of {catPage.totalPages} ({catPage.totalElements} tracks)
-                </span>
-                <button
-                  type="button"
-                  className="staff-page-btn"
-                  disabled={catPage.last}
-                  onClick={() => setCatPageIndex((p) => p + 1)}
-                  aria-label="Next page"
-                >
-                  Next →
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      )}
     </div>
 
       {/* ------------------------------------------------------------- */}
@@ -2085,228 +1597,6 @@ export function StaffLyricsManagementPage() {
             setNotification({ open: true, message, type });
             void loadModQueue(true);
           }}
-        />
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: CATALOG LRC EDITOR (UC-26) */}
-      {/* ------------------------------------------------------------- */}
-      {editorOpen &&
-        createPortal(
-          <div
-            className="modal-backdrop"
-            role="presentation"
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(15, 23, 42, 0.65)",
-              backdropFilter: "blur(4px)",
-              zIndex: 9999,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px",
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !savingLyric) {
-                setEditorOpen(false);
-              }
-            }}
-          >
-            <div
-              className="modal-container"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="catalog-editor-title"
-              style={{
-                background: "#FFFFFF",
-                borderRadius: "16px",
-                width: "100%",
-                maxWidth: "760px",
-                maxHeight: "90vh",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-              }}
-            >
-              {/* Modal Header */}
-              <div
-                style={{
-                  padding: "18px 24px",
-                  borderBottom: "1px solid #E2E8F0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "#FAFAFA",
-                }}
-              >
-                <div>
-                  <h2 id="catalog-editor-title" style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: 0 }}>
-                    Official Lyric Editor
-                  </h2>
-                  <span style={{ fontSize: "13px", color: "#64748B" }}>
-                    {editingTrack?.title} • {editingTrack?.artistName}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setEditorOpen(false)}
-                  disabled={savingLyric}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#64748B",
-                    cursor: "pointer",
-                    padding: 8,
-                    borderRadius: 8,
-                  }}
-                  title="Close (Esc)"
-                >
-                  <CloseIcon width={18} height={18} />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div
-                style={{
-                  padding: "20px 24px",
-                  overflowY: "auto",
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
-              >
-                {loadingLyricDetail ? (
-                  <div className="staff-empty-state" style={{ minHeight: 240 }}>
-                    <span className="track-details-spinner" aria-hidden="true" />
-                    <p>Loading lyric content...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
-                        LRC or Plain Text Lyrics
-                      </label>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: "12.5px", color: "#64748B" }}>Status:</span>
-                        <div
-                          style={{
-                            display: "inline-flex",
-                            borderRadius: "8px",
-                            padding: "3px",
-                            background: "#F1F5F9",
-                            border: "1px solid #CBD5E1",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setEditorStatus("PUBLISHED")}
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              border: "none",
-                              cursor: "pointer",
-                              background: editorStatus === "PUBLISHED" ? "#10B981" : "transparent",
-                              color: editorStatus === "PUBLISHED" ? "#FFFFFF" : "#64748B",
-                            }}
-                          >
-                            Published
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditorStatus("DRAFT")}
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              border: "none",
-                              cursor: "pointer",
-                              background: editorStatus === "DRAFT" ? "#F59E0B" : "transparent",
-                              color: editorStatus === "DRAFT" ? "#FFFFFF" : "#64748B",
-                            }}
-                          >
-                            Draft
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <textarea
-                      rows={14}
-                      value={editorLyricContent}
-                      onChange={(e) => setEditorLyricContent(e.target.value)}
-                      placeholder="Paste or compose .LRC timestamped lyrics here (e.g. [00:15.30]First line of lyrics)..."
-                      style={{
-                        width: "100%",
-                        padding: "12px 14px",
-                        borderRadius: "8px",
-                        border: "1px solid #CBD5E1",
-                        fontSize: "13px",
-                        fontFamily: "monospace",
-                        lineHeight: "1.6",
-                        resize: "vertical",
-                      }}
-                    />
-
-                    <div style={{ fontSize: "12px", color: "#64748B", display: "flex", justifyContent: "space-between" }}>
-                      <span>Tip: Lines with format <code>[mm:ss.xx]</code> will automatically enable synchronized lyric scrolling for listeners.</span>
-                      <span>{editorLyricContent.split(/\r?\n/).filter(Boolean).length} lines</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div
-                style={{
-                  padding: "16px 24px",
-                  borderTop: "1px solid #E2E8F0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 10,
-                  background: "#FAFAFA",
-                }}
-              >
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => setEditorOpen(false)}
-                  disabled={savingLyric}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={handleSaveCatalogLyric}
-                  disabled={savingLyric || loadingLyricDetail}
-                >
-                  {savingLyric ? "Saving..." : "Save Official Lyric"}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteTargetTrack && (
-        <DeleteConfirmationModal
-          open={true}
-          title="Delete Official Lyric"
-          message={`Are you sure you want to delete the official lyrics for "${deleteTargetTrack.title}"? Listeners will no longer see verified lyrics for this song.`}
-          confirmLabel="Delete Lyric"
-          submittingLabel="Deleting..."
-          submitting={deletingLyric}
-          onConfirm={handleDeleteCatalogLyric}
-          onCancel={() => setDeleteTargetTrack(null)}
         />
       )}
 

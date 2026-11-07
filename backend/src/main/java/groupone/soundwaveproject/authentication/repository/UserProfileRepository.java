@@ -11,7 +11,9 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
+    @EntityGraph(attributePaths = {"user"})
     Optional<UserProfile> findByUserId(Long userId);
+
     boolean existsByUsername(String username);
     boolean existsByUsernameIgnoreCaseAndUserIdNot(String username, Long userId);
 
