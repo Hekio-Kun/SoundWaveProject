@@ -3,6 +3,7 @@ package groupone.soundwaveproject.lyrics.service;
 import groupone.soundwaveproject.authentication.entity.User;
 import groupone.soundwaveproject.authentication.repository.UserRepository;
 import groupone.soundwaveproject.catalog.entity.Track;
+import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -212,14 +213,47 @@ public class LyricService {
     }
 
     /**
-     * Tra cứu nội dung lời bài hát chính thức dạng String (cho TrackResponse & StudioTrackResponse).
+     * Tra cứu nội dung lời bài hát chính thức dạng String (cho TrackResponse & StudioTrackResponse & Moderation).
+     * Trả về lời bài hát nếu có (kể cả bản DRAFT khi tác giả đang chỉnh sửa / xem trong Studio).
      */
     @Transactional(readOnly = true)
     public String getOfficialLyrics(Long trackId) {
         if (trackId == null) return null;
+        return officialLyricRepository.findByTrackId(trackId)
+                .map(OfficialLyric::getLyricContent)
+                .orElse(null);
+    }
+
+    /**
+     * Tra cứu nội dung lời bài hát chính thức đã PUBLISHED (dành riêng cho luồng nghe công khai).
+     */
+    @Transactional(readOnly = true)
+    public String getPublishedOfficialLyrics(Long trackId) {
+        if (trackId == null) return null;
         return officialLyricRepository.findByTrackIdAndStatus(trackId, "PUBLISHED")
                 .map(OfficialLyric::getLyricContent)
                 .orElse(null);
+    }
+
+    /**
+     * Cập nhật trạng thái lời bài hát chính thức sang PUBLISHED khi bài hát được duyệt xuất bản.
+     */
+    @Transactional
+    public void publishOfficialLyric(Long trackId) {
+        if (trackId == null) return;
+        officialLyricRepository.findByTrackId(trackId).ifPresent(lyric -> {
+            if (lyric.getLyricContent() != null && !lyric.getLyricContent().isBlank()) {
+                lyric.setStatus("PUBLISHED");
+                lyric.setUpdatedAt(Instant.now());
+                officialLyricRepository.save(lyric);
+                log.info("Published official lyric id={} for trackId={}", lyric.getId(), trackId);
+            }
+        });
+    }
+
+    @Transactional
+    public void publishOfficialLyricForTrack(Long trackId) {
+        publishOfficialLyric(trackId);
     }
 
     /**
@@ -250,26 +284,14 @@ public class LyricService {
 
     /**
      * Lưu hoặc cập nhật lời bài hát chính thức (Official Lyric) do tác giả (Creator) cập nhật.
+     * Tự động đồng bộ trạng thái DRAFT hoặc PUBLISHED tương ứng với trạng thái bài hát.
      */
     @Transactional
     public OfficialLyric saveOrUpdateOfficialLyrics(Long trackId, String rawLyrics, Long userId) {
-        return saveOrUpdateOfficialLyric(trackId, rawLyrics, "PUBLISHED", userId);
-    }
-
-    /**
-     * Kích hoạt chuyển trạng thái lời bài hát DRAFT thành PUBLISHED khi bài hát được phê duyệt xuất bản.
-     */
-    @Transactional
-    public void publishOfficialLyricForTrack(Long trackId) {
-        if (trackId == null) return;
-        officialLyricRepository.findByTrackId(trackId).ifPresent(lyric -> {
-            if (lyric.getLyricContent() != null && !lyric.getLyricContent().isBlank()) {
-                lyric.setStatus("PUBLISHED");
-                lyric.setUpdatedAt(Instant.now());
-                officialLyricRepository.save(lyric);
-                log.info("Auto-published official lyric for trackId={}", trackId);
-            }
-        });
+        Track track = trackRepository.findById(trackId).orElse(null);
+        String status = (track != null && track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
+                ? "PUBLISHED" : "DRAFT";
+        return saveOrUpdateOfficialLyric(trackId, rawLyrics, status, userId);
     }
 
     /**
