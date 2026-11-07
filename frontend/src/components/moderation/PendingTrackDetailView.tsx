@@ -372,7 +372,7 @@ export function PendingTrackDetailView({
               </span>
             </>
           ) : (
-            <span className="staff-crumb-active">Submission Details #{submissionId}</span>
+            <span className="staff-crumb-active">Submission Details</span>
           )}
         </div>
       </div>
@@ -412,7 +412,7 @@ export function PendingTrackDetailView({
             }}>
               <FileTextIcon width={22} height={22} style={{ color: "#0284C7", flexShrink: 0 }} />
               <div style={{ fontSize: "13px", color: "#0369A1", lineHeight: "1.5" }}>
-                <strong>Lyric Update Moderation (UC-24.6):</strong> The creator submitted updated synchronized lyrics for this already published song. Making a decision here only modifies the song's official lyrics; the song remains published and streamable without interruption.
+                <strong>Lyric Update Moderation:</strong> The creator submitted updated synchronized lyrics for this already published song. Making a decision here only modifies the song's official lyrics; the song remains published and streamable without interruption.
               </div>
             </div>
           ) : null}

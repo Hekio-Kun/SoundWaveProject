@@ -82,3 +82,57 @@ export const MinimizeIcon = (p: IconProps) => (
     <path d="M4 14h6v6m10-10h-6V4m0 6 7-7M3 21l7-7" />
   </svg>
 );
+
+export const CopyIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+export const ShareIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+  </svg>
+);
+
+export const SparklesIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+  </svg>
+);
+
+export const ArrowUpRightIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M7 17 17 7M17 7H7M17 7v10" />
+  </svg>
+);
+
+export const SlidersIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </svg>
+);
+
+export const WaveformIcon = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2" />
+  </svg>
+);
+
+export const CheckCircleIcon = (p: IconProps) => (
+  <svg {...base} {...p} fill="currentColor" stroke="none">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+  </svg>
+);

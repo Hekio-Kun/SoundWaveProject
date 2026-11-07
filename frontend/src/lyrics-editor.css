@@ -1,0 +1,558 @@
+/* =========================================================================
+   SOUNDWAVE — DEDICATED LYRIC STUDIO WORKSPACE (UC-16.2 & UC-18)
+   Theme: Light-first Coastal Ocean Blue (#0284C7) & Warm Sand (#D4A373, #F6EFE3)
+   ========================================================================= */
+
+.lyric-studio-page {
+  min-height: 100vh;
+  background-color: var(--color-sand-bg, #F6EFE3);
+  padding: 24px 24px 120px;
+  color: var(--color-stone-primary, #1C1917);
+}
+
+.lyric-studio-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 1. Header Navigation & Breadcrumbs */
+.lyric-studio-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-sand-border, #E8DCCB);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(140, 88, 40, 0.05);
+}
+
+.lyric-studio-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.lyric-studio-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-sand-warm, #F5EAD8);
+  color: var(--color-sand-deep, #8C5828);
+  border: 1px solid var(--color-sand-border, #E8DCCB);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.lyric-studio-back-btn:hover {
+  background: #EEDEC8;
+  color: #6C421B;
+}
+
+.lyric-studio-track-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lyric-studio-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  background: #E2E8F0;
+}
+
+.lyric-studio-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lyric-studio-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-stone-primary, #1C1917);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyric-studio-subtitle {
+  font-size: 12px;
+  color: var(--color-stone-secondary, #57534E);
+  margin-top: 2px;
+}
+
+/* Scope Mode Tabs */
+.lyric-studio-scope-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: #F1F5F9;
+  border-radius: 12px;
+}
+
+.lyric-studio-scope-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lyric-studio-scope-btn.is-active {
+  background: #FFFFFF;
+  color: var(--color-ocean-primary, #0284C7);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Notices & Alert Banners */
+.lyric-studio-banner {
+  padding: 14px 18px;
+  border-radius: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lyric-studio-banner.is-official {
+  background: #F0F9FF;
+  border: 1px solid #BAE6FD;
+  color: #0369A1;
+}
+
+.lyric-studio-banner.is-pending {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+.lyric-studio-banner.is-personal {
+  background: #FDF4FF;
+  border: 1px solid #F5D0FE;
+  color: #86198F;
+}
+
+.lyric-studio-banner-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 2. Sticky Interactive Audio Toolbar */
+.lyric-studio-audio-bar {
+  position: sticky;
+  top: 16px;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  background: #FFFFFF;
+  border: 1.5px solid var(--color-ocean-primary, #0284C7);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(2, 132, 199, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.lyric-studio-audio-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lyric-studio-play-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-ocean-primary, #0284C7);
+  color: #FFFFFF;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.lyric-studio-play-circle:hover {
+  background: var(--color-ocean-hover, #0369A1);
+  transform: scale(1.06);
+}
+
+.lyric-studio-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lyric-studio-skip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lyric-studio-skip-btn:hover {
+  background: #EDF2F7;
+  color: #0F172A;
+}
+
+.lyric-studio-time-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ocean-primary, #0284C7);
+  padding: 6px 12px;
+  background: #F0F9FF;
+  border-radius: 8px;
+  min-width: 130px;
+  text-align: center;
+}
+
+.lyric-studio-time-display small {
+  color: #94A3B8;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Rate cycling button */
+.lyric-studio-rate-btn {
+  padding: 6px 10px;
+  background: var(--color-sand-warm, #F5EAD8);
+  border: 1px solid var(--color-sand-border, #E8DCCB);
+  color: var(--color-sand-deep, #8C5828);
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lyric-studio-rate-btn:hover {
+  background: #EEDEC8;
+}
+
+/* Big Hero Stamp Button */
+.lyric-studio-stamp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #0284C7, #0EA5E9);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lyric-studio-stamp-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
+}
+
+.lyric-studio-stamp-btn:active {
+  transform: translateY(0);
+}
+
+.lyric-studio-stamp-btn kbd {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* 3. Wide Two-Column Workspace */
+.lyric-studio-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .lyric-studio-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lyric-studio-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--color-sand-border, #E8DCCB);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(140, 88, 40, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Panel Header & Tools */
+.lyric-studio-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.lyric-studio-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-stone-primary, #1C1917);
+  margin: 0;
+}
+
+.lyric-studio-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.lyric-studio-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lyric-studio-tool-btn:hover {
+  background: #EDF2F7;
+  color: #0284C7;
+  border-color: #BAE6FD;
+}
+
+/* Monospace Textarea */
+.lyric-studio-textarea {
+  width: 100%;
+  height: 520px;
+  padding: 16px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #1E293B;
+  background: #F8FAFC;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  white-space: pre;
+}
+
+.lyric-studio-textarea:focus {
+  border-color: var(--color-ocean-primary, #0284C7);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.lyric-studio-editor-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748B;
+  padding: 0 4px;
+}
+
+/* Submitter Note */
+.lyric-studio-note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+}
+
+.lyric-studio-note-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lyric-studio-note-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #1E293B;
+  outline: none;
+}
+
+.lyric-studio-note-input:focus {
+  border-color: #0284C7;
+}
+
+/* 4. Right Column: Live Karaoke Preview */
+.lyric-studio-preview-list {
+  height: 520px;
+  overflow-y: auto;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  background: #FFFFFF;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-behavior: smooth;
+}
+
+.lyric-studio-preview-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.lyric-studio-preview-line:hover {
+  background: #F1F5F9;
+}
+
+.lyric-studio-preview-line.is-active {
+  background: #F0F9FF;
+  border-left: 3.5px solid var(--color-ocean-primary, #0284C7);
+  padding-left: 10px;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.lyric-studio-time-chip {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #F1F5F9;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.lyric-studio-preview-line.is-active .lyric-studio-time-chip {
+  background: #E0F2FE;
+  color: #0369A1;
+}
+
+.lyric-studio-line-text {
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.lyric-studio-preview-line.is-active .lyric-studio-line-text {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-ocean-primary, #0284C7);
+}
+
+/* Diagnostics & Quality Card */
+.lyric-studio-diagnostics {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lyric-studio-diagnostics.is-valid {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+}
+
+.lyric-studio-diagnostics.is-warning {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+/* 5. Bottom Sticky Actions Bar */
+.lyric-studio-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-sand-border, #E8DCCB);
+  border-radius: 18px;
+  box-shadow: 0 -4px 20px rgba(140, 88, 40, 0.06);
+}
+
+.lyric-studio-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lyric-studio-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

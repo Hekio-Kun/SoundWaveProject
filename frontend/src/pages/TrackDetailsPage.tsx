@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { catalogApi } from "../api/catalog";
+import { useAuth } from "../context/AuthContext";
 import { lyricsApi } from "../api/lyrics";
 import { SectionHeader, TrackCard } from "../components/common/MusicCards";
 import { parseLyricsToLines, formatTimeDisplay } from "../components/common/LyricSyncTab";
+import { studioApi, type PendingLyricSubmission } from "../api/track";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ReportTrackModal } from "../components/modals/ReportTrackModal";
@@ -13,6 +15,7 @@ import { downloadLrcFile } from "../utils/lyricsDownload";
 import {
   AlertIcon,
   CheckIcon,
+  CopyIcon,
   DownloadIcon,
   EditIcon,
   FileTextIcon,
@@ -20,12 +23,16 @@ import {
   HeadphonesIcon,
   HeartFillIcon,
   HeartIcon,
-  MoreIcon,
+  MaximizeIcon,
+  MinimizeIcon,
   MusicIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
   RefreshIcon,
+  ShareIcon,
+  SlidersIcon,
+  SparklesIcon,
   TrashIcon,
   UserIcon,
 } from "../icons";
@@ -86,20 +93,40 @@ export function TrackDetailsPage({
   const [submittingAction, setSubmittingAction] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isTrackCreator = Boolean(
+    user && track && (user.id === track.creator?.userId || (user as any).userId === track.creator?.userId)
+  );
 
   // Dual-Tier Lyrics State (UC-16 & UC-18)
   const [lyricsBundle, setLyricsBundle] = useState<TrackLyricsBundle | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(true);
   const [lyricsError, setLyricsError] = useState(false);
-  const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
-  const [personalEditorOpen, setPersonalEditorOpen] = useState(false);
-  const [personalContent, setPersonalContent] = useState("");
+  const initialTabFromUrl = typeof window !== "undefined"
+    ? (new URLSearchParams(window.location.search || (window.location.hash.includes("?") ? window.location.hash.split("?")[1] : "")).get("tab") === "personal" ? "PERSONAL" : "OFFICIAL")
+    : "OFFICIAL";
+  const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">(initialTabFromUrl);
+
+  // If track has only personal lyrics, automatically switch to PERSONAL tab
+  useEffect(() => {
+    if (lyricsBundle && !lyricsBundle.officialLyric?.lyricContent && !track?.lyrics && lyricsBundle.userPersonalLyric?.lyricContent) {
+      setLyricsTab("PERSONAL");
+    }
+  }, [lyricsBundle, track]);
   const [personalType, setPersonalType] = useState<"CUSTOM" | "TRANSLATION">("CUSTOM");
-  const [personalSaving, setPersonalSaving] = useState(false);
+  const [submitterNote, setSubmitterNote] = useState("");
+  const [pendingLyricSub, setPendingLyricSub] = useState<PendingLyricSubmission | null>(null);
+  const [withdrawingSub, setWithdrawingSub] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [reportTrackModalOpen, setReportTrackModalOpen] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+
+  // More Creator Tracks & Karaoke Fullscreen
+  const [moreCreatorTracks, setMoreCreatorTracks] = useState<LandingTrack[]>([]);
+  const [moreCreatorLoading, setMoreCreatorLoading] = useState(false);
+  const [isKaraokeFullscreen, setIsKaraokeFullscreen] = useState(false);
+  const karaokeActiveLineRef = useRef<HTMLParagraphElement | null>(null);
 
   // Synchronous Playback Tracking (UC-16.1)
   const [currentTime, setCurrentTime] = useState(0);
@@ -137,11 +164,49 @@ export function TrackDetailsPage({
   }, [trackId]);
 
   useEffect(() => {
-    if (!contextMenuOpen) return;
-    const handleClickOutside = () => setContextMenuOpen(false);
-    window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
-  }, [contextMenuOpen]);
+    let active = true;
+    if (!track?.creator?.userId) {
+      setMoreCreatorTracks([]);
+      return;
+    }
+    setMoreCreatorLoading(true);
+    void catalogApi
+      .getTracks({ creatorId: track.creator.userId, size: 8 })
+      .then((res) => {
+        if (!active) return;
+        const tracks = res.content || [];
+        const filtered = tracks.filter((t) => t.id !== track.id).slice(0, 4);
+        setMoreCreatorTracks(filtered);
+      })
+      .catch(() => {
+        if (active) setMoreCreatorTracks([]);
+      })
+      .finally(() => {
+        if (active) setMoreCreatorLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [track?.id, track?.creator?.userId]);
+
+  const handleShareTrack = () => {
+    const currentUrl = window.location.href;
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(currentUrl).then(() => {
+        setNotification({
+          open: true,
+          message: "Track link copied to clipboard!",
+          type: "success",
+        });
+      });
+    } else {
+      setNotification({
+        open: true,
+        message: "Could not access clipboard.",
+        type: "error",
+      });
+    }
+  };
 
   // Load lyrics bundle with race condition prevention (UC-16.1 & UC-18)
   const lyricsRequestIdRef = useRef(0);
@@ -205,7 +270,12 @@ export function TrackDetailsPage({
     };
   }, [trackId]);
 
-  const anyModalOpen = playlistModalOpen || authPromptOpen || personalEditorOpen || deleteConfirmOpen;
+  const anyModalOpen =
+    playlistModalOpen ||
+    authPromptOpen ||
+    deleteConfirmOpen ||
+    reportModalOpen ||
+    isKaraokeFullscreen;
   useModalScrollLock(anyModalOpen);
 
   const goToCreatorProfile = (targetCreatorId?: number) => {
@@ -224,13 +294,15 @@ export function TrackDetailsPage({
       if (event.key === "Escape") {
         setPlaylistModalOpen(false);
         setAuthPromptOpen(false);
-        if (!personalSaving) setPersonalEditorOpen(false);
+        setReportModalOpen(false);
+        setIsKaraokeFullscreen(false);
+        
         if (!deleteSaving) setDeleteConfirmOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [anyModalOpen, personalSaving, deleteSaving]);
+  }, [anyModalOpen, deleteSaving]);
 
   const requestLibraryAccess = (action: () => void) => {
     setActionError(null);
@@ -270,38 +342,54 @@ export function TrackDetailsPage({
     }
   };
 
-  // Save personal lyrics
-  const handleSavePersonalLyrics = async () => {
-    if (!personalContent.trim()) {
-      setNotification({
-        open: true,
-        message: "Lyrics content cannot be blank.",
-        type: "warning",
-      });
-      return;
-    }
-
-    setPersonalSaving(true);
+  // Withdraw lyric submission (UC-16.2 AF02)
+  const handleWithdrawSubmission = async () => {
+    if (!track) return;
+    setWithdrawingSub(true);
     try {
-      const saved = await lyricsApi.savePersonalLyric(trackId, personalContent.trim(), personalType);
-      setLyricsBundle((prev) => ({
-        officialLyric: prev?.officialLyric ?? null,
-        userPersonalLyric: saved,
-      }));
-      setPersonalEditorOpen(false);
+      await studioApi.withdrawLyricsSubmission(track.id);
+      setPendingLyricSub(null);
       setNotification({
         open: true,
-        message: `${personalType === "TRANSLATION" ? "Translation" : "Custom lyrics"} saved successfully.`,
+        type: "success",
+        message: "Lyric submission withdrawn. You can now edit and re-submit.",
+      });
+    } catch (err) {
+      setNotification({
+        open: true,
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to withdraw lyric submission.",
+      });
+    } finally {
+      setWithdrawingSub(false);
+    }
+  };
+
+
+
+  const [isApprovingPersonal, setIsApprovingPersonal] = useState(false);
+
+  // Approve personal lyric to official track lyrics (for track creator)
+  const handleApprovePersonalToTrack = async () => {
+    if (!personalLyricContent || !track) return;
+    setIsApprovingPersonal(true);
+    try {
+      await studioApi.updateTrackLyrics(track.id, personalLyricContent);
+      await loadTrackLyrics();
+      setNotification({
+        open: true,
+        message: "Personal lyrics approved and published as official track lyrics successfully!",
         type: "success",
       });
-    } catch (err: any) {
+      setLyricsTab("OFFICIAL");
+    } catch (err: unknown) {
       setNotification({
         open: true,
-        message: err.message || "Failed to save lyrics.",
+        message: err instanceof Error ? err.message : "Failed to approve personal lyrics to track.",
         type: "error",
       });
     } finally {
-      setPersonalSaving(false);
+      setIsApprovingPersonal(false);
     }
   };
 
@@ -374,6 +462,15 @@ export function TrackDetailsPage({
       });
     }
   }, [activeLineIndex]);
+
+  useEffect(() => {
+    if (isKaraokeFullscreen && karaokeActiveLineRef.current) {
+      karaokeActiveLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex, isKaraokeFullscreen]);
 
   const handleLyricsScroll = () => {
     isUserScrollingRef.current = true;
@@ -464,12 +561,9 @@ export function TrackDetailsPage({
           <div className="track-labels">
             <span>TRACK</span>
             <span>{genreLabel}</span>
-            <span className="is-approved">
-              <CheckIcon width={12} height={12} /> {publicationLabel}
-            </span>
           </div>
           <h1>{track.title}</h1>
-          <p className="track-intro">{track.description?.trim() || "No description has been provided for this track."}</p>
+          {track.description?.trim() ? <p className="track-intro">{track.description.trim()}</p> : null}
           <button className="track-creator-chip" onClick={() => goToCreatorProfile(creatorId)}>
             {track.creator?.avatarUrl ? (
               <img src={track.creator.avatarUrl} alt="" />
@@ -522,78 +616,18 @@ export function TrackDetailsPage({
               disabled={submittingAction}
               onClick={() => requestLibraryAccess(() => setPlaylistModalOpen(true))}
               aria-label="Add to playlist"
+              title="Add to playlist"
             >
               <PlusIcon />
             </button>
-
-            {/* Context menu (...) for Track Operations (UC-22.1) */}
-            <div style={{ position: "relative" }}>
-              <button
-                type="button"
-                className="track-round-action"
-                title="More options (...)"
-                aria-label="More options"
-                aria-haspopup="true"
-                aria-expanded={contextMenuOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setContextMenuOpen((prev) => !prev);
-                }}
-              >
-                <MoreIcon width={18} height={18} />
-              </button>
-
-              {contextMenuOpen && (
-                <div
-                  className="track-context-menu"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    zIndex: 30,
-                    background: "#FFFFFF",
-                    borderRadius: "12px",
-                    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.14)",
-                    border: "1px solid #E2E8F0",
-                    minWidth: "170px",
-                    padding: "6px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2px",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "8px 12px",
-                      background: "transparent",
-                      border: "none",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "0.875rem",
-                      color: "#DC2626",
-                      fontWeight: 500,
-                      textAlign: "left",
-                      width: "100%",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#FEE2E2")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    onClick={() => {
-                      setContextMenuOpen(false);
-                      requestLibraryAccess(() => setReportTrackModalOpen(true));
-                    }}
-                  >
-                    <FlagIcon width={16} height={16} />
-                    <span>Report Track</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              className="track-round-action"
+              onClick={handleShareTrack}
+              aria-label="Share track"
+              title="Share track & copy link"
+            >
+              <ShareIcon />
+            </button>
           </div>
           {actionMessage ? (
             <p className="track-action-message is-success" role="status">
@@ -614,54 +648,83 @@ export function TrackDetailsPage({
           <header>
             <div>
               <span className="track-section-icon">
-                <FileTextIcon width={19} height={19} />
+                <FileTextIcon width={18} height={18} />
               </span>
               <span>
-                <small>LYRICS</small>
-                <h2>{track.title}</h2>
+                <h2>Lyrics</h2>
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {isPlayingThisTrack && (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "4px 9px",
-                    borderRadius: 8,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: "rgba(2, 132, 199, 0.12)",
-                    color: "#0284c7",
-                  }}
+
+            <div className="track-lyrics-tools-group">
+              {/* Karaoke Fullscreen Mode */}
+              {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
+                <button
+                  type="button"
+                  className="track-lyrics-tool-btn"
+                  onClick={() => setIsKaraokeFullscreen(true)}
+                  title="Karaoke Mode (Fullscreen)"
+                  aria-label="Karaoke Mode"
                 >
-                  <MusicIcon width={13} height={13} />
-                  <span>Now Playing</span>
-                </span>
+                  <MaximizeIcon width={16} height={16} />
+                </button>
               )}
-              {officialLyricContent && lyricsTab === "OFFICIAL" ? (
-                <span className="official-lyrics-badge">
-                  <CheckIcon width={13} height={13} /> Verified Official
-                </span>
-              ) : null}
+
+              {/* Copy Lyrics to Clipboard */}
+              {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
+                <button
+                  type="button"
+                  className="track-lyrics-tool-btn"
+                  onClick={() => {
+                    const content = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
+                    if (content) {
+                      const cleanText = content
+                        .split(/\r?\n/)
+                        .map((l) => l.replace(/^\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*/, ""))
+                        .join("\n");
+                      void navigator.clipboard.writeText(cleanText).then(() => {
+                        setNotification({
+                          open: true,
+                          message: "Lyrics copied to clipboard!",
+                          type: "success",
+                        });
+                      });
+                    }
+                  }}
+                  title="Copy lyrics to clipboard"
+                  aria-label="Copy lyrics"
+                >
+                  <CopyIcon width={15} height={15} />
+                </button>
+              )}
 
               {/* Download .LRC File */}
               {(lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent) && (
                 <button
                   type="button"
-                  className="button button-secondary button-small"
+                  className="track-lyrics-tool-btn"
                   onClick={() => {
                     const content = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
                     downloadLrcFile(track.title, track.creator?.displayName, content);
                   }}
                   title="Download .LRC file"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                  aria-label="Download .LRC file"
                 >
-                  <DownloadIcon width={13} height={13} />
-                  <span>Download .LRC</span>
+                  <DownloadIcon width={15} height={15} />
                 </button>
               )}
+
+              {/* Report Lyrics Issue */}
+              {lyricsTab === "OFFICIAL" && officialLyricContent && canManageLibrary ? (
+                <button
+                  type="button"
+                  className="track-lyrics-tool-btn"
+                  onClick={() => setReportModalOpen(true)}
+                  title="Report inaccurate lyrics"
+                  aria-label="Report inaccurate lyrics"
+                >
+                  <FlagIcon width={15} height={15} />
+                </button>
+              ) : null}
             </div>
           </header>
 
@@ -704,30 +767,43 @@ export function TrackDetailsPage({
               </button>
             </div>
 
-            {/* Actions for Personal tab when user is logged in & has custom lyrics */}
-            {lyricsTab === "PERSONAL" && canManageLibrary && personalLyricContent ? (
+            {/* Actions for Personal tab when user is logged in (UC-18) */}
+            {lyricsTab === "PERSONAL" && (canManageLibrary || isTrackCreator) ? (
               <div className="track-lyrics-tab-actions">
+                {isTrackCreator && personalLyricContent && (
+                  <button
+                    type="button"
+                    className="button button-small button-primary"
+                    onClick={handleApprovePersonalToTrack}
+                    disabled={isApprovingPersonal}
+                    title="Approve and publish your personal lyrics as the official track lyrics"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                  >
+                    <CheckIcon width={13} height={13} />
+                    <span>{isApprovingPersonal ? "Approving..." : "Approve to Track"}</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="button button-secondary button-small"
-                  onClick={() => {
-                    setPersonalContent(personalLyricContent);
-                    setPersonalEditorOpen(true);
-                  }}
-                  title="Edit your personal lyrics"
+                  className="button button-small button-secondary"
+                  onClick={() => onNavigate(`/track/${trackId}/lyrics/edit?mode=personal`)}
+                  title="Open Lyric Studio to edit personal lyrics"
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
                 >
                   <EditIcon width={13} height={13} />
-                  <span>Edit</span>
+                  <span>{personalLyricContent ? "Edit Personal Lyrics" : "Create Custom Lyrics"}</span>
                 </button>
-                <button
-                  type="button"
-                  className="button button-secondary button-small button-danger-hover"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  title="Delete personal lyrics"
-                >
-                  <TrashIcon width={13} height={13} />
-                  <span>Delete</span>
-                </button>
+                {personalLyricContent && (
+                  <button
+                    type="button"
+                    className="button button-secondary button-small button-danger-hover"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    title="Delete personal lyrics"
+                  >
+                    <TrashIcon width={13} height={13} />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
             ) : null}
           </div>
@@ -804,15 +880,24 @@ export function TrackDetailsPage({
                 <FileTextIcon width={32} height={32} />
                 <strong>No official lyrics available</strong>
                 <span>Official verified lyrics have not been provided for this track yet.</span>
-                {canManageLibrary ? (
+                {isTrackCreator ? (
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    onClick={() => onNavigate(`/track/${trackId}/lyrics/edit?mode=official`)}
+                  >
+                    <PlusIcon width={14} height={14} />
+                    <span>Add Official Lyrics</span>
+                  </button>
+                ) : canManageLibrary ? (
                   <button
                     type="button"
                     className="button button-secondary"
-                    style={{ marginTop: 12 }}
+                    style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: "6px" }}
                     onClick={() => {
                       setLyricsTab("PERSONAL");
-                      setPersonalContent("");
-                      setPersonalEditorOpen(true);
+                      onNavigate(`/track/${trackId}/lyrics/edit?mode=personal`);
                     }}
                   >
                     <PlusIcon width={14} height={14} />
@@ -823,7 +908,7 @@ export function TrackDetailsPage({
             )
           ) : (
             /* Tab 2: Personal Lyrics */
-            !canManageLibrary ? (
+            !canManageLibrary && !isTrackCreator ? (
               <div className="track-lyrics-empty">
                 <UserIcon width={32} height={32} />
                 <strong>Listener Login Required</strong>
@@ -885,11 +970,8 @@ export function TrackDetailsPage({
                 <button
                   type="button"
                   className="button button-primary"
-                  style={{ marginTop: 12 }}
-                  onClick={() => {
-                    setPersonalContent("");
-                    setPersonalEditorOpen(true);
-                  }}
+                  style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: "6px" }}
+                  onClick={() => onNavigate(`/track/${trackId}/lyrics/edit?mode=personal`)}
                 >
                   <PlusIcon width={14} height={14} />
                   <span>Create Custom Lyrics</span>
@@ -897,12 +979,6 @@ export function TrackDetailsPage({
               </div>
             )
           )}
-
-          <footer>
-            {hasTimestamps
-              ? "Time-synced lyrics (.lrc). Click any line to seek audio playback (Click-to-seek)."
-              : "Lyrics are displayed in plain text format."}
-          </footer>
         </section>
 
         <aside className="track-context-column">
@@ -947,7 +1023,52 @@ export function TrackDetailsPage({
             <p>Explore more music and albums from this creator.</p>
             <button onClick={() => goToCreatorProfile(creatorId)}>View profile</button>
           </section>
-          <p className="track-report-unavailable">Track reporting is not available in this release.</p>
+
+          {/* More from this Creator */}
+          <section className="track-context-card track-more-tracks-card">
+            <h4 style={{ margin: "0 0 10px", fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              More from this Creator
+            </h4>
+            {moreCreatorLoading ? (
+              <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>Loading songs...</p>
+            ) : moreCreatorTracks.length > 0 ? (
+              <div className="track-more-list">
+                {moreCreatorTracks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="track-more-item"
+                    onClick={() => onNavigate(`/tracks/${item.id}`)}
+                    title={`Go to ${item.title}`}
+                  >
+                    <img
+                      src={item.coverUrl || covers.dawn}
+                      alt={item.title}
+                      className="track-more-thumb"
+                    />
+                    <div className="track-more-info">
+                      <span className="track-more-title">{item.title}</span>
+                      <span className="track-more-meta">{formatDuration(item.durationMs)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="track-more-play-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayTrack(item);
+                      }}
+                      title={`Play ${item.title}`}
+                    >
+                      <PlayIcon width={12} height={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                No other songs found for this creator.
+              </p>
+            )}
+          </section>
         </aside>
       </div>
 
@@ -1057,100 +1178,6 @@ export function TrackDetailsPage({
           )
         : null}
 
-      {/* Personal Lyrics Editor Modal (UC-18) */}
-      {personalEditorOpen
-        ? createPortal(
-            <div
-              className="modal-backdrop"
-              role="presentation"
-              onClick={() => {
-                if (!personalSaving) setPersonalEditorOpen(false);
-              }}
-            >
-              <section
-                className="track-dialog"
-                style={{ width: "min(100%, 600px)" }}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="personal-lyrics-title"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="track-dialog-heading">
-                  <span>
-                    <FileTextIcon />
-                  </span>
-                  <div>
-                    <small>PERSONAL LYRICS</small>
-                    <h2 id="personal-lyrics-title">
-                      {personalLyricContent
-                        ? `Edit ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`
-                        : `Create ${personalType === "TRANSLATION" ? "Translation" : "Custom Lyrics"}`}
-                    </h2>
-                  </div>
-                </div>
-
-                {/* Lyric Type Selector (UC-18.2 - 18.4) */}
-                <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setPersonalType("CUSTOM")}
-                    className={`button ${personalType === "CUSTOM" ? "button-primary" : "button-secondary"}`}
-                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
-                  >
-                    🎵 Custom Lyrics (Lời tự soạn)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPersonalType("TRANSLATION")}
-                    className={`button ${personalType === "TRANSLATION" ? "button-primary" : "button-secondary"}`}
-                    style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px" }}
-                  >
-                    🌐 Translation (Bản dịch nghĩa)
-                  </button>
-                </div>
-
-                <p>
-                  Write or paste your {personalType === "TRANSLATION" ? "translated" : "custom"} lyrics for <b>{track.title}</b>. Supports both standard LRC timestamps
-                  (e.g. <code>[01:23.45] lyric line</code>) and plain text.
-                </p>
-
-                <textarea
-                  className="track-lyrics-dialog-textarea"
-                  value={personalContent}
-                  onChange={(e) => setPersonalContent(e.target.value)}
-                  placeholder="Paste or type your lyrics here..."
-                  rows={12}
-                  disabled={personalSaving}
-                />
-                <p className="track-lyrics-dialog-hint">
-                  Tip: Include timestamps like <code>[00:15.20]</code> at the start of lines to create time-synced lyrics!
-                </p>
-
-                <div className="track-dialog-actions">
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    disabled={personalSaving}
-                    onClick={() => setPersonalEditorOpen(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-primary"
-                    disabled={personalSaving || !personalContent.trim()}
-                    onClick={() => {
-                      void handleSavePersonalLyrics();
-                    }}
-                  >
-                    {personalSaving ? "Saving..." : "Save Lyrics"}
-                  </button>
-                </div>
-              </section>
-            </div>,
-            document.body
-          )
-        : null}
 
       {/* Delete Confirmation Modal for Personal Lyrics */}
       <DeleteConfirmationModal
@@ -1189,6 +1216,83 @@ export function TrackDetailsPage({
         message={notification.message}
         onClose={() => setNotification((prev) => ({ ...prev, open: false }))}
       />
+
+      {/* Karaoke Fullscreen View */}
+      {isKaraokeFullscreen
+        ? createPortal(
+            <div
+              className="track-karaoke-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Karaoke Mode"
+            >
+              <div className="track-karaoke-header">
+                <div className="track-karaoke-track-info">
+                  <img
+                    src={track.coverUrl ?? covers.dawn}
+                    alt={track.title}
+                    className="track-karaoke-cover"
+                  />
+                  <div>
+                    <h2 className="track-karaoke-title">{track.title}</h2>
+                    <p className="track-karaoke-artist">
+                      {track.creator?.displayName ?? "Unknown Artist"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="track-karaoke-actions">
+                  <button
+                    type="button"
+                    className="button button-primary button-small"
+                    onClick={() => onPlayTrack(track)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    {isPlayingThis ? <PauseIcon width={14} height={14} /> : <PlayIcon width={14} height={14} />}
+                    <span>{isPlayingThis ? "Pause" : "Play"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="track-karaoke-close-btn"
+                    onClick={() => setIsKaraokeFullscreen(false)}
+                    title="Exit Karaoke Mode (Esc)"
+                    aria-label="Exit Karaoke Mode"
+                  >
+                    <MinimizeIcon width={20} height={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="track-karaoke-body">
+                <div className="track-karaoke-lyrics-container">
+                  {parsedActiveLines.length === 0 ? (
+                    <p className="track-karaoke-empty">No lyrics available to display.</p>
+                  ) : (
+                    parsedActiveLines.map((line, idx) => {
+                      const isActive = idx === activeLineIndex;
+                      return (
+                        <p
+                          key={`${line.timeSec ?? idx}-${idx}`}
+                          ref={isActive ? karaokeActiveLineRef : null}
+                          className={`track-karaoke-line ${isActive ? "is-active" : ""}`}
+                          onClick={() => {
+                            if (line.timeSec !== null) {
+                              handleLineClick(line.timeSec);
+                            }
+                          }}
+                        >
+                          {line.text}
+                        </p>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

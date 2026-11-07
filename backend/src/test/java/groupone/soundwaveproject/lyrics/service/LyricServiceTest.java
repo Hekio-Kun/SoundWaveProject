@@ -195,4 +195,44 @@ class LyricServiceTest {
         verify(personalLyricRepository, times(1))
                 .deleteByUserIdAndTrackIdAndLyricType(5L, 1L, "CUSTOM");
     }
+
+    @Test
+    @DisplayName("saveOrUpdatePersonalLyric - maps lyricType and lyricContent correctly without inversion")
+    void saveOrUpdatePersonalLyric_Success() {
+        User user = createUser(5L, "listener@example.com");
+        Track track = createTrack(1L, "Test Song");
+
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(user));
+        when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
+        when(personalLyricRepository.findByUserIdAndTrackIdAndLyricType(5L, 1L, "CUSTOM"))
+                .thenReturn(Optional.empty());
+
+        when(personalLyricRepository.save(any(PersonalLyric.class))).thenAnswer(invocation -> {
+            PersonalLyric p = invocation.getArgument(0);
+            ReflectionTestUtils.setField(p, "id", 202L);
+            ReflectionTestUtils.setField(p, "createdAt", Instant.now());
+            ReflectionTestUtils.setField(p, "updatedAt", Instant.now());
+            return p;
+        });
+
+        when(personalLyricRepository.findById(202L)).thenAnswer(invocation -> {
+            PersonalLyric entity = PersonalLyric.builder()
+                    .user(user)
+                    .track(track)
+                    .lyricType("CUSTOM")
+                    .lyricContent("[00:10.00]Valid lyrics content")
+                    .build();
+            ReflectionTestUtils.setField(entity, "id", 202L);
+            ReflectionTestUtils.setField(entity, "createdAt", Instant.now());
+            ReflectionTestUtils.setField(entity, "updatedAt", Instant.now());
+            return Optional.of(entity);
+        });
+
+        var response = lyricService.saveOrUpdatePersonalLyric(1L, "CUSTOM", "[00:10.00]Valid lyrics content", "listener@example.com");
+
+        assertNotNull(response);
+        assertEquals(202L, response.id());
+        assertEquals("CUSTOM", response.lyricType());
+        assertEquals("[00:10.00]Valid lyrics content", response.lyricContent());
+    }
 }

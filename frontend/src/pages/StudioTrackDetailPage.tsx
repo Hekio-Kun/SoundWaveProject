@@ -831,7 +831,7 @@ export function StudioTrackDetailPage({
                     <button
                       type="button"
                       className="studio-crud-btn studio-crud-btn-edit"
-                      onClick={() => setUpdateLyricModalOpen(true)}
+                      onClick={() => (window.location.hash = `#/track/${track.id}/lyrics/edit?mode=official`)}
                       style={{
                         backgroundColor: "#f0f9ff",
                         color: "var(--color-ocean-primary, #0284C7)",

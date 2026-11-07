@@ -53,6 +53,7 @@ public class LyricService {
             if (userOpt.isPresent()) {
                 personalResponse = personalLyricRepository
                         .findByUserIdAndTrackIdAndLyricType(userOpt.get().getId(), trackId, "CUSTOM")
+                        .or(() -> personalLyricRepository.findByUserIdAndTrackIdAndLyricType(userOpt.get().getId(), trackId, "TRANSLATION"))
                         .map(this::mapPersonalToResponse)
                         .orElse(null);
             }
@@ -122,7 +123,7 @@ public class LyricService {
      */
     @Transactional
     public CustomLyricResponse saveOrUpdatePersonalLyric(Long trackId, String lyricType, String lyricContent, String userEmail) {
-        LyricDetailResponse detail = savePersonalLyric(userEmail, trackId, new SavePersonalLyricRequest(lyricContent, lyricType));
+        LyricDetailResponse detail = savePersonalLyric(userEmail, trackId, new SavePersonalLyricRequest(lyricType, lyricContent));
         User user = userRepository.findByEmailIgnoreCase(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
         PersonalLyric entity = personalLyricRepository.findById(detail.id())

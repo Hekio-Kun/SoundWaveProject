@@ -1,4 +1,7 @@
 import { useState, useEffect, type FormEvent, type ReactNode } from "react";
+import { usePlayer } from "../context/PlayerContext";
+import { catalogApi } from "../api/catalog";
+import type { LandingTrack } from "../types";
 import { AuthApiError, authApi, getAuthErrorMessage, type AuthSession } from "../api/auth";
 import {
   AlertIcon,
@@ -7,6 +10,7 @@ import {
   HeadphonesIcon,
   LockIcon,
   MailIcon,
+  PauseIcon,
   PlayIcon,
   ShieldIcon,
   UserIcon,
@@ -61,6 +65,47 @@ export function AuthExperience({
   description: string;
   onNavigate: (route: string) => void;
 }) {
+  const { currentTrack, playing, playTrack, togglePlay } = usePlayer();
+  const [curatedTracks, setCuratedTracks] = useState<LandingTrack[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    catalogApi
+      .getCuratedRecommendations(10)
+      .then((res) => {
+        if (isMounted && res && res.length > 0) {
+          setCuratedTracks(res);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not sync explore track for auth experience:", err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Synchronized with explore: use current playing track if available, else explore hero track
+  const activeTrack = (playing && currentTrack) ? currentTrack : (currentTrack || curatedTracks[0] || null);
+  const isPlayingActive = Boolean(activeTrack && currentTrack?.id === activeTrack.id && playing);
+
+  const handleTogglePlayback = () => {
+    if (!activeTrack) return;
+    if (currentTrack?.id === activeTrack.id) {
+      togglePlay();
+    } else {
+      playTrack(
+        activeTrack,
+        curatedTracks.length > 0 ? curatedTracks : [activeTrack],
+        "Explore Recommended"
+      );
+    }
+  };
+
+  const trackTitle = activeTrack?.title || "Explore SoundWave";
+  const artistName = (activeTrack as { artist?: string })?.artist || activeTrack?.creator?.displayName || "Independent Artist";
+  const genreName = activeTrack?.genreName || (activeTrack as { genre?: string })?.genre || activeTrack?.album?.title || "Indie";
+
   return (
     <main className="auth-v2-experience">
       <section className="auth-v2-story" aria-label="About SoundWave">
@@ -73,17 +118,50 @@ export function AuthExperience({
         <div className="auth-v2-story-content">
           <span className="auth-v2-story-tag"><HeadphonesIcon width={15} height={15} /> MUSIC CONNECTS THE COMMUNITY</span>
           <h2>Every moment<br />has its own <span>soundtrack.</span></h2>
-          <p>Listen to independent creators, save what you love, and share your own music.</p>
 
-          <div className="auth-v2-now-playing">
-            <span className="auth-v2-cover"><i /><i /><i /><i /></span>
-            <span><small>NOW PLAYING ON SOUNDWAVE</small><strong>Thành Phố Sau Mưa</strong><em>Bảo Lam · Pop</em></span>
-            <b><PlayIcon width={17} height={17} /></b>
-          </div>
-
-          <div className="auth-v2-trust-row">
-            <span><ShieldIcon width={16} height={16} /><b>No interrupting ads</b><small>Stay focused on the music</small></span>
-            <span><HeadphonesIcon width={16} height={16} /><b>Quality audio</b><small>A seamless listening experience</small></span>
+          {/* Synchronized Spotlight Card */}
+          <div
+            className="auth-v2-now-playing"
+            onClick={handleTogglePlayback}
+            role="region"
+            aria-label="SoundWave spotlight track preview"
+            style={{ cursor: "pointer" }}
+            title={isPlayingActive ? `Pause ${trackTitle}` : `Play ${trackTitle}`}
+          >
+            <span
+              className={`auth-v2-cover ${!isPlayingActive ? "is-paused" : ""}`}
+              style={
+                activeTrack?.coverUrl
+                  ? {
+                      backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.45)), url(${activeTrack.coverUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }
+                  : undefined
+              }
+            >
+              <i /><i /><i /><i />
+            </span>
+            <span>
+              <small>NOW PLAYING ON SOUNDWAVE</small>
+              <strong>{trackTitle}</strong>
+              <em>{artistName} · {genreName}</em>
+            </span>
+            <button
+              type="button"
+              className="auth-v2-play-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTogglePlayback();
+              }}
+              aria-label={isPlayingActive ? `Pause ${trackTitle}` : `Play ${trackTitle}`}
+            >
+              {isPlayingActive ? (
+                <PauseIcon width={17} height={17} />
+              ) : (
+                <PlayIcon width={17} height={17} />
+              )}
+            </button>
           </div>
         </div>
       </section>
@@ -112,6 +190,7 @@ export function AuthExperience({
     </main>
   );
 }
+
 function TextField({
   id,
   label,
