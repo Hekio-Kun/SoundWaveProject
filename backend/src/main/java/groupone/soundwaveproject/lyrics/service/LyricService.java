@@ -257,6 +257,22 @@ public class LyricService {
     }
 
     /**
+     * Kích hoạt chuyển trạng thái lời bài hát DRAFT thành PUBLISHED khi bài hát được phê duyệt xuất bản.
+     */
+    @Transactional
+    public void publishOfficialLyricForTrack(Long trackId) {
+        if (trackId == null) return;
+        officialLyricRepository.findByTrackId(trackId).ifPresent(lyric -> {
+            if (lyric.getLyricContent() != null && !lyric.getLyricContent().isBlank()) {
+                lyric.setStatus("PUBLISHED");
+                lyric.setUpdatedAt(Instant.now());
+                officialLyricRepository.save(lyric);
+                log.info("Auto-published official lyric for trackId={}", trackId);
+            }
+        });
+    }
+
+    /**
      * Xóa toàn bộ lyrics liên kết với bài hát khi bài hát bị xóa khỏi hệ thống.
      */
     @Transactional

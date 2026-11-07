@@ -128,6 +128,13 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
     setErrorMessage(null);
 
     const isPublished = track.status === "PUBLISHED" || (track as any).publicationStatus === "PUBLISHED";
+    const hasExistingOfficialLyrics = Boolean(track.lyrics && track.lyrics.trim().length > 0);
+
+    if (isPublished && hasExistingOfficialLyrics) {
+      setErrorMessage("This track already has official lyrics. Official lyrics can only be submitted once for tracks originally released without lyrics.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       if (isPublished) {

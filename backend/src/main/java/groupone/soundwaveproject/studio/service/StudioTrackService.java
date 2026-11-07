@@ -349,6 +349,13 @@ public class StudioTrackService {
             throw new ConflictOperationException("Only PUBLISHED tracks can submit lyric updates for moderation.");
         }
 
+        // Rule: Only tracks originally published without official lyrics can submit lyrics for moderation (one-time update)
+        String existingOfficialLyrics = lyricService != null ? lyricService.getOfficialLyrics(track.getId()) : null;
+        if (existingOfficialLyrics != null && !existingOfficialLyrics.isBlank()) {
+            throw new ConflictOperationException("ALREADY_HAS_OFFICIAL_LYRICS",
+                    "This track already has official lyrics. Official lyrics can only be submitted once for tracks originally released without lyrics.");
+        }
+
         // EX02: Existing pending submission
         Optional<TrackSubmission> pendingOpt = trackSubmissionRepository.findFirstByTrackIdAndSubmissionTypeAndStatus(
                 trackId, SubmissionType.LYRIC_UPDATE, SubmissionStatus.PENDING);
@@ -447,6 +454,9 @@ public class StudioTrackService {
 
         if (track.getPublicationStatus() == TrackPublicationStatus.PENDING) {
             throw new ForbiddenOperationException("Tracks currently pending review cannot be modified.");
+        }
+        if (track.getPublicationStatus() == TrackPublicationStatus.PUBLISHED) {
+            throw new ForbiddenOperationException("Official lyrics for published tracks cannot be updated directly. If your track was published without lyrics, please submit lyrics for Staff moderation.");
         }
 
         String rawLyrics = request != null ? request.lyrics() : null;

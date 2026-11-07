@@ -401,6 +401,10 @@ public class ModerationService {
             track.setLatestRejectionReason(null);
             trackRepository.save(track);
 
+            if (lyricService != null) {
+                lyricService.publishOfficialLyricForTrack(track.getId());
+            }
+
             if (submitter != null) {
                 notificationService.createNotification(
                         submitter.getId(),
@@ -582,6 +586,11 @@ public class ModerationService {
         }
 
         if (!approvedTracks.isEmpty()) {
+            if (lyricService != null) {
+                for (Track approvedTrack : approvedTracks) {
+                    lyricService.publishOfficialLyricForTrack(approvedTrack.getId());
+                }
+            }
             album.setStatus("PUBLISHED");
             album.setPublishedAt(nowUtc);
             albumRepository.save(album);

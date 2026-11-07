@@ -550,20 +550,20 @@ class StudioTrackServiceTest {
     }
 
     @Test
-    @DisplayName("updateLyrics updates lyrics and keeps PUBLISHED status intact without sending to PENDING")
-    void updateLyrics_Success_OnPublishedTrack() {
+    @DisplayName("updateLyrics updates lyrics for DRAFT track successfully")
+    void updateLyrics_Success_OnDraftTrack() {
         when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
                 .thenReturn(Optional.of(activeUser));
 
-        Track publishedTrack = Track.builder()
+        Track draftTrack = Track.builder()
                 .id(300L)
                 .uploaderUserId(10L)
-                .title("Public Track Without Lyrics")
-                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .title("Draft Track")
+                .publicationStatus(TrackPublicationStatus.DRAFT)
                 .build();
 
         when(trackRepository.findByIdAndUploaderUserId(300L, 10L))
-                .thenReturn(Optional.of(publishedTrack));
+                .thenReturn(Optional.of(draftTrack));
         when(lyricService.getOfficialLyrics(300L))
                 .thenReturn("[00:05.00] New Synced Lyric Line");
 
@@ -575,7 +575,7 @@ class StudioTrackServiceTest {
 
         assertThat(response).isNotNull();
         assertThat(response.lyrics()).isEqualTo("[00:05.00] New Synced Lyric Line");
-        assertThat(response.status()).isEqualTo("PUBLISHED");
+        assertThat(response.status()).isEqualTo("DRAFT");
         verify(lyricService).saveOrUpdateOfficialLyrics(300L, "[00:05.00] New Synced Lyric Line", 10L);
     }
 
@@ -644,5 +644,48 @@ class StudioTrackServiceTest {
         assertThat(res.submissionType()).isEqualTo(groupone.soundwaveproject.moderation.entity.SubmissionType.LYRIC_UPDATE);
         assertThat(res.status()).isEqualTo(SubmissionStatus.PENDING);
         assertThat(publishedTrack.getPublicationStatus()).isEqualTo(TrackPublicationStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("submitLyricsForReview - throws ConflictOperationException when track already has official lyrics")
+    void submitLyricsForReview_ThrowsConflict_WhenAlreadyHasOfficialLyrics() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com")).thenReturn(Optional.of(activeUser));
+
+        Track publishedTrack = Track.builder()
+                .id(401L)
+                .uploaderUserId(10L)
+                .title("Song with Lyrics")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(401L, 10L)).thenReturn(Optional.of(publishedTrack));
+        when(lyricService.getOfficialLyrics(401L)).thenReturn("[00:01.00]Existing Official Lyric");
+
+        assertThatThrownBy(() -> studioTrackService.submitLyricsForReview(
+                401L,
+                new groupone.soundwaveproject.studio.dto.request.SubmitTrackLyricsRequest("[00:01.00]New attempt", "Try update"),
+                "creator@soundwave.com"
+        ))
+                .isInstanceOf(groupone.soundwaveproject.exception.ConflictOperationException.class)
+                .hasMessageContaining("already has official lyrics");
+    }
+
+    @Test
+    @DisplayName("updateLyrics - throws ForbiddenOperationException when track is PUBLISHED")
+    void updateLyrics_ThrowsForbidden_WhenTrackIsPublished() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com")).thenReturn(Optional.of(activeUser));
+
+        Track publishedTrack = Track.builder()
+                .id(402L)
+                .uploaderUserId(10L)
+                .title("Published Song")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .build();
+
+        when(trackRepository.findByIdAndUploaderUserId(402L, 10L)).thenReturn(Optional.of(publishedTrack));
+
+        assertThatThrownBy(() -> studioTrackService.updateLyrics(402L, "Direct lyric update", "creator@soundwave.com"))
+                .isInstanceOf(ForbiddenOperationException.class)
+                .hasMessageContaining("Official lyrics for published tracks cannot be updated directly");
     }
 }
