@@ -81,11 +81,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentTrack]);
 
+  const currentTrackRef = useRef(currentTrack);
   useEffect(() => {
-    return () => {
-      audio.pause();
-    };
-  }, [audio]);
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
 
   // UC-10: Theo dõi ID track đã gửi request lấy stream info và ghi nhận lượt nghe cho phiên phát hiện tại
   const activeStreamTrackIdRef = useRef<number | null>(null);
@@ -108,6 +107,43 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       console.warn("Could not sync live track stream info:", err);
     }
   }, [audio]);
+
+  // UC-10 / UC-11: Tự động đồng bộ trạng thái playing với HTMLAudioElement nguyên bản
+  useEffect(() => {
+    const handlePlay = () => {
+      setPlaying(true);
+      const track = currentTrackRef.current;
+      if (track?.id && activeStreamTrackIdRef.current !== track.id) {
+        activeStreamTrackIdRef.current = track.id;
+        void syncTrackPlay(track);
+      }
+    };
+    const handlePause = () => {
+      setPlaying(false);
+    };
+    const handleEnded = () => {
+      setPlaying(false);
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("playing", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
+
+    if (!audio.paused && !audio.ended) {
+      setPlaying(true);
+    } else {
+      setPlaying(false);
+    }
+
+    return () => {
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("playing", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
+      audio.pause();
+    };
+  }, [audio, syncTrackPlay]);
 
   const setAudioPlaying = useCallback(
     (shouldPlay: boolean) => {

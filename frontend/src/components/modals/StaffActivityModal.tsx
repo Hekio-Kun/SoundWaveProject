@@ -83,11 +83,12 @@ export function StaffActivityModal({
         style={{
           maxWidth: "840px",
           width: "92vw",
-          height: "min(84vh, 690px)",
+          height: "min(82vh, 600px)",
           maxHeight: "calc(100dvh - 48px)",
+          boxSizing: "border-box",
           display: "flex",
           flexDirection: "column",
-          padding: "20px 24px",
+          padding: "18px 24px 16px",
           borderRadius: "18px",
           overflow: "hidden",
           gap: 0,
@@ -563,8 +564,8 @@ export function StaffActivityModal({
         <div
           className="modal-actions"
           style={{
-            marginTop: "12px",
-            paddingTop: "12px",
+            marginTop: "10px",
+            paddingTop: "10px",
             borderTop: "1px solid #E2E8F0",
             flexShrink: 0,
             display: "flex",
