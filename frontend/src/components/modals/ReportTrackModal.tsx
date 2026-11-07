@@ -53,6 +53,7 @@ export function ReportTrackModal({
   onSuccess,
 }: ReportTrackModalProps) {
   const [selectedReason, setSelectedReason] = useState<ReportCategoryType | "">("");
+  const [customDetails, setCustomDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -61,6 +62,7 @@ export function ReportTrackModal({
   useEffect(() => {
     if (!open) {
       setSelectedReason("");
+      setCustomDetails("");
       setErrorMessage(null);
       setSubmitting(false);
       return;
@@ -90,10 +92,16 @@ export function ReportTrackModal({
     setSubmitting(true);
     setErrorMessage(null);
 
+    const selectedOption = PREDEFINED_REASONS.find((r) => r.value === selectedReason);
+    const reportContent = customDetails.trim()
+      ? (selectedOption ? `${selectedOption.title} - ${customDetails.trim()}` : customDetails.trim())
+      : (selectedOption ? `${selectedOption.title} - ${selectedOption.description}` : selectedReason);
+
     try {
       await reportsApi.reportTrack({
         trackId,
         category: selectedReason,
+        description: reportContent,
       });
 
       // NF01 Step 7: Close modal & notify listener
@@ -367,9 +375,25 @@ export function ReportTrackModal({
             >
               {PREDEFINED_REASONS.map((option) => {
                 const isSelected = selectedReason === option.value;
+                const optionId = `report-reason-${option.value}`;
                 return (
-                  <label
+                  <div
                     key={option.value}
+                    role="button"
+                    tabIndex={submitting ? -1 : 0}
+                    onClick={() => {
+                      if (!submitting) {
+                        setSelectedReason(option.value);
+                        setErrorMessage(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!submitting && (e.key === " " || e.key === "Enter")) {
+                        e.preventDefault();
+                        setSelectedReason(option.value);
+                        setErrorMessage(null);
+                      }
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -380,9 +404,11 @@ export function ReportTrackModal({
                       background: isSelected ? "#F0F9FF" : "#FFFFFF",
                       cursor: submitting ? "not-allowed" : "pointer",
                       transition: "all 0.15s ease",
+                      userSelect: "none",
                     }}
                   >
                     <input
+                      id={optionId}
                       type="radio"
                       name="report-reason"
                       value={option.value}
@@ -401,7 +427,14 @@ export function ReportTrackModal({
                         flexShrink: 0,
                       }}
                     />
-                    <div style={{ flex: 1 }}>
+                    <label
+                      htmlFor={optionId}
+                      style={{
+                        flex: 1,
+                        cursor: submitting ? "not-allowed" : "pointer",
+                        margin: 0,
+                      }}
+                    >
                       <div
                         style={{
                           display: "flex",
@@ -430,10 +463,47 @@ export function ReportTrackModal({
                       >
                         {option.description}
                       </p>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
                 );
               })}
+            </div>
+
+            {/* Optional Additional Details */}
+            <div style={{ marginTop: "16px" }}>
+              <label
+                htmlFor="report-custom-details"
+                style={{
+                  display: "block",
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "#475569",
+                  marginBottom: "6px",
+                }}
+              >
+                Additional Details (Optional):
+              </label>
+              <textarea
+                id="report-custom-details"
+                rows={3}
+                value={customDetails}
+                onChange={(e) => setCustomDetails(e.target.value)}
+                placeholder="Describe details, evidence, or timestamps (e.g. at 01:23) to assist moderation..."
+                disabled={submitting}
+                maxLength={1000}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  borderRadius: "10px",
+                  border: "1px solid #CBD5E1",
+                  padding: "10px 12px",
+                  fontSize: "0.875rem",
+                  color: "#0F172A",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                  outline: "none",
+                }}
+              />
             </div>
           </div>
 

@@ -105,9 +105,13 @@ export function ChangeReportReasonModal({
     setSubmitting(true);
     setErrorMessage(null);
 
+    const selectedOption = PREDEFINED_REASONS.find((r) => r.value === selectedReason);
+    const reportContent = selectedOption ? `${selectedOption.title} - ${selectedOption.description}` : selectedReason;
+
     try {
       await reportsApi.updateReport(reportId, {
         category: selectedReason,
+        description: reportContent,
       });
 
       // Close modal & notify listener
@@ -395,10 +399,26 @@ export function ChangeReportReasonModal({
               {PREDEFINED_REASONS.map((option) => {
                 const isSelected = selectedReason === option.value;
                 const isCurrentStored = currentCategory === option.value;
+                const optionId = `change-reason-${option.value}`;
 
                 return (
-                  <label
+                  <div
                     key={option.value}
+                    role="button"
+                    tabIndex={submitting ? -1 : 0}
+                    onClick={() => {
+                      if (!submitting) {
+                        setSelectedReason(option.value);
+                        setErrorMessage(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!submitting && (e.key === " " || e.key === "Enter")) {
+                        e.preventDefault();
+                        setSelectedReason(option.value);
+                        setErrorMessage(null);
+                      }
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -409,9 +429,11 @@ export function ChangeReportReasonModal({
                       background: isSelected ? "#F0F9FF" : "#FFFFFF",
                       cursor: submitting ? "not-allowed" : "pointer",
                       transition: "all 0.15s ease",
+                      userSelect: "none",
                     }}
                   >
                     <input
+                      id={optionId}
                       type="radio"
                       name="violationReason"
                       value={option.value}
@@ -430,7 +452,10 @@ export function ChangeReportReasonModal({
                         flexShrink: 0,
                       }}
                     />
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <label
+                      htmlFor={optionId}
+                      style={{ flex: 1, minWidth: 0, cursor: submitting ? "not-allowed" : "pointer", margin: 0 }}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span
                           style={{
@@ -466,8 +491,8 @@ export function ChangeReportReasonModal({
                       >
                         {option.description}
                       </p>
-                    </div>
-                  </label>
+                    </label>
+                  </div>
                 );
               })}
             </div>
