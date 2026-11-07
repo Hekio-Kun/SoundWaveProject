@@ -1,4 +1,4 @@
-package groupone.soundwaveproject.authentication.dto.response;
+package groupone.soundwaveproject.moderation.dto.response;
 
 import java.time.Instant;
 

@@ -7,6 +7,7 @@ import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Genre;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.moderation.dto.response.*;
+import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import org.springframework.stereotype.Component;
@@ -249,6 +250,51 @@ public class TrackSubmissionMapper {
                 staff.getEmail(),
                 staff.getEmail().split("@")[0],
                 staff.getFullName()
+        );
+    }
+
+    /**
+     * Chuyển đổi bản ghi kiểm duyệt bài hát sang DTO hoạt động kiểm duyệt nhân viên (UC-27.4).
+     */
+    public TrackModerationActivityResponse toTrackModerationActivityResponse(
+            TrackSubmission submission,
+            String trackTitle,
+            String artistName
+    ) {
+        if (submission == null) {
+            return null;
+        }
+        return new TrackModerationActivityResponse(
+                submission.getId(),
+                submission.getTrackId(),
+                trackTitle,
+                artistName,
+                submission.getStatus() != null ? submission.getStatus().name() : "UNKNOWN",
+                submission.getRejectionReason(),
+                submission.getReviewerNote(),
+                submission.getReviewedAt()
+        );
+    }
+
+    /**
+     * Chuyển đổi bản ghi xử lý báo cáo vi phạm sang DTO hoạt động xử lý báo cáo nhân viên (UC-27.4).
+     */
+    public ReportResolutionActivityResponse toReportResolutionActivityResponse(
+            ContentReport report,
+            String targetTitle
+    ) {
+        if (report == null) {
+            return null;
+        }
+        return new ReportResolutionActivityResponse(
+                report.getId(),
+                report.getReason(),
+                report.getTargetType(),
+                report.getTargetId(),
+                targetTitle,
+                report.getStatus(),
+                report.getReviewerNote(),
+                report.getResolvedAt()
         );
     }
 

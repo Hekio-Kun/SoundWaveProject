@@ -1,5 +1,8 @@
 package groupone.soundwaveproject.authentication.dto.response;
 
+import groupone.soundwaveproject.moderation.dto.response.ReportResolutionActivityResponse;
+import groupone.soundwaveproject.moderation.dto.response.TrackModerationActivityResponse;
+
 import java.util.List;
 
 /**
@@ -28,4 +31,3 @@ public record StaffModerationActivityResponse(
         List<TrackModerationActivityResponse> trackReviews,
         List<ReportResolutionActivityResponse> reportResolutions
 ) {}
-
