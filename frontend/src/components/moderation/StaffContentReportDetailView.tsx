@@ -90,6 +90,7 @@ export function StaffContentReportDetailView({
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isUserScrollingRef = useRef<boolean>(false);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
   const scrollTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -157,29 +158,43 @@ export function StaffContentReportDetailView({
   // Auto-scroll active line strictly within lyrics container without scrolling whole page
   useEffect(() => {
     if (
+      activeLineIndex >= 0 &&
       activeLineRef.current &&
       scrollContainerRef.current &&
       !isUserScrollingRef.current
     ) {
       const container = scrollContainerRef.current;
       const activeLine = activeLineRef.current;
+
+      const lineRect = activeLine.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const relativeTop = lineRect.top - containerRect.top;
       const targetScrollTop =
-        activeLine.offsetTop -
+        container.scrollTop +
+        relativeTop -
         container.clientHeight / 2 +
-        activeLine.clientHeight / 2;
+        lineRect.height / 2;
+
+      isProgrammaticScrollRef.current = true;
       container.scrollTo({
         top: Math.max(0, targetScrollTop),
         behavior: "smooth",
       });
+
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = window.setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 450);
     }
   }, [activeLineIndex]);
 
   const handleLyricsScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
     isUserScrollingRef.current = true;
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = window.setTimeout(() => {
       isUserScrollingRef.current = false;
-    }, 2000);
+    }, 2500);
   };
 
   const handleLineClick = (timeSec: number | null) => {
@@ -646,10 +661,7 @@ export function StaffContentReportDetailView({
                   <FileTextIcon width={18} height={18} />
                 </div>
                 <div>
-                  <small style={{ color: "#0284c7", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                    Synchronous Audio & Lyric Review
-                  </small>
-                  <h3 style={{ margin: "2px 0 0 0", fontSize: "1.05rem", fontWeight: 700, color: "#1c1917" }}>
+                  <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1c1917" }}>
                     Lyrics
                   </h3>
                 </div>
@@ -657,12 +669,6 @@ export function StaffContentReportDetailView({
 
               {trackLyrics ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  {hasTimestamps && (
-                    <span className="official-lyrics-badge">
-                      <CheckIcon width={11} height={11} />
-                      <span>Synchronized (.LRC)</span>
-                    </span>
-                  )}
                   <button
                     type="button"
                     className="button button-ghost button-small"
@@ -680,8 +686,10 @@ export function StaffContentReportDetailView({
                 <div
                   ref={scrollContainerRef}
                   onScroll={handleLyricsScroll}
+                  onWheel={handleLyricsScroll}
+                  onTouchMove={handleLyricsScroll}
                   className="track-lyrics-synced-list"
-                  style={{ maxHeight: "380px", overflowY: "auto" }}
+                  style={{ maxHeight: "420px", overflowY: "auto", position: "relative" }}
                 >
                   {parsedActiveLines.map((line, idx) => {
                     const isActive = idx === activeLineIndex;
