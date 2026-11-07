@@ -278,105 +278,6 @@ export function ModeratePendingTracks({
         </div>
       ) : null}
 
-      {/* Top Interactive KPI Metric Cards (Semantic Buttons) */}
-      <section className="staff-kpi-grid" aria-label="Moderation throughput statistics">
-        {/* 1. Pending */}
-        <button
-          type="button"
-          className={`staff-metric-card is-amber ${
-            statusFilter === "PENDING" ? "is-selected-filter" : ""
-          }`}
-          onClick={() => {
-            setStatusFilter("PENDING");
-            setPage(0);
-          }}
-          aria-pressed={statusFilter === "PENDING"}
-          title="Filter: Pending review"
-        >
-          <div className="staff-metric-header">
-            <span className="staff-metric-icon is-amber">
-              <ClockIcon width={18} height={18} />
-            </span>
-          </div>
-          <div className="staff-metric-body">
-            <span className="staff-metric-value">{stats ? stats.pendingCount : "--"}</span>
-            <strong className="staff-metric-title">Pending</strong>
-          </div>
-        </button>
-
-        {/* 2. Approved */}
-        <button
-          type="button"
-          className={`staff-metric-card is-green ${
-            statusFilter === "APPROVED" ? "is-selected-filter" : ""
-          }`}
-          onClick={() => {
-            setStatusFilter("APPROVED");
-            setPage(0);
-          }}
-          aria-pressed={statusFilter === "APPROVED"}
-          title="Filter: Approved catalog"
-        >
-          <div className="staff-metric-header">
-            <span className="staff-metric-icon is-green">
-              <CheckIcon width={18} height={18} />
-            </span>
-          </div>
-          <div className="staff-metric-body">
-            <span className="staff-metric-value">{stats ? stats.approvedCount : "--"}</span>
-            <strong className="staff-metric-title">Approved</strong>
-          </div>
-        </button>
-
-        {/* 3. Rejected */}
-        <button
-          type="button"
-          className={`staff-metric-card is-red ${
-            statusFilter === "REJECTED" ? "is-selected-filter" : ""
-          }`}
-          onClick={() => {
-            setStatusFilter("REJECTED");
-            setPage(0);
-          }}
-          aria-pressed={statusFilter === "REJECTED"}
-          title="Filter: Rejected"
-        >
-          <div className="staff-metric-header">
-            <span className="staff-metric-icon is-red">
-              <AlertIcon width={18} height={18} />
-            </span>
-          </div>
-          <div className="staff-metric-body">
-            <span className="staff-metric-value">{stats ? stats.rejectedCount : "--"}</span>
-            <strong className="staff-metric-title">Rejected</strong>
-          </div>
-        </button>
-
-        {/* 4. Total Archive */}
-        <button
-          type="button"
-          className={`staff-metric-card is-cyan ${
-            statusFilter === "ALL" ? "is-selected-filter" : ""
-          }`}
-          onClick={() => {
-            setStatusFilter("ALL");
-            setPage(0);
-          }}
-          aria-pressed={statusFilter === "ALL"}
-          title="Filter: All records"
-        >
-          <div className="staff-metric-header">
-            <span className="staff-metric-icon is-cyan">
-              <DiscIcon width={18} height={18} />
-            </span>
-          </div>
-          <div className="staff-metric-body">
-            <span className="staff-metric-value">{stats ? stats.totalCount : "--"}</span>
-            <strong className="staff-metric-title">Total Tracks</strong>
-          </div>
-        </button>
-      </section>
-
       {/* Main Review Workspace Panel */}
       <section className="staff-queue-panel">
 
@@ -395,6 +296,7 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-amber" />
               <span>Pending</span>
+              <span className="staff-tab-count">{stats?.pendingCount ?? "--"}</span>
             </button>
 
             <button
@@ -409,6 +311,7 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-green" />
               <span>Approved</span>
+              <span className="staff-tab-count">{stats?.approvedCount ?? "--"}</span>
             </button>
 
             <button
@@ -423,6 +326,7 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-red" />
               <span>Rejected</span>
+              <span className="staff-tab-count">{stats?.rejectedCount ?? "--"}</span>
             </button>
 
             <button
@@ -437,6 +341,7 @@ export function ModeratePendingTracks({
             >
               <span className="staff-tab-dot is-cyan" />
               <span>All History</span>
+              <span className="staff-tab-count">{stats?.totalCount ?? "--"}</span>
             </button>
           </div>
 
@@ -471,15 +376,6 @@ export function ModeratePendingTracks({
                 </button>
               ) : null}
             </div>
-            <button
-              type="submit"
-              className="button button-primary staff-search-submit-btn"
-              aria-label="Search moderation tracks"
-              title="Search"
-            >
-              <SearchIcon width={15} height={15} />
-              <span>Search</span>
-            </button>
           </form>
         </div>
 
@@ -826,15 +722,6 @@ export function ModeratePendingTracks({
                       alt={item.trackTitle}
                       className="staff-thumb-image"
                     />
-                    <button
-                      type="button"
-                      className="staff-thumb-inspect-btn"
-                      onClick={() => handleSelectSubmission(item.id)}
-                      title="View track details"
-                      aria-label={`Inspect ${item.trackTitle}`}
-                    >
-                      <EyeIcon width={17} height={17} />
-                    </button>
                   </div>
 
                   {/* Track & artist metadata */}
@@ -848,12 +735,6 @@ export function ModeratePendingTracks({
                       >
                         {item.trackTitle}
                       </button>
-
-                      {/* Single track badge */}
-                      <span className="staff-tag-badge is-single" title="Single Track">
-                        <MusicIcon width={12} height={12} />
-                        <span>Single</span>
-                      </span>
 
                       {item.genreName ? (
                         <span className="staff-meta-pill is-genre">{item.genreName}</span>

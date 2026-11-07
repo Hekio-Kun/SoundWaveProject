@@ -252,7 +252,7 @@ export function AppTopBar({
                 setDropdownOpen(true);
               }
             }}
-            placeholder="Search tracks, albums, creators, or lyrics..."
+            placeholder="Artists, tracks, or your next favorite sound"
             aria-label="Search catalog"
             style={{
               width: "100%",
