@@ -80,6 +80,21 @@ public class ModerationService {
                 userRepository, staffRepository, profileRepository, notificationService, null, null);
     }
 
+    public ModerationService(
+            TrackSubmissionRepository submissionRepository,
+            TrackRepository trackRepository,
+            AlbumRepository albumRepository,
+            TrackSubmissionMapper mapper,
+            UserRepository userRepository,
+            StaffRepository staffRepository,
+            UserProfileRepository profileRepository,
+            NotificationService notificationService,
+            groupone.soundwaveproject.lyrics.service.LyricService lyricService
+    ) {
+        this(submissionRepository, trackRepository, albumRepository, mapper,
+                userRepository, staffRepository, profileRepository, notificationService, lyricService, null);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public ModerationService(
             TrackSubmissionRepository submissionRepository,

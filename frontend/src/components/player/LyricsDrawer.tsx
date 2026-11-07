@@ -47,7 +47,7 @@ export function LyricsDrawer({
   const [activeSource, setActiveSource] = useState<"OFFICIAL" | "PERSONAL">("OFFICIAL");
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
+
   const [fontSize, setFontSize] = useState<"NORMAL" | "LARGE" | "XLARGE">("NORMAL");
   const [duration, setDuration] = useState(0);
   const [toastNotification, setToastNotification] = useState<{
