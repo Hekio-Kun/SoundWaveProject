@@ -101,7 +101,7 @@ public class ContentReportService {
                 .reporterId(user.getId())
                 .targetType("TRACK")
                 .targetId(track.getId())
-                .reason(category.name())
+                .reason(category.getDisplayName())
                 .build();
 
         ContentReport saved = contentReportRepository.save(report);
@@ -188,7 +188,7 @@ public class ContentReportService {
                 : newCategory.getDisplayName();
 
         report.setCategory(newCategory.name());
-        report.setReason(newCategory.name());
+        report.setReason(newCategory.getDisplayName());
         report.setDescription(description);
         report.setStatus("PENDING");
         report.setResolutionNote(null);

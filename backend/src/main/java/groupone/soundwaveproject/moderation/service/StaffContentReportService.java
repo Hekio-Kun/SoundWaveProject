@@ -17,6 +17,7 @@ import groupone.soundwaveproject.moderation.dto.request.ResolveContentReportRequ
 import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
 import groupone.soundwaveproject.moderation.dto.response.StaffContentReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
+import groupone.soundwaveproject.moderation.entity.ReportCategory;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
@@ -52,8 +53,9 @@ public class StaffContentReportService {
         // Group by Target Track + Violation Reason so same reason on a track appears only once
         Map<String, List<ContentReport>> groupedMap = new LinkedHashMap<>();
         for (ContentReport report : allReports) {
+            String reasonLabel = resolveReasonLabel(report);
             String targetKey = (report.getTargetId() != null ? report.getTargetId().toString() : "0") + "::"
-                    + (report.getReason() != null ? report.getReason().trim().toLowerCase(Locale.ROOT) : "");
+                    + reasonLabel.trim().toLowerCase(Locale.ROOT);
             groupedMap.computeIfAbsent(targetKey, k -> new ArrayList<>()).add(report);
         }
 
@@ -72,9 +74,10 @@ public class StaffContentReportService {
                 .orElseThrow(() -> new ResourceNotFoundException("REPORT_NOT_FOUND", "Content report not found with id: " + id));
 
         // Find all reports in the same track + reason group
+        String targetReasonLabel = resolveReasonLabel(target);
         List<ContentReport> allSameTrack = contentReportRepository.findByTargetIdAndStatus(target.getTargetId(), "PENDING");
         List<ContentReport> group = allSameTrack.stream()
-                .filter(r -> r.getReason() != null && r.getReason().trim().equalsIgnoreCase(target.getReason().trim()))
+                .filter(r -> resolveReasonLabel(r).equalsIgnoreCase(targetReasonLabel))
                 .sorted(Comparator.comparing(ContentReport::getCreatedAt).reversed())
                 .toList();
 
@@ -111,9 +114,10 @@ public class StaffContentReportService {
         Instant now = Instant.now();
 
         // Find ALL pending reports for this track and reason
+        String primaryReasonLabel = resolveReasonLabel(primaryReport);
         List<ContentReport> pendingGroup = contentReportRepository.findByTargetIdAndStatus(primaryReport.getTargetId(), "PENDING")
                 .stream()
-                .filter(r -> r.getReason() != null && r.getReason().trim().equalsIgnoreCase(primaryReport.getReason().trim()))
+                .filter(r -> resolveReasonLabel(r).equalsIgnoreCase(primaryReasonLabel))
                 .toList();
 
         if (pendingGroup.isEmpty()) {
@@ -296,6 +300,8 @@ public class StaffContentReportService {
             }
         }
 
+        String displayReason = resolveReasonLabel(primary);
+
         return new StaffContentReportResponse(
                 primary.getId(),
                 reportIds,
@@ -313,7 +319,7 @@ public class StaffContentReportService {
                 audioUrl,
                 trackPublicationStatus,
                 lyrics,
-                primary.getReason(),
+                displayReason,
                 groupStatus,
                 primary.getReviewerId(),
                 reviewerName,
@@ -321,5 +327,17 @@ public class StaffContentReportService {
                 primary.getCreatedAt(),
                 primary.getResolvedAt()
         );
+    }
+
+    private String resolveReasonLabel(ContentReport report) {
+        if (report == null) return "Violation Report";
+        String r = report.getReason();
+        if (r == null || r.isBlank()) {
+            r = report.getCategory();
+        }
+        if (ReportCategory.isValid(r)) {
+            return ReportCategory.fromString(r).getDisplayName();
+        }
+        return (r != null && !r.isBlank()) ? r : "Violation Report";
     }
 }
