@@ -731,6 +731,8 @@ public class StudioAlbumService {
         } else {
             boolean hasRejectedTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.REJECTED
+            ) || trackRepository.existsByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.TAKEN_DOWN
             );
             boolean hasDraftTrack = trackRepository.existsByAlbum_IdAndPublicationStatus(
                     album.getId(), TrackPublicationStatus.DRAFT

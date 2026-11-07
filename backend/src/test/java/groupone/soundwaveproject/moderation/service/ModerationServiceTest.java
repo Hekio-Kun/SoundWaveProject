@@ -243,6 +243,45 @@ class ModerationServiceTest {
     }
 
     @Test
+    void takeDownSubmission_WhenTrackBelongsToAlbumWithSinglePublishedTrack_AlsoTakesDownAlbum() {
+        Album album = Album.builder()
+                .title("Solo Album")
+                .status("PUBLISHED")
+                .createdByUserId(10L)
+                .build();
+        ReflectionTestUtils.setField(album, "id", 77L);
+
+        Track albumTrack = Track.builder()
+                .title("Only Track")
+                .publicationStatus(TrackPublicationStatus.PUBLISHED)
+                .album(album)
+                .build();
+        ReflectionTestUtils.setField(albumTrack, "id", 100L);
+
+        TrackSubmission submission = TrackSubmission.builder()
+                .trackId(100L)
+                .submittedByUserId(10L)
+                .status(SubmissionStatus.APPROVED)
+                .build();
+        ReflectionTestUtils.setField(submission, "id", 1L);
+
+        when(submissionRepository.findById(1L)).thenReturn(Optional.of(submission));
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staffUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(albumTrack));
+        when(trackRepository.save(any(Track.class))).thenAnswer(i -> i.getArgument(0));
+        when(submissionRepository.save(any(TrackSubmission.class))).thenAnswer(i -> i.getArgument(0));
+        when(albumRepository.save(any(Album.class))).thenAnswer(i -> i.getArgument(0));
+        when(trackRepository.countByAlbum_IdAndPublicationStatus(77L, TrackPublicationStatus.PUBLISHED)).thenReturn(0L);
+
+        TakeDownTrackRequest request = new TakeDownTrackRequest("Violation confirmed", "Takedown note");
+        moderationService.takeDownSubmission(1L, request, "staff@soundwave.com");
+
+        assertEquals(TrackPublicationStatus.TAKEN_DOWN, albumTrack.getPublicationStatus());
+        assertEquals("REJECTED", album.getStatus());
+        verify(albumRepository).save(album);
+    }
+
+    @Test
     void getSubmissionDetail_NotFound_ThrowsException() {
         when(submissionRepository.findById(999L)).thenReturn(Optional.empty());
 

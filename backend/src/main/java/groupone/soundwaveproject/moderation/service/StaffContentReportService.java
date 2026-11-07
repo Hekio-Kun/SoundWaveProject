@@ -6,8 +6,10 @@ import groupone.soundwaveproject.authentication.entity.UserProfile;
 import groupone.soundwaveproject.authentication.repository.StaffRepository;
 import groupone.soundwaveproject.authentication.repository.UserProfileRepository;
 import groupone.soundwaveproject.authentication.repository.UserRepository;
+import groupone.soundwaveproject.catalog.entity.Album;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
+import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
@@ -45,6 +47,7 @@ public class StaffContentReportService {
     private final TrackSubmissionRepository submissionRepository;
     private final NotificationService notificationService;
     private final OfficialLyricRepository officialLyricRepository;
+    private final AlbumRepository albumRepository;
 
     @Transactional(readOnly = true)
     public List<StaffContentReportResponse> getReportsQueue() {
@@ -176,6 +179,34 @@ public class StaffContentReportService {
         track.setPublicationStatus(TrackPublicationStatus.TAKEN_DOWN);
         track.setLatestRejectionReason(takedownReason);
         trackRepository.save(track);
+
+        // If track belongs to an album, check whether the album has any remaining PUBLISHED tracks.
+        // If this track was the last published track (remaining published count is 0), take down the album as well (BR-18).
+        Album album = track.getAlbum();
+        if (album == null && track.getAlbumId() != null) {
+            album = albumRepository.findById(track.getAlbumId()).orElse(null);
+        }
+        if (album != null) {
+            long remainingPublished = trackRepository.countByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.PUBLISHED
+            );
+            if (remainingPublished == 0) {
+                album.setStatus("REJECTED");
+                albumRepository.save(album);
+
+                if (album.getCreatedByUserId() != null) {
+                    notificationService.createNotification(
+                            album.getCreatedByUserId(),
+                            staff.getId(),
+                            NotificationType.TRACK_REJECTED,
+                            "Album taken down",
+                            "Album \"" + album.getTitle() + "\" has been taken down because its remaining published track was removed.",
+                            "ALBUM",
+                            String.valueOf(album.getId())
+                    );
+                }
+            }
+        }
 
         // Update submission status if associated submission exists
         Optional<TrackSubmission> submissionOpt = submissionRepository.findFirstByTrackIdOrderBySubmittedAtDesc(track.getId());
