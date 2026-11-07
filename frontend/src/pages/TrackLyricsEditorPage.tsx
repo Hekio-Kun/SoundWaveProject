@@ -42,6 +42,7 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
   const isAuthor = Boolean(
     user && track && (user.id === track.creator?.userId || (user as any).userId === track.creator?.userId)
   );
+  const hasOfficialLyrics = Boolean(lyricsBundle?.officialLyric?.lyricContent?.trim() || track?.lyrics?.trim());
 
   useEffect(() => {
     setMode(initialMode);
@@ -111,12 +112,17 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
 
     try {
       if (mode === "official") {
-        await studioApi.updateTrackLyrics(track.id, lrcContent.trim());
-        setToastNotice("Official lyrics applied and published to track successfully!");
+        if (hasOfficialLyrics) {
+          setToastNotice("This track already has official lyrics. Official lyrics cannot be modified once published.");
+          setToastType("info");
+          return;
+        }
+        await studioApi.submitLyricsForReview(track.id, lrcContent.trim(), submitterNote.trim() || "Submitted via Lyric Editor");
+        setToastNotice("Official lyrics submitted for Staff moderation! Once approved, they will go live on the track.");
         setToastType("success");
         setTimeout(() => {
           onNavigate(`/track/${track.id}`);
-        }, 1200);
+        }, 1400);
       } else {
         await lyricsApi.savePersonalLyric(track.id, lrcContent.trim(), personalType);
         setToastNotice(`${personalType === "TRANSLATION" ? "Translation" : "Personal lyrics"} saved to your library!`);
@@ -229,13 +235,23 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
 
         {/* Informative Scope Banners */}
         {mode === "official" ? (
-          pendingSubmission ? (
+          hasOfficialLyrics ? (
+            <div className="lyric-studio-banner" style={{ borderLeftColor: "#0284C7", background: "rgba(2, 132, 199, 0.08)" }} role="alert">
+              <CheckCircleIcon width={20} height={20} style={{ color: "#0284C7", flexShrink: 0 }} />
+              <div>
+                <strong style={{ color: "#0369A1" }}>Official Lyrics Published & Locked:</strong>
+                <p style={{ margin: "4px 0 0", color: "#0C4A6E" }}>
+                  This track already has official published lyrics. Under SoundWave policy, official lyrics cannot be edited once published. You can switch to "Personal Lyrics" to create or edit your own custom lyrics.
+                </p>
+              </div>
+            </div>
+          ) : pendingSubmission ? (
             <div className="lyric-studio-banner is-pending" role="alert">
               <ClockIcon width={20} height={20} style={{ color: "#D97706", flexShrink: 0 }} />
               <div>
-                <strong>A lyric update proposal is currently pending Staff review:</strong>
+                <strong>Official lyrics proposal is currently pending Staff review:</strong>
                 <p style={{ margin: "4px 0 0" }}>
-                  Submitted on {new Date(pendingSubmission.submittedAt).toLocaleString()}. Making a new proposal will overwrite the pending request.
+                  Submitted on {new Date(pendingSubmission.submittedAt).toLocaleString()}. Staff will review and publish your lyrics soon.
                 </p>
               </div>
               <div className="lyric-studio-banner-actions">
@@ -250,7 +266,17 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
                 </button>
               </div>
             </div>
-) : null
+          ) : (
+            <div className="lyric-studio-banner" style={{ borderLeftColor: "#0284C7", background: "rgba(2, 132, 199, 0.06)" }}>
+              <CheckCircleIcon width={20} height={20} style={{ color: "#0284C7", flexShrink: 0 }} />
+              <div>
+                <strong style={{ color: "#0369A1" }}>Add Official Lyrics (One-time submission):</strong>
+                <p style={{ margin: "4px 0 0", color: "#0C4A6E" }}>
+                  This track was originally released without official lyrics. You can provide lyrics now, which will be sent to Staff for moderation before being published.
+                </p>
+              </div>
+            </div>
+          )
         ) : (
           <div className="lyric-studio-banner is-personal">
             <FileTextIcon width={20} height={20} style={{ color: "#A855F7", flexShrink: 0 }} />

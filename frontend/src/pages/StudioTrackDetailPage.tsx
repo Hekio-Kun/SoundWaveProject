@@ -25,6 +25,7 @@ import {
   HeadphonesIcon,
   PauseIcon,
   PlayIcon,
+  PlusIcon,
   ShieldIcon,
   TrashIcon,
   UploadIcon,
@@ -822,12 +823,30 @@ export function StudioTrackDetailPage({
 
                 <div className="staff-lyrics-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   {track.lyrics ? (
-                    <div className="staff-lyrics-stats-badge">
-                      <span><b>{track.lyrics.split(/\r?\n/).filter((l) => l.trim().length > 0).length}</b> lines</span>
-                    </div>
-                  ) : null}
-
-                  {isApproved && (
+                    <>
+                      <div className="staff-lyrics-stats-badge">
+                        <span><b>{track.lyrics.split(/\r?\n/).filter((l) => l.trim().length > 0).length}</b> lines</span>
+                      </div>
+                      <span
+                        style={{
+                          backgroundColor: "rgba(2, 132, 199, 0.08)",
+                          color: "var(--color-ocean-primary, #0284C7)",
+                          border: "1px solid rgba(2, 132, 199, 0.2)",
+                          borderRadius: "8px",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                        }}
+                        title="Official lyrics are published and locked for this track"
+                      >
+                        <CheckIcon width={13} height={13} />
+                        Official Lyrics
+                      </span>
+                    </>
+                  ) : isApproved ? (
                     <button
                       type="button"
                       className="studio-crud-btn studio-crud-btn-edit"
@@ -844,12 +863,12 @@ export function StudioTrackDetailPage({
                         fontWeight: 600,
                         borderRadius: "8px",
                       }}
-                      title="Update lyrics for this published track"
+                      title="Submit official lyrics for Staff moderation (one-time addition for tracks published without lyrics)"
                     >
-                      <EditIcon width={13} height={13} />
-                      <span>Update Lyric</span>
+                      <PlusIcon width={13} height={13} />
+                      <span>Add Official Lyric</span>
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 

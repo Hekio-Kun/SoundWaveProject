@@ -242,11 +242,18 @@ public class LyricService {
     public void publishOfficialLyric(Long trackId) {
         if (trackId == null) return;
         officialLyricRepository.findByTrackId(trackId).ifPresent(lyric -> {
-            lyric.setStatus("PUBLISHED");
-            lyric.setUpdatedAt(Instant.now());
-            officialLyricRepository.save(lyric);
-            log.info("Published official lyric id={} for trackId={}", lyric.getId(), trackId);
+            if (lyric.getLyricContent() != null && !lyric.getLyricContent().isBlank()) {
+                lyric.setStatus("PUBLISHED");
+                lyric.setUpdatedAt(Instant.now());
+                officialLyricRepository.save(lyric);
+                log.info("Published official lyric id={} for trackId={}", lyric.getId(), trackId);
+            }
         });
+    }
+
+    @Transactional
+    public void publishOfficialLyricForTrack(Long trackId) {
+        publishOfficialLyric(trackId);
     }
 
     /**

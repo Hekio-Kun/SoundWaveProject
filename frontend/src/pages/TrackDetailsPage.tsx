@@ -16,6 +16,7 @@ import { downloadLrcFile } from "../utils/lyricsDownload";
 import {
   AlertIcon,
   CheckIcon,
+  ClockIcon,
   CopyIcon,
   DownloadIcon,
   EditIcon,
@@ -237,6 +238,17 @@ export function TrackDetailsPage({
     void loadTrackLyrics();
   }, [loadTrackLyrics]);
 
+  useEffect(() => {
+    if (!isTrackCreator || !track?.id) {
+      setPendingLyricSub(null);
+      return;
+    }
+    studioApi
+      .getPendingLyricsSubmission(track.id)
+      .then((res) => setPendingLyricSub(res))
+      .catch(() => setPendingLyricSub(null));
+  }, [isTrackCreator, track?.id]);
+
   // Track real-time playback position from audio element
   useEffect(() => {
     if (!audio) return;
@@ -367,23 +379,34 @@ export function TrackDetailsPage({
 
   const [isApprovingPersonal, setIsApprovingPersonal] = useState(false);
 
-  // Approve personal lyric to official track lyrics (for track creator)
-  const handleApprovePersonalToTrack = async () => {
+  // Submit personal lyric as official track lyrics proposal for Staff moderation (UC-16.2)
+  const handleSubmitPersonalAsOfficial = async () => {
     if (!personalLyricContent || !track) return;
-    setIsApprovingPersonal(true);
-    try {
-      await studioApi.updateTrackLyrics(track.id, personalLyricContent);
-      await loadTrackLyrics();
+    if (hasOfficialLyrics) {
       setNotification({
         open: true,
-        message: "Personal lyrics approved and published as official track lyrics successfully!",
+        message: "This track already has official lyrics. Official lyrics cannot be modified once published.",
+        type: "warning",
+      });
+      return;
+    }
+    setIsApprovingPersonal(true);
+    try {
+      const sub = await studioApi.submitLyricsForReview(
+        track.id,
+        personalLyricContent,
+        "Submitted by creator from personal lyrics"
+      );
+      setPendingLyricSub(sub);
+      setNotification({
+        open: true,
+        message: "Official lyrics submitted for Staff moderation! Once approved, they will be published on your track.",
         type: "success",
       });
-      setLyricsTab("OFFICIAL");
     } catch (err: unknown) {
       setNotification({
         open: true,
-        message: err instanceof Error ? err.message : "Failed to approve personal lyrics to track.",
+        message: err instanceof Error ? err.message : "Failed to submit lyrics for moderation.",
         type: "error",
       });
     } finally {
@@ -420,6 +443,7 @@ export function TrackDetailsPage({
   // Active lyric resolution
   const officialLyricContent = lyricsBundle?.officialLyric?.lyricContent ?? track?.lyrics ?? null;
   const personalLyricContent = lyricsBundle?.userPersonalLyric?.lyricContent ?? null;
+  const hasOfficialLyrics = Boolean(officialLyricContent && officialLyricContent.trim().length > 0);
   const activeLyricContent = lyricsTab === "OFFICIAL" ? officialLyricContent : personalLyricContent;
 
   // Parse lines using standard LRC parser (EX01: safe fallback on malformed syntax)
@@ -768,18 +792,39 @@ export function TrackDetailsPage({
             {/* Actions for Personal tab when user is logged in (UC-18) */}
             {lyricsTab === "PERSONAL" && (canManageLibrary || isTrackCreator) ? (
               <div className="track-lyrics-tab-actions">
-                {isTrackCreator && personalLyricContent && (
-                  <button
-                    type="button"
-                    className="button button-small button-primary"
-                    onClick={handleApprovePersonalToTrack}
-                    disabled={isApprovingPersonal}
-                    title="Approve and publish your personal lyrics as the official track lyrics"
-                    style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-                  >
-                    <CheckIcon width={13} height={13} />
-                    <span>{isApprovingPersonal ? "Approving..." : "Approve to Track"}</span>
-                  </button>
+                {isTrackCreator && personalLyricContent && !hasOfficialLyrics && (
+                  pendingLyricSub ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        padding: "5px 10px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        backgroundColor: "rgba(217, 119, 6, 0.1)",
+                        color: "#D97706",
+                        border: "1px solid rgba(217, 119, 6, 0.25)",
+                      }}
+                      title="An official lyrics proposal is currently pending Staff moderation"
+                    >
+                      <ClockIcon width={13} height={13} />
+                      <span>Pending Staff Review</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button button-small button-primary"
+                      onClick={handleSubmitPersonalAsOfficial}
+                      disabled={isApprovingPersonal}
+                      title="Submit your personal lyrics to Staff for moderation to become the official lyrics (one-time addition)"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <CheckIcon width={13} height={13} />
+                      <span>{isApprovingPersonal ? "Submitting..." : "Submit as Official Lyric"}</span>
+                    </button>
+                  )
                 )}
                 <button
                   type="button"
@@ -876,9 +921,24 @@ export function TrackDetailsPage({
               /* AF01: Empty state when track has no official lyrics */
               <div className="track-lyrics-empty">
                 <FileTextIcon width={32} height={32} />
-                <strong>No official lyrics available</strong>
-                <span>Official verified lyrics have not been provided for this track yet.</span>
-                {isTrackCreator ? (
+                <strong>{pendingLyricSub ? "Official Lyrics Pending Review" : "No official lyrics available"}</strong>
+                <span>
+                  {pendingLyricSub
+                    ? `An official lyric proposal submitted on ${new Date(pendingLyricSub.submittedAt).toLocaleDateString()} is awaiting Staff review.`
+                    : "Official verified lyrics have not been provided for this track yet."}
+                </span>
+                {pendingLyricSub && isTrackCreator ? (
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    onClick={handleWithdrawSubmission}
+                    disabled={withdrawingSub}
+                  >
+                    <TrashIcon width={13} height={13} />
+                    <span>{withdrawingSub ? "Withdrawing..." : "Withdraw Submission"}</span>
+                  </button>
+                ) : !pendingLyricSub && isTrackCreator ? (
                   <button
                     type="button"
                     className="button button-primary"
@@ -888,7 +948,7 @@ export function TrackDetailsPage({
                     <PlusIcon width={14} height={14} />
                     <span>Add Official Lyrics</span>
                   </button>
-                ) : canManageLibrary ? (
+                ) : !pendingLyricSub && canManageLibrary ? (
                   <button
                     type="button"
                     className="button button-secondary"
