@@ -33,7 +33,7 @@ import { TrackDetailsPage } from "../pages/TrackDetailsPage";
 import { TrackLyricsEditorPage } from "../pages/TrackLyricsEditorPage";
 import { CreateMyTrack } from "../pages/UploadTrackPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
-import { SearchPage } from "../pages/SearchPage";
+import { Search } from "../pages/Search";
 import { SearchIcon } from "../icons";
 
 export function AppRouter(): React.ReactElement | null {
@@ -51,7 +51,7 @@ export function AppRouter(): React.ReactElement | null {
     reorderPlaylistTracks,
     playAllPlaylistTracks,
   } = usePlaylists();
-  const { pathname, queryParams, navigate, isDashboardRoute, isExploreRoute } = useRouter();
+  const { pathname, queryString, queryParams, navigate, isDashboardRoute, isExploreRoute } = useRouter();
 
   // Tắt nhạc khi điều hướng vào trang quản trị (Admin / Staff)
   useEffect(() => {
@@ -211,14 +211,21 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname === "/search") {
-    const qParam = queryParams.get("q") || queryParams.get("search") || "";
+  if (pathname === "/search" || pathname.startsWith("/search/")) {
+    let qParam = "";
+    if (pathname.startsWith("/search/")) {
+      const raw = pathname.slice("/search/".length);
+      qParam = decodeURIComponent(raw);
+    } else {
+      qParam = queryParams.get("q") || queryParams.get("search") || "";
+    }
     const typeParam = (queryParams.get("type") as any) || "ALL";
     const pageParam = queryParams.get("page");
     const parsedPage = pageParam ? parseInt(pageParam, 10) : 0;
 
     return (
-      <SearchPage
+      <Search
+        key={pathname + (queryString ? `?${queryString}` : "")}
         initialQuery={qParam}
         initialType={typeParam}
         initialPage={parsedPage}

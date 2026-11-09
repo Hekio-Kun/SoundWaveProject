@@ -62,9 +62,29 @@ public class PublicSearchService {
         switch (searchType) {
             case "SONGS" -> {
                 tracks = trackCatalogService.getPublishedTracks(null, normalized, "trending", null, pageable);
+                if ((tracks == null || tracks.isEmpty())) {
+                    Page<CreatorSearchResultResponse> matchingCreators = searchCreators(normalized, PageRequest.of(0, 1));
+                    if (matchingCreators != null && !matchingCreators.isEmpty()) {
+                        Long creatorUserId = matchingCreators.getContent().get(0).getUserId();
+                        Page<TrackResponse> creatorTracks = trackCatalogService.getPublishedTracks(null, null, "trending", creatorUserId, pageable);
+                        if (creatorTracks != null) {
+                            tracks = creatorTracks;
+                        }
+                    }
+                }
             }
             case "ALBUMS" -> {
                 albums = albumCatalogService.getPublishedAlbums(normalized, "newest", pageable);
+                if ((albums == null || albums.isEmpty())) {
+                    Page<CreatorSearchResultResponse> matchingCreators = searchCreators(normalized, PageRequest.of(0, 1));
+                    if (matchingCreators != null && !matchingCreators.isEmpty()) {
+                        Long creatorUserId = matchingCreators.getContent().get(0).getUserId();
+                        Page<PublicAlbumResponse> creatorAlbums = albumCatalogService.getPublishedAlbumsByCreator(creatorUserId, pageable);
+                        if (creatorAlbums != null) {
+                            albums = creatorAlbums;
+                        }
+                    }
+                }
             }
             case "CREATORS" -> {
                 creators = searchCreators(normalized, pageable);
@@ -84,7 +104,25 @@ public class PublicSearchService {
                 creators = searchCreators(normalized, creatorPreview);
                 lyrics = searchLyrics(normalized, lyricPreview);
 
-                topResult = determineTopResult(normalized, tracks.getContent(), albums.getContent(), creators.getContent());
+                topResult = determineTopResult(normalized, tracks != null ? tracks.getContent() : Collections.emptyList(), albums != null ? albums.getContent() : Collections.emptyList(), creators != null ? creators.getContent() : Collections.emptyList());
+
+                // Spotify contextual enhancement: When an artist is Top Result and tracks/albums are empty,
+                // populate with the artist's published tracks & albums
+                if (topResult != null && "CREATOR".equals(topResult.getType()) && topResult.getCreator() != null) {
+                    Long creatorUserId = topResult.getCreator().getUserId();
+                    if (tracks == null || tracks.isEmpty()) {
+                        Page<TrackResponse> creatorTracks = trackCatalogService.getPublishedTracks(null, null, "trending", creatorUserId, trackPreview);
+                        if (creatorTracks != null) {
+                            tracks = creatorTracks;
+                        }
+                    }
+                    if (albums == null || albums.isEmpty()) {
+                        Page<PublicAlbumResponse> creatorAlbums = albumCatalogService.getPublishedAlbumsByCreator(creatorUserId, albumPreview);
+                        if (creatorAlbums != null) {
+                            albums = creatorAlbums;
+                        }
+                    }
+                }
             }
             default -> {
                 throw new BadRequestOperationException("INVALID_SEARCH_TYPE", "Invalid search type: " + searchType);
@@ -95,10 +133,10 @@ public class PublicSearchService {
                 .query(normalized)
                 .type(searchType)
                 .topResult(topResult)
-                .tracks(tracks)
-                .albums(albums)
-                .creators(creators)
-                .lyrics(lyrics)
+                .tracks(tracks != null ? tracks : Page.empty(pageable))
+                .albums(albums != null ? albums : Page.empty(pageable))
+                .creators(creators != null ? creators : Page.empty(pageable))
+                .lyrics(lyrics != null ? lyrics : Page.empty(pageable))
                 .build();
     }
 
