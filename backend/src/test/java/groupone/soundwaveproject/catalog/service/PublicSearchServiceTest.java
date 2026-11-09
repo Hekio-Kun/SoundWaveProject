@@ -172,7 +172,11 @@ class PublicSearchServiceTest {
 
         when(trackCatalogService.getPublishedTracks(isNull(), eq("mck"), eq("trending"), isNull(), any(Pageable.class)))
                 .thenReturn(Page.empty());
+        when(trackCatalogService.getPublishedTracks(isNull(), isNull(), eq("trending"), eq(2L), any(Pageable.class)))
+                .thenReturn(Page.empty());
         when(albumCatalogService.getPublishedAlbums(eq("mck"), eq("newest"), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        when(albumCatalogService.getPublishedAlbumsByCreator(eq(2L), any(Pageable.class)))
                 .thenReturn(Page.empty());
         when(userProfileRepository.searchActiveCreators(eq("mck"), anyString(), anyString(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(mckProfile)));

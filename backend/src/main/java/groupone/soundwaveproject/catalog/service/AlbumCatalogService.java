@@ -114,6 +114,48 @@ public class AlbumCatalogService {
     }
 
     /**
+     * Lấy danh sách Album đã xuất bản của một Creator cụ thể.
+     */
+    @Transactional(readOnly = true)
+    public Page<PublicAlbumResponse> getPublishedAlbumsByCreator(Long creatorUserId, Pageable pageable) {
+        if (creatorUserId == null) {
+            return Page.empty(pageable);
+        }
+        List<Album> publishedAlbums = albumRepository.findByStatusIgnoreCaseOrderByCreatedAtDesc("PUBLISHED").stream()
+                .filter(a -> creatorUserId.equals(a.getCreatedByUserId()))
+                .toList();
+
+        List<PublicAlbumResponse> responses = new ArrayList<>();
+        for (Album album : publishedAlbums) {
+            int trackCount = (int) trackRepository.countByAlbum_IdAndPublicationStatus(
+                    album.getId(), TrackPublicationStatus.PUBLISHED
+            );
+            PublicAlbumResponse.AlbumCreatorSummary creator = resolveCreatorSummary(album.getCreatedByUserId());
+
+            responses.add(PublicAlbumResponse.builder()
+                    .id(album.getId())
+                    .title(album.getTitle())
+                    .slug(album.getSlug())
+                    .description(album.getDescription())
+                    .coverUrl(album.getCoverUrl())
+                    .releaseDate(album.getReleaseDate())
+                    .publishedAt(album.getPublishedAt())
+                    .createdAt(album.getCreatedAt())
+                    .trackCount(trackCount)
+                    .creator(creator)
+                    .build());
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), responses.size());
+        List<PublicAlbumResponse> pageContent = (start <= end && start < responses.size())
+                ? responses.subList(start, end)
+                : List.of();
+
+        return new PageImpl<>(pageContent, pageable, responses.size());
+    }
+
+    /**
      * Lấy thông tin chi tiết một Album công khai theo ID hoặc slug kèm toàn bộ bài hát đã PUBLISHED.
      */
     @Transactional(readOnly = true)

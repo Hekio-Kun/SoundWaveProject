@@ -43,7 +43,7 @@ type Props = {
   onNavigate: (route: string) => void;
 };
 
-export function SearchPage({
+export function Search({
   initialQuery = "",
   initialType = "ALL",
   initialPage = 0,
@@ -120,26 +120,28 @@ export function SearchPage({
     executeSearch();
   }, [executeSearch]);
 
-  // Tab switching
+  // Tab switching (Spotify-styled /search/:query?type=...)
   const handleTabChange = (newTab: SearchCategoryType) => {
     setActiveTab(newTab);
     setCurrentPage(0);
+    const trimmed = initialQuery.trim();
+    const basePath = trimmed ? `/search/${encodeURIComponent(trimmed)}` : "/search";
     const params = new URLSearchParams();
-    if (initialQuery.trim()) params.set("q", initialQuery.trim());
     if (newTab !== "ALL") params.set("type", newTab);
     const qs = params.toString();
-    onNavigate(`/search${qs ? `?${qs}` : ""}`);
+    onNavigate(`${basePath}${qs ? `?${qs}` : ""}`);
   };
 
   // Pagination switching (AF03)
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
+    const trimmed = initialQuery.trim();
+    const basePath = trimmed ? `/search/${encodeURIComponent(trimmed)}` : "/search";
     const params = new URLSearchParams();
-    if (initialQuery.trim()) params.set("q", initialQuery.trim());
     if (activeTab !== "ALL") params.set("type", activeTab);
     if (newPage > 0) params.set("page", String(newPage));
     const qs = params.toString();
-    onNavigate(`/search${qs ? `?${qs}` : ""}`);
+    onNavigate(`${basePath}${qs ? `?${qs}` : ""}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -228,54 +230,100 @@ export function SearchPage({
         })}
       </div>
 
-      {/* State 1: Invalid/Empty Keyword (EX01 Prompt Guidance) */}
+      {/* State 1: Spotify-styled Browse Landing when no search query is active */}
       {isQueryTooShort && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "80px 20px",
-            background: "#FFFFFF",
-            borderRadius: "16px",
-            border: "1px dashed var(--sw-border, #E2E8F0)",
-          }}
-        >
+        <div style={{ marginTop: "8px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--sw-text-h, #0F172A)", marginBottom: "20px" }}>
+            Browse all
+          </h2>
           <div
             style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "50%",
-              background: "#F0F9FF",
-              color: "#0284C7",
               display: "grid",
-              placeItems: "center",
-              margin: "0 auto 16px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              gap: "18px",
+              marginBottom: "36px",
             }}
           >
-            <SearchIcon width={26} height={26} />
+            {[
+              { title: "Top Charts", bg: "#0284C7", path: "/ranking", icon: "🏆" },
+              { title: "New Albums", bg: "#D97706", path: "/albums", icon: "💿" },
+              { title: "Pop", bg: "#EC4899", path: "/browse?genre=pop", icon: "✨" },
+              { title: "Rap / Hip-Hop", bg: "#8B5CF6", path: "/browse?genre=rap-hip-hop", icon: "🎤" },
+              { title: "R&B / Soul", bg: "#0EA5E9", path: "/browse?genre=rnb", icon: "🌊" },
+              { title: "Rock", bg: "#DC2626", path: "/browse?genre=rock", icon: "🎸" },
+              { title: "Indie / Acoustic", bg: "#10B981", path: "/browse?genre=indie", icon: "🌿" },
+              { title: "Browse Catalog", bg: "#6366F1", path: "/browse", icon: "🧭" },
+            ].map((cat) => (
+              <div
+                key={cat.title}
+                onClick={() => onNavigate(cat.path)}
+                style={{
+                  background: cat.bg,
+                  borderRadius: "14px",
+                  height: "120px",
+                  padding: "16px",
+                  position: "relative",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  color: "#FFFFFF",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                  transition: "transform 0.18s ease, box-shadow 0.18s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.03)";
+                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.06)";
+                }}
+              >
+                <span style={{ fontSize: "16px", fontWeight: 700, display: "block" }}>{cat.title}</span>
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    bottom: "8px",
+                    fontSize: "36px",
+                    opacity: 0.85,
+                    transform: "rotate(15deg)",
+                  }}
+                >
+                  {cat.icon}
+                </span>
+              </div>
+            ))}
           </div>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--sw-text-h, #0F172A)", marginBottom: "8px" }}>
-            Search Public Catalog
-          </h2>
-          <p style={{ color: "#64748B", fontSize: "14px", maxWidth: "440px", margin: "0 auto 24px", lineHeight: "1.5" }}>
-            Enter at least 2 characters in the search bar above to discover published songs, albums, artists, or officially approved lyrics.
-          </p>
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-            <button
-              className="button button-ghost button-small"
-              onClick={() => onNavigate("/ranking")}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 20px",
+              background: "#FFFFFF",
+              borderRadius: "16px",
+              border: "1px dashed var(--sw-border, #E2E8F0)",
+            }}
+          >
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "#F0F9FF",
+                color: "#0284C7",
+                display: "grid",
+                placeItems: "center",
+                margin: "0 auto 12px",
+              }}
             >
-              <TrophyIcon width={16} height={16} />
-              <span>Explore Top Charts</span>
-            </button>
-            <button
-              className="button button-ghost button-small"
-              onClick={() => onNavigate("/browse")}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-            >
-              <CompassIcon width={16} height={16} />
-              <span>Browse Catalog</span>
-            </button>
+              <SearchIcon width={22} height={22} />
+            </div>
+            <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--sw-text-h, #0F172A)", marginBottom: "6px" }}>
+              Search artists, songs, albums, and lyrics
+            </h3>
+            <p style={{ color: "#64748B", fontSize: "13.5px", maxWidth: "440px", margin: "0 auto" }}>
+              Type into the search bar above to see results live on this page.
+            </p>
           </div>
         </div>
       )}
@@ -1278,4 +1326,7 @@ export function SearchPage({
     </div>
   );
 }
+
+export { Search as SearchPage };
+
 

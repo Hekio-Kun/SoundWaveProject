@@ -6,19 +6,13 @@ import {
   DashboardIcon,
   FlagIcon,
   LogoutIcon,
-  PauseIcon,
-  PlayIcon,
   SearchIcon,
   ShieldIcon,
   UploadIcon,
   UserIcon,
 } from "../../icons";
 import { NotificationDropdown } from "./NotificationDropdown";
-import { searchApi } from "../../api/search";
-import type { CurrentUser, LandingTrack, UnifiedSearchResponse } from "../../types";
-
-const DEFAULT_COVER_FALLBACK =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300' width='300' height='300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230284C7'/%3E%3Cstop offset='100%25' stop-color='%230369A1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23bg)' rx='12'/%3E%3Ccircle cx='150' cy='150' r='54' fill='none' stroke='rgba(255,255,255,0.2)' stroke-width='4'/%3E%3Cpath d='M140 120v40a16 16 0 1 0 10 14.8V132l24-6v24a16 16 0 1 0 10 14.8V114l-44 6z' fill='%23ffffff'/%3E%3C/svg%3E";
+import type { CurrentUser, LandingTrack } from "../../types";
 
 type Props = {
   user: CurrentUser | null;
@@ -48,99 +42,72 @@ export function AppTopBar({
   const [searchKeyword, setSearchKeyword] = useState(() => {
     const hash = window.location.hash;
     if (hash.includes("/search")) {
+      const pathPart = hash.replace(/^#/, "").split("?")[0];
+      if (pathPart.startsWith("/search/")) {
+        return decodeURIComponent(pathPart.slice("/search/".length));
+      }
       const match = hash.match(/[?&]q=([^&]*)/);
       if (match) return decodeURIComponent(match[1]);
     }
     return "";
   });
   const [searchWarning, setSearchWarning] = useState<string | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [liveResults, setLiveResults] = useState<UnifiedSearchResponse | null>(null);
-  const [liveLoading, setLiveLoading] = useState(false);
 
   const actionsRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const searchCacheRef = useRef<Map<string, UnifiedSearchResponse>>(new Map());
-  const currentQueryRef = useRef<string>("");
 
   useEffect(() => setUnreadCount(unreadNotifications), [unreadNotifications]);
 
-  // Keep search keyword in sync with URL changes
+  // Keep search keyword in sync with URL changes (/search/:query and /search?q=...)
   useEffect(() => {
     const syncQueryFromUrl = () => {
       const hash = window.location.hash;
       if (hash.includes("/search")) {
+        const pathPart = hash.replace(/^#/, "").split("?")[0];
+        if (pathPart.startsWith("/search/")) {
+          setSearchKeyword(decodeURIComponent(pathPart.slice("/search/".length)));
+          return;
+        }
         const match = hash.match(/[?&]q=([^&]*)/);
         if (match) {
           setSearchKeyword(decodeURIComponent(match[1]));
+          return;
+        }
+        if (pathPart === "/search") {
+          setSearchKeyword("");
+          return;
         }
       }
     };
+    syncQueryFromUrl();
     window.addEventListener("hashchange", syncQueryFromUrl);
     return () => window.removeEventListener("hashchange", syncQueryFromUrl);
   }, []);
 
-  // Live Instant Search Autocomplete with 0ms in-memory cache and race condition guard
+  // Spotify-style live typing: typing updates the route to /search/:query
   useEffect(() => {
     const trimmed = searchKeyword.trim();
-    if (trimmed.length < 2) {
-      setLiveResults(null);
-      setLiveLoading(false);
-      setDropdownOpen(false);
-      return;
-    }
-
-    currentQueryRef.current = trimmed;
-
-    // Instant cache return (0ms response)
-    const cached = searchCacheRef.current.get(trimmed);
-    if (cached) {
-      setLiveResults(cached);
-      setDropdownOpen(true);
-      setLiveLoading(false);
-      return;
-    }
-
-    setLiveLoading(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await searchApi.search({ q: trimmed, type: "ALL", page: 0, size: 5 });
-        if (currentQueryRef.current === trimmed) {
-          const totalFound =
-            (res.tracks?.totalElements || 0) +
-            (res.albums?.totalElements || 0) +
-            (res.creators?.totalElements || 0) +
-            (res.lyrics?.totalElements || 0);
-          if (totalFound > 0) {
-            searchCacheRef.current.set(trimmed, res);
-          }
-          setLiveResults(res);
-          setDropdownOpen(true);
-        }
-      } catch (err) {
-        if (currentQueryRef.current === trimmed) {
-          console.error("Live autocomplete search failed:", err);
-        }
-      } finally {
-        if (currentQueryRef.current === trimmed) {
-          setLiveLoading(false);
-        }
+    if (!trimmed) {
+      const hash = window.location.hash;
+      if (hash.includes("/search/") || hash.includes("/search?")) {
+        onNavigate("/search");
       }
-    }, 150);
+      return;
+    }
+
+    if (trimmed.length < 2) return;
+
+    const timer = setTimeout(() => {
+      const hash = window.location.hash;
+      const currentPath = hash.replace(/^#/, "").split("?")[0];
+      const targetPath = `/search/${encodeURIComponent(trimmed)}`;
+      if (currentPath !== targetPath) {
+        onNavigate(targetPath);
+      }
+    }, 280);
 
     return () => clearTimeout(timer);
-  }, [searchKeyword]);
-
-  // Close live search dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!searchContainerRef.current?.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [searchKeyword, onNavigate]);
 
   // Handle outside clicks and keyboard events for User menu
   useEffect(() => {
@@ -153,7 +120,6 @@ export function AppTopBar({
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setUserMenuOpen(false);
-        setDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", closeMenus);
@@ -180,18 +146,18 @@ export function AppTopBar({
     window.history.forward();
   };
 
-  // UC-9: Normal Flow NF01 & Exception EX01
+  // UC-9: Spotify-styled submit to /search/:query
   const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = searchKeyword.trim();
     if (trimmed.length < 2) {
       setSearchWarning("Please enter at least 2 characters to search");
       setTimeout(() => setSearchWarning(null), 3500);
+      onNavigate("/search");
       return;
     }
     setSearchWarning(null);
-    setDropdownOpen(false);
-    onNavigate(`/search?q=${encodeURIComponent(trimmed)}`);
+    onNavigate(`/search/${encodeURIComponent(trimmed)}`);
   };
 
   const hasDashboardAccess = user?.role === "ADMIN" || user?.role === "STAFF" || user?.role === "MODERATOR";
@@ -201,12 +167,6 @@ export function AppTopBar({
       ? "/staff/dashboard"
       : "/track/create";
   const workspaceLabel = hasDashboardAccess ? "Open dashboard" : "Upload music";
-
-  const isLiveEmpty =
-    liveResults &&
-    liveResults.tracks.content.length === 0 &&
-    liveResults.albums.content.length === 0 &&
-    liveResults.creators.content.length === 0;
 
   return (
     <header className="app-topbar">
@@ -248,8 +208,9 @@ export function AppTopBar({
               }
             }}
             onFocus={() => {
-              if (searchKeyword.trim().length >= 2 && liveResults) {
-                setDropdownOpen(true);
+              if (!window.location.hash.includes("/search")) {
+                const trimmed = searchKeyword.trim();
+                onNavigate(trimmed.length >= 2 ? `/search/${encodeURIComponent(trimmed)}` : "/search");
               }
             }}
             placeholder="Artists, tracks, or your next favorite sound"
@@ -302,8 +263,7 @@ export function AppTopBar({
               onClick={() => {
                 setSearchKeyword("");
                 setSearchWarning(null);
-                setDropdownOpen(false);
-                setLiveResults(null);
+                onNavigate("/search");
               }}
               aria-label="Clear search keyword"
               style={{
@@ -329,270 +289,6 @@ export function AppTopBar({
             </button>
           )}
         </form>
-
-        {/* Live Search Instant Autocomplete Dropdown */}
-        {dropdownOpen && searchKeyword.trim().length >= 2 && (
-          <div
-            className="topbar-search-dropdown"
-            style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              left: 0,
-              right: 0,
-              width: "100%",
-              maxWidth: "100%",
-              boxSizing: "border-box",
-              maxHeight: "480px",
-              overflowY: "auto",
-              background: "#FFFFFF",
-              border: "1px solid var(--sw-border, #E2E8F0)",
-              borderRadius: "16px",
-              boxShadow: "0 16px 36px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.06)",
-              padding: "12px",
-              zIndex: 1000,
-            }}
-          >
-            {liveLoading && !liveResults && (
-              <div style={{ padding: "20px", textAlign: "center", color: "#64748B", fontSize: "13px" }}>
-                Searching songs, albums, and artists...
-              </div>
-            )}
-
-            {!liveLoading && isLiveEmpty && (
-              <div style={{ padding: "20px", textAlign: "center", color: "#64748B", fontSize: "13px" }}>
-                No published songs, albums, or artists found for "{searchKeyword.trim()}".
-              </div>
-            )}
-
-            {liveResults && (
-              <>
-                {/* 1. Songs Section */}
-                {liveResults.tracks.content.length > 0 && (
-                  <div className="topbar-results-section" style={{ marginBottom: "10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px 6px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Songs
-                      </span>
-                      <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#0284C7", background: "#E0F2FE", padding: "1px 6px", borderRadius: "8px" }}>
-                        {liveResults.tracks.totalElements}
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      {liveResults.tracks.content.slice(0, 4).map((track) => {
-                        const isTrackPlaying = currentTrack?.id === track.id && playing;
-
-                        return (
-                          <div
-                            key={track.id}
-                            className="topbar-dropdown-item"
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              onNavigate(`/search?q=${encodeURIComponent(searchKeyword.trim())}`);
-                            }}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
-                              padding: "6px 8px",
-                              borderRadius: "10px",
-                              cursor: "pointer",
-                              transition: "background 0.15s ease",
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          >
-                            <div style={{ position: "relative", width: "38px", height: "38px", borderRadius: "8px", overflow: "hidden", flexShrink: 0 }}>
-                              <img
-                                src={track.coverUrl || DEFAULT_COVER_FALLBACK}
-                                alt=""
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER_FALLBACK;
-                                }}
-                              />
-                              {onPlayTrack && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onPlayTrack(track);
-                                  }}
-                                  aria-label={isTrackPlaying ? "Pause" : "Play"}
-                                  style={{
-                                    position: "absolute",
-                                    inset: 0,
-                                    background: "rgba(0,0,0,0.45)",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "#FFFFFF",
-                                    display: "grid",
-                                    placeItems: "center",
-                                  }}
-                                >
-                                  {isTrackPlaying ? <PauseIcon width={15} height={15} /> : <PlayIcon width={15} height={15} />}
-                                </button>
-                              )}
-                            </div>
-
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {track.title}
-                              </div>
-                              <div style={{ fontSize: "12px", color: "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {track.creator?.displayName || "Unknown Artist"} {track.album ? `• ${track.album.title}` : ""}
-                              </div>
-                            </div>
-
-                            <span style={{ fontSize: "11px", color: "#0284C7", background: "#F0F9FF", padding: "2px 6px", borderRadius: "6px", fontWeight: 600, flexShrink: 0 }}>
-                              Play
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Albums Section */}
-                {liveResults.albums.content.length > 0 && (
-                  <div className="topbar-results-section" style={{ marginBottom: "10px", borderTop: "1px dashed #E2E8F0", paddingTop: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px 6px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Albums
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      {liveResults.albums.content.slice(0, 3).map((album) => (
-                        <div
-                          key={album.id}
-                          className="topbar-dropdown-item"
-                          onClick={() => {
-                            setDropdownOpen(false);
-                            onNavigate(`/album/${album.id}`);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            padding: "6px 8px",
-                            borderRadius: "10px",
-                            cursor: "pointer",
-                            transition: "background 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          <img
-                            src={album.coverUrl || DEFAULT_COVER_FALLBACK}
-                            alt=""
-                            style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {album.title}
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {album.creator?.displayName || "SoundWave Artist"} • {album.trackCount} tracks
-                            </div>
-                          </div>
-                          <span style={{ fontSize: "11px", color: "#64748B", flexShrink: 0 }}>
-                            Album
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Creators Section */}
-                {liveResults.creators.content.length > 0 && (
-                  <div className="topbar-results-section" style={{ marginBottom: "10px", borderTop: "1px dashed #E2E8F0", paddingTop: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px 6px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Artists & Creators
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      {liveResults.creators.content.slice(0, 3).map((creator) => (
-                        <div
-                          key={creator.userId}
-                          className="topbar-dropdown-item"
-                          onClick={() => {
-                            setDropdownOpen(false);
-                            onNavigate(`/creator/${creator.userId}`);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            padding: "6px 8px",
-                            borderRadius: "10px",
-                            cursor: "pointer",
-                            transition: "background 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          <img
-                            src={creator.avatarUrl || DEFAULT_COVER_FALLBACK}
-                            alt=""
-                            style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {creator.displayName}
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              @{creator.username} • {creator.trackCount} releases
-                            </div>
-                          </div>
-                          <span style={{ fontSize: "11px", color: "#64748B", flexShrink: 0 }}>
-                            Artist
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Footer Action: View Full Results Page */}
-                <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: "8px", textAlign: "center" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDropdownOpen(false);
-                      onNavigate(`/search?q=${encodeURIComponent(searchKeyword.trim())}`);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#F0F9FF",
-                      color: "#0284C7",
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "6px",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#E0F2FE")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "#F0F9FF")}
-                  >
-                    <span>View all results for "{searchKeyword.trim()}"</span>
-                    <ChevronRightIcon width={14} height={14} />
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
         {/* EX01: Inline guidance notification when keyword is < 2 characters */}
         {searchWarning && (
