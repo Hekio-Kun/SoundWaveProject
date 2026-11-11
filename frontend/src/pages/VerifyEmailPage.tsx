@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { authApi, getAuthErrorMessage } from "../api/auth";
 import { AlertIcon, CheckIcon, MailIcon, ShieldIcon } from "../icons";
-import { AuthExperience } from "./AuthPages";
+import { AuthExperience } from "../components/auth/AuthExperience";
 
 type VerifyEmailPageProps = {
   email: string;

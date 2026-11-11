@@ -11,10 +11,10 @@ import org.springframework.stereotype.Component;
 /**
  * Initializer tự động kiểm tra, khởi tạo và đồng bộ hóa cấu trúc Dual-Tier Lyrics:
  * 1. Đảm bảo các bảng official_lyrics (JPA) và personal_lyrics (JPA) luôn tồn tại.
- * 2. Đảm bảo các bảng tương thích official_lyric và custom_lyric tồn tại.
- * 3. Tự động chuyển đổi (backfill) dữ liệu lời bài hát hiện có từ tracks.lyrics sang cả
- *    bảng Official Lyrics (PUBLISHED) và Custom Lyrics (CUSTOM).
- * 4. Đồng bộ dữ liệu tương thích hai chiều giữa các bảng số ít và số nhiều.
+ * 2. Đảm bảo bảng content_reports (JPA) luôn tồn tại cho phân hệ kiểm duyệt.
+ * 3. Tự động chuyển đổi (backfill) dữ liệu lời bài hát hiện có từ tracks.lyrics sang
+ *    bảng Official Lyrics (PUBLISHED) và Personal Lyrics (CUSTOM).
+ * 4. Dọn dẹp sạch sẽ các bảng tàn dư cũ (official_lyric, custom_lyric).
  */
 @Slf4j
 @Component
@@ -123,33 +123,13 @@ public class LyricSchemaInitializer implements ApplicationRunner {
             log.warn("Could not verify/create table content_reports: {}", e.getMessage());
         }
 
-        // 3. Đảm bảo các bảng tương thích alias (official_lyric, custom_lyric) tồn tại
+        // 3. Dọn dẹp sạch sẽ các bảng tàn dư cũ (official_lyric, custom_lyric) nếu còn tồn tại
         try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS official_lyric (" +
-                            "    id BIGSERIAL PRIMARY KEY," +
-                            "    track_id BIGINT NOT NULL UNIQUE," +
-                            "    lyric_content TEXT NOT NULL," +
-                            "    status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED'," +
-                            "    created_by_user_id BIGINT NOT NULL," +
-                            "    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP" +
-                            ")"
-            );
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS custom_lyric (" +
-                            "    id BIGSERIAL PRIMARY KEY," +
-                            "    user_id BIGINT NOT NULL," +
-                            "    track_id BIGINT NOT NULL," +
-                            "    lyric_type VARCHAR(20) NOT NULL DEFAULT 'CUSTOM'," +
-                            "    lyric_content TEXT NOT NULL," +
-                            "    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "    CONSTRAINT uq_custom_lyric_user_track UNIQUE (user_id, track_id)" +
-                            ")"
-            );
+            jdbcTemplate.execute("DROP TABLE IF EXISTS official_lyric CASCADE");
+            jdbcTemplate.execute("DROP TABLE IF EXISTS custom_lyric CASCADE");
+            log.info("Cleaned up legacy redundant tables (official_lyric, custom_lyric) successfully.");
         } catch (Exception e) {
-            log.warn("Could not verify/create alias tables official_lyric/custom_lyric: {}", e.getMessage());
+            log.warn("Could not drop legacy redundant tables: {}", e.getMessage());
         }
 
         // 4. Backfill dữ liệu từ cột tracks.lyrics sang cả Official Lyrics và Custom Lyrics
@@ -207,25 +187,6 @@ public class LyricSchemaInitializer implements ApplicationRunner {
             log.warn("Could not copy official_lyrics to personal_lyrics: {}", e.getMessage());
         }
 
-        // 6. Đồng bộ hóa sang các bảng tương thích (official_lyric & custom_lyric)
-        try {
-            jdbcTemplate.execute(
-                    "INSERT INTO official_lyric (track_id, lyric_content, status, created_by_user_id, created_at, updated_at) " +
-                            "SELECT ol.track_id, ol.lyric_content, ol.status, COALESCE(ol.created_by_user_id, 1), " +
-                            "CAST(ol.created_at AS timestamp without time zone), CAST(ol.updated_at AS timestamp without time zone) " +
-                            "FROM official_lyrics ol " +
-                            "ON CONFLICT (track_id) DO UPDATE SET lyric_content = EXCLUDED.lyric_content, status = EXCLUDED.status"
-            );
-            jdbcTemplate.execute(
-                    "INSERT INTO custom_lyric (user_id, track_id, lyric_type, lyric_content, created_at, updated_at) " +
-                            "SELECT pl.user_id, pl.track_id, pl.lyric_type, pl.lyric_content, " +
-                            "CAST(pl.created_at AS timestamp without time zone), CAST(pl.updated_at AS timestamp without time zone) " +
-                            "FROM personal_lyrics pl " +
-                            "WHERE pl.lyric_type = 'CUSTOM' " +
-                            "ON CONFLICT (user_id, track_id) DO UPDATE SET lyric_content = EXCLUDED.lyric_content"
-            );
-        } catch (Exception ignored) {
-        }
 
         // 7. Cập nhật sequence cho các bảng
         try {
