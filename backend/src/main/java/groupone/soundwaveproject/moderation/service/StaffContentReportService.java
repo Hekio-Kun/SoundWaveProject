@@ -133,6 +133,9 @@ public class StaffContentReportService {
         List<ContentReport> resolvedGroup = new ArrayList<>();
         for (ContentReport r : pendingGroup) {
             r.setStatus(finalStatus);
+            r.setHandledByStaffId(staff.getId());
+            r.setResolutionNote(staffNote);
+            r.setHandledAt(now);
             r.setReviewerId(staff.getId());
             r.setReviewerNote(staffNote);
             r.setResolvedAt(now);

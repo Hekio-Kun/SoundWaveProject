@@ -27,11 +27,15 @@ public class OfficialLyric {
     @Column(name = "lyric_content", columnDefinition = "TEXT", nullable = false)
     private String lyricContent;
 
+    @Column(name = "language_code", length = 10, nullable = false)
+    @Builder.Default
+    private String languageCode = "vi";
+
     @Column(name = "status", nullable = false, length = 30)
     private String status; // "DRAFT" or "PUBLISHED"
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_user_id")
+    @JoinColumn(name = "created_by_staff_id")
     private Staff createdBy;
 
     @Column(name = "created_at", nullable = false)

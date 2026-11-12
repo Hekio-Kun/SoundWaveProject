@@ -36,17 +36,20 @@ public class LyricSchemaInitializer implements ApplicationRunner {
                             "    track_id BIGINT NOT NULL UNIQUE," +
                             "    lyric_content TEXT NOT NULL," +
                             "    status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED'," +
-                            "    created_by_user_id BIGINT," +
+                            "    created_by_staff_id BIGINT," +
                             "    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP," +
                             "    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP" +
                             ")"
             );
+            jdbcTemplate.execute("ALTER TABLE official_lyrics ADD COLUMN IF NOT EXISTS created_by_staff_id BIGINT");
             log.info("Table official_lyrics verified/created successfully.");
         } catch (Exception e) {
             log.warn("Could not verify/create table official_lyrics: {}", e.getMessage());
         }
 
         try {
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics ALTER COLUMN created_by_staff_id DROP NOT NULL");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics DROP CONSTRAINT IF EXISTS official_lyrics_created_by_user_id_not_null");
             jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics DROP CONSTRAINT IF EXISTS fk_official_lyrics_created_by_staffs");
             jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics DROP CONSTRAINT IF EXISTS fk_official_lyrics_created_by_app_users");
             jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics DROP CONSTRAINT IF EXISTS fk_official_lyrics_languages");
@@ -106,6 +109,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
             // Đảm bảo các cột mới và cũ đều tồn tại đầy đủ bất kể bảng được tạo từ kịch bản nào
             jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS track_id BIGINT");
             jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS submitted_by_user_id BIGINT");
+            jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS handled_by_staff_id BIGINT");
             jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS handled_by_user_id BIGINT");
             jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS category VARCHAR(50)");
             jdbcTemplate.execute("ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS resolution_note TEXT");
@@ -142,8 +146,8 @@ public class LyricSchemaInitializer implements ApplicationRunner {
             if (Boolean.TRUE.equals(hasTracksLyricsColumn)) {
                 // 4.1. Chuyển tracks.lyrics -> official_lyrics
                 int officialCount = jdbcTemplate.update(
-                        "INSERT INTO official_lyrics (track_id, lyric_content, status, created_by_user_id, created_at, updated_at) " +
-                                "SELECT t.track_id, t.lyrics, 'PUBLISHED', COALESCE(t.uploader_user_id, 1), " +
+                        "INSERT INTO official_lyrics (track_id, lyric_content, status, created_by_staff_id, created_at, updated_at) " +
+                                "SELECT t.track_id, t.lyrics, 'PUBLISHED', COALESCE((SELECT staff_id FROM staffs ORDER BY staff_id ASC LIMIT 1), 1), " +
                                 "COALESCE(t.created_at, timezone('UTC', CURRENT_TIMESTAMP)), " +
                                 "COALESCE(t.updated_at, timezone('UTC', CURRENT_TIMESTAMP)) " +
                                 "FROM tracks t " +

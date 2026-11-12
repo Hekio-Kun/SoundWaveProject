@@ -70,7 +70,10 @@ public class PlaylistService {
             return List.of();
         }
         User user = userOpt.get();
-        List<Playlist> playlists = playlistRepository.findByCreatedByUserIdOrderByCreatedAtDesc(user.getId());
+        List<Playlist> playlists = playlistRepository.findByOwnerUserIdOrderByCreatedAtDesc(user.getId());
+        if (playlists.isEmpty()) {
+            playlists = playlistRepository.findByCreatedByUserIdOrderByCreatedAtDesc(user.getId());
+        }
         return playlists.stream()
                 .map(p -> mapToPlaylistResponse(p, false))
                 .toList();

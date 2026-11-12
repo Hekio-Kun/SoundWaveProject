@@ -39,10 +39,27 @@ public class ContentReport {
     private Long submittedByUserId;
 
     /**
-     * ID nhân viên xử lý báo cáo (Khóa ngoại logic trỏ tới users.id / staffs.id).
+     * ID nhân viên xử lý báo cáo (Khóa ngoại logic trỏ tới staffs.staff_id).
      */
-    @Column(name = "handled_by_user_id")
-    private Long handledByUserId;
+    @Column(name = "handled_by_staff_id")
+    private Long handledByStaffId;
+
+    public Long getHandledByStaffId() {
+        return handledByStaffId != null ? handledByStaffId : reviewerId;
+    }
+
+    public void setHandledByStaffId(Long handledByStaffId) {
+        this.handledByStaffId = handledByStaffId;
+        this.reviewerId = handledByStaffId;
+    }
+
+    public Long getHandledByUserId() {
+        return getHandledByStaffId();
+    }
+
+    public void setHandledByUserId(Long handledByUserId) {
+        setHandledByStaffId(handledByUserId);
+    }
 
     /**
      * Danh mục báo cáo vi phạm (COPYRIGHT, INAPPROPRIATE_CONTENT, INCORRECT_METADATA, OTHER).
@@ -102,4 +119,24 @@ public class ContentReport {
 
     @Column(name = "resolved_at")
     private Instant resolvedAt;
+
+    @PrePersist
+    void syncFieldsOnPersist() {
+        if (handledByStaffId == null && reviewerId != null) handledByStaffId = reviewerId;
+        if (reviewerId == null && handledByStaffId != null) reviewerId = handledByStaffId;
+        if (handledAt == null && resolvedAt != null) handledAt = resolvedAt;
+        if (resolvedAt == null && handledAt != null) resolvedAt = handledAt;
+        if (submittedByUserId == null && reporterId != null) submittedByUserId = reporterId;
+        if (reporterId == null && submittedByUserId != null) reporterId = submittedByUserId;
+        if (trackId == null && targetId != null) trackId = targetId;
+        if (targetId == null && trackId != null) targetId = trackId;
+    }
+
+    @PreUpdate
+    void syncFieldsOnUpdate() {
+        if (handledByStaffId == null && reviewerId != null) handledByStaffId = reviewerId;
+        if (reviewerId == null && handledByStaffId != null) reviewerId = handledByStaffId;
+        if (handledAt == null && resolvedAt != null) handledAt = resolvedAt;
+        if (resolvedAt == null && handledAt != null) resolvedAt = handledAt;
+    }
 }

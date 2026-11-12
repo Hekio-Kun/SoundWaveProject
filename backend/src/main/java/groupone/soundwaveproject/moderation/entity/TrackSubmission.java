@@ -40,10 +40,26 @@ public class TrackSubmission {
     private Long submittedByUserId;
 
     /**
-     * ID của nhân viên kiểm duyệt đã thẩm định bài hát (Khóa ngoại trỏ tới bảng users, null khi đang chờ duyệt).
+     * ID của nhân viên kiểm duyệt đã thẩm định bài hát (Khóa ngoại trỏ tới bảng staffs, null khi đang chờ duyệt).
      */
-    @Column(name = "reviewer_user_id")
-    private Long reviewerUserId;
+    @Column(name = "reviewer_staff_id")
+    private Long reviewerStaffId;
+
+    public Long getReviewerStaffId() {
+        return reviewerStaffId;
+    }
+
+    public void setReviewerStaffId(Long reviewerStaffId) {
+        this.reviewerStaffId = reviewerStaffId;
+    }
+
+    public Long getReviewerUserId() {
+        return reviewerStaffId;
+    }
+
+    public void setReviewerUserId(Long reviewerUserId) {
+        this.reviewerStaffId = reviewerUserId;
+    }
 
     /**
      * Loại yêu cầu kiểm duyệt (TRACK_RELEASE hoặc LYRIC_UPDATE).

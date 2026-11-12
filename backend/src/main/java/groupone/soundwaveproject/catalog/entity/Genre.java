@@ -35,8 +35,24 @@ public class Genre {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Column(name = "created_by_user_id")
-    private Long createdByUserId;
+    @Column(name = "created_by_staff_id")
+    private Long createdByStaffId;
+
+    public Long getCreatedByStaffId() {
+        return createdByStaffId;
+    }
+
+    public void setCreatedByStaffId(Long createdByStaffId) {
+        this.createdByStaffId = createdByStaffId;
+    }
+
+    public Long getCreatedByUserId() {
+        return createdByStaffId;
+    }
+
+    public void setCreatedByUserId(Long createdByUserId) {
+        this.createdByStaffId = createdByUserId;
+    }
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -44,11 +60,11 @@ public class Genre {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Genre(String name, String slug, String description, Long createdByUserId) {
+    public Genre(String name, String slug, String description, Long createdByStaffId) {
         this.name = name;
         this.slug = slug;
         this.description = description;
-        this.createdByUserId = createdByUserId;
+        this.createdByStaffId = createdByStaffId;
         this.isActive = true;
     }
 
