@@ -19,6 +19,7 @@ import java.time.ZoneOffset;
 public class Genre {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "genre_id")
     private Long id;
 
     @Column(nullable = false, unique = true, length = 100)

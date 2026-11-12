@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 public class Track {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "track_id")
     private Long id;
 
     @Column(name = "uploader_user_id", nullable = false)

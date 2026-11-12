@@ -13,7 +13,9 @@ import java.time.ZoneOffset;
 @Table(name = "password_reset_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PasswordResetToken {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "reset_token_id")
     private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false)
     private User user;

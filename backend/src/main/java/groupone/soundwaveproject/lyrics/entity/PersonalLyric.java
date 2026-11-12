@@ -17,6 +17,7 @@ import java.time.Instant;
 public class PersonalLyric {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "personal_lyric_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

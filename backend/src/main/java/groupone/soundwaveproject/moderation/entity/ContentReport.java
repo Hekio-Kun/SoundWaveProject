@@ -23,6 +23,7 @@ public class ContentReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "report_id")
     private Long id;
 
     /**

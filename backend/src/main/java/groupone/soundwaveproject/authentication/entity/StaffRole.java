@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 public class StaffRole {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "role_id")
     private Short id;
 
     @Column(nullable = false, unique = true, length = 30)

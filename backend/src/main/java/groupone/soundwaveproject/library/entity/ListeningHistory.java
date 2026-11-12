@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 public class ListeningHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "history_id")
     private Long id;
 
     @Column(name = "user_id", nullable = false)

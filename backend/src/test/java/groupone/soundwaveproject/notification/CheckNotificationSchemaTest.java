@@ -35,7 +35,7 @@ public class CheckNotificationSchemaTest {
         System.out.println("STAFF NOTIFS FOUND: " + notifs.size());
 
         System.out.println("=== 2. CHECK STAFFS ===");
-        var staffs = jdbcTemplate.queryForList("SELECT id, email, status, role_id FROM staffs");
+        var staffs = jdbcTemplate.queryForList("SELECT staff_id, email, status, role_id FROM staffs");
         staffs.forEach(System.out::println);
 
         System.out.println("=== 3. CHECK STAFF ROLES ===");

@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 public class AccountUnlockToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "unlock_token_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

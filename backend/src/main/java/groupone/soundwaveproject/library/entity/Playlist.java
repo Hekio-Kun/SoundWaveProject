@@ -19,6 +19,7 @@ public class Playlist {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "playlist_id")
     private Long id;
 
     @Column(name = "owner_user_id", nullable = false)
