@@ -95,10 +95,10 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
     if (!dateStr) return "-";
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
+      return date.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
+        year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       });

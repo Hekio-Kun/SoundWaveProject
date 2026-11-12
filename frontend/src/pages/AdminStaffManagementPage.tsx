@@ -15,7 +15,6 @@ import {
   MailIcon,
   PlusIcon,
   RefreshIcon,
-  SearchIcon,
   ShieldIcon,
   UserIcon,
   UsersIcon,
@@ -61,9 +60,6 @@ export function AdminStaffManagementPage({
   onDeactivateClick,
 }: AdminStaffManagementPageProps) {
   const [staffPage, setStaffPage] = useState<StaffDirectoryResponse | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -93,8 +89,6 @@ export function AdminStaffManagementPage({
     setError("");
     try {
       const result = await adminStaffApi.getStaffDirectory({
-        search,
-        status: statusFilter === "ALL" ? undefined : statusFilter,
         page,
         size: 10,
         sort: "createdAt,desc",
@@ -119,35 +113,7 @@ export function AdminStaffManagementPage({
 
   useEffect(() => {
     void loadStaffDirectory();
-  }, [search, statusFilter, page]);
-
-  const handleSearchSubmit = (event?: React.FormEvent) => {
-    event?.preventDefault();
-    const trimmed = searchInput.trim();
-    if (trimmed === search && page === 0) {
-      void loadStaffDirectory();
-    } else {
-      setSearch(trimmed);
-      setPage(0);
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchInput("");
-    if (search === "" && page === 0) {
-      void loadStaffDirectory();
-    } else {
-      setSearch("");
-      setPage(0);
-    }
-  };
-
-  const handleStatusFilterChange = (newStatus: "ALL" | "ACTIVE" | "INACTIVE") => {
-    if (statusFilter !== newStatus) {
-      setStatusFilter(newStatus);
-      setPage(0);
-    }
-  };
+  }, [page]);
 
   const handleCreateStaff = async (input: CreateStaffInput): Promise<CreateStaffResult> => {
     setCreateSubmitting(true);
@@ -241,51 +207,11 @@ export function AdminStaffManagementPage({
       </header>
 
       <section className="ops-panel admin-genre-panel">
-        {/* Toolbar: Filters and Search */}
-        <div className="admin-genre-toolbar" style={{ flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {(["ALL", "ACTIVE", "INACTIVE"] as const).map((filterKey) => (
-              <button
-                key={filterKey}
-                type="button"
-                className={`button button-small ${statusFilter === filterKey ? "button-primary" : "button-secondary"}`}
-                onClick={() => handleStatusFilterChange(filterKey)}
-                style={{ fontSize: "12px", padding: "6px 12px" }}
-              >
-                {filterKey === "ALL" ? "All Staff" : filterKey === "ACTIVE" ? "Active" : "Inactive"}
-              </button>
-            ))}
-          </div>
-
-          <form className="admin-genre-search" onSubmit={handleSearchSubmit} role="search" style={{ flex: 1, minWidth: "260px" }}>
-            <SearchIcon width={17} height={17} />
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search staff by name or email..."
-              aria-label="Search staff"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                className="admin-genre-search-clear"
-                onClick={handleClearSearch}
-                aria-label="Clear search"
-                title="Clear search"
-              >
-                <CloseIcon width={14} height={14} />
-              </button>
-            )}
-            <button
-              type="submit"
-              className="button button-primary button-small admin-genre-search-btn"
-              aria-label="Search staff"
-            >
-              <SearchIcon width={14} height={14} />
-              <span>Search</span>
-            </button>
-          </form>
-
+        {/* Toolbar: Total accounts count */}
+        <div className="admin-genre-toolbar" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--sw-text-primary, #1e293b)" }}>
+            Staff Directory
+          </span>
           <span className="admin-genre-total">
             {totalStaff} {totalStaff === 1 ? "staff account" : "staff accounts"}
           </span>
@@ -316,11 +242,7 @@ export function AdminStaffManagementPage({
           <div className="staff-empty-box">
             <UsersIcon width={42} height={42} />
             <h2>No staff accounts found</h2>
-            <p>
-              {search
-                ? `No staff matching "${search}" found in ${statusFilter.toLowerCase()} status.`
-                : "No moderator staff accounts currently exist in this category."}
-            </p>
+            <p>No moderator staff accounts currently exist in the system.</p>
           </div>
         ) : (
           <>

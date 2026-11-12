@@ -4,6 +4,7 @@ import { covers } from "../data";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ChangeReportReasonModal } from "../components/modals/ChangeReportReasonModal";
+import { formatDate, formatDateTime } from "../utils/dateUtils";
 import {
   AlertIcon,
   ClockIcon,
@@ -27,18 +28,7 @@ function parseIsoDate(dateStr: string): Date {
 
 function getRelativeDateLabel(dateStr: string): string {
   if (!dateStr) return "Earlier";
-  const date = parseIsoDate(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const diffDays = Math.round((today - targetDay) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) {
-    return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDate(dateStr);
 }
 
 function formatReportTime(dateStr: string): string {
@@ -386,7 +376,7 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
                           <span
                             className="row-creator"
                             style={{ display: "flex", alignItems: "center", gap: "4px" }}
-                            title={`Submitted on ${new Date(item.createdAt).toLocaleString("en-US")}`}
+                            title={`Submitted on ${formatDateTime(item.createdAt)}`}
                           >
                             <ClockIcon width={12} height={12} style={{ opacity: 0.6 }} />
                             <span>{formatReportTime(item.createdAt)}</span>

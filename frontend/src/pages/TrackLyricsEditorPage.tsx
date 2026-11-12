@@ -5,6 +5,7 @@ import { lyricsApi } from "../api/lyrics";
 import { studioApi, type PendingLyricSubmission } from "../api/track";
 import { LyricSyncTab } from "../components/common/LyricSyncTab";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { formatDateTime } from "../utils/dateUtils";
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -251,7 +252,7 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
               <div>
                 <strong>Official lyrics proposal is currently pending Staff review:</strong>
                 <p style={{ margin: "4px 0 0" }}>
-                  Submitted on {new Date(pendingSubmission.submittedAt).toLocaleString()}. Staff will review and publish your lyrics soon.
+                  Submitted on {formatDateTime(pendingSubmission.submittedAt)}. Staff will review and publish your lyrics soon.
                 </p>
               </div>
               <div className="lyric-studio-banner-actions">

@@ -40,7 +40,7 @@ function formatDurationMs(ms?: number | null): string {
 function formatDate(isoString?: string | null): string {
   if (!isoString) return "--";
   try {
-    return new Date(isoString).toLocaleDateString("en-US", {
+    return new Date(isoString).toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",

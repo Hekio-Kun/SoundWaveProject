@@ -17,6 +17,7 @@ import type { LandingTrack, ListeningHistoryItem, Playlist } from "../types";
 import { historyApi } from "../api/history";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { formatDate, formatDateTime } from "../utils/dateUtils";
 
 export function historyItemToTrack(item: ListeningHistoryItem): LandingTrack {
   return {
@@ -68,18 +69,7 @@ function parseIsoDate(dateStr: string): Date {
 
 function getRelativeDateLabel(dateStr: string): string {
   if (!dateStr) return "Earlier";
-  const date = parseIsoDate(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const diffDays = Math.round((today - targetDay) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) {
-    return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDate(dateStr);
 }
 
 function formatPlayedTime(dateStr: string): string {
@@ -627,7 +617,7 @@ export function LibraryPage({
                             fontSize: "12.5px",
                             color: "var(--sw-muted, #64748B)",
                           }}
-                          title={`Streamed on ${new Date(item.playedAt).toLocaleString("en-US")}`}
+                          title={`Streamed on ${formatDateTime(item.playedAt)}`}
                         >
                           <ClockIcon width={13} height={13} style={{ opacity: 0.6 }} />
                           <span>{formatPlayedTime(item.playedAt)}</span>

@@ -137,23 +137,6 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
               <DiscIcon width={17} height={17} />
               <span>Genre Management</span>
             </button>
-            <button
-              type="button"
-              className={activeRoute === "/admin/lyrics" ? "is-active" : ""}
-              onClick={() => handleNavClick("/admin/lyrics")}
-              title="Official lyrics management"
-            >
-              <FileTextIcon width={17} height={17} />
-              <span>Official Lyrics</span>
-            </button>
-            <button
-              type="button"
-              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" ? "is-active" : ""}
-              onClick={() => handleNavClick("/staff/dashboard")}
-            >
-              <DashboardIcon width={17} height={17} />
-              <span>Staff Moderation Queue</span>
-            </button>
           </>
         )}
       </nav>
@@ -245,7 +228,9 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           </div>
 
           <div className="ops-shell-actions">
-            <NotificationDropdown onNavigate={handleNavClick} />
+            {isStaff ? (
+              <NotificationDropdown onNavigate={handleNavClick} />
+            ) : null}
             {user ? (
               <div className="ops-topbar-user-pill">
                 <div className="ops-topbar-avatar">

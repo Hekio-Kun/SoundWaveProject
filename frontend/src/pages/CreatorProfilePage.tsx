@@ -15,7 +15,7 @@ type Props = {
 
 const formatDate = (value: string | null | undefined) =>
   value
-    ? new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "long", year: "numeric" }).format(
+    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
         new Date(`${value}T00:00:00`)
       )
     : "Not provided";

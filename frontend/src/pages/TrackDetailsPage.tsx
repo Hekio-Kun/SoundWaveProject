@@ -924,7 +924,7 @@ export function TrackDetailsPage({
                 <strong>{pendingLyricSub ? "Official Lyrics Pending Review" : "No official lyrics available"}</strong>
                 <span>
                   {pendingLyricSub
-                    ? `An official lyric proposal submitted on ${new Date(pendingLyricSub.submittedAt).toLocaleDateString()} is awaiting Staff review.`
+                    ? `An official lyric proposal submitted on ${formatReleaseDate(pendingLyricSub.submittedAt)} is awaiting Staff review.`
                     : "Official verified lyrics have not been provided for this track yet."}
                 </span>
                 {pendingLyricSub && isTrackCreator ? (
