@@ -182,149 +182,89 @@ export function Search({
 
   return (
     <div className="search-page-container" style={{ padding: "24px 32px 64px", maxWidth: "1280px", margin: "0 auto" }}>
-      {/* Category Tabs (AF03: Navigate search result categories) */}
-      <div
-        className="search-tabs"
-        style={{
-          display: "flex",
-          gap: "8px",
-          alignItems: "center",
-          marginBottom: "28px",
-          borderBottom: "1px solid var(--sw-border, #E2E8F0)",
-          paddingBottom: "12px",
-          overflowX: "auto",
-        }}
-        role="tablist"
-      >
-        {(
-          [
-            { id: "ALL", label: "All" },
-            { id: "SONGS", label: "Songs" },
-            { id: "ALBUMS", label: "Albums" },
-            { id: "CREATORS", label: "Creators" },
-            { id: "LYRICS", label: "Lyrics" },
-          ] as const
-        ).map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => handleTabChange(tab.id)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: "20px",
-                border: "none",
-                background: isActive ? "#0284C7" : "transparent",
-                color: isActive ? "#FFFFFF" : "#64748B",
-                fontWeight: isActive ? 600 : 500,
-                fontSize: "13.5px",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* State 1: Spotify-styled Browse Landing when no search query is active */}
-      {isQueryTooShort && (
-        <div style={{ marginTop: "8px" }}>
-          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--sw-text-h, #0F172A)", marginBottom: "20px" }}>
-            Browse all
-          </h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-              gap: "18px",
-              marginBottom: "36px",
-            }}
-          >
-            {[
-              { title: "Top Charts", bg: "#0284C7", path: "/ranking", icon: "🏆" },
-              { title: "New Albums", bg: "#D97706", path: "/albums", icon: "💿" },
-              { title: "Pop", bg: "#EC4899", path: "/browse?genre=pop", icon: "✨" },
-              { title: "Rap / Hip-Hop", bg: "#8B5CF6", path: "/browse?genre=rap-hip-hop", icon: "🎤" },
-              { title: "R&B / Soul", bg: "#0EA5E9", path: "/browse?genre=rnb", icon: "🌊" },
-              { title: "Rock", bg: "#DC2626", path: "/browse?genre=rock", icon: "🎸" },
-              { title: "Indie / Acoustic", bg: "#10B981", path: "/browse?genre=indie", icon: "🌿" },
-              { title: "Browse Catalog", bg: "#6366F1", path: "/browse", icon: "🧭" },
-            ].map((cat) => (
-              <div
-                key={cat.title}
-                onClick={() => onNavigate(cat.path)}
+      {/* Category Tabs (AF03: Navigate search result categories) - Shown when searching */}
+      {!isQueryTooShort && (
+        <div
+          className="search-tabs"
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+            marginBottom: "28px",
+            borderBottom: "1px solid var(--sw-border, #E2E8F0)",
+            paddingBottom: "12px",
+            overflowX: "auto",
+          }}
+          role="tablist"
+        >
+          {(
+            [
+              { id: "ALL", label: "All" },
+              { id: "SONGS", label: "Songs" },
+              { id: "ALBUMS", label: "Albums" },
+              { id: "CREATORS", label: "Creators" },
+              { id: "LYRICS", label: "Lyrics" },
+            ] as const
+          ).map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => handleTabChange(tab.id)}
                 style={{
-                  background: cat.bg,
-                  borderRadius: "14px",
-                  height: "120px",
-                  padding: "16px",
-                  position: "relative",
-                  overflow: "hidden",
+                  padding: "8px 18px",
+                  borderRadius: "20px",
+                  border: "none",
+                  background: isActive ? "#0284C7" : "transparent",
+                  color: isActive ? "#FFFFFF" : "#64748B",
+                  fontWeight: isActive ? 600 : 500,
+                  fontSize: "13.5px",
                   cursor: "pointer",
-                  color: "#FFFFFF",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                  transition: "transform 0.18s ease, box-shadow 0.18s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.03)";
-                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.06)";
+                  transition: "all 0.15s ease",
                 }}
               >
-                <span style={{ fontSize: "16px", fontWeight: 700, display: "block" }}>{cat.title}</span>
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    bottom: "8px",
-                    fontSize: "36px",
-                    opacity: 0.85,
-                    transform: "rotate(15deg)",
-                  }}
-                >
-                  {cat.icon}
-                </span>
-              </div>
-            ))}
-          </div>
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
+      {/* State 1: Clean empty placeholder when no search query is active */}
+      {isQueryTooShort && (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "80px 20px",
+            background: "#FFFFFF",
+            borderRadius: "16px",
+            border: "1px dashed var(--sw-border, #E2E8F0)",
+            margin: "32px auto",
+            maxWidth: "520px",
+          }}
+        >
           <div
             style={{
-              textAlign: "center",
-              padding: "40px 20px",
-              background: "#FFFFFF",
-              borderRadius: "16px",
-              border: "1px dashed var(--sw-border, #E2E8F0)",
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              background: "#F0F9FF",
+              color: "#0284C7",
+              display: "grid",
+              placeItems: "center",
+              margin: "0 auto 12px",
             }}
           >
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                background: "#F0F9FF",
-                color: "#0284C7",
-                display: "grid",
-                placeItems: "center",
-                margin: "0 auto 12px",
-              }}
-            >
-              <SearchIcon width={22} height={22} />
-            </div>
-            <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--sw-text-h, #0F172A)", marginBottom: "6px" }}>
-              Search artists, songs, albums, and lyrics
-            </h3>
-            <p style={{ color: "#64748B", fontSize: "13.5px", maxWidth: "440px", margin: "0 auto" }}>
-              Type into the search bar above to see results live on this page.
-            </p>
+            <SearchIcon width={22} height={22} />
           </div>
+          <h3 style={{ fontSize: "17px", fontWeight: 700, color: "var(--sw-text-h, #0F172A)", marginBottom: "6px" }}>
+            Search artists, songs, albums, and lyrics
+          </h3>
+          <p style={{ color: "#64748B", fontSize: "13.5px", maxWidth: "400px", margin: "0 auto" }}>
+            Type into the search bar above to see results on this page.
+          </p>
         </div>
       )}
 
