@@ -24,6 +24,7 @@ public class TrackSubmission {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "submission_id")
     private Long id;
 
     /**

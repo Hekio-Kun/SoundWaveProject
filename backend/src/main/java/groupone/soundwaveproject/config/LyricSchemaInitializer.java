@@ -32,7 +32,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
         try {
             jdbcTemplate.execute(
                     "CREATE TABLE IF NOT EXISTS official_lyrics (" +
-                            "    id BIGSERIAL PRIMARY KEY," +
+                            "    official_lyric_id BIGSERIAL PRIMARY KEY," +
                             "    track_id BIGINT NOT NULL UNIQUE," +
                             "    lyric_content TEXT NOT NULL," +
                             "    status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED'," +
@@ -57,7 +57,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
         try {
             jdbcTemplate.execute(
                     "CREATE TABLE IF NOT EXISTS personal_lyrics (" +
-                            "    id BIGSERIAL PRIMARY KEY," +
+                            "    personal_lyric_id BIGSERIAL PRIMARY KEY," +
                             "    user_id BIGINT NOT NULL," +
                             "    track_id BIGINT NOT NULL," +
                             "    lyric_type VARCHAR(20) NOT NULL DEFAULT 'CUSTOM'," +
@@ -83,7 +83,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
         try {
             jdbcTemplate.execute(
                     "CREATE TABLE IF NOT EXISTS content_reports (" +
-                            "    id BIGSERIAL PRIMARY KEY," +
+                            "    report_id BIGSERIAL PRIMARY KEY," +
                             "    track_id BIGINT," +
                             "    submitted_by_user_id BIGINT," +
                             "    handled_by_user_id BIGINT," +
@@ -143,7 +143,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
                 // 4.1. Chuyển tracks.lyrics -> official_lyrics
                 int officialCount = jdbcTemplate.update(
                         "INSERT INTO official_lyrics (track_id, lyric_content, status, created_by_user_id, created_at, updated_at) " +
-                                "SELECT t.id, t.lyrics, 'PUBLISHED', COALESCE(t.uploader_user_id, 1), " +
+                                "SELECT t.track_id, t.lyrics, 'PUBLISHED', COALESCE(t.uploader_user_id, 1), " +
                                 "COALESCE(t.created_at, timezone('UTC', CURRENT_TIMESTAMP)), " +
                                 "COALESCE(t.updated_at, timezone('UTC', CURRENT_TIMESTAMP)) " +
                                 "FROM tracks t " +
@@ -156,7 +156,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
                 // 4.2. Chuyển tracks.lyrics -> personal_lyrics (Custom Lyric)
                 int personalCount = jdbcTemplate.update(
                         "INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at) " +
-                                "SELECT COALESCE(t.uploader_user_id, 1), t.id, 'CUSTOM', t.lyrics, " +
+                                "SELECT COALESCE(t.uploader_user_id, 1), t.track_id, 'CUSTOM', t.lyrics, " +
                                 "COALESCE(t.created_at, timezone('UTC', CURRENT_TIMESTAMP)), " +
                                 "COALESCE(t.updated_at, timezone('UTC', CURRENT_TIMESTAMP)) " +
                                 "FROM tracks t " +
@@ -176,7 +176,7 @@ public class LyricSchemaInitializer implements ApplicationRunner {
                     "INSERT INTO personal_lyrics (user_id, track_id, lyric_type, lyric_content, created_at, updated_at) " +
                             "SELECT COALESCE(t.uploader_user_id, 1), ol.track_id, 'CUSTOM', ol.lyric_content, ol.created_at, ol.updated_at " +
                             "FROM official_lyrics ol " +
-                            "JOIN tracks t ON t.id = ol.track_id " +
+                            "JOIN tracks t ON t.track_id = ol.track_id " +
                             "WHERE ol.lyric_content IS NOT NULL AND TRIM(ol.lyric_content) != '' " +
                             "ON CONFLICT (user_id, track_id, lyric_type) DO NOTHING"
             );
@@ -190,8 +190,8 @@ public class LyricSchemaInitializer implements ApplicationRunner {
 
         // 7. Cập nhật sequence cho các bảng
         try {
-            jdbcTemplate.execute("SELECT setval(pg_get_serial_sequence('official_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM official_lyrics");
-            jdbcTemplate.execute("SELECT setval(pg_get_serial_sequence('personal_lyrics', 'id'), COALESCE(MAX(id), 1)) FROM personal_lyrics");
+            jdbcTemplate.execute("SELECT setval(pg_get_serial_sequence('official_lyrics', 'official_lyric_id'), COALESCE(MAX(official_lyric_id), 1)) FROM official_lyrics");
+            jdbcTemplate.execute("SELECT setval(pg_get_serial_sequence('personal_lyrics', 'personal_lyric_id'), COALESCE(MAX(personal_lyric_id), 1)) FROM personal_lyrics");
         } catch (Exception ignored) {
         }
 

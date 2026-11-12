@@ -17,6 +17,7 @@ import java.time.Instant;
 public class OfficialLyric {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "official_lyric_id")
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)

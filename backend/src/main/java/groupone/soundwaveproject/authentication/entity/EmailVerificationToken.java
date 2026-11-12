@@ -13,7 +13,9 @@ import java.time.ZoneOffset;
 @Table(name = "email_verification_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EmailVerificationToken {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "verification_token_id")
     private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false)
     private User user;

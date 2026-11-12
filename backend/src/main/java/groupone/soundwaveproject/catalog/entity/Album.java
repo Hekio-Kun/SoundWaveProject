@@ -22,6 +22,7 @@ import java.time.ZoneOffset;
 public class Album {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "album_id")
     private Long id;
 
     @Column(name = "created_by_user_id", nullable = false)

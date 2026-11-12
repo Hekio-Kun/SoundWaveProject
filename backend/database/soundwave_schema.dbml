@@ -1,0 +1,409 @@
+// ======================================================================================
+// SoundWave Full-Stack Platform — Database Schema (DBML for dbdiagram.io)
+// Database Engine: PostgreSQL 18
+// Cập nhật: Chuẩn hóa 100% tên khóa chính (PK) theo tài liệu RDS:
+// users(user_id), tracks(track_id), albums(album_id), genres(genre_id), staffs(staff_id)...
+// Kiến trúc chuẩn: 20 bảng chuẩn hóa hoàn toàn khớp với Java JPA Entity.
+// ======================================================================================
+
+Project SoundWave {
+  database_type: 'PostgreSQL'
+  Note: '''
+    # Hệ thống SoundWave Music Platform
+    Hệ thống phát nhạc trực tuyến đa vai trò (Guest, User/Artist, Staff, Admin).
+    Bao gồm đúng 20 bảng chuẩn hóa chia thành 4 phân hệ chính:
+    1. Authentication & User Management (Người dùng, hồ sơ, token)
+    2. Staff & Administration (Ban quản trị, nhân viên, phân quyền)
+    3. Music Catalog & Lyrics (Thể loại, album, bài hát, kiểm duyệt, báo cáo, lời bài hát)
+    4. Social & User Interactions (Playlist, lượt thích, lịch sử nghe, thông báo)
+  '''
+}
+
+// ======================================================================================
+// 1. AUTHENTICATION & USER MANAGEMENT
+// ======================================================================================
+
+Table users {
+  user_id bigint [pk, increment]
+  email varchar(320) [unique, not null, note: 'Địa chỉ email đăng nhập duy nhất']
+  password_hash varchar(255) [not null, note: 'Mã băm BCrypt mật khẩu']
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING | ACTIVE | TEMPORARILY_LOCKED | BANNED']
+  email_verified_at timestamp [note: 'Thời điểm xác thực email thành công']
+  locked_until timestamp [note: 'Khóa tạm thời do đăng nhập sai quá số lần quy định']
+  last_login_at timestamp [note: 'Thời điểm đăng nhập thành công gần nhất']
+  deleted_at timestamp [note: 'Soft delete cho tài khoản']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Tài khoản người dùng/nghệ sĩ cốt lõi của nền tảng SoundWave'
+}
+
+Table user_profiles {
+  user_id bigint [pk, note: 'Khóa chính đồng thời là khóa ngoại tham chiếu users.user_id (1-1)']
+  username varchar(50) [unique, not null, note: 'Handle người dùng duy nhất (@username)']
+  display_name varchar(120) [not null, note: 'Tên hiển thị công khai hoặc nghệ danh']
+  bio varchar(1000) [note: 'Tiểu sử / giới thiệu nghệ sĩ']
+  avatar_url varchar(2048) [note: 'Đường dẫn ảnh đại diện (Cloudinary)']
+  avatar_public_id varchar(255) [note: 'Mã tài nguyên Cloudinary quản lý ảnh']
+  country_code char(2) [note: 'Mã quốc gia ISO 3166-1 alpha-2 (VN, US, JP, ...)']
+  date_of_birth date [note: 'Ngày sinh']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Hồ sơ công khai và thông tin cá nhân của người dùng'
+}
+
+Table email_verification_tokens {
+  verification_token_id bigint [pk, increment]
+  user_id bigint [not null, note: 'FK -> users.user_id']
+  token_hash varchar(255) [not null, note: 'Mã băm OTP/Token xác minh email']
+  expires_at timestamp [not null, note: 'Thời hạn hiệu lực của mã (thường 10 phút)']
+  used_at timestamp [note: 'Thời điểm mã đã được sử dụng thành công']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Token OTP kích hoạt và xác nhận quyền sở hữu email'
+}
+
+Table password_reset_tokens {
+  reset_token_id bigint [pk, increment]
+  user_id bigint [not null, note: 'FK -> users.user_id']
+  token_hash varchar(255) [not null, note: 'Mã băm OTP/Token quên mật khẩu']
+  expires_at timestamp [not null, note: 'Thời hạn hiệu lực (thường 10-15 phút)']
+  used_at timestamp [note: 'Thời điểm mã đã được sử dụng đổi mật khẩu']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Token OTP phục vụ quy trình lấy lại mật khẩu an toàn'
+}
+
+Table account_unlock_tokens {
+  unlock_token_id bigint [pk, increment]
+  user_id bigint [not null, note: 'FK -> users.user_id']
+  token_hash varchar(255) [not null, note: 'Mã băm OTP mở khóa tài khoản']
+  expires_at timestamp [not null, note: 'Thời hạn mã mở khóa']
+  used_at timestamp [note: 'Thời điểm đã mở khóa']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Token giải cứu khi tài khoản bị khóa tạm thời do nhập sai mật khẩu quá 5 lần'
+}
+
+Table refresh_tokens {
+  refresh_token_id bigint [pk, increment]
+  user_id bigint [note: 'FK -> users.user_id (cho người dùng)']
+  staff_id bigint [note: 'FK -> staffs.staff_id (cho nhân viên nội bộ)']
+  token_hash varchar(255) [not null, note: 'Mã băm Refresh Token JWT']
+  expires_at timestamp [not null, note: 'Hạn dùng phiên (thường 7 - 30 ngày)']
+  revoked_at timestamp [note: 'Thời điểm thu hồi token (đăng xuất hoặc Token Rotation)']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Quản lý phiên đăng nhập đa thiết bị và hỗ trợ Refresh Token Rotation (RFC 6749)'
+}
+
+// ======================================================================================
+// 2. STAFF & ADMINISTRATION
+// ======================================================================================
+
+Table staff_roles {
+  role_id smallint [pk, increment]
+  code varchar(30) [unique, not null, note: 'ADMIN | STAFF']
+  name varchar(80) [not null, note: 'Tên vai trò hiển thị']
+  description varchar(500) [note: 'Mô tả quyền hạn của vai trò']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Danh mục vai trò quyền hạn cho nhân sự nội bộ SoundWave'
+}
+
+Table staffs {
+  staff_id bigint [pk, increment]
+  role_id smallint [not null, note: 'FK -> staff_roles.role_id']
+  email varchar(320) [unique, not null, note: 'Email tài khoản nhân viên nội bộ']
+  password_hash varchar(255) [not null, note: 'Mã băm mật khẩu']
+  full_name varchar(120) [not null, note: 'Họ và tên nhân viên']
+  avatar_url varchar(2048) [note: 'Ảnh chân dung']
+  status varchar(30) [not null, default: 'ACTIVE', note: 'ACTIVE | INACTIVE | SUSPENDED']
+  last_login_at timestamp [note: 'Lần đăng nhập gần nhất']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Tài khoản nhân viên điều hành, kiểm duyệt và quản trị hệ thống'
+}
+
+// ======================================================================================
+// 3. MUSIC CATALOG, LYRICS & MODERATION
+// ======================================================================================
+
+Table genres {
+  genre_id bigint [pk, increment]
+  name varchar(100) [unique, not null, note: 'Tên thể loại (Pop, Ballad, Rap, ...)']
+  slug varchar(100) [unique, not null, note: 'Đường dẫn URL thân thiện (pop, rap-hip-hop)']
+  description varchar(1000) [note: 'Mô tả đặc trưng thể loại']
+  is_active boolean [not null, default: true, note: 'Trạng thái hiển thị']
+  created_by_user_id bigint [note: 'Người tạo thể loại (Admin/Staff)']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Phân loại dòng nhạc cho hệ sinh thái bài hát'
+}
+
+Table albums {
+  album_id bigint [pk, increment]
+  created_by_user_id bigint [not null, note: 'FK -> users.user_id (Nghệ sĩ tạo album)']
+  title varchar(200) [not null, note: 'Tên album / EP / Single']
+  slug varchar(220) [unique, not null, note: 'Slug URL duy nhất của album']
+  description varchar(2000) [note: 'Giới thiệu nội dung, thông điệp album']
+  status varchar(30) [not null, default: 'DRAFT', note: 'DRAFT | PUBLISHED | UNPUBLISHED']
+  cover_url varchar(2048) [note: 'Đường dẫn ảnh bìa album (Cloudinary)']
+  cover_public_id varchar(255) [note: 'Public ID ảnh bìa Cloudinary']
+  release_date date [note: 'Ngày phát hành chính thức']
+  published_at timestamp [note: 'Thời điểm công khai trên SoundWave']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Tập hợp các bài hát được phát hành theo dạng Album phòng thu hoặc EP'
+}
+
+Table tracks {
+  track_id bigint [pk, increment]
+  uploader_user_id bigint [not null, note: 'FK -> users.user_id (Nghệ sĩ hoặc tác giả tải lên)']
+  album_id bigint [note: 'FK -> albums.album_id (Thuộc album nào, có thể NULL nếu là Single lẻ)']
+  genre_id bigint [not null, note: 'FK -> genres.genre_id (Dòng nhạc chính)']
+  title varchar(200) [not null, note: 'Tên bài hát']
+  slug varchar(220) [unique, not null, note: 'Slug URL duy nhất của bài hát']
+  description varchar(2000) [note: 'Mô tả, ghi chú sản xuất âm nhạc']
+  track_number integer [note: 'Số thứ tự bài trong album']
+  duration_ms integer [not null, note: 'Thời lượng bài hát tính theo mili-giây']
+  audio_url varchar(2048) [note: 'Đường dẫn tệp âm thanh lossless/MP3 (Cloudinary)']
+  audio_public_id varchar(255) [note: 'Public ID âm thanh Cloudinary']
+  audio_format varchar(20) [not null, default: 'mp3', note: 'Định dạng âm thanh: mp3, flac, wav']
+  cover_url varchar(2048) [note: 'Đường dẫn ảnh bìa riêng của bài hát (Cloudinary)']
+  cover_public_id varchar(255) [note: 'Public ID ảnh bìa Cloudinary']
+  publication_status varchar(30) [not null, default: 'DRAFT', note: 'DRAFT | PENDING | PUBLISHED | REJECTED | TAKEN_DOWN']
+  play_count_cache bigint [not null, default: 0, note: 'Bộ đệm tổng số lượt nghe']
+  latest_rejection_reason varchar(1000) [note: 'Lý do từ chối kiểm duyệt gần nhất (nếu có)']
+  approved_at timestamp [note: 'Thời điểm được Staff phê duyệt']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Bản ghi âm thanh và metadata bài hát (đã tách hoàn toàn trường lyric sang bảng riêng)'
+}
+
+Table track_submissions {
+  submission_id bigint [pk, increment]
+  track_id bigint [not null, note: 'FK -> tracks.track_id']
+  submitted_by_user_id bigint [not null, note: 'FK -> users.user_id (Nghệ sĩ gửi duyệt)']
+  reviewer_staff_id bigint [note: 'FK -> staffs.staff_id (Nhân viên kiểm duyệt)']
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING | APPROVED | REJECTED']
+  submitter_note varchar(2000) [note: 'Ghi chú của người gửi duyệt']
+  reviewer_note varchar(2000) [note: 'Đánh giá/nhận xét của kiểm duyệt viên']
+  rejection_reason varchar(1000) [note: 'Lý do từ chối nếu không đạt chuẩn']
+  submitted_at timestamp [not null, default: `now()`]
+  reviewed_at timestamp [note: 'Thời điểm phê duyệt hoặc từ chối']
+
+  Note: 'Lịch sử và tiến trình kiểm duyệt bài hát trước khi được phát hành công khai'
+}
+
+Table content_reports {
+  report_id bigint [pk, increment]
+  track_id bigint [note: 'FK -> tracks.track_id (Bài hát bị báo cáo)']
+  submitted_by_user_id bigint [note: 'FK -> users.user_id (Người gửi báo cáo)']
+  handled_by_user_id bigint [note: 'FK -> staffs.staff_id (Nhân viên giải quyết)']
+  category varchar(50) [note: 'Danh mục vi phạm (Bản quyền, Ngôn từ kích động, Sai thông tin...)']
+  description text [note: 'Mô tả chi tiết vi phạm']
+  status varchar(50) [not null, default: 'PENDING', note: 'PENDING | RESOLVED | REJECTED']
+  resolution_note text [note: 'Ghi chú biện pháp xử lý của Staff']
+  created_at timestamp [default: `now()`'']
+  handled_at timestamp [note: 'Thời điểm xử lý báo cáo']
+  updated_at timestamp [default: `now()`'']
+
+  Note: 'Báo cáo vi phạm nội dung âm nhạc hoặc lời bài hát từ cộng đồng người nghe'
+}
+
+Table official_lyrics {
+  official_lyric_id bigint [pk, increment]
+  track_id bigint [unique, not null, note: 'FK -> tracks.track_id (Quan hệ 1-1: Mỗi track có tối đa 1 lyric chính thức)']
+  lyric_content text [not null, note: 'Nội dung lời bài hát chuẩn (hỗ trợ định dạng LRC timestamps karaoke)']
+  status varchar(30) [not null, default: 'PUBLISHED', note: 'DRAFT | PUBLISHED | ARCHIVED']
+  created_by_user_id bigint [note: 'FK -> staffs.staff_id (Nhân viên hoặc Admin biên tập lời)']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Lời bài hát chính thức được kiểm duyệt, đồng bộ chạy chữ cho người nghe'
+}
+
+Table personal_lyrics {
+  personal_lyric_id bigint [pk, increment]
+  track_id bigint [not null, note: 'FK -> tracks.track_id (Bài hát áp dụng lyric cá nhân)']
+  user_id bigint [not null, note: 'FK -> users.user_id (Người dùng tự viết lời cá nhân)']
+  lyric_content text [not null, note: 'Nội dung lời ghi chú hoặc bản dịch riêng']
+  lyric_type varchar(20) [not null, default: 'CUSTOM', note: 'CUSTOM (tùy biến) | TRANSLATION (bản dịch cá nhân)']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Lời bài hát cá nhân do từng thính giả tự lưu cho riêng mình'
+}
+
+// ======================================================================================
+// 4. SOCIAL & USER INTERACTIONS
+// ======================================================================================
+
+Table playlists {
+  playlist_id bigint [pk, increment]
+  owner_user_id bigint [not null, note: 'FK -> users.user_id (Chủ sở hữu danh sách phát)']
+  created_by_user_id bigint [not null, note: 'FK -> users.user_id (Người khởi tạo)']
+  title varchar(150) [not null, note: 'Tiêu đề playlist']
+  name varchar(150) [not null, note: 'Tên hiển thị của playlist']
+  slug varchar(180) [unique, not null, note: 'Slug URL duy nhất của playlist']
+  description varchar(2000) [note: 'Mô tả chủ đề danh sách phát']
+  cover_url varchar(2048) [note: 'Ảnh đại diện playlist (Cloudinary)']
+  cover_public_id varchar(255) [note: 'Public ID ảnh Cloudinary']
+  is_private boolean [not null, default: false, note: 'Trạng thái riêng tư']
+  visibility varchar(30) [not null, default: 'PUBLIC', note: 'PUBLIC | PRIVATE | UNLISTED']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Note: 'Danh sách phát nhạc do người dùng tự tạo và sắp xếp'
+}
+
+Table playlist_tracks {
+  playlist_track_id bigint [pk, increment]
+  playlist_id bigint [not null, note: 'FK -> playlists.playlist_id']
+  track_id bigint [not null, note: 'FK -> tracks.track_id']
+  added_by_user_id bigint [not null, note: 'FK -> users.user_id (Người thêm bài)']
+  position integer [not null, note: 'Thứ tự phát của bài hát trong playlist']
+  added_at timestamp [not null, default: `now()`]
+
+  indexes {
+    (playlist_id, track_id) [unique, name: 'uk_playlist_track']
+  }
+
+  Note: 'Bảng trung gian liên kết bài hát vào playlist theo thứ tự sắp xếp'
+}
+
+Table favorites {
+  track_id bigint [not null, note: 'FK -> tracks.track_id']
+  user_id bigint [not null, note: 'FK -> users.user_id']
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    (track_id, user_id) [pk]
+  }
+
+  Note: 'Danh sách bài hát yêu thích (thả tim) của người dùng'
+}
+
+Table listening_history {
+  history_id bigint [pk, increment]
+  user_id bigint [not null, note: 'FK -> users.user_id']
+  track_id bigint [not null, note: 'FK -> tracks.track_id']
+  listened_duration_ms integer [not null, note: 'Thời lượng thực tế đã nghe (ms)']
+  completed boolean [not null, default: false, note: 'Đã nghe hết bài hay chưa (>80%)']
+  played_at timestamp [not null, default: `now()`]
+
+  Note: 'Nhật ký lịch sử nghe nhạc phục vụ tiếp tục nghe và thuật toán gợi ý'
+}
+
+Table notifications {
+  notification_id bigint [pk, increment]
+  user_id bigint [note: 'FK -> users.user_id (Người nhận thông báo)']
+  staff_id bigint [note: 'FK -> staffs.staff_id (Nếu thông báo gửi tới nhân viên)']
+  actor_id bigint [note: 'FK -> users.user_id (Người gây ra hành động)']
+  title varchar(150) [not null, note: 'Tiêu đề thông báo']
+  message varchar(500) [not null, note: 'Nội dung chi tiết']
+  type varchar(50) [not null, note: 'TRACK_APPROVED | TRACK_REJECTED | TRACK_SUBMISSION | CONTENT_REPORT | SYSTEM_NOTICE...']
+  reference_id varchar(100) [note: 'ID của đối tượng liên quan (track_id, report_id, ...)']
+  reference_type varchar(50) [note: 'Kiểu đối tượng liên quan: TRACK, ALBUM, USER']
+  is_read boolean [not null, default: false, note: 'Đã đọc hay chưa']
+  created_at timestamp [not null, default: `now()`]
+
+  Note: 'Hệ thống thông báo thông minh trong ứng dụng cho User và Staff'
+}
+
+// ======================================================================================
+// 5. RELATIONSHIPS (FOREIGN KEYS & CARDINALITY)
+// ======================================================================================
+
+// --- User Profile (1 - 1) ---
+Ref: user_profiles.user_id - users.user_id
+
+// --- User Tokens (1 - N) ---
+Ref: email_verification_tokens.user_id > users.user_id
+Ref: password_reset_tokens.user_id > users.user_id
+Ref: account_unlock_tokens.user_id > users.user_id
+Ref: refresh_tokens.user_id > users.user_id
+Ref: refresh_tokens.staff_id > staffs.staff_id
+
+// --- Staff Roles & Management (1 - N) ---
+Ref: staffs.role_id > staff_roles.role_id
+
+// --- Music Catalog Relationships ---
+Ref: albums.created_by_user_id > users.user_id
+Ref: tracks.uploader_user_id > users.user_id
+Ref: tracks.genre_id > genres.genre_id
+Ref: tracks.album_id > albums.album_id
+Ref: genres.created_by_user_id > users.user_id
+
+// --- Track Submissions & Moderation ---
+Ref: track_submissions.track_id > tracks.track_id
+Ref: track_submissions.submitted_by_user_id > users.user_id
+Ref: track_submissions.reviewer_staff_id > staffs.staff_id
+
+// --- Content Reports ---
+Ref: content_reports.track_id > tracks.track_id
+Ref: content_reports.submitted_by_user_id > users.user_id
+Ref: content_reports.handled_by_user_id > staffs.staff_id
+
+// --- Lyrics Architecture (Dual-Tier) ---
+Ref: official_lyrics.track_id - tracks.track_id [delete: cascade] // 1-1: Mỗi track có đúng 1 lời chính thức
+Ref: official_lyrics.created_by_user_id > staffs.staff_id
+Ref: personal_lyrics.track_id > tracks.track_id [delete: cascade]
+Ref: personal_lyrics.user_id > users.user_id [delete: cascade]
+
+// --- Social & Playlist Relationships ---
+Ref: playlists.owner_user_id > users.user_id
+Ref: playlists.created_by_user_id > users.user_id
+Ref: playlist_tracks.playlist_id > playlists.playlist_id [delete: cascade]
+Ref: playlist_tracks.track_id > tracks.track_id [delete: cascade]
+Ref: playlist_tracks.added_by_user_id > users.user_id
+
+// --- Interactions ---
+Ref: favorites.track_id > tracks.track_id [delete: cascade]
+Ref: favorites.user_id > users.user_id [delete: cascade]
+Ref: listening_history.track_id > tracks.track_id [delete: cascade]
+Ref: listening_history.user_id > users.user_id [delete: cascade]
+Ref: notifications.user_id > users.user_id [delete: cascade]
+Ref: notifications.staff_id > staffs.staff_id [delete: cascade]
+
+// ======================================================================================
+// 6. VISUAL TABLE GROUPS (Hiển thị phân vùng đẹp mắt trên dbdiagram.io)
+// ======================================================================================
+
+TableGroup Authentication_and_Users [color: #0284C7] {
+  users
+  user_profiles
+  refresh_tokens
+  email_verification_tokens
+  password_reset_tokens
+  account_unlock_tokens
+}
+
+TableGroup Staff_and_Governance [color: #EA580C] {
+  staff_roles
+  staffs
+}
+
+TableGroup Music_Catalog_and_Lyrics [color: #10B981] {
+  genres
+  albums
+  tracks
+  track_submissions
+  content_reports
+  official_lyrics
+  personal_lyrics
+}
+
+TableGroup Social_and_Interactions [color: #D4A373] {
+  playlists
+  playlist_tracks
+  favorites
+  listening_history
+  notifications
+}
