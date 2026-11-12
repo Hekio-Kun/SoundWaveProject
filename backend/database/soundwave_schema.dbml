@@ -264,18 +264,18 @@ Table playlists {
 }
 
 Table playlist_tracks {
-  playlist_track_id bigint [pk, increment]
-  playlist_id bigint [not null, note: 'FK -> playlists.playlist_id']
-  track_id bigint [not null, note: 'FK -> tracks.track_id']
+  playlist_id bigint [not null, note: 'FK -> playlists.playlist_id (Phần 1 khóa chính tổng hợp)']
+  track_id bigint [not null, note: 'FK -> tracks.track_id (Phần 2 khóa chính tổng hợp)']
   added_by_user_id bigint [not null, note: 'FK -> users.user_id (Người thêm bài)']
   position integer [not null, note: 'Thứ tự phát của bài hát trong playlist']
-  added_at timestamp [not null, default: `now()`]
+  added_at timestamp [not null, default: 
+ow()]
 
   indexes {
-    (playlist_id, track_id) [unique, name: 'uk_playlist_track']
+    (playlist_id, track_id) [pk]
   }
 
-  Note: 'Bảng trung gian liên kết bài hát vào playlist theo thứ tự sắp xếp'
+  Note: 'Thực thể yếu (Weak Entity / Bảng trung gian) liên kết bài hát vào playlist theo thứ tự sắp xếp'
 }
 
 Table favorites {

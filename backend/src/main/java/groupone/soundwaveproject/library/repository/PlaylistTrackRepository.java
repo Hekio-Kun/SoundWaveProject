@@ -1,6 +1,7 @@
 package groupone.soundwaveproject.library.repository;
 
 import groupone.soundwaveproject.library.entity.PlaylistTrack;
+import groupone.soundwaveproject.library.entity.PlaylistTrackId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface PlaylistTrackRepository extends JpaRepository<PlaylistTrack, Long> {
+public interface PlaylistTrackRepository extends JpaRepository<PlaylistTrack, PlaylistTrackId> {
 
     List<PlaylistTrack> findByPlaylist_IdOrderByPositionAsc(Long playlistId);
 
