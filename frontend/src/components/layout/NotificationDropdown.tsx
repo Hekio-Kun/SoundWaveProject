@@ -37,7 +37,7 @@ function formatRelativeTime(dateString: string): string {
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return dateString;
   }

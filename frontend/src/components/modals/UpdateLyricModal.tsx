@@ -14,6 +14,7 @@ import {
 } from "../../icons";
 import type { StudioTrack } from "../../types";
 import { readLyricsFile, validateLyricsFile } from "../../utils/trackUpload";
+import { formatDate } from "../../utils/dateUtils";
 import { LyricSyncTab } from "../common/LyricSyncTab";
 
 type TrackLike = ApiTrack | StudioTrack;
@@ -387,7 +388,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
                     <div>
                       <strong>A lyric update is currently pending Staff review.</strong>
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#B45309" }}>
-                        Submitted on {new Date(pendingSubmission.submittedAt).toLocaleDateString()}. You can withdraw to edit.
+                        Submitted on {formatDate(pendingSubmission.submittedAt)}. You can withdraw to edit.
                       </p>
                     </div>
                   </div>

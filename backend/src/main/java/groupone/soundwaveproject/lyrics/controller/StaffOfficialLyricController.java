@@ -28,12 +28,12 @@ import java.security.Principal;
 import java.util.Map;
 
 /**
- * Controller quản lý lời bài hát chính thức dành riêng cho Staff và Admin (UC-26 / Section 6.4).
+ * Controller quản lý lời bài hát chính thức dành riêng cho Staff kiểm duyệt (UC-26 / Section 6.4).
  */
 @RestController
 @RequestMapping("/api/v1/staff/lyrics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+@PreAuthorize("hasRole('STAFF')")
 public class StaffOfficialLyricController {
 
     private final StaffOfficialLyricService staffOfficialLyricService;

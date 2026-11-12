@@ -712,6 +712,9 @@ body { overflow-x: hidden; }
 
 .notif-popover {
   width: min(390px, calc(100vw - 30px));
+  max-height: min(540px, calc(100vh - 90px));
+  display: flex;
+  flex-direction: column;
 }
 
 .notif-header {
@@ -723,6 +726,7 @@ body { overflow-x: hidden; }
   padding: 16px 18px;
   border-bottom: 1px solid #f0f2f5;
   background: linear-gradient(135deg, #f0fdff, #fff 65%, #fbf3e5);
+  flex-shrink: 0;
 }
 
 .popover-eyebrow {
@@ -767,6 +771,28 @@ body { overflow-x: hidden; }
   display: flex;
   flex-direction: column;
   padding: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.notif-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notif-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notif-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.notif-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.65);
 }
 
 .notif-item {
@@ -921,6 +947,7 @@ body { overflow-x: hidden; }
   background: #fafbfc;
   color: #98a2b3;
   font-size: 8px;
+  flex-shrink: 0;
 }
 
 .notif-footer span { display: flex; align-items: center; gap: 7px; }

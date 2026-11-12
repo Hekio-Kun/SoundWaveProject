@@ -33,7 +33,7 @@ function validate(form: FormState): FieldErrors {
 }
 
 const formatDate = (value: string | null) => value
-  ? new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(`${value}T00:00:00`))
+  ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T00:00:00`))
   : "Not provided";
 
 export function ProfilePage({ onProfileUpdated }: Props) {

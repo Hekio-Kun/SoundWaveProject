@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
+import { formatDateTime } from "../../utils/dateUtils";
 import type { RejectionDetails } from "../../api/track";
 import {
   AlertIcon,
@@ -222,7 +223,7 @@ export function RejectionDetailsModal({
                   marginTop: "3px",
                 }}
               >
-                Reviewed: {new Date(details.reviewedAt).toLocaleString()}
+                Reviewed: {formatDateTime(details.reviewedAt)}
               </small>
             )}
           </div>
@@ -368,7 +369,7 @@ export function RejectionDetailsModal({
                     </div>
                     {item.submittedAt && (
                       <div style={{ color: "#64748b", fontSize: "11px", marginBottom: "2px" }}>
-                        Submitted: {new Date(item.submittedAt).toLocaleString()}
+                        Submitted: {formatDateTime(item.submittedAt)}
                       </div>
                     )}
                     {item.rejectionReason && (

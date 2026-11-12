@@ -18,6 +18,7 @@ import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { formatDate } from "../utils/dateUtils";
 import {
   AlertIcon,
   CheckIcon,
@@ -224,7 +225,7 @@ export function StudioPage({
             : t.status,
           latestRejectionReason: t.latestRejectionReason,
           reviewerNote: t.reviewerNote,
-          createdAt: new Date(t.createdAt).toLocaleDateString(),
+          createdAt: formatDate(t.createdAt),
           lyrics: t.lyrics,
         }));
       setTrackList(mapped);
@@ -540,7 +541,7 @@ export function StudioPage({
                     </td>
                     <td>
                       <span style={{ fontSize: "13px", color: "var(--sw-text-muted, #64748b)" }}>
-                        {album.releaseDate || (album.createdAt ? new Date(album.createdAt).toLocaleDateString() : "—")}
+                        {formatDate(album.releaseDate || album.createdAt)}
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
@@ -1247,7 +1248,7 @@ export function StudioPage({
                         }}
                       >
                         <span>{album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}</span>
-                        <span>{album.releaseDate || (album.createdAt ? new Date(album.createdAt).toLocaleDateString() : "No release date")}</span>
+                        <span>{formatDate(album.releaseDate || album.createdAt, "No release date")}</span>
                       </div>
                     </div>
 
@@ -1270,7 +1271,7 @@ export function StudioPage({
 
                       <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>
-                          {album.releaseDate ? `Release: ${album.releaseDate}` : "No release date"}
+                          {album.releaseDate ? `Release: ${formatDate(album.releaseDate)}` : "No release date"}
                         </span>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {canSubmit && (

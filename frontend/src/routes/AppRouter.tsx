@@ -586,8 +586,8 @@ export function AppRouter(): React.ReactElement | null {
   }
 
 
-  if (pathname === "/staff/lyrics" || pathname === "/admin/lyrics") {
-    return user?.role === "STAFF" || user?.role === "ADMIN" ? (
+  if (pathname === "/staff/lyrics") {
+    return user?.role === "STAFF" ? (
       <StaffLyricsManagementPage />
     ) : (
       <DashboardAccessDenied onNavigate={navigate} requiredRole="Moderation Staff" />
