@@ -89,8 +89,8 @@ export function AppTopBar({
     const trimmed = searchKeyword.trim();
     if (!trimmed) {
       const hash = window.location.hash;
-      if (hash.includes("/search/") || hash.includes("/search?")) {
-        onNavigate("/search");
+      if (hash.includes("/search")) {
+        onNavigate("/");
       }
       return;
     }
@@ -150,10 +150,13 @@ export function AppTopBar({
   const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = searchKeyword.trim();
+    if (!trimmed) {
+      // User pressed enter without typing anything -> do nothing, stay on current page
+      return;
+    }
     if (trimmed.length < 2) {
       setSearchWarning("Please enter at least 2 characters to search");
       setTimeout(() => setSearchWarning(null), 3500);
-      onNavigate("/search");
       return;
     }
     setSearchWarning(null);
@@ -207,12 +210,6 @@ export function AppTopBar({
                 setSearchWarning(null);
               }
             }}
-            onFocus={() => {
-              if (!window.location.hash.includes("/search")) {
-                const trimmed = searchKeyword.trim();
-                onNavigate(trimmed.length >= 2 ? `/search/${encodeURIComponent(trimmed)}` : "/search");
-              }
-            }}
             placeholder="Artists, tracks, or your next favorite sound"
             aria-label="Search catalog"
             style={{
@@ -263,7 +260,10 @@ export function AppTopBar({
               onClick={() => {
                 setSearchKeyword("");
                 setSearchWarning(null);
-                onNavigate("/search");
+                const hash = window.location.hash;
+                if (hash.includes("/search")) {
+                  onNavigate("/");
+                }
               }}
               aria-label="Clear search keyword"
               style={{
