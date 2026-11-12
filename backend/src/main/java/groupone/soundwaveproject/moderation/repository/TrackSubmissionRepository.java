@@ -33,6 +33,7 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
     void deleteByTrackId(Long trackId);
 
     Optional<TrackSubmission> findFirstByTrackIdAndSubmissionTypeAndStatus(Long trackId, SubmissionType submissionType, SubmissionStatus status);
+    Optional<TrackSubmission> findFirstByTrackIdAndStatus(Long trackId, SubmissionStatus status);
     Optional<TrackSubmission> findFirstByTrackIdAndSubmissionTypeOrderBySubmittedAtDesc(Long trackId, SubmissionType submissionType);
 
     /**
@@ -80,18 +81,26 @@ public interface TrackSubmissionRepository extends JpaRepository<TrackSubmission
      * @param statuses        Tập hợp các trạng thái cần đếm (APPROVED, REJECTED)
      * @return Danh sách [reviewerUserId, count]
      */
-    @Query("SELECT s.reviewerUserId, COUNT(s) FROM TrackSubmission s WHERE s.reviewerUserId IN :reviewerUserIds AND s.status IN :statuses GROUP BY s.reviewerUserId")
+    @Query("SELECT s.reviewerStaffId, COUNT(s) FROM TrackSubmission s WHERE s.reviewerStaffId IN :reviewerUserIds AND s.status IN :statuses GROUP BY s.reviewerStaffId")
     java.util.List<Object[]> countByReviewerUserIdsAndStatusIn(
             @Param("reviewerUserIds") Collection<Long> reviewerUserIds,
             @Param("statuses") Collection<SubmissionStatus> statuses
     );
 
-    long countByReviewerUserIdAndStatusIn(Long reviewerUserId, Collection<SubmissionStatus> statuses);
+    long countByReviewerStaffIdAndStatusIn(Long reviewerStaffId, Collection<SubmissionStatus> statuses);
+
+    default long countByReviewerUserIdAndStatusIn(Long reviewerUserId, Collection<SubmissionStatus> statuses) {
+        return countByReviewerStaffIdAndStatusIn(reviewerUserId, statuses);
+    }
 
     /**
      * Lấy toàn bộ lịch sử các bài kiểm duyệt đã được xử lý bởi nhân viên (UC-27.4).
      */
-    List<TrackSubmission> findByReviewerUserIdOrderByReviewedAtDesc(Long reviewerUserId);
+    List<TrackSubmission> findByReviewerStaffIdOrderByReviewedAtDesc(Long reviewerStaffId);
+
+    default List<TrackSubmission> findByReviewerUserIdOrderByReviewedAtDesc(Long reviewerUserId) {
+        return findByReviewerStaffIdOrderByReviewedAtDesc(reviewerUserId);
+    }
 
     @Query("SELECT s FROM TrackSubmission s WHERE (:status IS NULL OR s.status = :status) " +
            "AND (:submissionType IS NULL OR s.submissionType = :submissionType) " +

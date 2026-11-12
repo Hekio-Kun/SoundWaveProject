@@ -111,5 +111,23 @@ public class DatabaseColumnRenameInitializer implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("DatabaseColumnRenameInitializer notice for 'playlist_tracks': {}", e.getMessage());
         }
+
+        // Cập nhật check constraint 'ck_albums_status' để hỗ trợ PENDING và REJECTED khi nộp kiểm duyệt
+        try {
+            jdbcTemplate.execute("ALTER TABLE albums DROP CONSTRAINT IF EXISTS ck_albums_status");
+            jdbcTemplate.execute("ALTER TABLE albums ADD CONSTRAINT ck_albums_status CHECK (status IN ('DRAFT', 'PENDING', 'PUBLISHED', 'REJECTED'))");
+            log.info("Updated check constraint 'ck_albums_status' to allow DRAFT, PENDING, PUBLISHED, REJECTED");
+        } catch (Exception e) {
+            log.warn("DatabaseColumnRenameInitializer notice for 'ck_albums_status': {}", e.getMessage());
+        }
+
+        // Cho phép NULL đối với official_lyrics.created_by_staff_id khi bài hát ở trạng thái DRAFT do Creator tải lên
+        try {
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics ALTER COLUMN created_by_staff_id DROP NOT NULL");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS official_lyrics DROP CONSTRAINT IF EXISTS official_lyrics_created_by_user_id_not_null");
+            log.info("Updated 'official_lyrics.created_by_staff_id' to allow NULL for creator draft uploads");
+        } catch (Exception e) {
+            log.warn("DatabaseColumnRenameInitializer notice for 'official_lyrics.created_by_staff_id': {}", e.getMessage());
+        }
     }
 }

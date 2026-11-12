@@ -24,6 +24,8 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, Lo
     /**
      * Lấy danh sách các báo cáo vi phạm do nhân viên xử lý (UC-27.4).
      */
+    List<ContentReport> findByHandledByStaffIdOrderByHandledAtDesc(Long handledByStaffId);
+
     List<ContentReport> findByReviewerIdOrderByResolvedAtDesc(Long reviewerId);
 
     long countByStatus(String status);

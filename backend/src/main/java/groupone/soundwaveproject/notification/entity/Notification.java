@@ -79,6 +79,18 @@ public class Notification {
     private String referenceId;
 
     /**
+     * Đường dẫn hành động điều hướng cho người nhận thông báo (RDS spec).
+     */
+    @Column(name = "action_url", length = 2048)
+    private String actionUrl;
+
+    /**
+     * Thời điểm thông báo được đánh dấu đã đọc theo UTC (RDS spec).
+     */
+    @Column(name = "read_at")
+    private Instant readAt;
+
+    /**
      * Trạng thái đã xem / đã đọc của thông báo (false: chưa đọc, true: đã đọc).
      */
     @Column(name = "is_read", nullable = false)
@@ -97,5 +109,10 @@ public class Notification {
      */
     public void markAsRead() {
         this.isRead = true;
+        this.readAt = Instant.now();
+    }
+
+    public boolean isRead() {
+        return isRead || readAt != null;
     }
 }

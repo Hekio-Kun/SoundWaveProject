@@ -50,20 +50,20 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
      * Cập nhật tất cả thông báo chưa đọc của người dùng thành đã đọc.
      */
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true WHERE n.userId = :userId AND n.isRead = false")
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.userId = :userId AND n.isRead = false")
     int markAllAsReadByUserId(@Param("userId") Long userId);
 
     /**
      * Cập nhật tất cả thông báo chưa đọc của nhân viên thành đã đọc.
      */
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true WHERE n.staffId = :staffId AND n.isRead = false")
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.staffId = :staffId AND n.isRead = false")
     int markAllAsReadByStaffId(@Param("staffId") Long staffId);
 
     /**
      * Cập nhật một thông báo cụ thể của người dùng thành đã đọc.
      */
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true WHERE n.id = :id AND n.userId = :userId")
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.id = :id AND n.userId = :userId")
     int markAsReadByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 }

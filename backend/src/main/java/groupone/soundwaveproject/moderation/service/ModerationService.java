@@ -855,7 +855,7 @@ public class ModerationService {
         }
 
         // 1. Lấy danh sách kiểm duyệt bài hát
-        List<TrackSubmission> submissions = submissionRepository.findByReviewerUserIdOrderByReviewedAtDesc(reviewerId);
+        List<TrackSubmission> submissions = submissionRepository.findByReviewerStaffIdOrderByReviewedAtDesc(reviewerId);
 
         Set<Long> trackIds = submissions.stream().map(TrackSubmission::getTrackId).collect(Collectors.toSet());
         Set<Long> submitterUserIds = submissions.stream().map(TrackSubmission::getSubmittedByUserId).collect(Collectors.toSet());
@@ -879,7 +879,7 @@ public class ModerationService {
         // 2. Lấy danh sách xử lý báo cáo vi phạm (Content Reports)
         List<ReportResolutionActivityResponse> reportResolutions = Collections.emptyList();
         if (contentReportRepository != null) {
-            List<ContentReport> reports = contentReportRepository.findByReviewerIdOrderByResolvedAtDesc(reviewerId);
+            List<ContentReport> reports = contentReportRepository.findByHandledByStaffIdOrderByHandledAtDesc(reviewerId);
             Set<Long> reportTrackIds = reports.stream()
                     .filter(r -> "TRACK".equalsIgnoreCase(r.getTargetType()) || "LYRICS".equalsIgnoreCase(r.getTargetType()))
                     .map(ContentReport::getTargetId)

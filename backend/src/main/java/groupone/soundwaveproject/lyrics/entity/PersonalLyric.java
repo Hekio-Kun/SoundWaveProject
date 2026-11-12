@@ -28,6 +28,10 @@ public class PersonalLyric {
     @JoinColumn(name = "track_id", nullable = false)
     private Track track;
 
+    @Column(name = "language_code", length = 10, nullable = false)
+    @Builder.Default
+    private String languageCode = "vi";
+
     @Column(name = "lyric_type", nullable = false, length = 20)
     @Builder.Default
     private String lyricType = "CUSTOM"; // "CUSTOM" or "TRANSLATION"

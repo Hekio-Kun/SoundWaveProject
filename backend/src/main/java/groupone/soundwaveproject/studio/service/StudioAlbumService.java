@@ -24,6 +24,7 @@ import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.entity.SubmissionStatus;
+import groupone.soundwaveproject.moderation.entity.SubmissionType;
 import groupone.soundwaveproject.moderation.entity.TrackSubmission;
 import groupone.soundwaveproject.moderation.repository.TrackSubmissionRepository;
 import groupone.soundwaveproject.studio.dto.request.AlbumTrackItemRequest;
@@ -605,13 +606,20 @@ public class StudioAlbumService {
             Track savedTrack = trackRepository.save(track);
             updatedTracks.add(savedTrack);
 
-            // 1.2.2.14.7 - 1.2.2.14.12: new TrackSubmission and save
-            TrackSubmission submission = TrackSubmission.builder()
-                    .trackId(savedTrack.getId())
-                    .submittedByUserId(user.getId())
-                    .status(SubmissionStatus.PENDING)
-                    .submitterNote("Album submission: " + album.getTitle())
-                    .build();
+            // 1.2.2.14.7 - 1.2.2.14.12: new or existing TrackSubmission and save (avoid ux_track_submissions_one_pending_per_track duplicate key)
+            TrackSubmission submission = trackSubmissionRepository
+                    .findFirstByTrackIdAndStatus(savedTrack.getId(), SubmissionStatus.PENDING)
+                    .orElseGet(() -> TrackSubmission.builder()
+                            .trackId(savedTrack.getId())
+                            .submittedByUserId(user.getId())
+                            .submissionType(SubmissionType.TRACK_RELEASE)
+                            .build()
+                    );
+            submission.setStatus(SubmissionStatus.PENDING);
+            submission.setSubmitterNote("Album submission: " + album.getTitle());
+            submission.setReviewerUserId(null);
+            submission.setReviewedAt(null);
+            submission.setRejectionReason(null);
             trackSubmissionRepository.save(submission);
         }
 

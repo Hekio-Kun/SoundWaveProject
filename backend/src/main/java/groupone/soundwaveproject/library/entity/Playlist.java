@@ -77,15 +77,77 @@ public class Playlist {
         this.playlistTracks = new ArrayList<>();
     }
 
+    public Long getOwnerUserId() {
+        return ownerUserId != null ? ownerUserId : createdByUserId;
+    }
+
+    public Long getCreatedByUserId() {
+        return ownerUserId != null ? ownerUserId : createdByUserId;
+    }
+
+    public void setOwnerUserId(Long userId) {
+        this.ownerUserId = userId;
+        this.createdByUserId = userId;
+    }
+
+    public void setCreatedByUserId(Long userId) {
+        this.ownerUserId = userId;
+        this.createdByUserId = userId;
+    }
+
+    public String getName() {
+        return name != null ? name : title;
+    }
+
+    public String getTitle() {
+        return name != null ? name : title;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+        this.title = name;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+        this.name = title;
+    }
+
+    public boolean isPrivate() {
+        if (visibility != null) {
+            return "PRIVATE".equalsIgnoreCase(visibility);
+        }
+        return isPrivate;
+    }
+
+    public void setVisibility(String visibility) {
+        this.visibility = visibility;
+        this.isPrivate = "PRIVATE".equalsIgnoreCase(visibility);
+    }
+
+    public void setPrivate(boolean isPrivate) {
+        this.isPrivate = isPrivate;
+        this.visibility = isPrivate ? "PRIVATE" : "PUBLIC";
+    }
+
     @PrePersist
     void initializeTimestamps() {
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (createdAt == null) createdAt = now;
         if (updatedAt == null) updatedAt = now;
+        if (ownerUserId == null && createdByUserId != null) ownerUserId = createdByUserId;
+        if (createdByUserId == null && ownerUserId != null) createdByUserId = ownerUserId;
+        if (name == null && title != null) name = title;
+        if (title == null && name != null) title = name;
+        if (visibility == null) visibility = isPrivate ? "PRIVATE" : "PUBLIC";
     }
 
     @PreUpdate
     void updateTimestamp() {
         updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+        if (ownerUserId == null && createdByUserId != null) ownerUserId = createdByUserId;
+        if (createdByUserId == null && ownerUserId != null) createdByUserId = ownerUserId;
+        if (name == null && title != null) name = title;
+        if (title == null && name != null) title = name;
     }
 }

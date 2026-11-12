@@ -28,13 +28,36 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class LyricService {
 
     private final OfficialLyricRepository officialLyricRepository;
     private final PersonalLyricRepository personalLyricRepository;
     private final TrackRepository trackRepository;
     private final UserRepository userRepository;
+    private groupone.soundwaveproject.authentication.repository.StaffRepository staffRepository;
+
+    public LyricService(OfficialLyricRepository officialLyricRepository,
+                        PersonalLyricRepository personalLyricRepository,
+                        TrackRepository trackRepository,
+                        UserRepository userRepository) {
+        this.officialLyricRepository = officialLyricRepository;
+        this.personalLyricRepository = personalLyricRepository;
+        this.trackRepository = trackRepository;
+        this.userRepository = userRepository;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LyricService(OfficialLyricRepository officialLyricRepository,
+                        PersonalLyricRepository personalLyricRepository,
+                        TrackRepository trackRepository,
+                        UserRepository userRepository,
+                        groupone.soundwaveproject.authentication.repository.StaffRepository staffRepository) {
+        this.officialLyricRepository = officialLyricRepository;
+        this.personalLyricRepository = personalLyricRepository;
+        this.trackRepository = trackRepository;
+        this.userRepository = userRepository;
+        this.staffRepository = staffRepository;
+    }
 
     /**
      * Lấy bundle lời bài hát cho trang chi tiết track (bao gồm Official và Personal của user hiện tại).
@@ -274,6 +297,9 @@ public class LyricService {
         official.setLyricContent(trimmed);
         if (status != null && !status.isBlank()) {
             official.setStatus(status);
+        }
+        if (userId != null && official.getCreatedBy() == null && staffRepository != null) {
+            staffRepository.findById(userId).ifPresent(official::setCreatedBy);
         }
         official.setUpdatedAt(Instant.now());
 
