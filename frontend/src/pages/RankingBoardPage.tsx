@@ -31,6 +31,7 @@ const formatPlayCount = (count?: number): string => {
   return new Intl.NumberFormat("en-US").format(count) + (count === 1 ? " play" : " plays");
 };
 
+
 export function RankingBoardPage({
   currentTrack,
   playing,
@@ -43,6 +44,7 @@ export function RankingBoardPage({
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre ?? "all");
   const [genres, setGenres] = useState<Genre[]>([]);
   const [rankingTracks, setRankingTracks] = useState<LandingTrack[]>([]);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,11 +98,6 @@ export function RankingBoardPage({
     void fetchRanking();
   }, [fetchRanking]);
 
-  // Top 3 for Podium cards
-  const top1 = rankingTracks[0] ?? null;
-  const top2 = rankingTracks[1] ?? null;
-  const top3 = rankingTracks[2] ?? null;
-
   // Selected genre display name
   const currentGenreName = useMemo(() => {
     if (selectedGenre === "all") return "All Genres";
@@ -108,12 +105,28 @@ export function RankingBoardPage({
     return found ? found.name : selectedGenre.toUpperCase();
   }, [selectedGenre, genres]);
 
+  // Compute items with stable original rank
+  const rankedItems = useMemo(() => {
+    const base = rankingTracks.map((track, idx) => ({
+      track,
+      originalRank: idx + 1,
+    }));
+
+    if (sortOrder === "asc") {
+      // Sort từ dưới lên (Bottom-up: ít lượt nghe nhất lên nhiều nhất)
+      return [...base].reverse();
+    }
+    return base;
+  }, [rankingTracks, sortOrder]);
+
+  const displayedTracks = useMemo(() => rankedItems.map((item) => item.track), [rankedItems]);
+
   // Play All handler
   const handlePlayAll = () => {
-    if (rankingTracks.length > 0) {
+    if (displayedTracks.length > 0) {
       onPlayTrack(
-        rankingTracks[0],
-        rankingTracks,
+        displayedTracks[0],
+        displayedTracks,
         `Top Charts - ${currentGenreName}`,
         `ranking-${selectedGenre}`
       );
@@ -129,69 +142,58 @@ export function RankingBoardPage({
       {/* Hero Section */}
       <section
         style={{
-          background: "linear-gradient(135deg, #091e3a 0%, #0d3b66 60%, #175676 100%)",
-          borderRadius: 24,
-          padding: "36px 40px",
-          color: "#ffffff",
-          boxShadow: "0 16px 36px -12px rgba(13, 59, 102, 0.4)",
+          background: "linear-gradient(125deg, #e9fbff 0%, #fdfcf9 45%, #fbf3e5 100%)",
+          borderRadius: 22,
+          padding: "32px 36px",
+          border: "1px solid rgba(2, 132, 199, 0.12)",
+          boxShadow: "0 14px 40px rgba(16, 24, 40, 0.055)",
           position: "relative",
           overflow: "hidden",
-          marginBottom: 32,
+          marginBottom: 28,
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: -40,
-            right: -20,
-            opacity: 0.1,
-            pointerEvents: "none",
-            transform: "rotate(15deg)",
-          }}
-        >
-          <TrophyIcon width={280} height={280} />
-        </div>
-
         <div style={{ position: "relative", zIndex: 1, maxWidth: 680 }}>
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              background: "rgba(255, 255, 255, 0.15)",
-              backdropFilter: "blur(8px)",
-              padding: "6px 14px",
+              gap: 6,
+              background: "#e0f2fe",
+              color: "#0284c7",
+              padding: "4px 12px",
               borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              color: "#fbbf24",
-              marginBottom: 16,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              marginBottom: 12,
               textTransform: "uppercase",
             }}
           >
-            <FlameIcon width={16} height={16} />
+            <FlameIcon width={13} height={13} />
             <span>Official SoundWave Leaderboard</span>
           </div>
 
           <h1
+            className="page-heading"
             style={{
-              fontSize: "clamp(28px, 4vw, 42px)",
-              fontWeight: 900,
+              fontSize: "clamp(28px, 4vw, 38px)",
+              fontWeight: 800,
               lineHeight: 1.15,
-              margin: "0 0 12px 0",
-              letterSpacing: "-0.02em",
+              margin: "0 0 8px 0",
+              letterSpacing: "-0.03em",
+              color: "var(--brand, #0284c7)",
             }}
           >
             Top Charts
           </h1>
 
           <p
+            className="page-subtext"
             style={{
-              fontSize: 15,
-              color: "rgba(255, 255, 255, 0.8)",
-              margin: "0 0 24px 0",
-              lineHeight: 1.5,
+              fontSize: 14.5,
+              color: "#57534e",
+              margin: "0 0 20px 0",
+              lineHeight: 1.55,
               maxWidth: 580,
             }}
           >
@@ -200,26 +202,30 @@ export function RankingBoardPage({
 
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
             <button
-              className="button button-primary button-large"
+              className="button button-primary"
               onClick={handlePlayAll}
               disabled={rankingTracks.length === 0 || loading}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 8,
                 background: "#0284c7",
                 color: "#ffffff",
                 fontWeight: 700,
-                padding: "12px 24px",
+                fontSize: 14,
+                padding: "10px 22px",
                 borderRadius: 999,
-                boxShadow: "0 4px 14px rgba(2, 132, 199, 0.4)",
+                border: 0,
+                cursor: rankingTracks.length === 0 || loading ? "not-allowed" : "pointer",
+                boxShadow: "0 4px 12px rgba(2, 132, 199, 0.25)",
+                transition: "all 0.2s ease",
               }}
             >
-              <PlayIcon width={18} height={18} />
+              <PlayIcon width={16} height={16} />
               <span>Play Chart ({rankingTracks.length})</span>
             </button>
 
-            <span style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.7)", marginLeft: 4 }}>
+            <span style={{ fontSize: 13, color: "#8d877f", fontWeight: 500 }}>
               {rankingTracks.length > 0 ? `Showing top ${rankingTracks.length} tracks` : ""}
             </span>
           </div>
@@ -227,12 +233,12 @@ export function RankingBoardPage({
       </section>
 
       {/* Genre Filter Tabs (AF01) */}
-      <section style={{ marginBottom: 32 }}>
+      <section style={{ marginBottom: 28 }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: 8,
             overflowX: "auto",
             paddingBottom: 6,
             scrollbarWidth: "none",
@@ -241,15 +247,15 @@ export function RankingBoardPage({
           <button
             onClick={() => setSelectedGenre("all")}
             style={{
-              padding: "8px 18px",
+              padding: "7px 16px",
               borderRadius: 999,
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: 700,
               cursor: "pointer",
-              transition: "all 0.2s ease",
-              border: selectedGenre === "all" ? "1px solid #0284c7" : "1px solid #e2e8f0",
-              background: selectedGenre === "all" ? "#0284c7" : "#ffffff",
-              color: selectedGenre === "all" ? "#ffffff" : "#475569",
+              transition: "all 0.15s ease",
+              border: selectedGenre === "all" ? "1px solid #0284c7" : "1px solid #e8dccb",
+              background: selectedGenre === "all" ? "#0284c7" : "#fbf4ea",
+              color: selectedGenre === "all" ? "#ffffff" : "#785028",
               boxShadow: selectedGenre === "all" ? "0 4px 12px rgba(2, 132, 199, 0.25)" : "none",
               whiteSpace: "nowrap",
             }}
@@ -264,15 +270,15 @@ export function RankingBoardPage({
                 key={g.id || g.slug}
                 onClick={() => setSelectedGenre(g.slug)}
                 style={{
-                  padding: "8px 18px",
+                  padding: "7px 16px",
                   borderRadius: 999,
-                  fontSize: 13.5,
+                  fontSize: 13,
                   fontWeight: 700,
                   cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  border: active ? "1px solid #0284c7" : "1px solid #e2e8f0",
-                  background: active ? "#0284c7" : "#ffffff",
-                  color: active ? "#ffffff" : "#475569",
+                  transition: "all 0.15s ease",
+                  border: active ? "1px solid #0284c7" : "1px solid #e8dccb",
+                  background: active ? "#0284c7" : "#fbf4ea",
+                  color: active ? "#ffffff" : "#785028",
                   boxShadow: active ? "0 4px 12px rgba(2, 132, 199, 0.25)" : "none",
                   whiteSpace: "nowrap",
                 }}
@@ -286,32 +292,12 @@ export function RankingBoardPage({
 
       {/* Loading Skeleton */}
       {loading && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 20,
-              marginBottom: 24,
-            }}
-          >
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: 180,
-                  background: "#f1f5f9",
-                  borderRadius: 18,
-                  animation: "pulse 1.5s infinite ease-in-out",
-                }}
-              />
-            ))}
-          </div>
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <div
               key={i}
               style={{
-                height: 60,
+                height: 56,
                 background: "#f8fafc",
                 borderRadius: 12,
                 animation: "pulse 1.5s infinite ease-in-out",
@@ -408,433 +394,72 @@ export function RankingBoardPage({
 
       {/* Ranking Board Content */}
       {!loading && !error && rankingTracks.length > 0 && (
-        <>
-          {/* Top 3 Podium Highlights */}
-          {top1 && (
-            <section style={{ marginBottom: 40 }}>
-              <h2
-                style={{
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  marginBottom: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <span>Podium Highlights</span>
-              </h2>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                  gap: 20,
-                  alignItems: "stretch",
-                }}
-              >
-                {/* #1 Champion */}
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
-                    border: "2px solid #fde68a",
-                    borderRadius: 20,
-                    padding: 22,
-                    position: "relative",
-                    boxShadow: "0 10px 25px -5px rgba(245, 158, 11, 0.2)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                    <div
-                      style={{
-                        position: "relative",
-                        width: 90,
-                        height: 90,
-                        borderRadius: 14,
-                        overflow: "hidden",
-                        flexShrink: 0,
-                        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.12)",
-                      }}
-                    >
-                      <img
-                        src={top1.coverUrl || "/placeholder-album.png"}
-                        alt={top1.title}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                      <button
-                        onClick={() =>
-                          onPlayTrack(
-                            top1,
-                            rankingTracks,
-                            `Top Charts - ${currentGenreName}`,
-                            `ranking-${selectedGenre}`
-                          )
-                        }
-                        aria-label={`Play #1 ${top1.title}`}
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "rgba(0, 0, 0, 0.4)",
-                          border: 0,
-                          display: "grid",
-                          placeItems: "center",
-                          color: "#ffffff",
-                          cursor: "pointer",
-                          opacity: isCurrentTrackPlaying(top1.id) ? 1 : 0.85,
-                          transition: "opacity 0.2s",
-                        }}
-                      >
-                        {isCurrentTrackPlaying(top1.id) ? (
-                          <PauseIcon width={24} height={24} />
-                        ) : (
-                          <PlayIcon width={24} height={24} />
-                        )}
-                      </button>
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          background: "#f59e0b",
-                          color: "#ffffff",
-                          fontSize: 11,
-                          fontWeight: 800,
-                          padding: "3px 10px",
-                          borderRadius: 999,
-                          marginBottom: 8,
-                        }}
-                      >
-                        🥇 #1 CHAMPION
-                      </div>
-
-                      <h3
-                        onClick={() => onNavigate(`/track/${top1.id}`)}
-                        style={{
-                          fontSize: 17,
-                          fontWeight: 800,
-                          color: "#78350f",
-                          margin: "0 0 4px 0",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                        title={top1.title}
-                      >
-                        {top1.title}
-                      </h3>
-
-                      <p
-                        onClick={() => onNavigate(`/creator/${top1.creator.userId}`)}
-                        style={{
-                          fontSize: 13,
-                          color: "#92400e",
-                          margin: "0 0 10px 0",
-                          cursor: "pointer",
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {top1.creator.displayName}
-                      </p>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#b45309", fontWeight: 700 }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <FlameIcon width={14} height={14} />
-                          {formatPlayCount(top1.playCount)}
-                        </span>
-                        <span>•</span>
-                        <span>{formatDuration(top1.durationMs)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* #2 Runner Up */}
-                {top2 && (
-                  <div
-                    style={{
-                      background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-                      border: "2px solid #cbd5e1",
-                      borderRadius: 20,
-                      padding: 22,
-                      boxShadow: "0 8px 20px -5px rgba(100, 116, 139, 0.15)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <div
-                        style={{
-                          position: "relative",
-                          width: 80,
-                          height: 80,
-                          borderRadius: 14,
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-                        }}
-                      >
-                        <img
-                          src={top2.coverUrl || "/placeholder-album.png"}
-                          alt={top2.title}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                        <button
-                          onClick={() =>
-                            onPlayTrack(
-                              top2,
-                              rankingTracks,
-                              `Top Charts - ${currentGenreName}`,
-                              `ranking-${selectedGenre}`
-                            )
-                          }
-                          aria-label={`Play #2 ${top2.title}`}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            background: "rgba(0, 0, 0, 0.4)",
-                            border: 0,
-                            display: "grid",
-                            placeItems: "center",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            opacity: isCurrentTrackPlaying(top2.id) ? 1 : 0.85,
-                            transition: "opacity 0.2s",
-                          }}
-                        >
-                          {isCurrentTrackPlaying(top2.id) ? (
-                            <PauseIcon width={22} height={22} />
-                          ) : (
-                            <PlayIcon width={22} height={22} />
-                          )}
-                        </button>
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            background: "#64748b",
-                            color: "#ffffff",
-                            fontSize: 11,
-                            fontWeight: 800,
-                            padding: "3px 10px",
-                            borderRadius: 999,
-                            marginBottom: 8,
-                          }}
-                        >
-                          🥈 #2 RUNNER-UP
-                        </div>
-
-                        <h3
-                          onClick={() => onNavigate(`/track/${top2.id}`)}
-                          style={{
-                            fontSize: 16,
-                            fontWeight: 800,
-                            color: "#1e293b",
-                            margin: "0 0 4px 0",
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                          title={top2.title}
-                        >
-                          {top2.title}
-                        </h3>
-
-                        <p
-                          onClick={() => onNavigate(`/creator/${top2.creator.userId}`)}
-                          style={{
-                            fontSize: 12.5,
-                            color: "#475569",
-                            margin: "0 0 8px 0",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {top2.creator.displayName}
-                        </p>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "#64748b", fontWeight: 600 }}>
-                          <span>{formatPlayCount(top2.playCount)}</span>
-                          <span>•</span>
-                          <span>{formatDuration(top2.durationMs)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* #3 Bronze */}
-                {top3 && (
-                  <div
-                    style={{
-                      background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
-                      border: "2px solid #fed7aa",
-                      borderRadius: 20,
-                      padding: 22,
-                      boxShadow: "0 8px 20px -5px rgba(234, 88, 12, 0.15)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <div
-                        style={{
-                          position: "relative",
-                          width: 80,
-                          height: 80,
-                          borderRadius: 14,
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-                        }}
-                      >
-                        <img
-                          src={top3.coverUrl || "/placeholder-album.png"}
-                          alt={top3.title}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                        <button
-                          onClick={() =>
-                            onPlayTrack(
-                              top3,
-                              rankingTracks,
-                              `Top Charts - ${currentGenreName}`,
-                              `ranking-${selectedGenre}`
-                            )
-                          }
-                          aria-label={`Play #3 ${top3.title}`}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            background: "rgba(0, 0, 0, 0.4)",
-                            border: 0,
-                            display: "grid",
-                            placeItems: "center",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            opacity: isCurrentTrackPlaying(top3.id) ? 1 : 0.85,
-                            transition: "opacity 0.2s",
-                          }}
-                        >
-                          {isCurrentTrackPlaying(top3.id) ? (
-                            <PauseIcon width={22} height={22} />
-                          ) : (
-                            <PlayIcon width={22} height={22} />
-                          )}
-                        </button>
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            background: "#ea580c",
-                            color: "#ffffff",
-                            fontSize: 11,
-                            fontWeight: 800,
-                            padding: "3px 10px",
-                            borderRadius: 999,
-                            marginBottom: 8,
-                          }}
-                        >
-                          🥉 #3 BRONZE
-                        </div>
-
-                        <h3
-                          onClick={() => onNavigate(`/track/${top3.id}`)}
-                          style={{
-                            fontSize: 16,
-                            fontWeight: 800,
-                            color: "#9a3412",
-                            margin: "0 0 4px 0",
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                          title={top3.title}
-                        >
-                          {top3.title}
-                        </h3>
-
-                        <p
-                          onClick={() => onNavigate(`/creator/${top3.creator.userId}`)}
-                          style={{
-                            fontSize: 12.5,
-                            color: "#c2410c",
-                            margin: "0 0 8px 0",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {top3.creator.displayName}
-                        </p>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "#ea580c", fontWeight: 600 }}>
-                          <span>{formatPlayCount(top3.playCount)}</span>
-                          <span>•</span>
-                          <span>{formatDuration(top3.durationMs)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* Full Leaderboard Table */}
-          <section>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 16,
-              }}
-            >
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>
+        <section>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1c1917", margin: "0 0 4px 0" }}>
                 Leaderboard Rankings
               </h2>
-              <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>
-                Sorted by Total Plays & Fresh Releases
+              <span style={{ fontSize: 13, color: "#57534e", fontWeight: 600 }}>
+                {sortOrder === "desc"
+                  ? `Top to Bottom (#1 → #${rankingTracks.length}) • Highest to lowest plays`
+                  : `Bottom Up (#${rankingTracks.length} → #1) • Lowest to highest plays`}
               </span>
             </div>
 
-            <div
+            {/* Sort Order Toggle Button (Bottom-Up vs Top-to-Bottom) */}
+            <button
+              onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
               style={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 18,
-                overflow: "hidden",
-                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.03)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "8px 16px",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+                border: sortOrder === "asc" ? "1px solid #0284c7" : "1px solid #e8dccb",
+                background: sortOrder === "asc" ? "#0284c7" : "#ffffff",
+                color: sortOrder === "asc" ? "#ffffff" : "#475569",
+                transition: "all 0.15s ease",
+                boxShadow: sortOrder === "asc" ? "0 4px 12px rgba(2, 132, 199, 0.25)" : "0 1px 3px rgba(0, 0, 0, 0.04)",
               }}
+              title={
+                sortOrder === "desc"
+                  ? "Bấm để đổi sang sắp xếp từ dưới lên (Bottom-up: ít lượt nghe nhất lên đầu)"
+                  : "Bấm để quay về sắp xếp chuẩn từ trên xuống (Top-down: #1 lên đầu)"
+              }
             >
+              <span style={{ fontSize: 13, fontWeight: 900 }}>
+                {sortOrder === "desc" ? "⬇" : "⬆"}
+              </span>
+              <span>
+                {sortOrder === "desc"
+                  ? `Sort: Top to Bottom (#1 → #${rankingTracks.length})`
+                  : `Sort: Bottom Up (#${rankingTracks.length} → #1)`}
+              </span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #e8dccb",
+              borderRadius: 18,
+              overflow: "hidden",
+              boxShadow: "0 4px 20px rgba(16, 24, 40, 0.04)",
+            }}
+          >
               {/* Header row */}
               <div
                 style={{
@@ -852,19 +477,52 @@ export function RankingBoardPage({
                   background: "#f8fafc",
                 }}
               >
-                <span style={{ textAlign: "center" }}>Rank</span>
+                <div
+                  onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                    cursor: "pointer",
+                    userSelect: "none",
+                    color: "#0f172a",
+                  }}
+                  title="Click to toggle rank sort order"
+                >
+                  <span>Rank</span>
+                  <span style={{ fontSize: 11, color: "#0284c7" }}>
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </span>
+                </div>
                 <span>Track</span>
                 <span>Title & Artist</span>
                 <span>Genre / Album</span>
-                <span style={{ textAlign: "right" }}>Plays</span>
+                <div
+                  onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 4,
+                    cursor: "pointer",
+                    userSelect: "none",
+                    color: "#0f172a",
+                  }}
+                  title="Click to toggle plays sort order"
+                >
+                  <span>Plays</span>
+                  <span style={{ fontSize: 11, color: "#0284c7" }}>
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </span>
+                </div>
                 <span style={{ textAlign: "right" }}>Time</span>
                 <span style={{ textAlign: "center" }}>Save</span>
               </div>
 
               {/* Rows */}
               <div>
-                {rankingTracks.map((track, idx) => {
-                  const rank = idx + 1;
+                {rankedItems.map(({ track, originalRank }, idx) => {
                   const isCurrent = currentTrack?.id === track.id;
                   const isPlaying = isCurrent && playing;
                   const isFavorited = favoriteIds.includes(track.id);
@@ -881,21 +539,21 @@ export function RankingBoardPage({
                     margin: "0 auto",
                   };
 
-                  if (rank === 1) {
+                  if (originalRank === 1) {
                     rankBadgeStyle = {
                       ...rankBadgeStyle,
                       background: "#fef3c7",
                       color: "#b45309",
                       border: "1px solid #fde68a",
                     };
-                  } else if (rank === 2) {
+                  } else if (originalRank === 2) {
                     rankBadgeStyle = {
                       ...rankBadgeStyle,
                       background: "#f1f5f9",
                       color: "#475569",
                       border: "1px solid #cbd5e1",
                     };
-                  } else if (rank === 3) {
+                  } else if (originalRank === 3) {
                     rankBadgeStyle = {
                       ...rankBadgeStyle,
                       background: "#ffedd5",
@@ -921,15 +579,13 @@ export function RankingBoardPage({
                         alignItems: "center",
                         gap: 12,
                         padding: "10px 18px",
-                        borderBottom: idx === rankingTracks.length - 1 ? 0 : "1px solid #f1f5f9",
+                        borderBottom: idx === rankedItems.length - 1 ? 0 : "1px solid #f1f5f9",
                         transition: "background 0.15s ease",
                       }}
                     >
                       {/* Rank Column */}
                       <div style={{ textAlign: "center" }}>
-                        <span style={rankBadgeStyle}>
-                          {rank === 1 ? "1" : rank === 2 ? "2" : rank === 3 ? "3" : rank}
-                        </span>
+                        <span style={rankBadgeStyle}>{originalRank}</span>
                       </div>
 
                       {/* Thumbnail & Quick Play */}
@@ -946,8 +602,8 @@ export function RankingBoardPage({
                         onClick={() =>
                           onPlayTrack(
                             track,
-                            rankingTracks,
-                            `Top Charts - ${currentGenreName}`,
+                            displayedTracks,
+                            `Top Charts - ${currentGenreName}${sortOrder === "asc" ? " (Bottom-Up)" : ""}`,
                             `ranking-${selectedGenre}`
                           )
                         }
@@ -967,8 +623,8 @@ export function RankingBoardPage({
                             e.stopPropagation();
                             onPlayTrack(
                               track,
-                              rankingTracks,
-                              `Top Charts - ${currentGenreName}`,
+                              displayedTracks,
+                              `Top Charts - ${currentGenreName}${sortOrder === "asc" ? " (Bottom-Up)" : ""}`,
                               `ranking-${selectedGenre}`
                             );
                           }}
@@ -1099,7 +755,6 @@ export function RankingBoardPage({
               </div>
             </div>
           </section>
-        </>
       )}
     </div>
   );
