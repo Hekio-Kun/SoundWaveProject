@@ -648,17 +648,19 @@ export function TrackDetailsPage({
               <ShareIcon />
             </button>
 
-            {/* Direct Report Track Action Button (UC-22.1) */}
-            <button
-              type="button"
-              className="track-round-action track-round-action--report"
-              disabled={submittingAction}
-              onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
-              title="Report Track"
-              aria-label="Report Track"
-            >
-              <FlagIcon width={18} height={18} />
-            </button>
+            {/* Direct Report Track Action Button (UC-22.1) - Chỉ hiển thị cho người dùng không phải tác giả của bài hát */}
+            {!isTrackCreator && (
+              <button
+                type="button"
+                className="track-round-action track-round-action--report"
+                disabled={submittingAction}
+                onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
+                title="Report Track"
+                aria-label="Report Track"
+              >
+                <FlagIcon width={18} height={18} />
+              </button>
+            )}
           </div>
           {actionMessage ? (
             <p className="track-action-message is-success" role="status">
@@ -1257,6 +1259,7 @@ export function TrackDetailsPage({
         trackTitle={track.title}
         trackArtist={track.creator?.displayName || "Unknown Creator"}
         trackCoverUrl={track.coverUrl}
+        isCreator={isTrackCreator}
         onSuccess={(msg) =>
           setNotification({
             open: true,

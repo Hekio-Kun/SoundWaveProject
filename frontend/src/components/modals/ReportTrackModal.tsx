@@ -12,6 +12,7 @@ export type ReportTrackModalProps = {
   trackArtist?: string;
   trackCoverUrl?: string | null;
   onSuccess: (message: string) => void;
+  isCreator?: boolean;
 };
 
 type ReasonOption = {
@@ -51,6 +52,7 @@ export function ReportTrackModal({
   trackArtist = "Unknown Artist",
   trackCoverUrl,
   onSuccess,
+  isCreator = false,
 }: ReportTrackModalProps) {
   const [selectedReason, setSelectedReason] = useState<ReportCategoryType | "">("");
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +82,11 @@ export function ReportTrackModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isCreator) {
+      setErrorMessage("You are the author of this track and cannot report your own content.");
+      return;
+    }
 
     // Validate that a reason option was selected
     if (!selectedReason) {
@@ -327,6 +334,33 @@ export function ReportTrackModal({
               </div>
             </div>
 
+            {/* Creator Alert Banner */}
+            {isCreator && (
+              <div
+                role="alert"
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  padding: "12px 14px",
+                  background: "#FEF3C7",
+                  border: "1px solid #FCD34D",
+                  borderRadius: "10px",
+                  color: "#92400E",
+                  fontSize: "0.875rem",
+                  marginBottom: "16px",
+                  lineHeight: 1.4,
+                }}
+              >
+                <span style={{ flexShrink: 0, marginTop: "2px" }}>
+                  <AlertIcon width={18} height={18} />
+                </span>
+                <span style={{ flex: 1 }}>
+                  You are the author of this track and cannot report your own content.
+                </span>
+              </div>
+            )}
+
             {/* Error / Alert Banner */}
             {errorMessage && (
               <div
@@ -499,21 +533,21 @@ export function ReportTrackModal({
             <button
               type="submit"
               className="button button-primary"
-              disabled={submitting || !selectedReason}
+              disabled={submitting || !selectedReason || isCreator}
               style={{
                 borderRadius: "10px",
                 padding: "8px 20px",
                 fontSize: "0.875rem",
                 fontWeight: 600,
-                backgroundColor: !selectedReason ? "#94A3B8" : "#0284C7",
-                borderColor: !selectedReason ? "#94A3B8" : "#0284C7",
+                backgroundColor: !selectedReason || isCreator ? "#94A3B8" : "#0284C7",
+                borderColor: !selectedReason || isCreator ? "#94A3B8" : "#0284C7",
                 color: "#FFFFFF",
-                cursor: submitting || !selectedReason ? "not-allowed" : "pointer",
+                cursor: submitting || !selectedReason || isCreator ? "not-allowed" : "pointer",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "8px",
                 minHeight: "38px",
-                boxShadow: !selectedReason ? "none" : "0 2px 6px rgba(2, 132, 199, 0.35)",
+                boxShadow: !selectedReason || isCreator ? "none" : "0 2px 6px rgba(2, 132, 199, 0.35)",
               }}
             >
               {submitting ? (
