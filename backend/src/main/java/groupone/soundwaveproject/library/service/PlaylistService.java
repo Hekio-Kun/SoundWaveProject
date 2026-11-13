@@ -122,6 +122,7 @@ public class PlaylistService {
         }
 
         String slug = generateUniqueSlug(trimmedTitle);
+        String initialCoverUrl = normalizeCoverUrl(request.coverUrl());
 
         Playlist playlist = Playlist.builder()
                 .ownerUserId(user.getId())
@@ -130,7 +131,8 @@ public class PlaylistService {
                 .name(trimmedTitle)
                 .slug(slug)
                 .description(request.description() != null ? request.description().trim() : null)
-                .coverUrl(request.coverUrl() != null && !request.coverUrl().isBlank() ? request.coverUrl().trim() : null)
+                .coverUrl(initialCoverUrl)
+                .coverPublicId(cloudMediaService.extractPublicIdFromUrl(initialCoverUrl))
                 .visibility("PRIVATE")
                 .isPrivate(true)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
@@ -173,13 +175,25 @@ public class PlaylistService {
         playlist.setPrivate(true);
         playlist.setVisibility("PRIVATE");
 
+        String oldCoverPublicIdToDelete = null;
         if (request.coverUrl() != null) {
-            playlist.setCoverUrl(request.coverUrl().trim());
+            String newCoverUrl = normalizeCoverUrl(request.coverUrl());
+            if (!Objects.equals(newCoverUrl, playlist.getCoverUrl())) {
+                oldCoverPublicIdToDelete = resolveCoverPublicId(playlist);
+                playlist.setCoverUrl(newCoverUrl);
+                playlist.setCoverPublicId(cloudMediaService.extractPublicIdFromUrl(newCoverUrl));
+            }
         }
 
         playlist.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         Playlist updated = playlistRepository.save(playlist);
         log.info("Playlist ID {} updated by user ID {}", updated.getId(), user.getId());
+
+        // Dọn ảnh bìa cũ trên Cloudinary (invalidate CDN) để không còn file mồ côi
+        if (oldCoverPublicIdToDelete != null
+                && !oldCoverPublicIdToDelete.equals(updated.getCoverPublicId())) {
+            cloudMediaService.deleteImageQuietly(oldCoverPublicIdToDelete);
+        }
 
         return mapToPlaylistResponse(updated, true);
     }
@@ -195,9 +209,26 @@ public class PlaylistService {
 
         validateOwnership(playlist, user);
 
+        String coverPublicId = resolveCoverPublicId(playlist);
         playlistTrackRepository.deleteByPlaylist_Id(id);
         playlistRepository.delete(playlist);
+        cloudMediaService.deleteImageQuietly(coverPublicId);
         log.info("Playlist ID {} deleted by user ID {}", id, user.getId());
+    }
+
+    /** Chuẩn hóa coverUrl: chuỗi rỗng = gỡ ảnh bìa (null). */
+    private String normalizeCoverUrl(String coverUrl) {
+        if (coverUrl == null) return null;
+        String trimmed = coverUrl.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /** Lấy public_id ảnh bìa: ưu tiên cột cover_public_id, fallback tách từ cover_url (dữ liệu cũ). */
+    private String resolveCoverPublicId(Playlist playlist) {
+        if (playlist.getCoverPublicId() != null && !playlist.getCoverPublicId().isBlank()) {
+            return playlist.getCoverPublicId();
+        }
+        return cloudMediaService.extractPublicIdFromUrl(playlist.getCoverUrl());
     }
 
     /**

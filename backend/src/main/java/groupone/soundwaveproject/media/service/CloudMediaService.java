@@ -99,6 +99,28 @@ public class CloudMediaService {
     }
 
     /**
+     * Tách public_id từ secure_url của Cloudinary (chỉ áp dụng cho ảnh thuộc folder của SoundWave).
+     * Ví dụ: https://res.cloudinary.com/demo/image/upload/v1712/soundwave/playlists/covers/abc.jpg
+     *   -> soundwave/playlists/covers/abc
+     * Trả về null nếu URL không phải ảnh Cloudinary do hệ thống quản lý (ví dụ ảnh preset Unsplash).
+     */
+    public String extractPublicIdFromUrl(String url) {
+        if (url == null || url.isBlank() || !url.contains("res.cloudinary.com")) return null;
+        int uploadIndex = url.indexOf("/upload/");
+        if (uploadIndex < 0) return null;
+        String path = url.substring(uploadIndex + "/upload/".length());
+        int queryIndex = path.indexOf('?');
+        if (queryIndex >= 0) path = path.substring(0, queryIndex);
+        int soundwaveIndex = path.indexOf("soundwave/");
+        if (soundwaveIndex < 0) return null;
+        path = path.substring(soundwaveIndex);
+        int dotIndex = path.lastIndexOf('.');
+        int slashIndex = path.lastIndexOf('/');
+        if (dotIndex > slashIndex) path = path.substring(0, dotIndex);
+        return path.isBlank() ? null : path;
+    }
+
+    /**
      * Xóa file âm thanh khỏi Cloudinary nhưng không làm hỏng transaction chính khi Cloudinary lỗi.
      */
     public void deleteTrackAudioQuietly(String publicId) {

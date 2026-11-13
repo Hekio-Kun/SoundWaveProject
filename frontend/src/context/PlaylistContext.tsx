@@ -43,13 +43,10 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuth();
   const { playTrack, setQueueOpen } = usePlayer();
 
+  // Không cache playlist trong localStorage nữa: server (DB) là nguồn dữ liệu duy nhất,
+  // tránh hiển thị coverUrl cũ sau khi ảnh đã bị đổi/xóa.
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
-    const saved = localStorage.getItem("soundwave_playlists");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {}
-    }
+    localStorage.removeItem("soundwave_playlists");
     return demoPlaylists;
   });
 
@@ -85,11 +82,15 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
       }
     };
     loadPlaylists();
+
+    // Đồng bộ lại khi người dùng quay lại tab (dữ liệu có thể đã đổi ở nơi khác)
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") loadPlaylists();
+    };
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => document.removeEventListener("visibilitychange", handleFocus);
   }, [isAuthenticated, user?.role]);
 
-  useEffect(() => {
-    localStorage.setItem("soundwave_playlists", JSON.stringify(playlists));
-  }, [playlists]);
 
   const openCreatePlaylist = useCallback(() => {
     if (!isAuthenticated) {
