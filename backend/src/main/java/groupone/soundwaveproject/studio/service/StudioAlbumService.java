@@ -53,6 +53,8 @@ import java.util.regex.Pattern;
 @Service
 public class StudioAlbumService {
 
+    public static final int MAX_ALBUM_TRACKS = 7;
+
     private final AlbumRepository albumRepository;
     private final TrackRepository trackRepository;
     private final GenreRepository genreRepository;
@@ -189,6 +191,17 @@ public class StudioAlbumService {
         boolean isSubmit = Boolean.TRUE.equals(request.getSubmitForReview());
         boolean hasTracks = request.getTracks() != null && !request.getTracks().isEmpty();
         boolean hasTrackIds = request.getTrackIds() != null && !request.getTrackIds().isEmpty();
+
+        int totalTracksCount = (request.getTracks() != null ? request.getTracks().size() : 0)
+                + (request.getTrackIds() != null ? request.getTrackIds().size() : 0);
+        if (totalTracksCount > MAX_ALBUM_TRACKS) {
+            throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                    "An album cannot contain more than " + MAX_ALBUM_TRACKS + " tracks.");
+        }
+        if (audioFiles != null && audioFiles.size() > MAX_ALBUM_TRACKS) {
+            throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                    "An album cannot contain more than " + MAX_ALBUM_TRACKS + " audio files.");
+        }
 
         if (isSubmit && !hasTracks && !hasTrackIds) {
             throw new BadRequestOperationException("EMPTY_ALBUM_SUBMISSION", "An album must contain at least one track to be submitted for review.");
@@ -597,6 +610,11 @@ public class StudioAlbumService {
             throw new BadRequestOperationException("EMPTY_ALBUM", "Cannot submit an empty album. Please add at least one track.");
         }
 
+        if (tracks.size() > MAX_ALBUM_TRACKS) {
+            throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                    "An album cannot contain more than " + MAX_ALBUM_TRACKS + " tracks.");
+        }
+
         // Sequence 1.2.2.14: loop for each track in constituentTracks
         List<Track> updatedTracks = new ArrayList<>();
         for (Track track : tracks) {
@@ -654,6 +672,11 @@ public class StudioAlbumService {
         int trackNumber = 1;
         List<Long> distinctTrackIds = trackIds.stream().distinct().toList();
 
+        if (distinctTrackIds.size() > MAX_ALBUM_TRACKS) {
+            throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                    "An album cannot contain more than " + MAX_ALBUM_TRACKS + " tracks.");
+        }
+
         for (Long trackId : distinctTrackIds) {
             Track track = trackRepository.findByIdAndUploaderUserId(trackId, currentUserId)
                     .orElseThrow(() -> new BadRequestOperationException("Track ID " + trackId + " not found or does not belong to you."));
@@ -681,6 +704,11 @@ public class StudioAlbumService {
 
         if (distinctTrackIds.isEmpty()) {
             throw new BadRequestOperationException("An album must contain at least one track. To remove all tracks, please delete the album instead.");
+        }
+
+        if (distinctTrackIds.size() > MAX_ALBUM_TRACKS) {
+            throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                    "An album cannot contain more than " + MAX_ALBUM_TRACKS + " tracks.");
         }
 
         Set<Long> newTrackIdSet = new HashSet<>(distinctTrackIds);

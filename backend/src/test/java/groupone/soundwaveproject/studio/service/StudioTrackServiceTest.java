@@ -11,6 +11,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.library.repository.ListeningHistoryRepository;
@@ -198,6 +199,32 @@ class StudioTrackServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.albumId()).isEqualTo(50L);
         verify(trackRepository).save(argThat(t -> t.getTrackNumber() == 4));
+    }
+
+    @Test
+    @DisplayName("createDraft throws BadRequest when album already reached max 7 tracks")
+    void createDraft_WithAlbum_AlreadyHasMaxTracks_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase("creator@soundwave.com"))
+                .thenReturn(Optional.of(activeUser));
+        when(genreRepository.findById(1L)).thenReturn(Optional.of(activeGenre));
+
+        groupone.soundwaveproject.catalog.entity.Album album = groupone.soundwaveproject.catalog.entity.Album.builder()
+                .id(50L)
+                .createdByUserId(10L)
+                .title("Full Album")
+                .status("DRAFT")
+                .build();
+        when(albumRepository.findByIdAndCreatedByUserId(50L, 10L)).thenReturn(Optional.of(album));
+        when(trackRepository.countByAlbum_Id(50L)).thenReturn(7L);
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+                "audio", "song.mp3", "audio/mpeg", new byte[]{1, 2, 3});
+        CreateTrackRequest request = new CreateTrackRequest(
+                "Track 8", 1L, 50L, null, "Desc", 200000, null);
+
+        assertThatThrownBy(() -> studioTrackService.createDraft(request, audioFile, null, "creator@soundwave.com"))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("maximum of 7 tracks");
     }
 
     @Test

@@ -199,6 +199,11 @@ public class StudioTrackService {
         if (request.albumId() != null) {
             album = albumRepository.findByIdAndCreatedByUserId(request.albumId(), user.getId())
                     .orElseThrow(() -> new BadRequestOperationException("Selected album is invalid or unauthorized."));
+            long currentTrackCount = trackRepository.countByAlbum_Id(album.getId());
+            if (currentTrackCount >= StudioAlbumService.MAX_ALBUM_TRACKS) {
+                throw new BadRequestOperationException("ALBUM_MAX_TRACKS_EXCEEDED",
+                        "Cannot add track to this album. An album can contain a maximum of " + StudioAlbumService.MAX_ALBUM_TRACKS + " tracks.");
+            }
         }
 
         StoredAudioResponse audioResponse = cloudMediaService.uploadTrackAudio(audio, user.getId());

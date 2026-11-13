@@ -24,6 +24,8 @@ type Props = {
   initialTab?: "MANAGE" | "ADD";
 };
 
+const MAX_ALBUM_TRACKS = 7;
+
 function formatDuration(ms?: number): string {
   if (!ms || ms <= 0) return "0:00";
   const totalSeconds = Math.floor(ms / 1000);
@@ -122,6 +124,10 @@ export function ManageAlbumTracksModal({
 
   // Save new track list to Backend
   const syncTracksToBackend = async (newTrackList: StudioTrack[]) => {
+    if (newTrackList.length > MAX_ALBUM_TRACKS) {
+      setErrorMessage(`An album cannot contain more than ${MAX_ALBUM_TRACKS} tracks.`);
+      return;
+    }
     setSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -181,6 +187,10 @@ export function ManageAlbumTracksModal({
 
   // Add standalone track into album
   const handleAddTrack = async (track: StudioTrack) => {
+    if (currentTracks.length >= MAX_ALBUM_TRACKS) {
+      setErrorMessage(`This album has reached the maximum capacity of ${MAX_ALBUM_TRACKS} tracks. Remove an existing track before adding another.`);
+      return;
+    }
     setActionLoadingTrackId(track.id);
     const updated = [...currentTracks, track];
     await syncTracksToBackend(updated);
@@ -401,7 +411,7 @@ export function ManageAlbumTracksModal({
                 transition: "all 0.16s ease",
               }}
             >
-              Tracklist ({currentTracks.length})
+              Tracklist ({currentTracks.length}/{MAX_ALBUM_TRACKS})
             </button>
             <button
               type="button"
@@ -711,6 +721,26 @@ export function ManageAlbumTracksModal({
               maxHeight: "440px",
             }}
           >
+            {currentTracks.length >= MAX_ALBUM_TRACKS && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
+                  color: "#92400e",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "10px",
+                }}
+              >
+                <AlertIcon width={16} height={16} />
+                <span>Album has reached maximum capacity ({MAX_ALBUM_TRACKS} tracks). Remove an existing track to add another.</span>
+              </div>
+            )}
             {loadingAvailable ? (
               <div style={{ padding: "40px", textAlign: "center", color: "var(--sw-muted, #64748B)" }}>
                 Loading standalone tracks...
@@ -794,7 +824,7 @@ export function ManageAlbumTracksModal({
                       {/* Add Button */}
                       <button
                         type="button"
-                        disabled={saving || isAdding}
+                        disabled={saving || isAdding || currentTracks.length >= MAX_ALBUM_TRACKS}
                         onClick={() => handleAddTrack(track)}
                         style={{
                           padding: "6px 14px",
@@ -802,17 +832,17 @@ export function ManageAlbumTracksModal({
                           fontWeight: 700,
                           borderRadius: "10px",
                           border: "none",
-                          background: "var(--color-ocean-primary, #0284C7)",
+                          background: currentTracks.length >= MAX_ALBUM_TRACKS ? "#94a3b8" : "var(--color-ocean-primary, #0284C7)",
                           color: "#ffffff",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "5px",
-                          cursor: saving || isAdding ? "not-allowed" : "pointer",
+                          cursor: saving || isAdding || currentTracks.length >= MAX_ALBUM_TRACKS ? "not-allowed" : "pointer",
                           transition: "all 0.16s ease",
                         }}
                       >
                         <PlusIcon width={14} height={14} />
-                        <span>{isAdding ? "Adding..." : "Add to album"}</span>
+                        <span>{isAdding ? "Adding..." : currentTracks.length >= MAX_ALBUM_TRACKS ? "Album Full" : "Add to album"}</span>
                       </button>
                     </div>
                   );

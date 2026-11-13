@@ -20,6 +20,8 @@ type Props = {
   onSuccess: (updatedAlbum: StudioAlbum) => void;
 };
 
+const MAX_ALBUM_TRACKS = 7;
+
 function formatDuration(ms?: number): string {
   if (!ms || ms <= 0) return "0:00";
   const totalSeconds = Math.floor(ms / 1000);
@@ -70,7 +72,9 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
 
   const current = fullAlbum ?? album;
   const tracks: StudioTrack[] = current.tracks ?? [];
-  const isEmptyAlbum = tracks.length === 0 && (current.trackCount ?? 0) === 0;
+  const trackCount = tracks.length > 0 ? tracks.length : (current.trackCount ?? 0);
+  const isEmptyAlbum = trackCount === 0;
+  const isOverLimit = trackCount > MAX_ALBUM_TRACKS;
   const totalDurationMs = tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMinutes = Math.round(totalDurationMs / 60000);
 
@@ -78,6 +82,10 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
   const handleConfirmSubmission = async () => {
     if (isEmptyAlbum) {
       setError("Cannot submit an empty album. Please add at least one track.");
+      return;
+    }
+    if (isOverLimit) {
+      setError(`An album cannot contain more than ${MAX_ALBUM_TRACKS} tracks. Please remove excess tracks before submitting.`);
       return;
     }
     try {
@@ -230,6 +238,43 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
           </div>
         ) : (
           <>
+            {isOverLimit && (
+              <div
+                style={{
+                  background: "#FFFBEB",
+                  border: "1px solid #FDE68A",
+                  borderRadius: "14px",
+                  padding: "16px 20px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "14px",
+                }}
+              >
+                <span
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    background: "#FEF3C7",
+                    color: "#D97706",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertIcon width={20} height={20} />
+                </span>
+                <div>
+                  <b style={{ color: "#92400E", fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                    Album Exceeds Maximum Track Limit ({trackCount}/{MAX_ALBUM_TRACKS})
+                  </b>
+                  <p style={{ margin: 0, fontSize: "13px", color: "#B45309", lineHeight: "1.5" }}>
+                    An album can contain a maximum of {MAX_ALBUM_TRACKS} tracks. Please remove excess tracks before submitting for review.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Sequence 1.2.2.1: displayAlbumSubmissionReviewBanner(albumMetadata, constituentTracks[]) */}
             <div
               style={{
@@ -424,7 +469,7 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
                 type="button"
                 className="button button-primary"
                 onClick={() => void handleConfirmSubmission()}
-                disabled={submitting || !agreeTerms || isEmptyAlbum || loading}
+                disabled={submitting || !agreeTerms || isEmptyAlbum || isOverLimit || loading}
                 id="btn-confirm-album-submission"
                 style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
               >

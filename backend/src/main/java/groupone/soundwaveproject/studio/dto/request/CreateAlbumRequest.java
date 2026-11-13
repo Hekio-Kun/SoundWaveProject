@@ -41,11 +41,13 @@ public class CreateAlbumRequest {
      * Danh sách thông tin chi tiết từng bài hát cấu thành khi upload toàn bộ bài hát cùng album (UC-21.1).
      */
     @Valid
+    @Size(max = 7, message = "An album cannot contain more than 7 tracks.")
     private List<AlbumTrackItemRequest> tracks;
 
     /**
      * Danh sách ID các bài hát đã có sẵn trong studio muốn đưa vào Album (hỗ trợ tương thích ngược).
      */
+    @Size(max = 7, message = "An album cannot contain more than 7 tracks.")
     private List<Long> trackIds;
 }
 

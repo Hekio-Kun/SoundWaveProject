@@ -106,6 +106,11 @@ export function StudioAlbumDetailPage({
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    if (album.tracks.length > 7) {
+      setActionError("An album cannot contain more than 7 tracks. Please remove excess tracks before submitting.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     setActionError(null);
     setSubmitReviewModalOpen(true);
   };
@@ -501,7 +506,7 @@ export function StudioAlbumDetailPage({
                 Created by <b style={{ color: "var(--color-ocean-dark, #0F172A)" }}>{currentUser?.displayName || "You"}</b>
               </span>
               <span>•</span>
-              <span><b>{albumTracks.length}</b> tracks</span>
+              <span><b>{albumTracks.length}/7</b> tracks</span>
               {totalMinutes > 0 && (
                 <>
                   <span>•</span>
@@ -615,10 +620,16 @@ export function StudioAlbumDetailPage({
                 setManageTracksModalOpen(true);
               }}
               id="btn-open-add-tracks"
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: albumTracks.length >= 7 ? "var(--sw-sand-dark, #b45309)" : undefined,
+              }}
+              title={albumTracks.length >= 7 ? "Album reached maximum 7 tracks" : "Add tracks to album"}
             >
               <PlusIcon width={14} height={14} />
-              <span>Add tracks</span>
+              <span>{albumTracks.length >= 7 ? "Full (7/7)" : "Add tracks"}</span>
             </button>
           </div>
         </div>
