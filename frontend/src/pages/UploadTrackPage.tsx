@@ -71,6 +71,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   const [submitterNote, setSubmitterNote] = useState("");
   const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
+  const isSavedOrBypassedRef = useRef(false);
+
+  useEffect(() => {
+    isSavedOrBypassedRef.current = false;
+  }, [title, genreId, albumId, description, audioFile, coverFile, lyricsFile, lyrics]);
+
   useModalScrollLock(confirmModalOpen || unsavedModalOpen);
 
   useEffect(() => {
@@ -252,6 +258,8 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
           message: "Track submitted for review successfully!",
           type: "success",
         }));
+        isSavedOrBypassedRef.current = true;
+        resetForm();
         onNavigate(`/track/submission/${targetTrackId}`);
         return true;
       }
@@ -261,7 +269,15 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
         type: "success",
       }));
 
-      if (destinationRoute) {
+      isSavedOrBypassedRef.current = true;
+      resetForm();
+      if (destinationRoute === "BACK") {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          onNavigate("/track");
+        }
+      } else if (destinationRoute) {
         onNavigate(destinationRoute);
       } else if (redirectToStudio) {
         onNavigate("/track");
@@ -270,6 +286,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       }
       return true;
     } catch (error: unknown) {
+      isSavedOrBypassedRef.current = false;
       if (error instanceof TrackApiError && Object.keys(error.fieldErrors).length > 0) {
         const errors = { ...error.fieldErrors };
         if (errors.media && !errors.audio) errors.audio = errors.media;
@@ -329,6 +346,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   };
 
   const hasUnsavedChanges = () => {
+    if (isSavedOrBypassedRef.current) return false;
     const initialGenreId = genres[0]?.id || 0;
     return Boolean(
       title.trim() !== "" ||
@@ -350,6 +368,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       setPendingNavigation("BACK");
       setUnsavedModalOpen(true);
     } else {
+      isSavedOrBypassedRef.current = true;
       if (window.history.length > 1) {
         window.history.back();
       } else {
@@ -428,6 +447,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       setPendingNavigation("BACK");
       setUnsavedModalOpen(true);
     } else {
+      isSavedOrBypassedRef.current = true;
       resetForm();
       if (window.history.length > 1) {
         window.history.back();
@@ -438,21 +458,10 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   };
 
   const handleSaveAndExit = async () => {
-    let dest: string | undefined = undefined;
-    if (pendingNavigation && pendingNavigation !== "BACK") {
-      dest = pendingNavigation;
-    }
-    const success = await processUpload(false, undefined, true, dest);
+    const dest = pendingNavigation ?? undefined;
+    const success = await processUpload(false, undefined, !dest, dest);
     if (success) {
       setUnsavedModalOpen(false);
-      resetForm();
-      if (pendingNavigation === "BACK") {
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          onNavigate("/track");
-        }
-      }
       setPendingNavigation(null);
     } else {
       setUnsavedModalOpen(false);
@@ -834,6 +843,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
                 disabled={submitting}
                 onClick={() => {
                   const target = pendingNavigation;
+                  isSavedOrBypassedRef.current = true;
                   setUnsavedModalOpen(false);
                   resetForm();
                   setPendingNavigation(null);
