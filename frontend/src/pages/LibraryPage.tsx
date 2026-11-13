@@ -311,6 +311,14 @@ export function LibraryPage({
           </div>
         ) : (
           <div className="library-tracks-table">
+            <div className="library-tracks-header">
+              <span style={{ textAlign: "center" }}>#</span>
+              <span />
+              <span>Track & Creator</span>
+              <span>Album</span>
+              <span style={{ textAlign: "right" }}>Duration</span>
+              <span style={{ textAlign: "right", paddingRight: "6px" }}>Favorite</span>
+            </div>
             {favoriteTracks.map((track, idx) => {
               const isCurrent = currentTrack?.id === track.id;
               const isPlayingThis = isCurrent && playing;
@@ -537,24 +545,7 @@ export function LibraryPage({
                 </div>
 
                 <div className="library-tracks-table">
-                  <div
-                    className="library-tracks-header"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "36px 44px minmax(180px, 2fr) minmax(140px, 1.2fr) 70px 80px",
-                      alignItems: "center",
-                      gap: "12px",
-                      padding: "8px 18px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: "#94a3b8",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      borderBottom: "1px solid #eef2f6",
-                      background: "#f8fafc",
-                      borderRadius: "10px 10px 0 0",
-                    }}
-                  >
+                  <div className="library-tracks-header">
                     <span style={{ textAlign: "center" }}>#</span>
                     <span />
                     <span>Track & Creator</span>
@@ -562,7 +553,7 @@ export function LibraryPage({
                       <ClockIcon width={12} height={12} /> Played Time
                     </span>
                     <span style={{ textAlign: "right" }}>Duration</span>
-                    <span style={{ textAlign: "center" }}>Remove</span>
+                    <span style={{ textAlign: "right", paddingRight: "6px" }}>Remove</span>
                   </div>
 
                   {group.items.map((item, idx) => {
@@ -605,17 +596,17 @@ export function LibraryPage({
                           >
                             {item.title}
                           </a>
-                          <span className="row-artist">{item.artistName}</span>
+                          <span className="row-creator">{item.artistName}</span>
                         </div>
 
                         <div
-                          className="row-album"
+                          className="row-album-name"
                           style={{
                             display: "flex",
                             alignItems: "center",
                             gap: "6px",
                             fontSize: "12.5px",
-                            color: "var(--sw-muted, #64748B)",
+                            color: "#475467",
                           }}
                           title={`Streamed on ${formatDateTime(item.playedAt)}`}
                         >
@@ -626,33 +617,21 @@ export function LibraryPage({
                         <span
                           className="row-duration"
                           title={`Track duration: ${formatDuration(item.durationMs)}`}
-                          style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}
                         >
                           {formatDuration(item.durationMs)}
                         </span>
 
                         <div className="row-actions">
                           <button
-                            className="icon-button"
+                            className="row-icon-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeleteTarget(item);
                             }}
                             title="Remove from history"
                             aria-label={`Remove ${item.title} from history`}
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              border: "1px solid var(--sw-border, #E2E8F0)",
-                              background: "#fff",
-                              color: "#94A3B8",
-                              cursor: "pointer",
-                              display: "grid",
-                              placeItems: "center",
-                            }}
                           >
-                            <TrashIcon width={14} height={14} />
+                            <TrashIcon width={15} height={15} />
                           </button>
                         </div>
                       </div>
