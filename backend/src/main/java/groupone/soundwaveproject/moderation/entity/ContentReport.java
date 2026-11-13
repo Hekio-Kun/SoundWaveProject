@@ -142,6 +142,8 @@ public class ContentReport {
         if (reporterId == null && submittedByUserId != null) reporterId = submittedByUserId;
         if (trackId == null && targetId != null) trackId = targetId;
         if (targetId == null && trackId != null) targetId = trackId;
+        if (resolutionNote == null && reviewerNote != null) resolutionNote = reviewerNote;
+        if (reviewerNote == null && resolutionNote != null) reviewerNote = resolutionNote;
     }
 
     @PreUpdate
@@ -150,5 +152,7 @@ public class ContentReport {
         if (reviewerId == null && handledByStaffId != null) reviewerId = handledByStaffId;
         if (handledAt == null && resolvedAt != null) handledAt = resolvedAt;
         if (resolvedAt == null && handledAt != null) resolvedAt = handledAt;
+        if (resolutionNote == null && reviewerNote != null) resolutionNote = reviewerNote;
+        if (reviewerNote == null && resolutionNote != null) reviewerNote = resolutionNote;
     }
 }

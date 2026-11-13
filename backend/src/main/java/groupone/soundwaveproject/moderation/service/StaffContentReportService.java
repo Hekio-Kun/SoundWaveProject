@@ -119,8 +119,8 @@ public class StaffContentReportService {
         String finalStatus;
         if (decisionInput.contains("CONFIRM") || "RESOLVED".equals(decisionInput)) {
             finalStatus = "RESOLVED";
-        } else if (decisionInput.contains("DISMISS") || "DISMISSED".equals(decisionInput)) {
-            finalStatus = "DISMISSED";
+        } else if (decisionInput.contains("DISMISS") || "DISMISSED".equals(decisionInput) || "REJECTED".equals(decisionInput)) {
+            finalStatus = "REJECTED";
         } else {
             throw new BadRequestOperationException("INVALID_DECISION", "Resolution decision must be either Confirm Violation or Dismiss Report");
         }
@@ -258,10 +258,14 @@ public class StaffContentReportService {
 
         // Mark all associated pending reports against this track as RESOLVED
         List<ContentReport> pendingReports = contentReportRepository.findByTargetIdAndStatus(track.getId(), "PENDING");
+        String takedownNote = "Track taken down due to policy violation: " + takedownReason;
         for (ContentReport pendingReport : pendingReports) {
             pendingReport.setStatus("RESOLVED");
+            pendingReport.setHandledByStaffId(staff.getId());
+            pendingReport.setResolutionNote(takedownNote);
+            pendingReport.setHandledAt(now);
             pendingReport.setReviewerId(staff.getId());
-            pendingReport.setReviewerNote("Track taken down due to policy violation: " + takedownReason);
+            pendingReport.setReviewerNote(takedownNote);
             pendingReport.setResolvedAt(now);
             contentReportRepository.save(pendingReport);
 
