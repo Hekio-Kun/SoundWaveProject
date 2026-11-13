@@ -96,10 +96,10 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
               type="button"
               className={activeRoute === "/staff/reports" ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/reports")}
-              title="Content violation reports"
+              title="Reported tracks"
             >
               <FlagIcon width={17} height={17} />
-              <span>Content Reports</span>
+              <span>Reported Tracks</span>
             </button>
             <button
               type="button"

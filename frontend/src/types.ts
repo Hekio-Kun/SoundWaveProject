@@ -428,13 +428,20 @@ export type StaffContentReportResponse = {
   reporterCount?: number;
   reporterId: number;
   reporterName: string;
+  reporterUsername?: string | null;
   reporterEmail: string | null;
+  reporterAvatarUrl?: string | null;
+  description?: string | null;
+  category?: string | null;
   reporters?: Array<{
     reporterId: number;
     reporterName: string;
+    reporterUsername?: string | null;
     reporterEmail: string | null;
+    avatarUrl?: string | null;
     submittedAt: string;
     evidenceUrl?: string | null;
+    description?: string | null;
   }>;
   targetType: string;
   targetId: number;

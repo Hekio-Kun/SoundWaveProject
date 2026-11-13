@@ -53,13 +53,19 @@ public class StaffContentReportService {
     public List<StaffContentReportResponse> getReportsQueue() {
         List<ContentReport> allReports = contentReportRepository.findAllByOrderByCreatedAtDesc();
 
-        // Group by Target Track + Violation Reason so same reason on a track appears only once
+        // Group by Target Track + Violation Reason, EXCEPT Copyright Infringement which is kept standalone
         Map<String, List<ContentReport>> groupedMap = new LinkedHashMap<>();
         for (ContentReport report : allReports) {
-            String reasonLabel = resolveReasonLabel(report);
-            String targetKey = (report.getTargetId() != null ? report.getTargetId().toString() : "0") + "::"
-                    + reasonLabel.trim().toLowerCase(Locale.ROOT);
-            groupedMap.computeIfAbsent(targetKey, k -> new ArrayList<>()).add(report);
+            if (isCopyrightReport(report)) {
+                // Individual unmerged group per copyright report
+                String uniqueKey = "COPYRIGHT::" + report.getId();
+                groupedMap.computeIfAbsent(uniqueKey, k -> new ArrayList<>()).add(report);
+            } else {
+                String reasonLabel = resolveReasonLabel(report);
+                String targetKey = (report.getTargetId() != null ? report.getTargetId().toString() : "0") + "::"
+                        + reasonLabel.trim().toLowerCase(Locale.ROOT);
+                groupedMap.computeIfAbsent(targetKey, k -> new ArrayList<>()).add(report);
+            }
         }
 
         List<StaffContentReportResponse> responses = new ArrayList<>();
@@ -76,16 +82,22 @@ public class StaffContentReportService {
         ContentReport target = contentReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("REPORT_NOT_FOUND", "Content report not found with id: " + id));
 
-        // Find all reports in the same track + reason group
-        String targetReasonLabel = resolveReasonLabel(target);
-        List<ContentReport> allSameTrack = contentReportRepository.findByTargetIdAndStatus(target.getTargetId(), "PENDING");
-        List<ContentReport> group = allSameTrack.stream()
-                .filter(r -> resolveReasonLabel(r).equalsIgnoreCase(targetReasonLabel))
-                .sorted(Comparator.comparing(ContentReport::getCreatedAt).reversed())
-                .toList();
-
-        if (group.isEmpty()) {
+        List<ContentReport> group;
+        if (isCopyrightReport(target)) {
+            // Copyright reports are never grouped with other reports
             group = List.of(target);
+        } else {
+            // Find all reports in the same track + reason group
+            String targetReasonLabel = resolveReasonLabel(target);
+            List<ContentReport> allSameTrack = contentReportRepository.findByTargetIdAndStatus(target.getTargetId(), "PENDING");
+            group = allSameTrack.stream()
+                    .filter(r -> !isCopyrightReport(r) && resolveReasonLabel(r).equalsIgnoreCase(targetReasonLabel))
+                    .sorted(Comparator.comparing(ContentReport::getCreatedAt).reversed())
+                    .toList();
+
+            if (group.isEmpty()) {
+                group = List.of(target);
+            }
         }
 
         return mapGroupToResponse(group);
@@ -116,18 +128,26 @@ public class StaffContentReportService {
         String staffNote = request.staffNote().trim();
         Instant now = Instant.now();
 
-        // Find ALL pending reports for this track and reason
-        String primaryReasonLabel = resolveReasonLabel(primaryReport);
-        List<ContentReport> pendingGroup = contentReportRepository.findByTargetIdAndStatus(primaryReport.getTargetId(), "PENDING")
-                .stream()
-                .filter(r -> resolveReasonLabel(r).equalsIgnoreCase(primaryReasonLabel))
-                .toList();
-
-        if (pendingGroup.isEmpty()) {
+        List<ContentReport> pendingGroup;
+        if (isCopyrightReport(primaryReport)) {
             if (!"PENDING".equalsIgnoreCase(primaryReport.getStatus())) {
                 throw new BadRequestOperationException("REPORT_ALREADY_ADJUDICATED", "This report has already been adjudicated");
             }
             pendingGroup = List.of(primaryReport);
+        } else {
+            // Find ALL pending non-copyright reports for this track and reason
+            String primaryReasonLabel = resolveReasonLabel(primaryReport);
+            pendingGroup = contentReportRepository.findByTargetIdAndStatus(primaryReport.getTargetId(), "PENDING")
+                    .stream()
+                    .filter(r -> !isCopyrightReport(r) && resolveReasonLabel(r).equalsIgnoreCase(primaryReasonLabel))
+                    .toList();
+
+            if (pendingGroup.isEmpty()) {
+                if (!"PENDING".equalsIgnoreCase(primaryReport.getStatus())) {
+                    throw new BadRequestOperationException("REPORT_ALREADY_ADJUDICATED", "This report has already been adjudicated");
+                }
+                pendingGroup = List.of(primaryReport);
+            }
         }
 
         List<ContentReport> resolvedGroup = new ArrayList<>();
@@ -275,23 +295,43 @@ public class StaffContentReportService {
         List<StaffContentReportResponse.ReporterSummary> reporters = new ArrayList<>();
         for (ContentReport r : group) {
             String name = "Unknown Reporter";
+            String username = null;
             String email = null;
-            if (r.getReporterId() != null) {
-                Optional<User> uOpt = userRepository.findById(r.getReporterId());
+            String avatarUrl = null;
+            Long uid = r.getSubmittedByUserId() != null ? r.getSubmittedByUserId() : r.getReporterId();
+            if (uid != null) {
+                Optional<User> uOpt = userRepository.findById(uid);
                 if (uOpt.isPresent()) {
                     email = uOpt.get().getEmail();
-                    Optional<UserProfile> pOpt = userProfileRepository.findByUserId(r.getReporterId());
-                    name = pOpt.flatMap(up -> Optional.ofNullable(up.getDisplayName()))
-                            .filter(d -> !d.isBlank())
-                            .orElse(email);
+                }
+                Optional<UserProfile> pOpt = userProfileRepository.findByUserId(uid);
+                if (pOpt.isPresent()) {
+                    UserProfile profile = pOpt.get();
+                    username = profile.getUsername();
+                    avatarUrl = profile.getAvatarUrl();
+                    name = profile.getDisplayName() != null && !profile.getDisplayName().isBlank()
+                            ? profile.getDisplayName()
+                            : (username != null ? username : (email != null ? email : "User #" + uid));
+                } else if (email != null) {
+                    name = email;
+                    username = email.split("@")[0];
                 }
             }
-            reporters.add(new StaffContentReportResponse.ReporterSummary(r.getReporterId(), name, email, r.getCreatedAt(), r.getEvidenceUrl()));
+            reporters.add(new StaffContentReportResponse.ReporterSummary(
+                    uid,
+                    name,
+                    username,
+                    email,
+                    avatarUrl,
+                    r.getCreatedAt(),
+                    r.getEvidenceUrl(),
+                    r.getDescription()
+            ));
         }
 
         StaffContentReportResponse.ReporterSummary primaryReporter = reporters.get(0);
 
-        Long trackId = primary.getTargetId();
+        Long trackId = primary.getTargetId() != null ? primary.getTargetId() : primary.getTrackId();
         String trackTitle = "Unknown Track";
         String artistName = "Unknown Artist";
         String coverUrl = null;
@@ -335,6 +375,7 @@ public class StaffContentReportService {
         }
 
         String displayReason = resolveReasonLabel(primary);
+        String category = primary.getCategory() != null ? primary.getCategory() : (isCopyrightReport(primary) ? "COPYRIGHT" : "OTHER");
 
         return new StaffContentReportResponse(
                 primary.getId(),
@@ -342,7 +383,11 @@ public class StaffContentReportService {
                 reporterCount,
                 primaryReporter.reporterId(),
                 primaryReporter.reporterName(),
+                primaryReporter.reporterUsername(),
                 primaryReporter.reporterEmail(),
+                primaryReporter.avatarUrl(),
+                primary.getDescription(),
+                category,
                 reporters,
                 primary.getTargetType(),
                 primary.getTargetId(),
@@ -362,6 +407,24 @@ public class StaffContentReportService {
                 primary.getResolvedAt(),
                 primary.getEvidenceUrl()
         );
+    }
+
+    private boolean isCopyrightReport(ContentReport report) {
+        if (report == null) return false;
+        if ("COPYRIGHT".equalsIgnoreCase(report.getCategory())) return true;
+        if (report.getReason() != null) {
+            String r = report.getReason().trim().toLowerCase(Locale.ROOT);
+            if (r.contains("copyright") || r.contains("bản quyền")) {
+                return true;
+            }
+        }
+        if (report.getCategory() != null) {
+            String c = report.getCategory().trim().toLowerCase(Locale.ROOT);
+            if (c.contains("copyright") || c.contains("bản quyền")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String resolveReasonLabel(ContentReport report) {
