@@ -155,7 +155,7 @@ class TrackCatalogServiceTest {
     }
 
     @Test
-    void recordTrackPlay_guest_incrementsPlayCount_withoutListeningHistory() {
+    void recordTrackPlay_guest_doesNotIncrementPlayCountNorListeningHistory() {
         Track track = createMockTrack(1L, "test-song", TrackPublicationStatus.PUBLISHED);
         when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
 
@@ -164,10 +164,10 @@ class TrackCatalogServiceTest {
 
         assertNotNull(response);
         assertEquals(1L, response.trackId());
-        assertEquals(16L, response.playCount());
+        assertEquals(15L, response.playCount()); // Unchanged for guest per BR-13
         assertFalse(response.recordedHistory());
 
-        verify(trackRepository).incrementPlayCount(1L);
+        verify(trackRepository, never()).incrementPlayCount(anyLong());
         verifyNoInteractions(listeningHistoryPublicService);
     }
 

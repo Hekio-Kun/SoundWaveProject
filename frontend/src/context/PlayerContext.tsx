@@ -89,19 +89,34 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // UC-10: Theo dõi ID track đã gửi request lấy stream info và ghi nhận lượt nghe cho phiên phát hiện tại
   const activeStreamTrackIdRef = useRef<number | null>(null);
 
-  const syncTrackPlay = useCallback(async (targetTrack: LandingTrack) => {
+  const syncTrackPlay = useCallback(async (targetTrack: LandingTrack, recordPlaySession: boolean = true) => {
     if (!targetTrack || !targetTrack.id) return;
     try {
-      const freshTrack = await catalogApi.getTrackById(targetTrack.id);
-      if (freshTrack) {
-        setCurrentTrack((prev) => (prev && Number(prev.id) === Number(targetTrack.id) ? { ...prev, ...freshTrack } : prev));
-        setQueue((prevQueue) =>
-          prevQueue.map((item) => (Number(item.id) === Number(targetTrack.id) ? { ...item, ...freshTrack } : item))
-        );
-        if (freshTrack.audioUrl && (!audio.src || audio.src === window.location.href)) {
-          audio.src = freshTrack.audioUrl;
-          void audio.play().catch(() => {});
+      let updatedPlayCount = targetTrack.playCount;
+      // UC-10: Ghi nhận lượt nghe và lịch sử nghe nhạc (Immediate on play - BR-13)
+      if (recordPlaySession) {
+        try {
+          const playRes = await catalogApi.recordPlay(targetTrack.id, 0, false);
+          if (playRes && typeof playRes.playCount === "number") {
+            updatedPlayCount = playRes.playCount;
+          }
+        } catch (playErr) {
+          console.warn("Could not record track play count:", playErr);
         }
+      }
+
+      const freshTrack = await catalogApi.getTrackById(targetTrack.id);
+      const mergedTrack = freshTrack
+        ? { ...freshTrack, playCount: updatedPlayCount }
+        : { ...targetTrack, playCount: updatedPlayCount };
+
+      setCurrentTrack((prev) => (prev && Number(prev.id) === Number(targetTrack.id) ? { ...prev, ...mergedTrack } : prev));
+      setQueue((prevQueue) =>
+        prevQueue.map((item) => (Number(item.id) === Number(targetTrack.id) ? { ...item, ...mergedTrack } : item))
+      );
+      if (mergedTrack.audioUrl && (!audio.src || audio.src === window.location.href)) {
+        audio.src = mergedTrack.audioUrl;
+        void audio.play().catch(() => {});
       }
     } catch (err) {
       console.warn("Could not sync live track stream info:", err);
@@ -115,7 +130,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const track = currentTrackRef.current;
       if (track?.id && activeStreamTrackIdRef.current !== track.id) {
         activeStreamTrackIdRef.current = track.id;
-        void syncTrackPlay(track);
+        void syncTrackPlay(track, true);
       }
     };
     const handlePause = () => {
@@ -154,7 +169,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             setPlaying(true);
             if (currentTrack?.id && activeStreamTrackIdRef.current !== currentTrack.id) {
               activeStreamTrackIdRef.current = currentTrack.id;
-              void syncTrackPlay(currentTrack);
+              void syncTrackPlay(currentTrack, true);
             }
           })
           .catch(() => setPlaying(false));
@@ -194,16 +209,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             .play()
             .then(() => setPlaying(true))
             .catch(() => setPlaying(false));
-          void syncTrackPlay(track);
+          void syncTrackPlay(track, true);
           return;
         }
 
         if (playing) {
           setAudioPlaying(false);
         } else {
-          activeStreamTrackIdRef.current = track.id;
           setAudioPlaying(true);
-          void syncTrackPlay(track);
         }
         return;
       }
@@ -228,9 +241,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setPlaying(false);
       }
 
-      // UC-10: Gửi request GET /api/v1/tracks/{trackId} lấy stream info, tự động tăng play count và ghi history
+      // UC-10: Ghi nhận lượt nghe và đồng bộ metadata
       if (track.id) {
-        void syncTrackPlay(track);
+        void syncTrackPlay(track, true);
       }
     },
     [audio, currentTrack, playing, setAudioPlaying, syncTrackPlay]

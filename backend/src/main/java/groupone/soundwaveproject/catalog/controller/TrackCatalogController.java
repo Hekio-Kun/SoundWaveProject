@@ -92,25 +92,17 @@ public class TrackCatalogController {
     }
 
     /**
-     * Lấy dữ liệu phát bài hát và URL stream CDN (UC-10: Play Music).
+     * Retrieves published track metadata, details, and CDN streaming audio URL.
      * <p>
-     * Tuân thủ quy tắc:
-     * - Chỉ phát bài hát có trạng thái PUBLISHED (trả về 404 NOT_FOUND nếu không hợp lệ).
-     * - Nếu người nghe đã đăng nhập: tự động tăng lượt nghe và lưu lịch sử nghe nhạc.
-     * - Nếu là khách vãng lai (Guest): cho phép nghe nhạc mà không tăng lượt nghe và không lưu lịch sử.
+     * Safe, idempotent read-only endpoint (does not mutate play count or listening history).
      *
      * @param idOrSlug Numeric ID or unique slug of the requested track.
-     * @param authentication Current user authentication context (nullable for guests).
-     * @return {@link ResponseEntity} containing {@link TrackResponse} with CDN audio URL.
+     * @return {@link ResponseEntity} containing {@link TrackResponse} with track metadata.
      */
     @GetMapping("/{idOrSlug}")
-    public ResponseEntity<TrackResponse> getTrack(
-            @PathVariable String idOrSlug,
-            Authentication authentication
-    ) {
-        String userEmail = extractUserEmail(authentication);
-        log.info("Fetching playback metadata for track identifier: {}, userEmail: {}", idOrSlug, userEmail);
-        TrackResponse response = trackCatalogService.getTrackStream(idOrSlug, userEmail);
+    public ResponseEntity<TrackResponse> getTrack(@PathVariable String idOrSlug) {
+        log.info("Fetching track metadata for track identifier: {}", idOrSlug);
+        TrackResponse response = trackCatalogService.getTrackByIdOrSlug(idOrSlug);
         return ResponseEntity.ok(response);
     }
 

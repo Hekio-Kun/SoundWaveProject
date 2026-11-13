@@ -29,9 +29,7 @@ export function StaffDashboardPage({ onNavigate, initialSubmissionId }: Props) {
             <h1 className="staff-hero-title">Moderate Pending Tracks</h1>
           </div>
 
-          <p className="staff-hero-description">
-            Review pending submissions and record an approval or rejection decision.
-          </p>
+
         </div>
       </header>
 
