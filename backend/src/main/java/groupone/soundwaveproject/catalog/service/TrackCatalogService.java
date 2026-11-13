@@ -288,21 +288,26 @@ public class TrackCatalogService {
                 .filter(t -> t.getPublicationStatus() == TrackPublicationStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_UNAVAILABLE", "Track unavailable"));
 
-        // 1. Increment play count in database transaction
-        trackRepository.incrementPlayCount(trackId);
-        track.incrementPlayCount();
-        long updatedPlayCount = (track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L);
-
-        // 2. Persist listening history if user is authenticated
+        long currentPlayCount = track.getPlayCountCache() != null ? track.getPlayCountCache() : 0L;
+        long updatedPlayCount = currentPlayCount;
         boolean recordedHistory = false;
+
+        // BR-13: Only authenticated listeners increment play count and record listening history.
+        // Streaming sessions initiated by unauthenticated Guests do not increment the track's play count nor record listening history.
         if (userEmail != null && !userEmail.isBlank()) {
+            trackRepository.incrementPlayCount(trackId);
+            track.incrementPlayCount();
+            updatedPlayCount = currentPlayCount + 1L;
+
             Optional<Long> userIdOpt = userAccountPublicService.findUserIdByEmail(userEmail);
             if (userIdOpt.isPresent()) {
+                int durationMs = (request != null && request.listenedDurationMs() != null) ? request.listenedDurationMs() : 0;
+                boolean completed = request != null && Boolean.TRUE.equals(request.completed());
                 listeningHistoryPublicService.recordListeningHistory(
                         userIdOpt.get(),
                         trackId,
-                        request.listenedDurationMs(),
-                        Boolean.TRUE.equals(request.completed())
+                        durationMs,
+                        completed
                 );
                 recordedHistory = true;
             }
