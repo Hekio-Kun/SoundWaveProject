@@ -65,6 +65,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   const [submitting, setSubmitting] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [unsavedModalOpen, setUnsavedModalOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [showLyricMaker, setShowLyricMaker] = useState(false);
   const [copyrightAgreed, setCopyrightAgreed] = useState(false);
   const [submitterNote, setSubmitterNote] = useState("");
@@ -218,7 +219,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     requestAnimationFrame(() => document.getElementById(targetId)?.focus());
   };
 
-  const processUpload = async (submitForReview: boolean, note?: string, redirectToStudio = false) => {
+  const processUpload = async (
+    submitForReview: boolean,
+    note?: string,
+    redirectToStudio = false,
+    destinationRoute?: string
+  ) => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -255,7 +261,9 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
         type: "success",
       }));
 
-      if (redirectToStudio) {
+      if (destinationRoute) {
+        onNavigate(destinationRoute);
+      } else if (redirectToStudio) {
         onNavigate("/track");
       } else {
         onNavigate(`/track/submission/${targetTrackId}`);
@@ -334,8 +342,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
     );
   };
 
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
+
   const handleBack = () => {
     if (hasUnsavedChanges()) {
+      setPendingNavigation("BACK");
       setUnsavedModalOpen(true);
     } else {
       if (window.history.length > 1) {
@@ -350,18 +362,70 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   handleBackRef.current = handleBack;
 
   useEffect(() => {
+    // 1. Intercept header back button
     const handleSoundWaveBack = (e: Event) => {
       e.preventDefault();
       handleBackRef.current();
     };
+
+    // 2. Intercept router navigation (Sidebar, TopBar, etc.)
+    const handleSoundWaveNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ to: string }>;
+      const destination = customEvent.detail?.to;
+
+      // Ignore if navigating to the same draft creation route
+      if (destination === "/track/create" || destination === "/track/upload") return;
+
+      if (hasUnsavedChangesRef.current()) {
+        customEvent.preventDefault();
+        setPendingNavigation(destination || null);
+        setUnsavedModalOpen(true);
+      }
+    };
+
+    // 3. Intercept direct anchor link clicks (e.g. playback player track/creator links)
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (!href || !href.startsWith("#/")) return;
+
+      const destination = href.slice(1);
+      if (destination === "/track/create" || destination === "/track/upload") return;
+
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingNavigation(destination);
+        setUnsavedModalOpen(true);
+      }
+    };
+
+    // 4. Intercept window refresh or close
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
     window.addEventListener("soundwave:back", handleSoundWaveBack);
+    window.addEventListener("soundwave:navigate", handleSoundWaveNavigate);
+    window.addEventListener("click", handleGlobalClick, true);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       window.removeEventListener("soundwave:back", handleSoundWaveBack);
+      window.removeEventListener("soundwave:navigate", handleSoundWaveNavigate);
+      window.removeEventListener("click", handleGlobalClick, true);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
   const handleCancel = () => {
     if (hasUnsavedChanges()) {
+      setPendingNavigation("BACK");
       setUnsavedModalOpen(true);
     } else {
       resetForm();
@@ -374,9 +438,22 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   };
 
   const handleSaveAndExit = async () => {
-    const success = await processUpload(false, undefined, true);
+    let dest: string | undefined = undefined;
+    if (pendingNavigation && pendingNavigation !== "BACK") {
+      dest = pendingNavigation;
+    }
+    const success = await processUpload(false, undefined, true, dest);
     if (success) {
       setUnsavedModalOpen(false);
+      resetForm();
+      if (pendingNavigation === "BACK") {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          onNavigate("/track");
+        }
+      }
+      setPendingNavigation(null);
     } else {
       setUnsavedModalOpen(false);
     }
@@ -707,7 +784,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
         <div
           className="modal-backdrop"
           role="presentation"
-          onClick={() => !submitting && setUnsavedModalOpen(false)}
+          onClick={() => {
+            if (!submitting) {
+              setPendingNavigation(null);
+              setUnsavedModalOpen(false);
+            }
+          }}
         >
           <div
             className="modal-card modal-card--narrow"
@@ -721,7 +803,10 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               <button
                 type="button"
                 className="icon-button"
-                onClick={() => setUnsavedModalOpen(false)}
+                onClick={() => {
+                  setPendingNavigation(null);
+                  setUnsavedModalOpen(false);
+                }}
                 disabled={submitting}
                 aria-label="Close dialog"
               >
@@ -735,7 +820,10 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
               <button
                 type="button"
                 className="button button-ghost"
-                onClick={() => setUnsavedModalOpen(false)}
+                onClick={() => {
+                  setPendingNavigation(null);
+                  setUnsavedModalOpen(false);
+                }}
                 disabled={submitting}
               >
                 Cancel
@@ -745,12 +833,26 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
                 className="button button-secondary"
                 disabled={submitting}
                 onClick={() => {
+                  const target = pendingNavigation;
                   setUnsavedModalOpen(false);
                   resetForm();
-                  if (window.history.length > 1) {
-                    window.history.back();
+                  setPendingNavigation(null);
+                  if (target) {
+                    if (target === "BACK") {
+                      if (window.history.length > 1) {
+                        window.history.back();
+                      } else {
+                        onNavigate("/track");
+                      }
+                    } else {
+                      onNavigate(target);
+                    }
                   } else {
-                    onNavigate("/track");
+                    if (window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      onNavigate("/track");
+                    }
                   }
                 }}
               >

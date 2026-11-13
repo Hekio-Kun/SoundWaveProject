@@ -36,6 +36,8 @@ export type MusicPlayerProps = {
   playbackContext?: string | null;
   /** Optional callback to reorder active queue when shuffle mode is toggled */
   onReorderQueue?: (newQueue: LandingTrack[]) => void;
+  /** Optional callback to navigate to a target route */
+  onNavigate?: (route: string) => void;
 };
 
 /**
@@ -72,6 +74,7 @@ export function MusicPlayer({
   onRecordPlay,
   playbackContext,
   onReorderQueue,
+  onNavigate,
 }: MusicPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(track.durationMs / 1000);
@@ -343,10 +346,35 @@ export function MusicPlayer({
   return (
     <aside className={`music-player ${playing ? "music-player--playing" : ""}`} aria-label="Music player">
       <div className="player-track">
-        <img src={track.coverUrl ?? undefined} alt={`${track.title} cover`} />
+        <img
+          src={track.coverUrl ?? undefined}
+          alt={`${track.title} cover`}
+          style={{ cursor: onNavigate ? "pointer" : "default" }}
+          onClick={() => onNavigate?.(`/track/${track.id}`)}
+        />
         <div>
-          <a href={`#/track/${track.id}`}>{track.title}</a>
-          <a href={`#/creator/${track.creator.userId}`}>{track.creator.displayName}</a>
+          <a
+            href={`#/track/${track.id}`}
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate(`/track/${track.id}`);
+              }
+            }}
+          >
+            {track.title}
+          </a>
+          <a
+            href={`#/creator/${track.creator.userId}`}
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate(`/creator/${track.creator.userId}`);
+              }
+            }}
+          >
+            {track.creator.displayName}
+          </a>
           {playbackContext && (
             <span
               style={{
