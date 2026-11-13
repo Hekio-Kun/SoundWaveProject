@@ -786,58 +786,6 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       ======================================================== */}
       {step === 2 && (
         <div>
-          {/* Top Album Summary Card */}
-          <div
-            style={{
-              background: "var(--color-sand-light, #F5EFE6)",
-              border: "1px solid var(--color-sand-primary, #D4B996)",
-              borderRadius: "14px",
-              padding: "14px 20px",
-              marginBottom: "28px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "8px",
-                  backgroundColor: "#ffffff",
-                  overflow: "hidden",
-                  display: "grid",
-                  placeItems: "center",
-                  flexShrink: 0,
-                }}
-              >
-                {coverPreview ? (
-                  <img src={coverPreview} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <DiscIcon width={24} height={24} style={{ color: "var(--color-ocean-primary, #0284C7)" }} />
-                )}
-              </div>
-              <div>
-                <h3 style={{ margin: "0 0 2px", fontSize: "16px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)" }}>
-                  {title || "Untitled Album"}
-                </h3>
-                <span style={{ fontSize: "12px", color: "var(--sw-text-secondary, #64748B)" }}>
-                  {releaseDate ? `Release: ${releaseDate}` : "Immediate Release"}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="button button-ghost button-small"
-              onClick={() => setStep(1)}
-              style={{ fontSize: "12px" }}
-            >
-              Edit Album Details
-            </button>
-          </div>
-
           {/* Upload Track Layout matching UploadTrackPage */}
           <div className="upload-track-layout">
             
