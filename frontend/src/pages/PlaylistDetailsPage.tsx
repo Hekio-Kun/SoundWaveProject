@@ -310,7 +310,7 @@ export function PlaylistDetailsPage({
       >
         <div style={{ position: "relative", width: "220px", height: "220px", borderRadius: "16px", overflow: "hidden" }}>
           <img
-            src={playlist.coverUrl}
+            src={playlist.coverUrl || covers.dawn}
             alt={playlist.title}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = covers.dawn;

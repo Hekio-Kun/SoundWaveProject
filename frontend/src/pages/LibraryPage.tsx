@@ -395,7 +395,7 @@ export function LibraryPage({
               <div key={pl.id} className="playlist-card">
                 <div className="playlist-art" onClick={() => onNavigate(`/playlist/${pl.id}`)}>
                   <img
-                    src={pl.coverUrl}
+                    src={pl.coverUrl || covers.dawn}
                     alt={pl.title}
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = covers.dawn;
