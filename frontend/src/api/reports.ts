@@ -10,6 +10,7 @@ export interface CreateTrackReportPayload {
   trackId: number;
   category: ReportCategoryType | string;
   description?: string;
+  evidenceFile?: File | null;
 }
 
 export interface UpdateTrackReportPayload {
@@ -27,6 +28,7 @@ export interface TrackReportResponse {
   categoryLabel: string;
   description: string;
   status: string;
+  evidenceUrl?: string;
   createdAt: string;
 }
 
@@ -39,6 +41,7 @@ export interface MyReportHistoryResponse {
   categoryLabel: string;
   status: "PENDING" | "RESOLVED" | "DISMISSED" | "REJECTED" | string;
   resolutionNote?: string | null;
+  evidenceUrl?: string | null;
   createdAt: string;
   handledAt?: string | null;
 }
@@ -65,9 +68,35 @@ export const reportsApi = {
    * Báo cáo vi phạm nội dung bài hát đã phát hành (UC-22.1).
    */
   reportTrack: (payload: CreateTrackReportPayload): Promise<TrackReportResponse> => {
+    if (payload.evidenceFile) {
+      const formData = new FormData();
+      formData.append(
+        "report",
+        new Blob(
+          [
+            JSON.stringify({
+              trackId: payload.trackId,
+              category: payload.category,
+              description: payload.description,
+            }),
+          ],
+          { type: "application/json" }
+        )
+      );
+      formData.append("evidence", payload.evidenceFile);
+      return apiFetch<TrackReportResponse>("/reports", {
+        method: "POST",
+        body: formData,
+      });
+    }
+
     return apiFetch<TrackReportResponse>("/reports", {
       method: "POST",
-      body: payload,
+      body: {
+        trackId: payload.trackId,
+        category: payload.category,
+        description: payload.description,
+      },
     });
   },
 

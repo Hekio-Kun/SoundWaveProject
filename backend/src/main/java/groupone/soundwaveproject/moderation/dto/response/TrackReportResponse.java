@@ -15,6 +15,22 @@ public record TrackReportResponse(
         String categoryLabel,
         String description,
         String status,
-        Instant createdAt
-) {}
+        Instant createdAt,
+        String evidenceUrl
+) {
+        public TrackReportResponse(
+                Long id,
+                Long trackId,
+                String trackTitle,
+                String trackCoverUrl,
+                Long submittedByUserId,
+                String category,
+                String categoryLabel,
+                String description,
+                String status,
+                Instant createdAt
+        ) {
+                this(id, trackId, trackTitle, trackCoverUrl, submittedByUserId, category, categoryLabel, description, status, createdAt, null);
+        }
+}
 

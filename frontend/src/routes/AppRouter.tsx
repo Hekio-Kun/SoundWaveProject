@@ -28,6 +28,7 @@ import { StaffContentReportsPage } from "../pages/StaffContentReportsPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { RankingBoardPage } from "../pages/RankingBoardPage";
 import { ReportsHistoryPage } from "../pages/ReportsHistoryPage";
+import { ReportTrackPage } from "../pages/ReportTrackPage";
 import { StudioAlbumDetailPage } from "../pages/StudioAlbumDetailPage";
 import { StudioPage } from "../pages/StudioPage";
 import { StudioTrackDetailPage } from "../pages/StudioTrackDetailPage";
@@ -454,6 +455,36 @@ export function AppRouter(): React.ReactElement | null {
       );
     }
     return <ReportsHistoryPage onNavigate={navigate} />;
+  }
+
+  // Dedicated Content Report Page (UC-22.1)
+  if (pathname.startsWith("/report/track/") || pathname.startsWith("/reports/track/")) {
+    if (!authReady) return null;
+    if (!isAuthenticated) {
+      return (
+        <div className="state-page" style={{ padding: "80px 20px", textAlign: "center" }}>
+          <span className="state-icon">!</span>
+          <h1>Log in to report a track</h1>
+          <p>You need to be logged in with a listener account to submit a content report.</p>
+          <button className="button button-primary" onClick={() => navigate("/login")}>
+            Go to login
+          </button>
+        </div>
+      );
+    }
+    const parts = pathname.split("/");
+    const trackId = Number(parts[3]) || null;
+    if (!trackId) {
+      navigate("/explore");
+      return null;
+    }
+    return (
+      <ReportTrackPage
+        trackId={trackId}
+        currentUser={user}
+        onNavigate={navigate}
+      />
+    );
   }
 
   // 4. Creator Studio Routes

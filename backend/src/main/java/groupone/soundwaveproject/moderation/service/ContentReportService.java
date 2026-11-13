@@ -8,6 +8,8 @@ import groupone.soundwaveproject.catalog.repository.TrackRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
+import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
+import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.dto.request.CreateContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.CreateTrackReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.UpdateTrackReportRequest;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.function.Function;
@@ -38,16 +41,22 @@ public class ContentReportService {
     private final ContentReportRepository contentReportRepository;
     private final UserRepository userRepository;
     private final TrackRepository trackRepository;
+    private final CloudMediaService cloudMediaService;
 
     /**
      * Tiếp nhận báo cáo vi phạm nội dung đối với bài hát đã phát hành từ người nghe (UC-22.1).
      *
      * @param userEmail Email của người dùng đăng nhập gửi báo cáo
      * @param request DTO chứa trackId, danh mục báo cáo và mô tả chi tiết
+     * @param evidenceFile Tệp tài liệu chứng nhận bản quyền đính kèm (nếu có)
      * @return Thông tin báo cáo đã tạo thành công
      */
     @Transactional
-    public TrackReportResponse submitTrackReport(String userEmail, CreateTrackReportRequest request) {
+    public TrackReportResponse submitTrackReport(
+            String userEmail,
+            CreateTrackReportRequest request,
+            MultipartFile evidenceFile
+    ) {
         // 1. Xác thực người dùng gửi báo cáo (BR-36)
         User user = userRepository.findByEmailIgnoreCase(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account not found"));
@@ -98,12 +107,23 @@ public class ContentReportService {
             );
         }
 
+        // Xử lý tệp bằng chứng sở hữu bản quyền nếu người dùng cung cấp (UC-22.1)
+        String evidenceUrl = request.evidenceUrl();
+        String evidencePublicId = null;
+        if (evidenceFile != null && !evidenceFile.isEmpty()) {
+            StoredMediaResponse stored = cloudMediaService.uploadReportEvidence(evidenceFile, user.getId());
+            evidenceUrl = stored.secureUrl();
+            evidencePublicId = stored.publicId();
+        }
+
         // 5. Lưu báo cáo vào cơ sở dữ liệu với trạng thái PENDING (BR-32)
         ContentReport report = ContentReport.builder()
                 .trackId(track.getId())
                 .submittedByUserId(user.getId())
                 .category(category.name())
                 .description(description)
+                .evidenceUrl(evidenceUrl)
+                .evidencePublicId(evidencePublicId)
                 .status("PENDING")
                 // Đồng bộ tương thích cho các cột legacy
                 .reporterId(user.getId())
@@ -113,8 +133,8 @@ public class ContentReportService {
                 .build();
 
         ContentReport saved = contentReportRepository.save(report);
-        log.info("Content report #{} submitted for trackId: {} ('{}') by user: {}",
-                saved.getId(), track.getId(), track.getTitle(), user.getEmail());
+        log.info("Content report #{} submitted for trackId: {} ('{}') by user: {} with evidence: {}",
+                saved.getId(), track.getId(), track.getTitle(), user.getEmail(), evidenceUrl);
 
         return new TrackReportResponse(
                 saved.getId(),
@@ -126,8 +146,14 @@ public class ContentReportService {
                 category.getDisplayName(),
                 saved.getDescription(),
                 saved.getStatus(),
-                saved.getCreatedAt()
+                saved.getCreatedAt(),
+                saved.getEvidenceUrl()
         );
+    }
+
+    @Transactional
+    public TrackReportResponse submitTrackReport(String userEmail, CreateTrackReportRequest request) {
+        return submitTrackReport(userEmail, request, null);
     }
 
     /**
@@ -232,7 +258,8 @@ public class ContentReportService {
                 catLabel,
                 report.getDescription(),
                 report.getStatus(),
-                report.getCreatedAt()
+                report.getCreatedAt(),
+                report.getEvidenceUrl()
         );
     }
 
@@ -269,7 +296,12 @@ public class ContentReportService {
             );
         }
 
-        // 5. Xóa bản ghi báo cáo khỏi cơ sở dữ liệu (NF01 Step 5, POST-1)
+        // 5. Dọn dẹp tệp chứng minh đính kèm trên Cloudinary (nếu có)
+        if (report.getEvidencePublicId() != null && !report.getEvidencePublicId().isBlank()) {
+            cloudMediaService.deleteReportEvidenceQuietly(report.getEvidencePublicId());
+        }
+
+        // 6. Xóa bản ghi báo cáo khỏi cơ sở dữ liệu (NF01 Step 5, POST-1)
         contentReportRepository.delete(report);
         log.info("Content report #{} on trackId {} successfully withdrawn and deleted by user {}",
                 reportId, report.getTrackId() != null ? report.getTrackId() : report.getTargetId(), user.getEmail());
@@ -319,7 +351,8 @@ public class ContentReportService {
                     r.getStatus(),
                     r.getResolutionNote() != null ? r.getResolutionNote() : r.getReviewerNote(),
                     r.getCreatedAt(),
-                    r.getHandledAt() != null ? r.getHandledAt() : r.getResolvedAt()
+                    r.getHandledAt() != null ? r.getHandledAt() : r.getResolvedAt(),
+                    r.getEvidenceUrl()
             );
         }).toList();
     }

@@ -817,6 +817,105 @@ export function StaffContentReportDetailView({
 
             {/* Unified Card Body: Form or Resolution Record */}
             <div style={{ padding: "24px" }}>
+              {/* Copyright Evidence Document Attachment if present */}
+              {(report.evidenceUrl || report.reporters?.some((r) => r.evidenceUrl)) && (
+                <div
+                  style={{
+                    backgroundColor: "#F0F9FF",
+                    border: "1px solid #BAE6FD",
+                    borderRadius: "12px",
+                    padding: "16px 20px",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "8px",
+                          backgroundColor: "#E0F2FE",
+                          color: "#0284C7",
+                          display: "grid",
+                          placeItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <FileTextIcon width={22} height={22} />
+                      </div>
+                      <div>
+                        <strong style={{ display: "block", fontSize: "0.95rem", color: "#0369A1", fontWeight: 700 }}>
+                          Copyright Ownership Proof Document Attached
+                        </strong>
+                        <span style={{ fontSize: "0.85rem", color: "#0284C7" }}>
+                          Official documentation or certificate proving intellectual property rights submitted with this report.
+                        </span>
+                      </div>
+                    </div>
+                    {report.evidenceUrl && (
+                      <a
+                        href={report.evidenceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="button button-small"
+                        style={{
+                          backgroundColor: "#0284C7",
+                          color: "#FFFFFF",
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                          fontWeight: 600,
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        Open Proof Document ↗
+                      </a>
+                    )}
+                  </div>
+
+                  {/* If grouped reports have additional documents */}
+                  {report.reporters && report.reporters.filter((r) => r.evidenceUrl && r.evidenceUrl !== report.evidenceUrl).length > 0 && (
+                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #BAE6FD" }}>
+                      <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "#0369A1" }}>
+                        Additional evidence files from other reporters in this case:
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
+                        {report.reporters
+                          .filter((r) => r.evidenceUrl && r.evidenceUrl !== report.evidenceUrl)
+                          .map((r, idx) => (
+                            <a
+                              key={r.reporterId || idx}
+                              href={r.evidenceUrl!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "4px 10px",
+                                backgroundColor: "#FFFFFF",
+                                border: "1px solid #BAE6FD",
+                                borderRadius: "6px",
+                                fontSize: "0.8rem",
+                                color: "#0284C7",
+                                textDecoration: "none",
+                                fontWeight: 500,
+                              }}
+                            >
+                              <FileTextIcon width={14} height={14} />
+                              Evidence #{idx + 2} ({r.reporterName}) ↗
+                            </a>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {isPending ? (
                 <>
                   <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1C1917", margin: "0 0 16px 0" }}>

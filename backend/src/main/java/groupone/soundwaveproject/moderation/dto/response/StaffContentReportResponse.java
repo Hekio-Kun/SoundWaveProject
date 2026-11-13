@@ -26,12 +26,18 @@ public record StaffContentReportResponse(
         String reviewerName,
         String staffNote,
         Instant createdAt,
-        Instant resolvedAt
+        Instant resolvedAt,
+        String evidenceUrl
 ) {
     public record ReporterSummary(
             Long reporterId,
             String reporterName,
             String reporterEmail,
-            Instant submittedAt
-    ) {}
+            Instant submittedAt,
+            String evidenceUrl
+    ) {
+        public ReporterSummary(Long reporterId, String reporterName, String reporterEmail, Instant submittedAt) {
+            this(reporterId, reporterName, reporterEmail, submittedAt, null);
+        }
+    }
 }

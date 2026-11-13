@@ -15,6 +15,22 @@ public record MyReportHistoryResponse(
         String status,
         String resolutionNote,
         Instant createdAt,
-        Instant handledAt
-) {}
+        Instant handledAt,
+        String evidenceUrl
+) {
+        public MyReportHistoryResponse(
+                Long id,
+                Long trackId,
+                String trackTitle,
+                String trackCoverUrl,
+                String category,
+                String categoryLabel,
+                String status,
+                String resolutionNote,
+                Instant createdAt,
+                Instant handledAt
+        ) {
+                this(id, trackId, trackTitle, trackCoverUrl, category, categoryLabel, status, resolutionNote, createdAt, handledAt, null);
+        }
+}
 
