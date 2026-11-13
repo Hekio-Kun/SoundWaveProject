@@ -9,7 +9,6 @@ import { parseLyricsToLines, formatTimeDisplay } from "../components/common/Lyri
 import { studioApi, type PendingLyricSubmission } from "../api/track";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
-import { ReportTrackModal } from "../components/modals/ReportTrackModal";
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { downloadLrcFile } from "../utils/lyricsDownload";
@@ -122,7 +121,6 @@ export function TrackDetailsPage({
   const [withdrawingSub, setWithdrawingSub] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
-  const [reportTrackModalOpen, setReportTrackModalOpen] = useState(false);
 
   // More Creator Tracks & Karaoke Fullscreen
   const [moreCreatorTracks, setMoreCreatorTracks] = useState<LandingTrack[]>([]);
@@ -285,8 +283,7 @@ export function TrackDetailsPage({
   const anyModalOpen =
     playlistModalOpen ||
     authPromptOpen ||
-    deleteConfirmOpen ||
-    reportTrackModalOpen;
+    deleteConfirmOpen;
   useModalScrollLock(anyModalOpen);
 
   const goToCreatorProfile = (targetCreatorId?: number) => {
@@ -305,7 +302,6 @@ export function TrackDetailsPage({
       if (event.key === "Escape") {
         setPlaylistModalOpen(false);
         setAuthPromptOpen(false);
-        setReportTrackModalOpen(false);
         
         if (!deleteSaving) setDeleteConfirmOpen(false);
       }
@@ -654,7 +650,7 @@ export function TrackDetailsPage({
                 type="button"
                 className="track-round-action track-round-action--report"
                 disabled={submittingAction}
-                onClick={() => requestLibraryAccess(() => setReportTrackModalOpen(true))}
+                onClick={() => requestLibraryAccess(() => onNavigate(`/report/track/${track.id}`))}
                 title="Report Track"
                 aria-label="Report Track"
               >
@@ -1249,24 +1245,6 @@ export function TrackDetailsPage({
           void handleDeletePersonalLyrics();
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
-      />
-
-      {/* UC-22.1: Report Track Violation Modal */}
-      <ReportTrackModal
-        open={reportTrackModalOpen}
-        onClose={() => setReportTrackModalOpen(false)}
-        trackId={trackId}
-        trackTitle={track.title}
-        trackArtist={track.creator?.displayName || "Unknown Creator"}
-        trackCoverUrl={track.coverUrl}
-        isCreator={isTrackCreator}
-        onSuccess={(msg) =>
-          setNotification({
-            open: true,
-            message: msg,
-            type: "success",
-          })
-        }
       />
 
       {/* Central Feedback Toast Popup */}

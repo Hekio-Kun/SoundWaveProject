@@ -10,10 +10,12 @@ import groupone.soundwaveproject.moderation.service.ContentReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -33,7 +35,7 @@ public class ContentReportController {
      * Báo cáo vi phạm nội dung đối với bài hát đã phát hành (UC-22.1).
      * Yêu cầu người nghe đã đăng nhập (BR-36).
      */
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TrackReportResponse> reportTrack(
             @Valid @RequestBody CreateTrackReportRequest request,
@@ -41,7 +43,26 @@ public class ContentReportController {
     ) {
         TrackReportResponse response = contentReportService.submitTrackReport(
                 authentication.getName(),
-                request
+                request,
+                null
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Báo cáo vi phạm nội dung kèm tệp tài liệu chứng nhận sở hữu bản quyền bài hát (UC-22.1 Multipart).
+     */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<TrackReportResponse> reportTrackWithEvidence(
+            @Valid @RequestPart("report") CreateTrackReportRequest request,
+            @RequestPart(value = "evidence", required = false) MultipartFile evidence,
+            Authentication authentication
+    ) {
+        TrackReportResponse response = contentReportService.submitTrackReport(
+                authentication.getName(),
+                request,
+                evidence
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

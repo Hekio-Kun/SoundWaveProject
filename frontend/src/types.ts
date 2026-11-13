@@ -434,6 +434,7 @@ export type StaffContentReportResponse = {
     reporterName: string;
     reporterEmail: string | null;
     submittedAt: string;
+    evidenceUrl?: string | null;
   }>;
   targetType: string;
   targetId: number;
@@ -449,6 +450,7 @@ export type StaffContentReportResponse = {
   reviewerId: number | null;
   reviewerName: string | null;
   staffNote: string | null;
+  evidenceUrl?: string | null;
   createdAt: string;
   resolvedAt: string | null;
 };

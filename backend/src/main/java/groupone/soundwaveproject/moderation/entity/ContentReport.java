@@ -86,6 +86,18 @@ public class ContentReport {
     @Column(name = "resolution_note", length = 2000)
     private String resolutionNote;
 
+    /**
+     * Đường dẫn tài liệu / hình ảnh chứng minh sở hữu bản quyền từ người báo cáo (UC-22.1).
+     */
+    @Column(name = "evidence_url", length = 500)
+    private String evidenceUrl;
+
+    /**
+     * Mã định danh tài liệu chứng minh trên Cloudinary.
+     */
+    @Column(name = "evidence_public_id", length = 200)
+    private String evidencePublicId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

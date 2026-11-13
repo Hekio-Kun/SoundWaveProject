@@ -6,6 +6,7 @@ import com.cloudinary.utils.ObjectUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import groupone.soundwaveproject.config.CloudinaryProperties;
+import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.exception.CloudStorageUnavailableException;
@@ -27,6 +28,7 @@ public class CloudMediaService {
     private static final long MAX_AVATAR_SIZE = 5L * 1024 * 1024;
     private static final long MAX_TRACK_AUDIO_SIZE = 30L * 1024 * 1024;
     private static final long MAX_TRACK_COVER_SIZE = 5L * 1024 * 1024;
+    private static final long MAX_EVIDENCE_DOCUMENT_SIZE = 15L * 1024 * 1024;
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
     private final Cloudinary cloudinary;
@@ -89,6 +91,35 @@ public class CloudMediaService {
         byte[] content = readValidTrackCover(file);
         Map<?, ?> result = upload(content, "soundwave/albums/covers", "user-" + userId + "-album-cover", "image");
         return toStoredMedia(result);
+    }
+
+    /**
+     * Tải tệp tài liệu / hình ảnh chứng minh sở hữu bản quyền bài hát lên Cloudinary (UC-22.1).
+     * Hỗ trợ PDF, văn bản, hình ảnh pháp lý (dung lượng tối đa 15MB).
+     */
+    public StoredMediaResponse uploadReportEvidence(MultipartFile file, Long userId) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestOperationException("EVIDENCE_EMPTY", "Evidence document cannot be empty.");
+        }
+        if (file.getSize() > MAX_EVIDENCE_DOCUMENT_SIZE) {
+            throw new BadRequestOperationException("EVIDENCE_TOO_LARGE", "Evidence document must not exceed 15MB.");
+        }
+        try {
+            byte[] content = file.getBytes();
+            Map<?, ?> result = upload(content, "soundwave/reports/evidence", "user-" + userId + "-evidence", "auto");
+            return toStoredMedia(result);
+        } catch (IOException e) {
+            log.error("Failed to read evidence document", e);
+            throw new BadRequestOperationException("EVIDENCE_READ_ERROR", "Could not read uploaded evidence file.");
+        }
+    }
+
+    /**
+     * Xóa tệp bằng chứng bản quyền khỏi Cloudinary khi báo cáo bị rút hoặc thay đổi.
+     */
+    public void deleteReportEvidenceQuietly(String publicId) {
+        deleteMediaQuietly(publicId, "raw");
+        deleteMediaQuietly(publicId, "image");
     }
 
     /**

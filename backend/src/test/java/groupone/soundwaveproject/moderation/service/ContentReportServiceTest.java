@@ -17,6 +17,7 @@ import groupone.soundwaveproject.moderation.dto.response.MyReportHistoryResponse
 import groupone.soundwaveproject.moderation.dto.response.TrackReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.repository.ContentReportRepository;
+import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -46,6 +48,9 @@ class ContentReportServiceTest {
 
     @Mock
     private TrackRepository trackRepository;
+
+    @Mock
+    private groupone.soundwaveproject.media.service.CloudMediaService cloudMediaService;
 
     @InjectMocks
     private ContentReportService contentReportService;
@@ -114,6 +119,41 @@ class ContentReportServiceTest {
         assertEquals("PENDING", response.status());
 
         verify(contentReportRepository, times(1)).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("submitTrackReport - Successfully submits report with copyright evidence document")
+    void submitTrackReport_WithCopyrightEvidence_UploadsEvidenceAndSucceeds() {
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+        when(contentReportRepository.hasPendingReportForTrack(100L, 10L, "PENDING")).thenReturn(false);
+
+        MockMultipartFile evidenceFile = new MockMultipartFile(
+                "evidence", "copyright_certificate.pdf", "application/pdf", new byte[]{1, 2, 3, 4});
+        when(cloudMediaService.uploadReportEvidence(evidenceFile, 10L))
+                .thenReturn(new StoredMediaResponse("ev_pub_123", "https://cloud.com/certificate.pdf"));
+
+        when(contentReportRepository.save(any(ContentReport.class))).thenAnswer(invocation -> {
+            ContentReport report = invocation.getArgument(0);
+            ReflectionTestUtils.setField(report, "id", 2L);
+            ReflectionTestUtils.setField(report, "createdAt", Instant.now());
+            return report;
+        });
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "COPYRIGHT",
+                "Official copyright ownership claim"
+        );
+
+        TrackReportResponse response = contentReportService.submitTrackReport("listener@example.com", request, evidenceFile);
+
+        assertNotNull(response);
+        assertEquals(2L, response.id());
+        assertEquals("https://cloud.com/certificate.pdf", response.evidenceUrl());
+        verify(cloudMediaService, times(1)).uploadReportEvidence(evidenceFile, 10L);
+        verify(contentReportRepository, times(1)).save(argThat(r ->
+                "https://cloud.com/certificate.pdf".equals(r.getEvidenceUrl()) && "ev_pub_123".equals(r.getEvidencePublicId())));
     }
 
     @Test

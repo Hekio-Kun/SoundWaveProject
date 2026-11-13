@@ -286,7 +286,7 @@ public class StaffContentReportService {
                             .orElse(email);
                 }
             }
-            reporters.add(new StaffContentReportResponse.ReporterSummary(r.getReporterId(), name, email, r.getCreatedAt()));
+            reporters.add(new StaffContentReportResponse.ReporterSummary(r.getReporterId(), name, email, r.getCreatedAt(), r.getEvidenceUrl()));
         }
 
         StaffContentReportResponse.ReporterSummary primaryReporter = reporters.get(0);
@@ -359,7 +359,8 @@ public class StaffContentReportService {
                 reviewerName,
                 primary.getReviewerNote(),
                 primary.getCreatedAt(),
-                primary.getResolvedAt()
+                primary.getResolvedAt(),
+                primary.getEvidenceUrl()
         );
     }
 

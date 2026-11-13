@@ -17,9 +17,16 @@ public record CreateTrackReportRequest(
         String category,
 
         @Size(max = 2000, message = "Description cannot exceed 2000 characters")
-        String description
+        String description,
+
+        @Size(max = 500, message = "Evidence URL cannot exceed 500 characters")
+        String evidenceUrl
 ) {
         public CreateTrackReportRequest(Long trackId, String category) {
-                this(trackId, category, null);
+                this(trackId, category, null, null);
+        }
+
+        public CreateTrackReportRequest(Long trackId, String category, String description) {
+                this(trackId, category, description, null);
         }
 }
