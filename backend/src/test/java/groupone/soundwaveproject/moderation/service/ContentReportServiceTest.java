@@ -138,6 +138,28 @@ class ContentReportServiceTest {
     }
 
     @Test
+    @DisplayName("submitTrackReport - Throws exception when user reports their own track")
+    void submitTrackReport_OwnTrack_ThrowsBadRequestOperationException() {
+        // mockUser id is 10L; set mockTrack's uploaderUserId to 10L
+        mockTrack.setUploaderUserId(10L);
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+
+        CreateTrackReportRequest request = new CreateTrackReportRequest(
+                100L,
+                "COPYRIGHT",
+                "Infringement description"
+        );
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.submitTrackReport("listener@example.com", request)
+        );
+
+        assertEquals("CANNOT_REPORT_OWN_TRACK", ex.getCode());
+        verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    @Test
     @DisplayName("submitTrackReport - Throws exception when duplicate PENDING report exists (EX01)")
     void submitTrackReport_DuplicatePendingReport() {
         when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
@@ -347,6 +369,23 @@ class ContentReportServiceTest {
                 contentReportService.submitLyricReport("listener@example.com", request)
         );
 
+        verify(contentReportRepository, never()).save(any(ContentReport.class));
+    }
+
+    @Test
+    @DisplayName("submitLyricReport - Throws BadRequestOperationException when user reports lyrics of their own track")
+    void submitLyricReport_OwnTrack_ThrowsBadRequestOperationException() {
+        mockTrack.setUploaderUserId(10L);
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(mockUser));
+        when(trackRepository.findById(100L)).thenReturn(Optional.of(mockTrack));
+
+        CreateContentReportRequest request = new CreateContentReportRequest(100L, "OUT_OF_SYNC", "My own track lyrics");
+
+        BadRequestOperationException ex = assertThrows(BadRequestOperationException.class, () ->
+                contentReportService.submitLyricReport("listener@example.com", request)
+        );
+
+        assertEquals("CANNOT_REPORT_OWN_TRACK", ex.getCode());
         verify(contentReportRepository, never()).save(any(ContentReport.class));
     }
 

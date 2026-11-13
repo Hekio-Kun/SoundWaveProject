@@ -63,7 +63,15 @@ public class ContentReportService {
             );
         }
 
-        // 3. Kiểm tra danh mục vi phạm hợp lệ (BR-31)
+        // 3. Kiểm tra tác giả bài hát: Người up nhạc lên không thể tự báo cáo bài hát của chính mình
+        if (track.getUploaderUserId() != null && track.getUploaderUserId().equals(user.getId())) {
+            throw new BadRequestOperationException(
+                    "CANNOT_REPORT_OWN_TRACK",
+                    "You cannot report your own track"
+            );
+        }
+
+        // 4. Kiểm tra danh mục vi phạm hợp lệ (BR-31)
         if (!ReportCategory.isValid(request.category())) {
             throw new BadRequestOperationException(
                     "INVALID_REPORT_CATEGORY",
@@ -337,6 +345,14 @@ public class ContentReportService {
 
         Track track = trackRepository.findById(request.trackId())
                 .orElseThrow(() -> new ResourceNotFoundException("TRACK_NOT_FOUND", "Track not found with id: " + request.trackId()));
+
+        // Chặn tác giả tự báo cáo lời bài hát của chính mình
+        if (track.getUploaderUserId() != null && track.getUploaderUserId().equals(user.getId())) {
+            throw new BadRequestOperationException(
+                    "CANNOT_REPORT_OWN_TRACK",
+                    "You cannot report lyrics of your own track"
+            );
+        }
 
         String reason = request.reason().trim();
         String description = request.description() != null ? request.description().trim() : null;
