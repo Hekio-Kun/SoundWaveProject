@@ -185,6 +185,9 @@ export function TakeDownConfirmationModal({
               borderRadius: "8px",
               fontSize: "0.85rem",
               marginBottom: "16px",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              boxSizing: "border-box",
             }}
           >
             {errorMessage}

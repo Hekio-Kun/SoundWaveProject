@@ -2203,3 +2203,91 @@ body { overflow-x: hidden; }
 .studio-page .studio-table tr:hover .track-preview-hover-btn {
   opacity: 1 !important;
 }
+
+/* ==========================================================================
+   Comprehensive Image Scaling & Aspect Ratio Fit (UI-Wide)
+   ========================================================================== */
+img {
+  image-rendering: auto;
+}
+
+.table-track-cell img,
+.row-thumbnail img,
+.discover-feature-card-img,
+.discover-feature-card img,
+.sw-track-cover img,
+.sw-album-art img,
+.album-card-art img,
+.music-card-cover img,
+.playlist-art img,
+.playlist-cover-wrap img,
+.player-track img,
+.queue-item img,
+.sw-creator-avatar img,
+.creator-card > img,
+.track-author-card > img,
+.track-cover-button img,
+.track-showcase-visual img,
+.profile-settings-avatar img,
+.modal-card img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.table-track-cell img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.row-thumbnail {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.row-thumbnail img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.brand-mark {
+  object-fit: contain;
+}
+
+/* ==========================================================================
+   Modal Alert & Text Overflow Protection (UI-Wide)
+   ========================================================================== */
+.modal-alert-box,
+.auth-v2-error,
+.upload-track-alert,
+.genre-form-alert,
+.rejection-box,
+.modal-card .auth-v2-error {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+.modal-alert-box span,
+.modal-alert-box div,
+.auth-v2-error > div,
+.auth-v2-error > span:not(:first-child),
+.auth-v2-error small,
+.genre-form-alert > span,
+.rejection-box p,
+.rejection-text,
+.modal-card p {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+

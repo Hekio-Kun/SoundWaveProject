@@ -1061,6 +1061,23 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   background: #fef3f2;
   font-size: 12px;
   font-weight: 600;
+  box-sizing: border-box;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.genre-form-alert > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.genre-form-alert > span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .genre-form-modal [aria-invalid="true"] {

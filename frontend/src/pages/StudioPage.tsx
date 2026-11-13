@@ -122,7 +122,6 @@ export function StudioPage({
     "ALL" | "PUBLISHED" | "PENDING" | "REJECTED" | "DRAFT"
   >("ALL");
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
-  const [albumViewMode, setAlbumViewMode] = useState<"table" | "grid">("table");
   const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [albumModalOpen, setAlbumModalOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<StudioAlbum | null>(null);
@@ -478,6 +477,9 @@ export function StudioPage({
                         <img
                           src={album.coverUrl || "/pics/album.png"}
                           alt={album.title}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = "/pics/album.png";
+                          }}
                           style={{
                             width: "44px",
                             height: "44px",
@@ -769,6 +771,9 @@ export function StudioPage({
                           <img
                             src={t.coverUrl ?? "/pics/album.png"}
                             alt={t.title}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = "/pics/album.png";
+                            }}
                             style={{
                               width: "100%",
                               height: "100%",
@@ -1056,56 +1061,6 @@ export function StudioPage({
                   </button>
                 )}
               </div>
-
-              {/* View Mode Toggle (Table / Grid) */}
-              <div
-                style={{
-                  display: "inline-flex",
-                  background: "#f1f5f9",
-                  padding: "3px",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setAlbumViewMode("table")}
-                  style={{
-                    border: "none",
-                    background: albumViewMode === "table" ? "#ffffff" : "transparent",
-                    color: albumViewMode === "table" ? "var(--color-ocean-primary, #0284C7)" : "#64748b",
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: albumViewMode === "table" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.15s ease",
-                  }}
-                  title="Table view (matches Sequence Diagram UC-21.4 step 1.16)"
-                >
-                  Table
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAlbumViewMode("grid")}
-                  style={{
-                    border: "none",
-                    background: albumViewMode === "grid" ? "#ffffff" : "transparent",
-                    color: albumViewMode === "grid" ? "var(--color-ocean-primary, #0284C7)" : "#64748b",
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: albumViewMode === "grid" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.15s ease",
-                  }}
-                  title="Grid card view"
-                >
-                  Cards
-                </button>
-              </div>
             </div>
           </div>
 
@@ -1166,169 +1121,9 @@ export function StudioPage({
                 </button>
               )}
             </div>
-          ) : albumViewMode === "table" ? (
+          ) : (
             /* Sequence Diagram UC-21.4 Step 1.16: renderMyAlbumsTable(albums[coverUrl, title, statusBadge, trackCount, actions]) */
             renderMyAlbumsTable(filteredAlbums)
-          ) : (
-            /* Grid View */
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: "20px",
-              }}
-            >
-              {filteredAlbums.map((album) => {
-                const status = (album.status || "DRAFT").toUpperCase();
-                const isPublished = status === "PUBLISHED" || status === "APPROVED";
-                const isPending = status === "PENDING";
-                const isRejected = status === "REJECTED";
-                const canSubmit = status === "DRAFT" || status === "REJECTED";
-                const statusClass = isPublished
-                  ? "status-pill--approved"
-                  : isPending
-                  ? "status-pill--pending"
-                  : isRejected
-                  ? "status-pill--rejected"
-                  : "status-pill--draft";
-
-                return (
-                  <div
-                    key={album.id}
-                    onClick={() => onNavigate(`/album/submission/${album.id}`)}
-                    style={{
-                      background: "#ffffff",
-                      border: "1px solid var(--color-sand-light, #E6D5B8)",
-                      borderRadius: "16px",
-                      overflow: "hidden",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                      display: "flex",
-                      flexDirection: "column",
-                      cursor: "pointer",
-                      transition: "transform 0.18s ease, box-shadow 0.18s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                      e.currentTarget.style.boxShadow = "0 10px 24px rgba(2, 132, 199, 0.12)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-                    }}
-                    title={`Click to view details & manage "${album.title}"`}
-                  >
-                    {/* Cover & Publication Status */}
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", backgroundColor: "#f1f5f9" }}>
-                      <img
-                        src={album.coverUrl || "/pics/album.png"}
-                        alt={album.title}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                      <div style={{ position: "absolute", top: "12px", right: "12px" }}>
-                        <span
-                          className={`status-pill ${statusClass}`}
-                          style={{ boxShadow: "0 2px 6px rgba(0,0,0,0.12)" }}
-                        >
-                          {status}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "0",
-                          left: "0",
-                          right: "0",
-                          background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-                          padding: "24px 14px 10px",
-                          color: "#ffffff",
-                          fontSize: "12px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span>{album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}</span>
-                        <span>{formatDate(album.releaseDate || album.createdAt, "No release date")}</span>
-                      </div>
-                    </div>
-
-                    {/* Album Info */}
-                    <div style={{ padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
-                      <h4
-                        style={{
-                          margin: "0 0 6px",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: "var(--color-ocean-dark, #0F172A)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={album.title}
-                      >
-                        {album.title}
-                      </h4>
-
-                      <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: "12px", color: "var(--sw-text-muted)" }}>
-                          {album.releaseDate ? `Release: ${formatDate(album.releaseDate)}` : "No release date"}
-                        </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          {canSubmit && (
-                            <button
-                              type="button"
-                              className="button button-primary button-small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleStartSubmitAlbum(album);
-                              }}
-                              id={`btn-submit-album-${album.id}`}
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "12px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                              title="Submit album for staff moderation review"
-                            >
-                              <UploadIcon width={13} height={13} />
-                              <span>Submit</span>
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigate(`/album/submission/${album.id}`);
-                            }}
-                            style={{ padding: "4px 8px" }}
-                            title="View album details"
-                          >
-                            <EyeIcon width={13} height={13} />
-                            <span>View</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-ghost button-small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirmAlbum(album);
-                            }}
-                            style={{ color: "var(--sw-danger, #b42318)", padding: "4px 8px" }}
-                            title="Delete album"
-                          >
-                            <TrashIcon width={13} height={13} />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           )}
         </>
       )}

@@ -334,13 +334,15 @@ export function StaffActivityModal({
                 border: "1px solid #FECACA",
                 color: "#991B1B",
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: "10px",
                 fontSize: "13px",
+                boxSizing: "border-box",
+                width: "100%",
               }}
             >
-              <AlertIcon width={18} height={18} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
+              <AlertIcon width={18} height={18} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere", lineHeight: 1.45 }}>{error}</span>
             </div>
           ) : activeTab === "tracks" ? (
             trackReviews.length === 0 ? (

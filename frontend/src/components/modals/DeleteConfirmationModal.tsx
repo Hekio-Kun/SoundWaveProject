@@ -81,7 +81,7 @@ export function DeleteConfirmationModal({
         <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 8px", color: "var(--sw-text)" }}>
           {title}
         </h3>
-        <p style={{ fontSize: "13px", color: "var(--sw-muted)", lineHeight: 1.6, margin: "0 0 20px" }}>
+        <p style={{ fontSize: "13px", color: "var(--sw-muted)", lineHeight: 1.6, margin: "0 0 20px", wordBreak: "break-word", overflowWrap: "anywhere" }}>
           {message}
         </p>
 

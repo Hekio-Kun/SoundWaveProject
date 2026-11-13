@@ -342,7 +342,7 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
               style={{
                 marginBottom: "16px",
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: "10px",
                 padding: "10px 14px",
                 borderRadius: "10px",
@@ -350,14 +350,21 @@ export function UpdateLyricModal({ open, track, onClose, onSaved, onSuccess }: P
                 border: "1px solid #FECACA",
                 color: "#991B1B",
                 fontSize: "13px",
+                boxSizing: "border-box",
+                width: "100%",
               }}
             >
-              <AlertIcon width={18} height={18} />
-              <div style={{ flex: 1 }}>{errorMessage}</div>
+              <span style={{ width: "24px", height: "24px", flexShrink: 0, display: "grid", placeItems: "center" }}>
+                <AlertIcon width={18} height={18} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere", lineHeight: 1.45 }}>
+                {errorMessage}
+              </div>
               <button
                 type="button"
                 onClick={() => setErrorMessage(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "inherit" }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "2px", flexShrink: 0 }}
+                aria-label="Dismiss error"
               >
                 <CloseIcon width={14} height={14} />
               </button>
