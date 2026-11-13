@@ -21,6 +21,7 @@ import {
   VolumeIcon,
 } from "../../icons";
 import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
+import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 
 function formatDuration(ms?: number | null): string {
   if (!ms || ms <= 0) return "0:00";
@@ -84,8 +85,8 @@ const PRESET_REASONS = [
 type Props = {
   submissionId: number;
   onBack: () => void;
-  onApproveSuccess?: () => void;
-  onRejectSuccess?: () => void;
+  onApproveSuccess?: (message?: string) => void;
+  onRejectSuccess?: (message?: string) => void;
   onNavigateToSubmission?: (submissionId: number) => void;
 };
 
@@ -124,6 +125,29 @@ export function PendingTrackDetailView({
   const isUserScrollingRef = useRef<boolean>(false);
   const isProgrammaticScrollRef = useRef<boolean>(false);
   const scrollTimeoutRef = useRef<number | null>(null);
+
+  // Floating Toast Notification
+  const [internalToast, setInternalToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const showInternalToast = (message: string, type: "success" | "error" = "success") => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setInternalToast({ message, type });
+    toastTimerRef.current = window.setTimeout(() => {
+      setInternalToast(null);
+      toastTimerRef.current = null;
+    }, 3500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   // Sync lyrics from submission or lyricsApi
   useEffect(() => {
@@ -189,6 +213,25 @@ export function PendingTrackDetailView({
     }
     return idx;
   }, [parsedActiveLines, currentTime, hasTimestamps]);
+
+  const totalAlbumDurationMs = useMemo(() => {
+    if (!detail?.albumNavigation?.tracks) return 0;
+    return detail.albumNavigation.tracks.reduce((sum, t) => sum + (t.durationMs || 0), 0);
+  }, [detail?.albumNavigation?.tracks]);
+
+  const albumProgressStats = useMemo(() => {
+    if (!detail?.albumNavigation?.tracks) {
+      return { total: 0, approved: 0, rejected: 0, pending: 0, processed: 0, percent: 0 };
+    }
+    const tracks = detail.albumNavigation.tracks;
+    const total = tracks.length;
+    const approved = tracks.filter((t) => t.status === "APPROVED").length;
+    const rejected = tracks.filter((t) => t.status === "REJECTED").length;
+    const pending = tracks.filter((t) => !t.status || t.status === "PENDING").length;
+    const processed = approved + rejected;
+    const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+    return { total, approved, rejected, pending, processed, percent };
+  }, [detail?.albumNavigation?.tracks]);
 
   // Auto-scroll active line strictly within lyrics container without scrolling whole page
   useEffect(() => {
@@ -393,7 +436,35 @@ export function PendingTrackDetailView({
       if (audioRef.current) audioRef.current.pause();
       setDetail(updated);
       setActionType(null);
-      onApproveSuccess?.();
+
+      const isAlbumFinished = Boolean(
+        updated.albumNavigation && !updated.albumNavigation.nextPendingSubmissionId
+      );
+
+      const finalMsg = isAlbumFinished
+        ? "All tracks in album have been reviewed."
+        : detail.submissionType === "LYRIC_UPDATE"
+        ? "Lyric update approved successfully."
+        : "Track approved successfully.";
+
+      try {
+        sessionStorage.setItem(
+          "soundwave_flash_toast",
+          JSON.stringify({ message: finalMsg, type: "success" })
+        );
+      } catch {
+        // ignore
+      }
+
+      showInternalToast(finalMsg, "success");
+      onApproveSuccess?.(finalMsg);
+
+      const nextPendingId = updated.albumNavigation?.nextPendingSubmissionId;
+      if (nextPendingId && onNavigateToSubmission) {
+        onNavigateToSubmission(nextPendingId);
+      } else if (updated.albumNavigation) {
+        onBack();
+      }
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to approve track.");
     } finally {
@@ -417,7 +488,35 @@ export function PendingTrackDetailView({
       if (audioRef.current) audioRef.current.pause();
       setDetail(updated);
       setActionType(null);
-      onRejectSuccess?.();
+
+      const isAlbumFinished = Boolean(
+        updated.albumNavigation && !updated.albumNavigation.nextPendingSubmissionId
+      );
+
+      const finalMsg = isAlbumFinished
+        ? "All tracks in album have been reviewed."
+        : detail.submissionType === "LYRIC_UPDATE"
+        ? "Lyric update rejected successfully."
+        : "Track rejected successfully.";
+
+      try {
+        sessionStorage.setItem(
+          "soundwave_flash_toast",
+          JSON.stringify({ message: finalMsg, type: "success" })
+        );
+      } catch {
+        // ignore
+      }
+
+      showInternalToast(finalMsg, "success");
+      onRejectSuccess?.(finalMsg);
+
+      const nextPendingId = updated.albumNavigation?.nextPendingSubmissionId;
+      if (nextPendingId && onNavigateToSubmission) {
+        onNavigateToSubmission(nextPendingId);
+      } else if (updated.albumNavigation) {
+        onBack();
+      }
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to reject track.");
     } finally {
@@ -429,6 +528,15 @@ export function PendingTrackDetailView({
 
   return (
     <div className="staff-detail-view-container">
+      {/* SoundWave Standard Top-Center Toast Notification */}
+      <CenterNotificationPopup
+        open={Boolean(internalToast)}
+        type={internalToast?.type ?? "success"}
+        message={internalToast?.message ?? ""}
+        durationMs={3000}
+        onClose={() => setInternalToast(null)}
+      />
+
       {/* Top Breadcrumb & Navigation Bar */}
       <div className="staff-detail-top-nav">
         <button
@@ -449,11 +557,11 @@ export function PendingTrackDetailView({
               <span className="staff-crumb-muted">{detail.albumNavigation.albumTitle}</span>
               <span className="staff-crumb-sep">/</span>
               <span className="staff-crumb-active">
-                Track #{detail.track.trackNumber ?? detail.albumNavigation.currentIndex} ({detail.track.title})
+                Track #{detail.track.trackNumber ?? detail.albumNavigation.currentIndex}: {detail.track.title}
               </span>
             </>
           ) : (
-            <span className="staff-crumb-active">Submission Details</span>
+            <span className="staff-crumb-active">{detail ? detail.track.title : "Submission Details"}</span>
           )}
         </div>
       </div>
@@ -527,89 +635,10 @@ export function PendingTrackDetailView({
             </div>
           </div>
 
-          {/* Album Track Navigation Ribbon (when track belongs to an Album) */}
-          {detail.albumNavigation ? (
-            <div className="staff-album-nav-ribbon">
-              <div className="staff-album-ribbon-header">
-                <div className="staff-album-ribbon-title-col">
-                  <span className="staff-album-ribbon-tag">
-                    <DiscIcon width={13} height={13} />
-                    <span>ALBUM MODERATION</span>
-                  </span>
-                  <strong className="staff-album-ribbon-name">{detail.albumNavigation.albumTitle}</strong>
-                  <span className="staff-album-ribbon-count">
-                    Track {detail.albumNavigation.currentIndex} of {detail.albumNavigation.totalTracks}
-                  </span>
-                </div>
-
-                <div className="staff-album-ribbon-actions">
-                  <button
-                    type="button"
-                    className="staff-ribbon-step-btn"
-                    disabled={!detail.albumNavigation.prevSubmissionId}
-                    onClick={() => {
-                      if (detail.albumNavigation?.prevSubmissionId) {
-                        onNavigateToSubmission?.(detail.albumNavigation.prevSubmissionId);
-                      }
-                    }}
-                    title="Go to previous track in this album"
-                  >
-                    <ChevronLeftIcon width={14} height={14} />
-                    <span>Previous Track</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="staff-ribbon-step-btn is-next"
-                    disabled={!detail.albumNavigation.nextSubmissionId}
-                    onClick={() => {
-                      if (detail.albumNavigation?.nextSubmissionId) {
-                        onNavigateToSubmission?.(detail.albumNavigation.nextSubmissionId);
-                      }
-                    }}
-                    title="Go to next track in this album"
-                  >
-                    <span>Next Track</span>
-                    <ChevronRightIcon width={14} height={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Horizontal list of tracks in the album */}
-              <div className="staff-album-ribbon-tracklist">
-                {detail.albumNavigation.tracks.map((t, idx) => {
-                  const isCurrent = t.trackId === detail.track.id || t.submissionId === detail.id;
-                  const canClick = Boolean(t.submissionId && !isCurrent);
-
-                  return (
-                    <button
-                      key={t.trackId}
-                      type="button"
-                      className={`staff-ribbon-track-chip ${isCurrent ? "is-current" : ""} ${t.status === "APPROVED"
-                          ? "is-approved"
-                          : t.status === "REJECTED"
-                            ? "is-rejected"
-                            : "is-pending"
-                        }`}
-                      disabled={!canClick}
-                      onClick={() => {
-                        if (t.submissionId) {
-                          onNavigateToSubmission?.(t.submissionId);
-                        }
-                      }}
-                      title={`Track #${t.trackNumber || idx + 1}: ${t.title} (${t.status || "Pending"})`}
-                    >
-                      <span className="staff-chip-num">#{t.trackNumber || idx + 1}</span>
-                      <span className="staff-chip-title">{t.title}</span>
-                      <span className="staff-chip-status-dot" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Hero Card & Integrated Stream Player (Spacious Full-Width) */}
+          {/* Main Layout Grid: Split layout when albumNavigation exists, otherwise single flow */}
+          <div className={detail.albumNavigation ? "staff-detail-layout-split" : "staff-detail-layout-single"}>
+            <div className="staff-detail-main-flow">
+              {/* Hero Card & Integrated Stream Player (Spacious Full-Width) */}
           <div className="staff-inspector-hero-card staff-detail-hero-card">
             <div className="staff-hero-artwork-wrap staff-detail-artwork-wrap">
               <img
@@ -898,76 +927,6 @@ export function PendingTrackDetailView({
             </div>
           ) : null}
 
-          {/* Album Continuous Review Next Action Card (Only show if there are still pending tracks to moderate in the album) */}
-          {detail.status !== "PENDING" &&
-          detail.albumNavigation &&
-          detail.albumNavigation.nextPendingSubmissionId ? (
-            (() => {
-              const pendingCount = detail.albumNavigation.tracks.filter(
-                (t) => t.status === "PENDING"
-              ).length;
-
-              if (pendingCount === 0) {
-                return null;
-              }
-
-              const nextPendingTrack = detail.albumNavigation.tracks.find(
-                (t) => t.submissionId === detail.albumNavigation?.nextPendingSubmissionId
-              );
-
-              if (!nextPendingTrack) {
-                return null;
-              }
-
-              const approvedCount = detail.albumNavigation.tracks.filter(
-                (t) => t.status === "APPROVED"
-              ).length;
-
-              return (
-                <div className="staff-album-next-action-card">
-                  <div className="staff-album-next-header">
-                    <div className="staff-album-next-icon-wrap">
-                      <DiscIcon width={22} height={22} />
-                    </div>
-                    <div className="staff-album-next-titles">
-                      <div className="staff-album-next-title-row">
-                        <h4 className="staff-album-next-album-name">
-                          Album: “{detail.albumNavigation.albumTitle}”
-                        </h4>
-                        <span className="staff-album-progress-badge">
-                          {approvedCount}/{detail.albumNavigation.totalTracks} Approved · {pendingCount} pending
-                        </span>
-                      </div>
-                      <p className="staff-album-next-prompt">
-                        Next track in album pending review:{" "}
-                        <b>
-                          Track #{nextPendingTrack.trackNumber ?? ""}: {nextPendingTrack.title}
-                        </b>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="staff-album-next-actions-row">
-                    <button
-                      type="button"
-                      className="button staff-btn-next-track"
-                      onClick={() => {
-                        if (detail.albumNavigation?.nextPendingSubmissionId) {
-                          onNavigateToSubmission?.(
-                            detail.albumNavigation.nextPendingSubmissionId
-                          );
-                        }
-                      }}
-                    >
-                      <span>Next Track ({nextPendingTrack.title})</span>
-                      <ArrowIcon width={16} height={16} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })()
-          ) : null}
-
           {/* Moderation Decision Form Section (Buttons moved into detail page) */}
           {detail.status === "PENDING" ? (
             <div className="staff-moderation-decision-area staff-detail-decision-area">
@@ -1130,6 +1089,117 @@ export function PendingTrackDetailView({
               )}
             </div>
           ) : null}
+        </div>
+
+        {/* Album Tracklist Sidebar (matching Image 2 style) */}
+        {detail.albumNavigation ? (
+          <aside className="staff-album-tracklist-sidebar">
+            <div className="staff-album-sidebar-header">
+              <div className="staff-album-sidebar-title-wrap">
+                <h3 className="staff-album-sidebar-title">ALBUM TRACKLIST</h3>
+                <span className="staff-album-sidebar-album-name">
+                  {albumProgressStats.pending === 0 ? (
+                    `All ${albumProgressStats.total} tracks processed`
+                  ) : (
+                    <>
+                      <b>{albumProgressStats.processed}/{albumProgressStats.total}</b> processed · <b>{albumProgressStats.pending}</b> pending
+                    </>
+                  )}
+                </span>
+              </div>
+              <span className="staff-album-sidebar-meta-badge">
+                {detail.albumNavigation.totalTracks} tracks • {formatDuration(totalAlbumDurationMs)}
+              </span>
+            </div>
+
+            {/* Navigation Bar with Pre & Next Buttons */}
+            <div className="staff-album-sidebar-nav">
+              <button
+                type="button"
+                className="staff-album-nav-step-btn"
+                disabled={!detail.albumNavigation.prevSubmissionId}
+                onClick={() => {
+                  if (detail.albumNavigation?.prevSubmissionId) {
+                    onNavigateToSubmission?.(detail.albumNavigation.prevSubmissionId);
+                  }
+                }}
+                title="Go to previous track in this album"
+              >
+                <ChevronLeftIcon width={14} height={14} />
+                <span>Pre</span>
+              </button>
+
+              <div className="staff-album-nav-counter">
+                Track <b>{detail.albumNavigation.currentIndex}</b> of <b>{detail.albumNavigation.totalTracks}</b>
+              </div>
+
+              <button
+                type="button"
+                className="staff-album-nav-step-btn is-next"
+                disabled={!detail.albumNavigation.nextSubmissionId}
+                onClick={() => {
+                  if (detail.albumNavigation?.nextSubmissionId) {
+                    onNavigateToSubmission?.(detail.albumNavigation.nextSubmissionId);
+                  }
+                }}
+                title="Go to next track in this album"
+              >
+                <span>Next</span>
+                <ChevronRightIcon width={14} height={14} />
+              </button>
+            </div>
+
+            {/* Track Items List matching Image 2 */}
+            <div className="staff-album-sidebar-tracklist">
+              {detail.albumNavigation.tracks.map((t, idx) => {
+                const isCurrent = t.trackId === detail.track.id || t.submissionId === detail.id;
+                const canClick = Boolean(t.submissionId && !isCurrent);
+                const trackNumberDisplay = t.trackNumber || idx + 1;
+
+                return (
+                  <button
+                    key={t.trackId}
+                    type="button"
+                    className={`staff-album-sidebar-track-item ${isCurrent ? "is-current" : ""}`}
+                    disabled={!canClick}
+                    onClick={() => {
+                      if (t.submissionId) {
+                        onNavigateToSubmission?.(t.submissionId);
+                      }
+                    }}
+                    title={
+                      isCurrent
+                        ? `Currently reviewing Track #${trackNumberDisplay}: ${t.title}`
+                        : canClick
+                        ? `Click to review Track #${trackNumberDisplay}: ${t.title}`
+                        : `Track #${trackNumberDisplay}: ${t.title}`
+                    }
+                  >
+                    <div className="staff-album-track-main-info">
+                      <span className="staff-album-track-num-badge">
+                        {trackNumberDisplay}
+                      </span>
+                      <div className="staff-album-track-text-meta">
+                        <span className="staff-album-track-title">{t.title}</span>
+                        <span className="staff-album-track-sub">
+                          {formatDuration(t.durationMs)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="staff-album-track-right-meta">
+                      <span className={`staff-album-track-status-pill is-${(t.status || "pending").toLowerCase()}`}>
+                        <span className="staff-album-track-status-dot" />
+                        <span>{t.status === "APPROVED" ? "Approved" : t.status === "REJECTED" ? "Rejected" : "Pending"}</span>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        ) : null}
+      </div>
         </div>
       ) : null}
     </div>

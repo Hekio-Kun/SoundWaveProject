@@ -1376,6 +1376,14 @@ export function StaffLyricsManagementPage() {
                       </button>
                     ) : null}
                   </div>
+                  <button
+                    type="submit"
+                    className="button button-primary staff-search-submit-btn"
+                    aria-label="Search lyric proposals"
+                  >
+                    <SearchIcon width={15} height={15} />
+                    <span>Search</span>
+                  </button>
                 </form>
               </div>
 
