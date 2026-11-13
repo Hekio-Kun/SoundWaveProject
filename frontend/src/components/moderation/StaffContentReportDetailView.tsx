@@ -6,10 +6,12 @@ import {
   DiscIcon,
   FileTextIcon,
   FlagIcon,
+  PaperclipIcon,
   PauseIcon,
   PlayIcon,
   ShieldIcon,
   UserIcon,
+  UsersIcon,
   VolumeIcon,
 } from "../../icons";
 import { staffReportsApi } from "../../api/staffReports";
@@ -83,6 +85,13 @@ export function StaffContentReportDetailView({
 
   // Take Down Modal state
   const [isTakedownModalOpen, setIsTakedownModalOpen] = useState<boolean>(false);
+
+  const isCopyright = useMemo(() => {
+    if (!report) return false;
+    if (report.category?.toUpperCase() === "COPYRIGHT") return true;
+    const r = (report.reason || "").toLowerCase();
+    return r.includes("copyright") || r.includes("bản quyền");
+  }, [report]);
 
   // Lyrics state
   const [trackLyrics, setTrackLyrics] = useState<string | null>(initialReport?.lyrics || null);
@@ -362,8 +371,8 @@ export function StaffContentReportDetailView({
         staffNote: trimmedNote,
       });
 
-      // Guarantee all reports in this track + reason group are resolved
-      if (report?.reportIds && report.reportIds.length > 1) {
+      // Guarantee all reports in this track + reason group are resolved (only for grouped non-copyright)
+      if (!isCopyright && report?.reportIds && report.reportIds.length > 1) {
         for (const otherId of report.reportIds) {
           if (otherId !== reportId) {
             try {
@@ -388,9 +397,6 @@ export function StaffContentReportDetailView({
         message: successMsg,
         type: "success",
       });
-      if (onNotify) {
-        onNotify(successMsg, "success");
-      }
       onRefreshQueue();
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -433,9 +439,6 @@ export function StaffContentReportDetailView({
       message: msg,
       type: "success",
     });
-    if (onNotify) {
-      onNotify(msg, "success");
-    }
     fetchReport();
     onRefreshQueue();
   };
@@ -452,14 +455,14 @@ export function StaffContentReportDetailView({
           type="button"
           onClick={onBack}
           className="staff-detail-back-btn"
-          title="Back to Content Reports queue"
+          title="Back to Reported Tracks queue"
         >
           <span className="staff-detail-back-arrow" aria-hidden="true">←</span>
-          <span>Back to Reports</span>
+          <span>Back to Reported Tracks</span>
         </button>
 
         <div className="staff-detail-breadcrumbs">
-          <span className="staff-crumb-muted">Content Reports</span>
+          <span className="staff-crumb-muted">Reported Tracks</span>
           <span className="staff-crumb-sep">/</span>
           <span className="staff-crumb-active">Report #{reportId}</span>
         </div>
@@ -808,7 +811,9 @@ export function StaffContentReportDetailView({
                   }}
                 />
                 <span>
-                  {report.reporterCount && report.reporterCount > 1
+                  {isCopyright
+                    ? "Copyright Infringement"
+                    : report.reporterCount && report.reporterCount > 1
                     ? `${report.reporterCount} Reports`
                     : "1 Report"}
                 </span>
@@ -817,43 +822,89 @@ export function StaffContentReportDetailView({
 
             {/* Unified Card Body: Form or Resolution Record */}
             <div style={{ padding: "24px" }}>
-              {/* Copyright Evidence Document Attachment if present */}
-              {(report.evidenceUrl || report.reporters?.some((r) => r.evidenceUrl)) && (
+              {/* Reporter Info Section: Copyright (Individual Detailed) vs Grouped (Summary line) */}
+              {isCopyright ? (
+                /* Copyright Infringement: Individual Claimant Details */
                 <div
                   style={{
                     backgroundColor: "#F0F9FF",
                     border: "1px solid #BAE6FD",
-                    borderRadius: "12px",
-                    padding: "16px 20px",
+                    borderRadius: "14px",
+                    padding: "20px 24px",
                     marginBottom: "24px",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <div
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          borderRadius: "8px",
-                          backgroundColor: "#E0F2FE",
-                          color: "#0284C7",
-                          display: "grid",
-                          placeItems: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <FileTextIcon width={22} height={22} />
-                      </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "16px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                      {report.reporterAvatarUrl ? (
+                        <img
+                          src={report.reporterAvatarUrl}
+                          alt={report.reporterName}
+                          style={{
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: "2px solid #BAE6FD",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "50%",
+                            backgroundColor: "#0284C7",
+                            color: "#FFFFFF",
+                            display: "grid",
+                            placeItems: "center",
+                            fontWeight: 700,
+                            fontSize: "1.1rem",
+                            border: "2px solid #BAE6FD",
+                          }}
+                        >
+                          {(report.reporterName || report.reporterUsername || "U").charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
-                        <strong style={{ display: "block", fontSize: "0.95rem", color: "#0369A1", fontWeight: 700 }}>
-                          Copyright Ownership Proof Document Attached
-                        </strong>
-                        <span style={{ fontSize: "0.85rem", color: "#0284C7" }}>
-                          Official documentation or certificate proving intellectual property rights submitted with this report.
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "#0C4A6E" }}>
+                            {report.reporterName}
+                          </span>
+                          <span style={{ fontSize: "0.85rem", color: "#0284C7", fontWeight: 600 }}>
+                            @{report.reporterUsername || report.reporterName}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            marginTop: "4px",
+                            fontSize: "0.82rem",
+                            color: "#57534E",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {report.reporterEmail && <span>{report.reporterEmail}</span>}
+                          <span>•</span>
+                          <span>
+                            Submitted: <b>{formatDate(report.createdAt)}</b>
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    {report.evidenceUrl && (
+
+                    {/* Proof Document Open / Download Button */}
+                    {report.evidenceUrl ? (
                       <a
                         href={report.evidenceUrl}
                         target="_blank"
@@ -863,63 +914,64 @@ export function StaffContentReportDetailView({
                           backgroundColor: "#0284C7",
                           color: "#FFFFFF",
                           textDecoration: "none",
-                          whiteSpace: "nowrap",
-                          fontWeight: 600,
-                          padding: "8px 16px",
-                          borderRadius: "8px",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
+                          fontWeight: 600,
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        Open Proof Document ↗
+                        <PaperclipIcon width={14} height={14} />
+                        <span>View Proof Document ↗</span>
                       </a>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: "0.82rem",
+                          color: "#6B7280",
+                          fontStyle: "italic",
+                          padding: "6px 12px",
+                          backgroundColor: "#E5E7EB",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        No proof document attached
+                      </span>
                     )}
                   </div>
-
-                  {/* If grouped reports have additional documents */}
-                  {report.reporters && report.reporters.filter((r) => r.evidenceUrl && r.evidenceUrl !== report.evidenceUrl).length > 0 && (
-                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #BAE6FD" }}>
-                      <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "#0369A1" }}>
-                        Additional evidence files from other reporters in this case:
-                      </span>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
-                        {report.reporters
-                          .filter((r) => r.evidenceUrl && r.evidenceUrl !== report.evidenceUrl)
-                          .map((r, idx) => (
-                            <a
-                              key={r.reporterId || idx}
-                              href={r.evidenceUrl!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                padding: "4px 10px",
-                                backgroundColor: "#FFFFFF",
-                                border: "1px solid #BAE6FD",
-                                borderRadius: "6px",
-                                fontSize: "0.8rem",
-                                color: "#0284C7",
-                                textDecoration: "none",
-                                fontWeight: 500,
-                              }}
-                            >
-                              <FileTextIcon width={14} height={14} />
-                              Evidence #{idx + 2} ({r.reporterName}) ↗
-                            </a>
-                          ))}
-                      </div>
-                    </div>
-                  )}
+                </div>
+              ) : (
+                /* Non-Copyright Grouped Report: Total Reports Count */
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    backgroundColor: "#F9FAFB",
+                    border: "1px solid #E5E7EB",
+                    borderRadius: "12px",
+                    padding: "14px 18px",
+                    marginBottom: "24px",
+                    gap: "10px",
+                  }}
+                >
+                  <UsersIcon width={18} height={18} style={{ color: "#6B7280", flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.92rem", color: "#374151" }}>
+                    Total Reports:{" "}
+                    <strong style={{ color: "#0C4A6E" }}>
+                      {report.reporterCount && report.reporterCount > 1
+                        ? `${report.reporterCount} reports submitted by listeners`
+                        : "1 report submitted by a listener"}
+                    </strong>
+                  </span>
                 </div>
               )}
 
               {isPending ? (
                 <>
                   <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1C1917", margin: "0 0 16px 0" }}>
-                    Adjudicate Content Report
+                    Adjudicate Reported Track
                   </h3>
 
                   {actionError && (

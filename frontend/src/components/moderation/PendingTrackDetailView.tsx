@@ -447,15 +447,6 @@ export function PendingTrackDetailView({
         ? "Lyric update approved successfully."
         : "Track approved successfully.";
 
-      try {
-        sessionStorage.setItem(
-          "soundwave_flash_toast",
-          JSON.stringify({ message: finalMsg, type: "success" })
-        );
-      } catch {
-        // ignore
-      }
-
       showInternalToast(finalMsg, "success");
       onApproveSuccess?.(finalMsg);
 
@@ -498,15 +489,6 @@ export function PendingTrackDetailView({
         : detail.submissionType === "LYRIC_UPDATE"
         ? "Lyric update rejected successfully."
         : "Track rejected successfully.";
-
-      try {
-        sessionStorage.setItem(
-          "soundwave_flash_toast",
-          JSON.stringify({ message: finalMsg, type: "success" })
-        );
-      } catch {
-        // ignore
-      }
 
       showInternalToast(finalMsg, "success");
       onRejectSuccess?.(finalMsg);
@@ -936,7 +918,11 @@ export function PendingTrackDetailView({
                     {detail.submissionType === "LYRIC_UPDATE" ? "Approve Lyric Update" : "Approve & Publish"} “{detail.track.title}”
                   </h4>
                   <p className="staff-decision-panel-desc">
-                    {detail.submissionType === "LYRIC_UPDATE" ? "The proposed lyrics will become the official published lyrics for this track. The track remains PUBLISHED and streamable." : "The track will immediately change to <b>PUBLISHED</b> status and be streamable on SoundWave."}
+                    {detail.submissionType === "LYRIC_UPDATE" ? (
+                      "The proposed lyrics will become the official published lyrics for this track. The track remains PUBLISHED and streamable."
+                    ) : (
+                      <>The track will immediately change to <strong>PUBLISHED</strong> status and be streamable on SoundWave.</>
+                    )}
                   </p>
 
                   <label className="staff-input-group" htmlFor="detail-approve-note">

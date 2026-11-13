@@ -112,6 +112,7 @@ export function ModeratePendingTracks({
 
   const handleSelectSubmission = (id: number | null) => {
     setSelectedSubmissionId(id);
+    setToast(null);
     onSelectionChange?.(id);
     if (id) {
       onNavigate(`/staff/submissions/${id}`);
@@ -272,13 +273,11 @@ export function ModeratePendingTracks({
             void loadStats();
             void loadQueue();
           }}
-          onApproveSuccess={(msg) => {
-            showToast(msg || "Track approved successfully.", "success");
+          onApproveSuccess={() => {
             void loadStats();
             void loadQueue();
           }}
-          onRejectSuccess={(msg) => {
-            showToast(msg || "Track rejected successfully.", "success");
+          onRejectSuccess={() => {
             void loadStats();
             void loadQueue();
           }}

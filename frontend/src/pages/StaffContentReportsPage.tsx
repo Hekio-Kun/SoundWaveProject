@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AlertIcon, CheckIcon, FlagIcon, RefreshIcon } from "../icons";
+import { AlertIcon, CheckIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../icons";
 import { staffReportsApi } from "../api/staffReports";
 import { ApiError } from "../api/client";
 import type { StaffContentReportResponse } from "../types";
@@ -35,7 +35,7 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
           onNavigate("/staff/login");
           return;
         }
-        setErrorMessage(err.message || "Failed to load content reports.");
+        setErrorMessage(err.message || "Failed to load reported tracks.");
       } else {
         setErrorMessage("A data retrieval error occurred.");
       }
@@ -48,28 +48,51 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
     fetchReports();
   }, [fetchReports]);
 
-  // Group reports by Target Track + Violation Reason to guarantee 1 row per reason on a track
+  const isCopyrightReport = (report: StaffContentReportResponse): boolean => {
+    if (report.category?.toUpperCase() === "COPYRIGHT") return true;
+    const reason = (report.reason || "").toLowerCase();
+    return reason.includes("copyright") || reason.includes("bản quyền");
+  };
+
+  // Group reports by Target Track + Violation Reason, but DO NOT group Copyright reports!
   const groupedReports = useMemo(() => {
-    const map = new Map<string, StaffContentReportResponse>();
+    const list: StaffContentReportResponse[] = [];
+    const nonCopyrightMap = new Map<string, StaffContentReportResponse>();
+
     for (const report of reports) {
-      const key = `${report.targetId}::${report.reason.trim().toLowerCase()}`;
-      if (!map.has(key)) {
-        map.set(key, { ...report });
+      if (isCopyrightReport(report)) {
+        list.push({ ...report });
       } else {
-        const existing = map.get(key)!;
-        const combinedIds = Array.from(
-          new Set([...(existing.reportIds || [existing.id]), ...(report.reportIds || [report.id])])
-        );
-        const isPending =
-          existing.status?.toUpperCase() === "PENDING" || report.status?.toUpperCase() === "PENDING";
-        existing.reportIds = combinedIds;
-        existing.reporterCount = combinedIds.length;
-        if (isPending) {
-          existing.status = "PENDING";
+        const key = `${report.targetId}::${(report.reason || "").trim().toLowerCase()}`;
+        if (!nonCopyrightMap.has(key)) {
+          const clone = { ...report };
+          nonCopyrightMap.set(key, clone);
+          list.push(clone);
+        } else {
+          const existing = nonCopyrightMap.get(key)!;
+          const combinedIds = Array.from(
+            new Set([...(existing.reportIds || [existing.id]), ...(report.reportIds || [report.id])])
+          );
+          const isPending =
+            existing.status?.toUpperCase() === "PENDING" || report.status?.toUpperCase() === "PENDING";
+          existing.reportIds = combinedIds;
+          existing.reporterCount = combinedIds.length;
+          if (isPending) {
+            existing.status = "PENDING";
+          }
+          if (report.reporters && existing.reporters) {
+            const seen = new Set(existing.reporters.map((r) => r.reporterId));
+            for (const r of report.reporters) {
+              if (!seen.has(r.reporterId)) {
+                existing.reporters.push(r);
+                seen.add(r.reporterId);
+              }
+            }
+          }
         }
       }
     }
-    return Array.from(map.values());
+    return list;
   }, [reports]);
 
   // If a report is selected, render the dedicated Inspection & Adjudication Detail View
@@ -81,6 +104,7 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
         initialReport={activeReport}
         onBack={() => {
           setSelectedReportId(null);
+          setToastNotification((prev) => ({ ...prev, open: false }));
           fetchReports();
         }}
         onRefreshQueue={fetchReports}
@@ -170,10 +194,10 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
               <span className="staff-hero-title-icon" aria-hidden="true">
                 <FlagIcon width={18} height={18} />
               </span>
-              <h1 className="staff-hero-title">Content Reports</h1>
+              <h1 className="staff-hero-title">Reported Tracks</h1>
             </div>
             <p className="staff-hero-description">
-              Queue of content violation reports submitted by listeners. Review reported tracks and adjudicate violations.
+              Queue of tracks reported by listeners for potential policy violations. Review reported tracks and adjudicate violations.
             </p>
           </div>
 
@@ -235,16 +259,16 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
       <section className="ops-panel" style={{ padding: "0", overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: "48px 24px", textAlign: "center", color: "#8D877F" }}>
-            <p>Loading content reports queue...</p>
+            <p>Loading reported tracks queue...</p>
           </div>
         ) : groupedReports.length === 0 ? (
           <div style={{ padding: "64px 24px", textAlign: "center", color: "#8D877F" }}>
             <FlagIcon width={36} height={36} style={{ margin: "0 auto 12px auto", opacity: 0.4, display: "block" }} />
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#57534E", marginBottom: "4px" }}>
-              No content reports found.
+              No reported tracks found.
             </h3>
             <p style={{ fontSize: "0.88rem", margin: 0 }}>
-              There are currently no violation reports in the queue.
+              There are currently no reported tracks in the queue.
             </p>
           </div>
         ) : (
@@ -252,12 +276,12 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
             <table className="ops-table">
               <thead>
                 <tr>
-                  <th style={{ width: "34%" }}>Track Title</th>
-                  <th style={{ width: "26%" }}>Violation Reason</th>
-                  <th style={{ width: "12%" }}>Total Reports</th>
-                  <th style={{ width: "15%" }}>Submission Date</th>
+                  <th style={{ width: "32%" }}>Track Title</th>
+                  <th style={{ width: "24%" }}>Violation Reason</th>
+                  <th style={{ width: "16%" }}>Reporter / Count</th>
+                  <th style={{ width: "14%" }}>Submission Date</th>
                   <th style={{ width: "8%" }}>Status</th>
-                  <th style={{ width: "5%", textAlign: "right" }}>Actions</th>
+                  <th style={{ width: "6%", textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -355,24 +379,61 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                         </span>
                       </td>
 
-                      {/* Total Reports Column */}
+                      {/* Reporter / Count Column */}
                       <td>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            fontSize: "0.8rem",
-                            fontWeight: 700,
-                            color: count > 1 ? "#0369A1" : "#57534E",
-                            backgroundColor: count > 1 ? "#E0F2FE" : "#F6EFE3",
-                            border: count > 1 ? "1px solid #BAE6FD" : "1px solid #E8DCCB",
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {count} {count > 1 ? "reports" : "report"}
-                        </span>
+                        {isCopyrightReport(report) ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                color: "#0C4A6E",
+                                fontSize: "0.86rem",
+                                maxWidth: "160px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={`@${report.reporterUsername || report.reporterName || "user"}`}
+                            >
+                              @{report.reporterUsername || report.reporterName || "user"}
+                            </span>
+                            {report.evidenceUrl && (
+                              <span
+                                title="Copyright evidence document attached"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#0284C7",
+                                  backgroundColor: "#E0F2FE",
+                                  border: "1px solid #BAE6FD",
+                                  padding: "3px 6px",
+                                  borderRadius: "6px",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <PaperclipIcon width={13} height={13} />
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              fontSize: "0.8rem",
+                              fontWeight: 700,
+                              color: count > 1 ? "#0369A1" : "#57534E",
+                              backgroundColor: count > 1 ? "#E0F2FE" : "#F6EFE3",
+                              border: count > 1 ? "1px solid #BAE6FD" : "1px solid #E8DCCB",
+                              padding: "4px 10px",
+                              borderRadius: "12px",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {count} {count > 1 ? "reports" : "report"}
+                          </span>
+                        )}
                       </td>
 
                       {/* Submission Date */}
