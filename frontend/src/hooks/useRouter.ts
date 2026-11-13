@@ -26,6 +26,18 @@ export function useRouter(): AppRouterState {
 
   const navigate = (path: string) => {
     const target = path.startsWith("#") ? path : `#${path.startsWith("/") ? path : `/${path}`}`;
+    const cleanTarget = path.startsWith("#") ? path.slice(1) : (path.startsWith("/") ? path : `/${path}`);
+
+    // Dispatch a cancelable navigation event so active pages with unsaved changes can intercept
+    const event = new CustomEvent("soundwave:navigate", {
+      cancelable: true,
+      detail: { to: cleanTarget },
+    });
+    const allowed = window.dispatchEvent(event);
+    if (!allowed) {
+      return;
+    }
+
     window.location.hash = target;
   };
 

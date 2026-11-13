@@ -117,6 +117,7 @@ function AppContent() {
           isLyricsOpen={lyricsOpen}
           onRecordPlay={handleRecordPlay}
           onReorderQueue={reorderQueue}
+          onNavigate={navigate}
         />
       )}
 
