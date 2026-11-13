@@ -265,6 +265,9 @@ export function RejectionDetailsModal({
               lineHeight: 1.5,
               color: "#991b1b",
               fontWeight: 500,
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              whiteSpace: "pre-wrap",
             }}
           >
             {effectiveReason}
@@ -300,6 +303,9 @@ export function RejectionDetailsModal({
                   padding: "8px 12px",
                   borderRadius: "8px",
                   borderLeft: "3px solid #b42318",
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  whiteSpace: "pre-wrap",
                 }}
               >
                 {details.reviewerNote}

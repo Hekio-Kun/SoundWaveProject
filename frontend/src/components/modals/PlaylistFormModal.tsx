@@ -202,6 +202,9 @@ export function PlaylistFormModal({ open, onClose, playlist, onSave }: Props) {
               fontSize: "12px",
               fontWeight: 600,
               marginBottom: "16px",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              boxSizing: "border-box",
             }}
           >
             {error}

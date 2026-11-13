@@ -240,10 +240,25 @@ export function AlbumFormModal({ open, onClose, album, onSaved }: Props) {
 
         {/* Error Alert */}
         {errorMessage && (
-          <div className="auth-v2-error" role="alert" style={{ margin: 0 }}>
-            <span><AlertIcon width={16} height={16} /></span>
-            <div><small>{errorMessage}</small></div>
-            <button type="button" className="icon-button" onClick={() => setErrorMessage(null)} style={{ marginLeft: "auto" }} aria-label="Dismiss error">
+          <div
+            className="auth-v2-error"
+            role="alert"
+            style={{
+              margin: 0,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              boxSizing: "border-box",
+              width: "100%",
+            }}
+          >
+            <span style={{ width: "24px", height: "24px", flexShrink: 0, display: "grid", placeItems: "center" }}>
+              <AlertIcon width={16} height={16} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+              <small style={{ fontSize: "12.5px", lineHeight: 1.45, display: "block" }}>{errorMessage}</small>
+            </div>
+            <button type="button" className="icon-button" onClick={() => setErrorMessage(null)} style={{ marginLeft: "auto", flexShrink: 0, padding: "2px" }} aria-label="Dismiss error">
               <CloseIcon width={14} height={14} />
             </button>
           </div>

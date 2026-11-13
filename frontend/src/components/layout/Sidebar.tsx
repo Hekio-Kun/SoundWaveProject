@@ -166,16 +166,6 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           <span>Create playlist</span>
         </button>
       </div>
-
-      {!isAuthenticated && (
-        <div className="sidebar-guest-card">
-          <p className="guest-card-title">Join SoundWave</p>
-          <p className="guest-card-text">Log in to create playlists and upload your own tracks.</p>
-          <button className="button button-primary button-small" onClick={() => onNavigate("/login")}>
-            Login now
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

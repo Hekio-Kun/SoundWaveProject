@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog";
 import { TrackCard } from "../components/common/MusicCards";
+import { tracks as fallbackTracks } from "../data";
 import {
   ArrowIcon,
   ArrowUpRightIcon,
@@ -48,12 +49,12 @@ export function ExplorePage({
   onToggleFavorite,
   onAddToPlaylist,
 }: Props) {
-  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>([]);
-  const [tracksLoading, setTracksLoading] = useState(true);
+  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>(() => fallbackTracks.slice(0, 10));
+  const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState("");
   const [selectedChip, setSelectedChip] = useState("all");
 
-  const heroTrack = recommendedTracks[0] ?? null;
+  const heroTrack = recommendedTracks[0] ?? fallbackTracks[0] ?? null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);
 
   // [FEATURE]: UC-06 View Recommended Song - Tải danh sách bài hát gợi ý theo sở thích và thể loại
@@ -64,10 +65,16 @@ export function ExplorePage({
       const recommendedRes = await catalogApi.getCuratedRecommendations(10);
       if (recommendedRes && recommendedRes.length > 0) {
         setRecommendedTracks(recommendedRes);
+      } else {
+        setRecommendedTracks(fallbackTracks.slice(0, 10));
       }
     } catch (err: unknown) {
-      console.error("Failed to load explore recommendations:", err);
-      setTracksError("Unable to load recommendations at this time");
+      console.warn("Using curated fallback tracks for explore feed:", err);
+      if (fallbackTracks && fallbackTracks.length > 0) {
+        setRecommendedTracks(fallbackTracks.slice(0, 10));
+      } else {
+        setTracksError("Unable to load recommendations at this time");
+      }
     } finally {
       setTracksLoading(false);
     }
@@ -84,13 +91,19 @@ export function ExplorePage({
     try {
       if (chipId === "all" || !genre) {
         const res = await catalogApi.getCuratedRecommendations(10);
-        setRecommendedTracks(res || []);
+        setRecommendedTracks(res && res.length > 0 ? res : fallbackTracks.slice(0, 10));
       } else {
         const res = await catalogApi.getTracks({ genre, size: 10 });
-        setRecommendedTracks(res.content || []);
+        if (res?.content && res.content.length > 0) {
+          setRecommendedTracks(res.content);
+        } else {
+          const filtered = fallbackTracks.filter((t) => t.genreSlug?.toLowerCase() === genre.toLowerCase());
+          setRecommendedTracks(filtered.length > 0 ? filtered : fallbackTracks.slice(0, 10));
+        }
       }
     } catch {
-      setTracksError("Unable to load tracks for this category");
+      const filtered = genre ? fallbackTracks.filter((t) => t.genreSlug?.toLowerCase() === genre.toLowerCase()) : fallbackTracks;
+      setRecommendedTracks(filtered.length > 0 ? filtered : fallbackTracks.slice(0, 10));
     } finally {
       setTracksLoading(false);
     }
@@ -140,7 +153,7 @@ export function ExplorePage({
               title={heroTrack ? `Play ${heroTrack.title}` : "Play music"}
             >
               {heroPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-              <span>{tracksLoading ? "Loading..." : heroPlaying ? "Pause" : "Listen Now"}</span>
+              <span>{heroPlaying ? "Pause" : "Listen Now"}</span>
             </button>
 
             <button
@@ -156,7 +169,7 @@ export function ExplorePage({
         {/* Right Feature Card with Angled Backdrop */}
         <div className="discover-feature-wrapper">
           <div className="discover-feature-backdrop" />
-          {tracksLoading ? (
+          {tracksLoading && !heroTrack ? (
             <div className="discover-feature-card discover-feature-card--skeleton">
               <span className="skeleton" style={{ width: "100%", height: "100%", display: "block" }} />
             </div>
@@ -172,6 +185,9 @@ export function ExplorePage({
                 src={heroTrack.coverUrl || FALLBACK_BEACH_COVER}
                 alt={heroTrack.title}
                 className="discover-feature-card-img"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = FALLBACK_BEACH_COVER;
+                }}
               />
 
               {/* Radar Badge */}

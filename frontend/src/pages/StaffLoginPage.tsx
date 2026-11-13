@@ -9,7 +9,6 @@ import {
   LogoutIcon,
   MailIcon,
   ShieldIcon,
-  ZapIcon,
 } from "../icons";
 
 type StaffLoginPageProps = {
@@ -41,7 +40,6 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
   const [apiError, setApiError] = useState("");
   const [listenerRejectedError, setListenerRejectedError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [activeDemo, setActiveDemo] = useState<"admin" | "staff" | null>(null);
 
   // Auto redirect if already authenticated with administrative or staff privileges
   useEffect(() => {
@@ -51,15 +49,6 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
       window.location.hash = "#/staff/dashboard";
     }
   }, [user]);
-
-  const handleFillDemo = (demoType: "admin" | "staff", demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setActiveDemo(demoType);
-    setErrors({});
-    setApiError("");
-    setListenerRejectedError(null);
-  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -308,43 +297,6 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
               </div>
             </div>
           )}
-
-          {/* Quick Demo Pre-fill for Review & Development */}
-          <div className="ops-demo-card">
-            <div className="ops-demo-header">
-              <span>
-                <ZapIcon width={13} height={13} /> ONE-CLICK DEMO ACCOUNTS
-              </span>
-              <small>Click to fill credentials:</small>
-            </div>
-            <div className="ops-demo-grid">
-              <button
-                type="button"
-                className={`ops-demo-btn ops-demo-btn--admin ${activeDemo === "admin" ? "is-active" : ""}`}
-                onClick={() => handleFillDemo("admin", "admin@soundwave.com", "Test@123456")}
-                title="Fill Administrator account"
-              >
-                <span className="ops-demo-role-badge">Admin</span>
-                <div className="ops-demo-details">
-                  <strong>admin@soundwave.com</strong>
-                  <small>Password: Admin@123456</small>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className={`ops-demo-btn ops-demo-btn--staff ${activeDemo === "staff" ? "is-active" : ""}`}
-                onClick={() => handleFillDemo("staff", "staff@soundwave.com", "Test@123456")}
-                title="Fill Moderation Staff account"
-              >
-                <span className="ops-demo-role-badge">Staff</span>
-                <div className="ops-demo-details">
-                  <strong>staff@soundwave.com</strong>
-                  <small>Password: Staff@123456</small>
-                </div>
-              </button>
-            </div>
-          </div>
 
           {/* Login Form */}
           <form className="auth-v2-form" onSubmit={handleSubmit} noValidate>

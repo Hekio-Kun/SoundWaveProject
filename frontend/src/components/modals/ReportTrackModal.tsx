@@ -382,7 +382,7 @@ export function ReportTrackModal({
                 <span style={{ flexShrink: 0, marginTop: "2px" }}>
                   <AlertIcon width={18} height={18} />
                 </span>
-                <span style={{ flex: 1 }}>{errorMessage}</span>
+                <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{errorMessage}</span>
               </div>
             )}
 

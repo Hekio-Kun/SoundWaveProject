@@ -135,7 +135,7 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
         {/* Error / Alert Display */}
         {error && (
           <div
-            className="auth-v2-error"
+            className="modal-alert-box modal-alert-box--error"
             role="alert"
             style={{
               padding: "12px 16px",
@@ -144,13 +144,52 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
               border: "1px solid #FCA5A5",
               color: "#991B1B",
               display: "flex",
-              alignItems: "center",
-              gap: "10px",
+              alignItems: "flex-start",
+              gap: "12px",
               fontSize: "13.5px",
+              boxSizing: "border-box",
+              width: "100%",
             }}
           >
-            <AlertIcon width={18} height={18} />
-            <span>{error}</span>
+            <span
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "8px",
+                background: "#FEE2E2",
+                color: "#DC2626",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                marginTop: "1px",
+              }}
+            >
+              <AlertIcon width={18} height={18} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere", lineHeight: 1.5 }}>
+              <b style={{ display: "block", marginBottom: "2px", fontSize: "13.5px", color: "#7F1D1D" }}>
+                Submission Error
+              </b>
+              <span style={{ fontSize: "13px", color: "#991B1B", whiteSpace: "pre-wrap" }}>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              aria-label="Dismiss error"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#991B1B",
+                padding: "4px",
+                flexShrink: 0,
+                display: "grid",
+                placeItems: "center",
+                borderRadius: "6px",
+              }}
+            >
+              <CloseIcon width={14} height={14} />
+            </button>
           </div>
         )}
 
@@ -246,11 +285,11 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
                   )}
                 </div>
 
-                <h3 style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)", margin: "0 0 6px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-ocean-dark, #0F172A)", margin: "0 0 6px", wordBreak: "break-word", overflowWrap: "anywhere" }}>
                   {current.title}
                 </h3>
 
-                <p style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", margin: "0 0 10px", lineHeight: "1.5" }}>
+                <p style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", margin: "0 0 10px", lineHeight: "1.5", wordBreak: "break-word", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
                   {current.description || "No description provided."}
                 </p>
 
@@ -355,7 +394,7 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
                 style={{ marginTop: "2px" }}
                 id="chk-album-submission-terms"
               />
-              <span>
+              <span style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
                 I confirm that I own or hold all required intellectual property rights for the audio and artwork in this album, and all tracks adhere to SoundWave Community Guidelines.
               </span>
             </label>
