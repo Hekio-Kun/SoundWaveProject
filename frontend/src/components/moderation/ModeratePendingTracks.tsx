@@ -6,6 +6,7 @@ import {
   type SubmissionStats,
 } from "../../api/moderation";
 import { PendingTrackDetailView } from "./PendingTrackDetailView";
+import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 import {
   AlertIcon,
   ArrowDownIcon,
@@ -92,6 +93,22 @@ export function ModeratePendingTracks({
   useEffect(() => {
     setSelectedSubmissionId(initialSubmissionId ?? null);
   }, [initialSubmissionId]);
+
+  // Flash toast handler from sessionStorage across route changes
+  useEffect(() => {
+    try {
+      const flash = sessionStorage.getItem("soundwave_flash_toast");
+      if (flash) {
+        sessionStorage.removeItem("soundwave_flash_toast");
+        const parsed = JSON.parse(flash);
+        if (parsed?.message) {
+          showToast(parsed.message, parsed.type || "success");
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedSubmissionId]);
 
   const handleSelectSubmission = (id: number | null) => {
     setSelectedSubmissionId(id);
@@ -225,31 +242,6 @@ export function ModeratePendingTracks({
     void loadQueue(true);
   };
 
-  // Render Dedicated Detail View if a submission is selected
-  if (selectedSubmissionId) {
-    return (
-      <div className="mod-track-view">
-        <PendingTrackDetailView
-          submissionId={selectedSubmissionId}
-          onBack={() => handleSelectSubmission(null)}
-          onNavigateToSubmission={(nextId) => {
-            handleSelectSubmission(nextId);
-            void loadStats();
-            void loadQueue();
-          }}
-          onApproveSuccess={() => {
-            void loadStats();
-            void loadQueue();
-          }}
-          onRejectSuccess={() => {
-            void loadStats();
-            void loadQueue();
-          }}
-        />
-      </div>
-    );
-  }
-
   const hasVisibleItems = Boolean(
     queuePage?.content.some((item) => {
       if (item.itemType === "ALBUM") {
@@ -262,24 +254,38 @@ export function ModeratePendingTracks({
 
   return (
     <div className="mod-track-view">
-      {/* Toast Notification with aria-live */}
-      {toast ? (
-        <div
-          className={`staff-floating-toast is-${toast.type}`}
-          role="status"
-          aria-live="polite"
-        >
-          {toast.type === "success" ? (
-            <CheckIcon width={16} height={16} />
-          ) : (
-            <AlertIcon width={16} height={16} />
-          )}
-          <span>{toast.message}</span>
-        </div>
-      ) : null}
+      {/* SoundWave Standard Top-Center Toast Notification */}
+      <CenterNotificationPopup
+        open={Boolean(toast)}
+        type={toast?.type ?? "success"}
+        message={toast?.message ?? ""}
+        durationMs={3000}
+        onClose={() => setToast(null)}
+      />
 
-      {/* Main Review Workspace Panel */}
-      <section className="staff-queue-panel">
+      {selectedSubmissionId ? (
+        <PendingTrackDetailView
+          submissionId={selectedSubmissionId}
+          onBack={() => handleSelectSubmission(null)}
+          onNavigateToSubmission={(nextId) => {
+            handleSelectSubmission(nextId);
+            void loadStats();
+            void loadQueue();
+          }}
+          onApproveSuccess={(msg) => {
+            showToast(msg || "Track approved successfully.", "success");
+            void loadStats();
+            void loadQueue();
+          }}
+          onRejectSuccess={(msg) => {
+            showToast(msg || "Track rejected successfully.", "success");
+            void loadStats();
+            void loadQueue();
+          }}
+        />
+      ) : (
+        /* Main Review Workspace Panel */
+        <section className="staff-queue-panel">
 
         {/* Toolbar: Segmented Filter Tabs & Instant Search */}
         <div className="staff-filter-toolbar">
@@ -376,6 +382,14 @@ export function ModeratePendingTracks({
                 </button>
               ) : null}
             </div>
+            <button
+              type="submit"
+              className="button button-primary staff-search-submit-btn"
+              aria-label="Search track submissions"
+            >
+              <SearchIcon width={15} height={15} />
+              <span>Search</span>
+            </button>
           </form>
         </div>
 
@@ -472,6 +486,7 @@ export function ModeratePendingTracks({
                 const approvedTracks = albumTrackList.filter((t) => t.status === "APPROVED");
                 const rejectedTracks = albumTrackList.filter((t) => t.status === "REJECTED");
                 const isPendingAlbum = statusFilter === "PENDING" || (statusFilter === "ALL" && pendingTracks.length > 0);
+                const targetSubmissionId = pendingTracks[0]?.id || visibleTracks[0]?.id || albumTrackList[0]?.id || (item.trackId ? item.id : null);
 
                 return (
                   <div
@@ -481,7 +496,15 @@ export function ModeratePendingTracks({
                     <div className="staff-album-main-row">
                       <div className="staff-track-primary-content">
                       {/* Album Artwork Thumbnail */}
-                      <div className="staff-thumb-container">
+                      <div
+                        className="staff-thumb-container"
+                        style={{ cursor: targetSubmissionId ? "pointer" : "default" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (targetSubmissionId) handleSelectSubmission(targetSubmissionId);
+                        }}
+                        title={targetSubmissionId ? `Click to review album "${item.trackTitle}"` : undefined}
+                      >
                         {item.coverUrl ? (
                           <img
                             src={item.coverUrl}
@@ -505,16 +528,26 @@ export function ModeratePendingTracks({
                       </div>
 
                       {/* Album Metadata */}
-                      <div className="staff-track-meta-section" onClick={() => toggleAlbumExpand(item.id)}>
+                      <div
+                        className="staff-track-meta-section"
+                        style={{ cursor: targetSubmissionId ? "pointer" : "default" }}
+                        onClick={() => {
+                          if (targetSubmissionId) handleSelectSubmission(targetSubmissionId);
+                        }}
+                      >
                         <div className="staff-track-name-row">
                           <button
                             type="button"
                             className="staff-track-title-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleAlbumExpand(item.id);
+                              if (targetSubmissionId) {
+                                handleSelectSubmission(targetSubmissionId);
+                              } else {
+                                toggleAlbumExpand(item.id);
+                              }
                             }}
-                            title={`View tracks in album ${item.trackTitle}`}
+                            title={`Click to review album "${item.trackTitle}"`}
                           >
                             {item.trackTitle}
                           </button>
@@ -625,8 +658,8 @@ export function ModeratePendingTracks({
                             {isExpanded
                               ? "Collapse"
                               : statusFilter === "ALL"
-                              ? `View tracks (${totalTracksCount})`
-                              : `View tracks (${visibleTracks.length}/${totalTracksCount})`}
+                              ? `Tracks (${totalTracksCount})`
+                              : `Tracks (${visibleTracks.length}/${totalTracksCount})`}
                           </span>
                           {isExpanded ? (
                             <ArrowUpIcon width={14} height={14} />
@@ -828,6 +861,7 @@ export function ModeratePendingTracks({
           </div>
         ) : null}
       </section>
+      )}
     </div>
   );
 }
