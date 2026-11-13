@@ -33,5 +33,6 @@ public class UpdateAlbumRequest {
     /**
      * Danh sách ID các bài hát cập nhật trong Album (theo thứ tự track number mới).
      */
+    @Size(max = 7, message = "An album cannot contain more than 7 tracks.")
     private List<Long> trackIds;
 }

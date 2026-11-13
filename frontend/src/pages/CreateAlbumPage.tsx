@@ -47,6 +47,8 @@ type TrackItem = {
 
 type FormErrors = Record<string, string>;
 
+const MAX_ALBUM_TRACKS = 7;
+
 function formatDuration(ms?: number): string {
   if (!ms || ms <= 0) return "0:00";
   const totalSeconds = Math.floor(ms / 1000);
@@ -262,6 +264,14 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
 
   // Save current track and advance to next track ("Add Next Track")
   const handleSaveAndNextTrack = () => {
+    if (editingTrackIndex === null && tracks.length >= MAX_ALBUM_TRACKS) {
+      setPageToast({
+        type: "warning",
+        message: `An album can only contain up to ${MAX_ALBUM_TRACKS} tracks. Please save draft or edit existing tracks.`,
+      });
+      return;
+    }
+
     const errors: FormErrors = {};
 
     if (!currentAudioFile && editingTrackIndex === null) {
@@ -369,6 +379,11 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
     // 1.1: validateAlbumAndTracks()
     let finalTracks = [...tracks];
     if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
+      if (finalTracks.length >= MAX_ALBUM_TRACKS) {
+        setSubmitError(`An album cannot contain more than ${MAX_ALBUM_TRACKS} tracks.`);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const genreIdVal = Number(currentGenreId || genres[0]?.id || 1);
       const autoTrack: TrackItem = {
         id: `track-auto-${Date.now()}`,
@@ -393,6 +408,8 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
 
     if (finalTracks.length === 0) {
       errors.tracks = "Please add at least one track to your album.";
+    } else if (finalTracks.length > MAX_ALBUM_TRACKS) {
+      errors.tracks = `An album cannot contain more than ${MAX_ALBUM_TRACKS} tracks.`;
     }
 
     // Sequence 1.2.1.1: displayInlineValidationErrors("Please complete all required fields")
@@ -1065,6 +1082,22 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                       <CheckIcon width={16} height={16} /> Save track changes
                     </button>
                   </>
+                ) : tracks.length >= MAX_ALBUM_TRACKS ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <button
+                      className="button button-primary"
+                      type="button"
+                      disabled
+                      title="Maximum album capacity reached (7 tracks)"
+                      style={{ opacity: 0.65, cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <CheckIcon width={16} height={16} />
+                      <span>Max limit reached ({tracks.length}/{MAX_ALBUM_TRACKS} tracks)</span>
+                    </button>
+                    <span style={{ fontSize: "12px", color: "#b45309", fontWeight: 500 }}>
+                      Album is full (maximum {MAX_ALBUM_TRACKS} tracks). Click <b>"Save Draft"</b> below to finish.
+                    </span>
+                  </div>
                 ) : (
                   <button
                     className="button button-primary"
@@ -1090,13 +1123,13 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                     style={{
                       padding: "3px 10px",
                       borderRadius: "12px",
-                      backgroundColor: "#e0f2fe",
-                      color: "var(--sw-primary-dark, #0284c7)",
+                      backgroundColor: tracks.length >= MAX_ALBUM_TRACKS ? "#fef3c7" : "#e0f2fe",
+                      color: tracks.length >= MAX_ALBUM_TRACKS ? "#b45309" : "var(--sw-primary-dark, #0284c7)",
                       fontWeight: 700,
                       fontSize: "12px",
                     }}
                   >
-                    {tracks.length} track{tracks.length === 1 ? "" : "s"} • {formatDuration(totalDurationMs)}
+                    {tracks.length}/{MAX_ALBUM_TRACKS} tracks • {formatDuration(totalDurationMs)}
                   </span>
                 </div>
 
@@ -1216,14 +1249,24 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
                         <button
                           type="button"
                           className="button button-secondary button-small"
-                          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                          disabled={tracks.length >= MAX_ALBUM_TRACKS}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            opacity: tracks.length >= MAX_ALBUM_TRACKS ? 0.6 : 1,
+                            cursor: tracks.length >= MAX_ALBUM_TRACKS ? "not-allowed" : "pointer",
+                          }}
                           onClick={() => {
+                            if (tracks.length >= MAX_ALBUM_TRACKS) return;
                             resetTrackForm();
                             requestAnimationFrame(() => document.getElementById("upload-track-title")?.focus());
                           }}
                         >
                           <PlusIcon width={14} height={14} />
-                          <span>Add Next Track</span>
+                          <span>{tracks.length >= MAX_ALBUM_TRACKS ? `Max Limit Reached (${MAX_ALBUM_TRACKS}/${MAX_ALBUM_TRACKS})` : "Add Next Track"}</span>
                         </button>
                       </div>
                     )}

@@ -37,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -503,5 +504,61 @@ class StudioAlbumServiceTest {
         assertThatThrownBy(() -> studioAlbumService.deleteAlbum(0L, mockUser.getEmail()))
                 .isInstanceOf(BadRequestOperationException.class)
                 .hasMessageContaining("Invalid album ID");
+    }
+
+    @Test
+    @DisplayName("UC-21.1 EX: Báo lỗi BadRequest khi tạo album với số lượng bài hát vượt quá giới hạn 7 bài")
+    void createAlbum_ExceedMaxTracks_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCase(10L, "Too Many Tracks Album")).thenReturn(false);
+
+        List<AlbumTrackItemRequest> eightTracks = new ArrayList<>();
+        for (int i = 1; i <= 8; i++) {
+            eightTracks.add(AlbumTrackItemRequest.builder().title("Track " + i).genreId(1L).build());
+        }
+
+        CreateAlbumRequest request = CreateAlbumRequest.builder()
+                .title("Too Many Tracks Album")
+                .tracks(eightTracks)
+                .build();
+
+        assertThatThrownBy(() -> studioAlbumService.createAlbum(request, null, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("cannot contain more than 7 tracks");
+    }
+
+    @Test
+    @DisplayName("UC-21.5 EX: Báo lỗi BadRequest khi cập nhật album với số lượng trackIds vượt quá 7 bài")
+    void updateAlbum_ExceedMaxTracks_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(albumRepository.existsByCreatedByUserIdAndTitleIgnoreCaseAndIdNot(10L, "New Album Title", 100L)).thenReturn(false);
+
+        List<Long> eightTrackIds = List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+        UpdateAlbumRequest request = UpdateAlbumRequest.builder()
+                .title("New Album Title")
+                .trackIds(eightTrackIds)
+                .build();
+
+        assertThatThrownBy(() -> studioAlbumService.updateAlbum(100L, request, null, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("cannot contain more than 7 tracks");
+    }
+
+    @Test
+    @DisplayName("UC-21.2 EX: Báo lỗi BadRequest khi nộp album kiểm duyệt có số lượng bài vượt quá 7 bài")
+    void submitAlbumForReview_ExceedMaxTracks_ThrowsBadRequest() {
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+
+        List<Track> eightTracks = new ArrayList<>();
+        for (long i = 1; i <= 8; i++) {
+            eightTracks.add(Track.builder().id(i).title("Track " + i).build());
+        }
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(eightTracks);
+
+        assertThatThrownBy(() -> studioAlbumService.submitAlbumForReview(100L, mockUser.getEmail()))
+                .isInstanceOf(BadRequestOperationException.class)
+                .hasMessageContaining("cannot contain more than 7 tracks");
     }
 }
