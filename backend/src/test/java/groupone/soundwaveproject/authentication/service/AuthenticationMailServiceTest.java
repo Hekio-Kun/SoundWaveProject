@@ -47,7 +47,7 @@ class AuthenticationMailServiceTest {
                 "mod.tran@soundwave.com",
                 "Trần Moderator",
                 "Temp@123456",
-                "http://localhost:5173/#/staff/login"
+                "http://localhost:5173/staff/login"
         );
 
         assertTrue(result, "Gửi email thành công phải trả về true");
@@ -65,7 +65,7 @@ class AuthenticationMailServiceTest {
                 "mod.tran@soundwave.com",
                 "Trần Moderator",
                 "Temp@123456",
-                "http://localhost:5173/#/staff/login"
+                "http://localhost:5173/staff/login"
         );
 
         assertFalse(result, "Khi SMTP lỗi phải bắt ngoại lệ an toàn và trả về false (EX01)");

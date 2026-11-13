@@ -1,8 +1,8 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { AuthApiError, authApi, getAuthErrorMessage, type AuthSession } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { navigateTo } from "../utils/navigation";
 import {
-  ActivityIcon,
   AlertIcon,
   ChevronLeftIcon,
   LockIcon,
@@ -44,9 +44,9 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
   // Auto redirect if already authenticated with administrative or staff privileges
   useEffect(() => {
     if (user?.role === "ADMIN") {
-      window.location.hash = "#/admin/dashboard";
+      navigateTo("/admin/dashboard", { force: true });
     } else if (user?.role === "STAFF" || user?.role === "MODERATOR") {
-      window.location.hash = "#/staff/dashboard";
+      navigateTo("/staff/dashboard", { force: true });
     }
   }, [user]);
 
@@ -96,9 +96,9 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
       onLoginSuccess(session, rememberMe);
 
       if (session.user.role === "ADMIN") {
-        window.location.hash = "#/admin/dashboard";
+        navigateTo("/admin/dashboard", { force: true });
       } else {
-        window.location.hash = "#/staff/dashboard";
+        navigateTo("/staff/dashboard", { force: true });
       }
     } catch (error) {
       if (error instanceof AuthApiError) {
@@ -125,86 +125,8 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
   };
 
   return (
-    <main className="auth-v2-experience">
-      {/* Operations Story / Command Center Panel (Left Column) */}
-      <section className="auth-v2-story ops-auth-story" aria-label="SoundWave Operations Command">
-        <div className="auth-v2-orbit auth-v2-orbit--one" />
-        <div className="auth-v2-orbit auth-v2-orbit--two" />
-
-        <button
-          type="button"
-          className="auth-v2-brand"
-          onClick={() => onNavigate("/")}
-          aria-label="Return to SoundWave Explore"
-        >
-          <img src="/soundwave-logo.png" alt="SoundWave" />
-          <span>SoundWave</span>
-          <span className="ops-auth-env-pill">Operations</span>
-        </button>
-
-        <div className="auth-v2-story-content">
-          <span className="auth-v2-story-tag">
-            <ShieldIcon width={14} height={14} /> RESTRICTED OPERATIONS GATEWAY
-          </span>
-
-          <h2>
-            Unified Governance for<br />
-            <span>Platform & Creators.</span>
-          </h2>
-
-          <p>
-            Dedicated operational environment for SoundWave Staff and System Administrators
-            to supervise music moderation, review submissions, and manage system telemetry.
-          </p>
-
-          {/* Operations Live Status Widget */}
-          <div className="ops-auth-telemetry" role="status">
-            <div className="ops-telemetry-top">
-              <span className="ops-pulse-badge">
-                <i className="ops-pulse-dot" /> SYSTEM OPERATIONAL
-              </span>
-              <small>TLS 1.3 · ENCRYPTED</small>
-            </div>
-
-            <div className="ops-telemetry-grid">
-              <div className="ops-telemetry-item">
-                <span className="ops-telemetry-icon ops-telemetry-icon--blue">
-                  <ShieldIcon width={18} height={18} />
-                </span>
-                <div>
-                  <strong>Track Moderation</strong>
-                  <small>Submission review queue</small>
-                </div>
-              </div>
-
-              <div className="ops-telemetry-item">
-                <span className="ops-telemetry-icon ops-telemetry-icon--sand">
-                  <ActivityIcon width={18} height={18} />
-                </span>
-                <div>
-                  <strong>System Governance</strong>
-                  <small>Staff role enforcement</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="auth-v2-trust-row">
-            <span>
-              <ShieldIcon width={16} height={16} />
-              <b>Role-Based Access</b>
-              <small>Admin & Staff privileged scope</small>
-            </span>
-            <span>
-              <LockIcon width={16} height={16} />
-              <b>Audit Trail Logged</b>
-              <small>All operations securely tracked</small>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* Operations Workspace (Right Column) */}
+    <main className="auth-v2-experience auth-v2-experience--single">
+      {/* Operations Workspace (single centered column) */}
       <section className="auth-v2-workspace">
         {/* Top Navigation Controls */}
         <button

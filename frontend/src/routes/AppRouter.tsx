@@ -4,6 +4,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { usePlayer } from "../context/PlayerContext";
 import { usePlaylists } from "../context/PlaylistContext";
 import { useRouter } from "../hooks/useRouter";
+import { navigateTo } from "../utils/navigation";
 import { initialStudioTracks } from "../data";
 
 import { AlbumDetailsPage } from "../pages/AlbumDetailsPage";
@@ -84,14 +85,14 @@ export function AppRouter(): React.ReactElement | null {
         pathname === "/create-album" ||
         pathname === "/albums/create"
       ) {
-        window.location.hash = "#/login";
+        navigateTo("/login", { force: true });
         return;
       }
       if (
         (pathname.startsWith("/staff") && pathname !== "/staff/login" && pathname !== "/staff-login") ||
         pathname.startsWith("/admin")
       ) {
-        window.location.hash = "#/staff/login";
+        navigateTo("/staff/login", { force: true });
         return;
       }
     }
@@ -100,7 +101,7 @@ export function AppRouter(): React.ReactElement | null {
         (pathname.startsWith("/staff") && pathname !== "/staff/login" && pathname !== "/staff-login") ||
         pathname.startsWith("/admin")
       ) {
-        window.location.hash = "#/";
+        navigateTo("/", { force: true });
         return;
       }
     }
@@ -114,7 +115,7 @@ export function AppRouter(): React.ReactElement | null {
         pathname === "" ||
         pathname.startsWith("/admin")
       ) {
-        window.location.hash = "#/staff/dashboard";
+        navigateTo("/staff/dashboard", { force: true });
       }
     } else if (user?.role === "ADMIN") {
       if (
@@ -124,7 +125,7 @@ export function AppRouter(): React.ReactElement | null {
         pathname === "/staff-login" ||
         pathname.startsWith("/staff")
       ) {
-        window.location.hash = "#/admin/dashboard";
+        navigateTo("/admin/dashboard", { force: true });
       }
     }
   }, [authReady, isAuthenticated, user, pathname]);

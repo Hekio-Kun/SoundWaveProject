@@ -178,7 +178,7 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
                   <div className="row-main-info">
                     <a
                       className="row-title"
-                      href={`#/track/${track.id}`}
+                      href={`/track/${track.id}`}
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate(`/track/${track.id}`);

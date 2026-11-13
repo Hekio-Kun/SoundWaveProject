@@ -13,6 +13,7 @@ import {
 } from "../../icons";
 import { NotificationDropdown } from "./NotificationDropdown";
 import type { CurrentUser, LandingTrack } from "../../types";
+import { LOCATION_CHANGE_EVENT } from "../../utils/navigation";
 
 type Props = {
   user: CurrentUser | null;
@@ -40,14 +41,12 @@ export function AppTopBar({
 
   // Search input & live autocomplete state (UC-9: Search Public Catalog)
   const [searchKeyword, setSearchKeyword] = useState(() => {
-    const hash = window.location.hash;
-    if (hash.includes("/search")) {
-      const pathPart = hash.replace(/^#/, "").split("?")[0];
-      if (pathPart.startsWith("/search/")) {
-        return decodeURIComponent(pathPart.slice("/search/".length));
-      }
-      const match = hash.match(/[?&]q=([^&]*)/);
-      if (match) return decodeURIComponent(match[1]);
+    const pathname = window.location.pathname;
+    if (pathname.startsWith("/search/")) {
+      return decodeURIComponent(pathname.slice("/search/".length));
+    }
+    if (pathname === "/search") {
+      return new URLSearchParams(window.location.search).get("q") || "";
     }
     return "";
   });
@@ -61,35 +60,30 @@ export function AppTopBar({
   // Keep search keyword in sync with URL changes (/search/:query and /search?q=...)
   useEffect(() => {
     const syncQueryFromUrl = () => {
-      const hash = window.location.hash;
-      if (hash.includes("/search")) {
-        const pathPart = hash.replace(/^#/, "").split("?")[0];
-        if (pathPart.startsWith("/search/")) {
-          setSearchKeyword(decodeURIComponent(pathPart.slice("/search/".length)));
-          return;
-        }
-        const match = hash.match(/[?&]q=([^&]*)/);
-        if (match) {
-          setSearchKeyword(decodeURIComponent(match[1]));
-          return;
-        }
-        if (pathPart === "/search") {
-          setSearchKeyword("");
-          return;
-        }
+      const pathname = window.location.pathname;
+      if (pathname.startsWith("/search/")) {
+        setSearchKeyword(decodeURIComponent(pathname.slice("/search/".length)));
+        return;
+      }
+      if (pathname === "/search") {
+        const q = new URLSearchParams(window.location.search).get("q");
+        setSearchKeyword(q ?? "");
       }
     };
     syncQueryFromUrl();
-    window.addEventListener("hashchange", syncQueryFromUrl);
-    return () => window.removeEventListener("hashchange", syncQueryFromUrl);
+    window.addEventListener("popstate", syncQueryFromUrl);
+    window.addEventListener(LOCATION_CHANGE_EVENT, syncQueryFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncQueryFromUrl);
+      window.removeEventListener(LOCATION_CHANGE_EVENT, syncQueryFromUrl);
+    };
   }, []);
 
   // Spotify-style live typing: typing updates the route to /search/:query
   useEffect(() => {
     const trimmed = searchKeyword.trim();
     if (!trimmed) {
-      const hash = window.location.hash;
-      if (hash.includes("/search")) {
+      if (window.location.pathname.startsWith("/search")) {
         onNavigate("/");
       }
       return;
@@ -98,8 +92,7 @@ export function AppTopBar({
     if (trimmed.length < 2) return;
 
     const timer = setTimeout(() => {
-      const hash = window.location.hash;
-      const currentPath = hash.replace(/^#/, "").split("?")[0];
+      const currentPath = window.location.pathname;
       const targetPath = `/search/${encodeURIComponent(trimmed)}`;
       if (currentPath !== targetPath) {
         onNavigate(targetPath);
@@ -260,8 +253,7 @@ export function AppTopBar({
               onClick={() => {
                 setSearchKeyword("");
                 setSearchWarning(null);
-                const hash = window.location.hash;
-                if (hash.includes("/search")) {
+                if (window.location.pathname.startsWith("/search")) {
                   onNavigate("/");
                 }
               }}

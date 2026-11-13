@@ -389,9 +389,9 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       const anchor = target?.closest?.("a");
       if (!anchor) return;
       const href = anchor.getAttribute("href");
-      if (!href || !href.startsWith("#/")) return;
+      if (!href || !href.startsWith("/") || href.startsWith("//")) return;
 
-      const destination = href.slice(1);
+      const destination = href;
       if (destination === "/track/create" || destination === "/track/upload") return;
 
       if (hasUnsavedChangesRef.current()) {

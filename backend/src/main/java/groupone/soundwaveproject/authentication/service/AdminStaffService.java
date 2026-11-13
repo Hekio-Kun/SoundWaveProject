@@ -49,7 +49,7 @@ public class AdminStaffService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationMailService mailService;
 
-    @Value("${app.staff.login-url:http://127.0.0.1:4174/#/staff/login}")
+    @Value("${app.staff.login-url:http://127.0.0.1:4174/staff/login}")
     private String staffLoginUrl;
 
     /**

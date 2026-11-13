@@ -39,7 +39,7 @@ class SendStaffCredentialEmailManualTest {
                 "haotntce200338@gmail.com",
                 "Trần Ngọc Hạo",
                 "Temp@Staff2026",
-                "http://localhost:5173/#/staff/login"
+                "http://localhost:5173/staff/login"
         );
 
         System.out.println("==================================================");

@@ -7,6 +7,7 @@ import { PlaylistFormModal } from "../components/modals/PlaylistFormModal";
 import { useAuth } from "./AuthContext";
 import { usePlayer } from "./PlayerContext";
 import type { LandingTrack, Playlist } from "../types";
+import { navigateTo } from "../utils/navigation";
 
 export interface PlaylistContextType {
   playlists: Playlist[];
@@ -95,7 +96,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const openCreatePlaylist = useCallback(() => {
     if (!isAuthenticated) {
       showToast("Please log in to create a playlist.", "warning");
-      window.location.hash = "#/login";
+      navigateTo("/login", { force: true });
       return;
     }
     setEditingPlaylist(null);
@@ -106,7 +107,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     (pl: Playlist) => {
       if (!isAuthenticated) {
         showToast("Please log in to edit the playlist.", "warning");
-        window.location.hash = "#/login";
+        navigateTo("/login", { force: true });
         return;
       }
       setEditingPlaylist(pl);
@@ -172,8 +173,8 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setPlaylists((prev) => prev.filter((pl) => pl.id !== targetId));
     setDeletePlaylistId(null);
     showToast("Playlist deleted successfully.");
-    if (window.location.hash.includes(`/playlist/${targetId}`)) {
-      window.location.hash = "#/playlists";
+    if (window.location.pathname.includes(`/playlist/${targetId}`)) {
+      navigateTo("/playlists", { force: true });
     }
   }, [deletePlaylistId, showToast]);
 

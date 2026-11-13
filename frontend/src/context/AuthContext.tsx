@@ -3,6 +3,7 @@ import { authApi, type AuthSession } from "../api/auth";
 import { clearAccessToken, setAccessToken } from "../api/client";
 import type { ProfileDetails } from "../api/profile";
 import type { CurrentUser } from "../types";
+import { navigateTo } from "../utils/navigation";
 
 export interface AuthContextType {
   user: CurrentUser | null;
@@ -71,12 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("soundwave_access_token");
     sessionStorage.removeItem("soundwave_user");
     sessionStorage.removeItem("soundwave_access_token");
-    window.location.hash =
+    navigateTo(
       session.user.role === "ADMIN"
-        ? "#/admin/dashboard"
+        ? "/admin/dashboard"
         : session.user.role === "STAFF"
-        ? "#/staff/dashboard"
-        : "#/";
+        ? "/staff/dashboard"
+        : "/",
+      { force: true }
+    );
   }, []);
 
   const handleProfileUpdated = useCallback((profile: ProfileDetails) => {
@@ -128,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? "You have logged out successfully."
           : "You have been logged out from this device."
       );
-      window.location.hash = "#/";
+      navigateTo("/", { force: true });
     }
   }, []);
 

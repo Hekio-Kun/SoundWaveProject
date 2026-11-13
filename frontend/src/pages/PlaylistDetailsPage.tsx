@@ -668,7 +668,7 @@ export function PlaylistDetailsPage({
                       </button>
                     </div>
                     <a
-                      href={`#/creator/${track.creator.userId}`}
+                      href={`/creator/${track.creator.userId}`}
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate(`/creator/${track.creator.userId}`);

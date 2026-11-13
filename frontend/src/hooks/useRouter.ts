@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMotionReveal } from "./useMotionReveal";
+import { getCurrentRoute, LOCATION_CHANGE_EVENT, navigateTo } from "../utils/navigation";
 
 export interface AppRouterState {
   route: string;
@@ -14,35 +15,24 @@ export interface AppRouterState {
 }
 
 export function useRouter(): AppRouterState {
-  const [route, setRoute] = useState(() => window.location.hash || "#/");
+  const [route, setRoute] = useState(() => getCurrentRoute());
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setRoute(window.location.hash || "#/");
+    const handleLocationChange = () => {
+      setRoute(getCurrentRoute());
     };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleLocationChange);
+    window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange);
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+      window.removeEventListener(LOCATION_CHANGE_EVENT, handleLocationChange);
+    };
   }, []);
 
-  const navigate = (path: string) => {
-    const target = path.startsWith("#") ? path : `#${path.startsWith("/") ? path : `/${path}`}`;
-    const cleanTarget = path.startsWith("#") ? path.slice(1) : (path.startsWith("/") ? path : `/${path}`);
+  // navigateTo() tự phát event "soundwave:navigate" (cancelable) để trang có thay đổi chưa lưu chặn lại
+  const navigate = (path: string) => navigateTo(path);
 
-    // Dispatch a cancelable navigation event so active pages with unsaved changes can intercept
-    const event = new CustomEvent("soundwave:navigate", {
-      cancelable: true,
-      detail: { to: cleanTarget },
-    });
-    const allowed = window.dispatchEvent(event);
-    if (!allowed) {
-      return;
-    }
-
-    window.location.hash = target;
-  };
-
-  const cleanRoute = route.startsWith("#") ? route.slice(1) : route;
-  const [pathname, queryString] = cleanRoute.split("?");
+  const [pathname, queryString] = route.split("?");
   const queryParams = useMemo(() => new URLSearchParams(queryString || ""), [queryString]);
 
   useMotionReveal(pathname);

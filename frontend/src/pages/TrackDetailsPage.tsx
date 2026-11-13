@@ -106,7 +106,7 @@ export function TrackDetailsPage({
   const [lyricsLoading, setLyricsLoading] = useState(true);
   const [lyricsError, setLyricsError] = useState(false);
   const initialTabFromUrl = typeof window !== "undefined"
-    ? (new URLSearchParams(window.location.search || (window.location.hash.includes("?") ? window.location.hash.split("?")[1] : "")).get("tab") === "personal" ? "PERSONAL" : "OFFICIAL")
+    ? (new URLSearchParams(window.location.search).get("tab") === "personal" ? "PERSONAL" : "OFFICIAL")
     : "OFFICIAL";
   const [lyricsTab, setLyricsTab] = useState<"OFFICIAL" | "PERSONAL">(initialTabFromUrl);
 
