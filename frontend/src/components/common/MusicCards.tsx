@@ -211,7 +211,7 @@ export function TrackCard({
 
       <div className="sw-card-copy">
         <a
-          href={`#/track/${track.id}`}
+          href={`/track/${track.id}`}
           className="sw-card-title"
           onClick={(event) => {
             event.preventDefault();
@@ -221,7 +221,7 @@ export function TrackCard({
           {track.title}
         </a>
         <a
-          href={`#/creator/${track.creator.userId}`}
+          href={`/creator/${track.creator.userId}`}
           className="sw-card-subtitle"
           onClick={(event) => {
             event.preventDefault();
@@ -245,7 +245,7 @@ export function AlbumCard({ album, onNavigate }: { album: FeaturedAlbum; onNavig
         <img src={album.coverUrl} alt="" loading="lazy" />
         <span className="sw-track-play"><PlayIcon width={19} height={19} /></span>
       </button>
-      <a href={`#/album/${album.id}`} className="sw-card-title" onClick={(event) => { event.preventDefault(); onNavigate(`/album/${album.id}`); }}>{album.title}</a>
+      <a href={`/album/${album.id}`} className="sw-card-title" onClick={(event) => { event.preventDefault(); onNavigate(`/album/${album.id}`); }}>{album.title}</a>
       <span className="sw-card-subtitle">{album.creatorName} · {album.releaseYear}</span>
     </article>
   );
@@ -256,7 +256,7 @@ export function CreatorCard({ creator, onNavigate }: { creator: FeaturedCreator;
     <article className="sw-creator-card">
       <button className="sw-creator-avatar" onClick={() => onNavigate(`/creator/${creator.userId}`)} aria-label={`Open ${creator.displayName}'s profile`}><img src={creator.avatarUrl} alt="" loading="lazy" /></button>
       <div>
-        <a href={`#/creator/${creator.userId}`} className="sw-card-title" onClick={(event) => { event.preventDefault(); onNavigate(`/creator/${creator.userId}`); }}>{creator.displayName}</a>
+        <a href={`/creator/${creator.userId}`} className="sw-card-title" onClick={(event) => { event.preventDefault(); onNavigate(`/creator/${creator.userId}`); }}>{creator.displayName}</a>
         <p>{creator.bio}</p>
         <span>{creator.publishedTracks} tracks · {compactNumber(creator.followersCount ?? 0)} followers</span>
       </div>

@@ -9,6 +9,7 @@ import {
 } from "../api/track";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { usePlayer } from "../context/PlayerContext";
+import { navigateTo } from "../utils/navigation";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { RejectionDetailsModal } from "../components/modals/RejectionDetailsModal";
 import { UpdateLyricModal } from "../components/modals/UpdateLyricModal";
@@ -850,7 +851,7 @@ export function StudioTrackDetailPage({
                     <button
                       type="button"
                       className="studio-crud-btn studio-crud-btn-edit"
-                      onClick={() => (window.location.hash = `#/track/${track.id}/lyrics/edit?mode=official`)}
+                      onClick={() => navigateTo(`/track/${track.id}/lyrics/edit?mode=official`, { force: true })}
                       style={{
                         backgroundColor: "#f0f9ff",
                         color: "var(--color-ocean-primary, #0284C7)",

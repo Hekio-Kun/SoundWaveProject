@@ -3,6 +3,7 @@ import { catalogApi } from "../../api/catalog";
 import { albums, featuredCreators, genres, heroCovers, tracks } from "../../data";
 import { ArrowIcon, CheckIcon, HeadphonesIcon, MoreIcon, PauseIcon, PlayIcon, UploadIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
+import { navigateTo } from "../../utils/navigation";
 
 type Props = {
   currentTrack: LandingTrack | null;
@@ -12,7 +13,7 @@ type Props = {
 };
 
 const go = (path: string) => {
-  window.location.hash = path;
+  navigateTo(path);
 };
 
 const formatPlays = (value: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -41,8 +42,8 @@ function TrackCard({ track, active, playing, onPlay }: { track: LandingTrack; ac
         </button>
         {active && playing && <span className="playing-bars" aria-label="Now playing"><i/><i/><i/></span>}
       </div>
-      <a className="track-title" href={`#/track/${track.id}`}>{track.title}</a>
-      <a className="track-creator" href={`#/creator/${track.creator.userId}`}>{track.creator.displayName}</a>
+      <a className="track-title" href={`/track/${track.id}`}>{track.title}</a>
+      <a className="track-creator" href={`/creator/${track.creator.userId}`}>{track.creator.displayName}</a>
       <span className="track-plays"><HeadphonesIcon /> {formatPlays(track.playCount)} plays</span>
     </article>
   );
@@ -158,8 +159,8 @@ export function LandingPage({ currentTrack, playing, onPlay, isAuthenticated }: 
                 <img src={track.coverUrl ?? undefined} alt="" />
                 <span>{currentTrack?.id === track.id && playing ? <PauseIcon/> : <PlayIcon/>}</span>
               </button>
-              <div className="row-song"><a href={`#/track/${track.id}`}>{track.title}</a><a href={`#/creator/${track.creator.userId}`}>{track.creator.displayName}</a></div>
-              <a className="row-album" href={track.album ? `#/album/${track.album.id}` : "#/explore"}>{track.album?.title ?? "Single"}</a>
+              <div className="row-song"><a href={`/track/${track.id}`}>{track.title}</a><a href={`/creator/${track.creator.userId}`}>{track.creator.displayName}</a></div>
+              <a className="row-album" href={track.album ? `/album/${track.album.id}` : "/explore"}>{track.album?.title ?? "Single"}</a>
               <span className="row-duration">{formatDuration(track.durationMs)}</span>
               <button className="icon-button" aria-label={`More options for ${track.title}`}><MoreIcon /></button>
             </article>
@@ -171,7 +172,7 @@ export function LandingPage({ currentTrack, playing, onPlay, isAuthenticated }: 
         <SectionHeading eyebrow="HEAR THE WHOLE STORY" title="Featured albums" action={() => go("/albums")} />
         <div className="album-grid horizontal-on-mobile">
           {albums.map((album) => (
-            <a className="album-card" href={`#/album/${album.id}`} key={album.id}>
+            <a className="album-card" href={`/album/${album.id}`} key={album.id}>
               <div className="album-art"><img src={album.coverUrl} alt={`${album.title} album cover`} /><span><PlayIcon /></span></div>
               <b>{album.title}</b><span>{album.creatorName} · {album.releaseYear}</span>
             </a>

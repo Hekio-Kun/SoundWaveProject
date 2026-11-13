@@ -364,7 +364,7 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
                         <div className="row-main-info">
                           <a
                             className="row-title"
-                            href={`#/track/${item.trackId}`}
+                            href={`/track/${item.trackId}`}
                             onClick={(e) => {
                               e.preventDefault();
                               onNavigate(`/track/${item.trackId}`);

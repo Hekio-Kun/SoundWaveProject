@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { CloseIcon, MenuIcon, SearchIcon } from "../../icons";
+import { navigateTo } from "../../utils/navigation";
 
 type Props = {
   isAuthenticated: boolean;
@@ -7,7 +8,7 @@ type Props = {
 };
 
 const go = (path: string) => {
-  window.location.hash = path;
+  navigateTo(path);
 };
 
 export function SoundWaveLogo() {
@@ -23,7 +24,7 @@ export function SoundWaveHeader({ isAuthenticated, hasPlayer }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [query, setQuery] = useState("");
-  const activePath = (window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash).split("?")[0];
+  const activePath = window.location.pathname;
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -37,9 +38,9 @@ export function SoundWaveHeader({ isAuthenticated, hasPlayer }: Props) {
         <SoundWaveLogo />
 
         <nav className={`main-nav ${menuOpen ? "main-nav--open" : ""}`} aria-label="Main navigation">
-          <a href="#/" className="nav-active" onClick={() => setMenuOpen(false)}>Explore</a>
-          <a href="#/library" onClick={() => setMenuOpen(false)}>Library</a>
-          <a href="#/genres" onClick={() => setMenuOpen(false)}>Genres</a>
+          <a href="/" className="nav-active" onClick={() => setMenuOpen(false)}>Explore</a>
+          <a href="/library" onClick={() => setMenuOpen(false)}>Library</a>
+          <a href="/genres" onClick={() => setMenuOpen(false)}>Genres</a>
         </nav>
 
         <form className={`header-search ${mobileSearch ? "header-search--open" : ""}`} onSubmit={submitSearch} role="search">

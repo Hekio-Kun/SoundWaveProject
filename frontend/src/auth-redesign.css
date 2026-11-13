@@ -7,6 +7,12 @@
   color: var(--sw-text, #101828);
 }
 
+/* Staff login: chỉ còn 1 cột form, căn giữa toàn màn hình */
+.auth-v2-experience.auth-v2-experience--single {
+  grid-template-columns: 1fr;
+  background: #F6EFE3;
+}
+
 .auth-v2-story {
   position: relative;
   isolation: isolate;

@@ -354,7 +354,7 @@ export function MusicPlayer({
         />
         <div>
           <a
-            href={`#/track/${track.id}`}
+            href={`/track/${track.id}`}
             onClick={(e) => {
               if (onNavigate) {
                 e.preventDefault();
@@ -365,7 +365,7 @@ export function MusicPlayer({
             {track.title}
           </a>
           <a
-            href={`#/creator/${track.creator.userId}`}
+            href={`/creator/${track.creator.userId}`}
             onClick={(e) => {
               if (onNavigate) {
                 e.preventDefault();

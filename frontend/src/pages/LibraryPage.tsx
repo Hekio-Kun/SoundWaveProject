@@ -350,7 +350,7 @@ export function LibraryPage({
                   <div className="row-main-info">
                     <a
                       className="row-title"
-                      href={`#/track/${track.id}`}
+                      href={`/track/${track.id}`}
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate(`/track/${track.id}`);
@@ -360,7 +360,7 @@ export function LibraryPage({
                     </a>
                     <a
                       className="row-creator"
-                      href={`#/creator/${track.creator.userId}`}
+                      href={`/creator/${track.creator.userId}`}
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate(`/creator/${track.creator.userId}`);
@@ -588,7 +588,7 @@ export function LibraryPage({
                         <div className="row-main-info">
                           <a
                             className="row-title"
-                            href={`#/track/${item.trackId}`}
+                            href={`/track/${item.trackId}`}
                             onClick={(e) => {
                               e.preventDefault();
                               onNavigate(`/track/${item.trackId}`);

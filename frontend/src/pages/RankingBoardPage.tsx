@@ -641,7 +641,7 @@ export function RankingBoardPage({
                       <div className="row-main-info" style={{ minWidth: 0 }}>
                         <a
                           className="row-title"
-                          href={`#/track/${track.id}`}
+                          href={`/track/${track.id}`}
                           onClick={(e) => {
                             e.preventDefault();
                             onNavigate(`/track/${track.id}`);
@@ -660,7 +660,7 @@ export function RankingBoardPage({
                         </a>
                         <a
                           className="row-creator"
-                          href={`#/creator/${track.creator.userId}`}
+                          href={`/creator/${track.creator.userId}`}
                           onClick={(e) => {
                             e.preventDefault();
                             onNavigate(`/creator/${track.creator.userId}`);
