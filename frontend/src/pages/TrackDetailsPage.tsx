@@ -968,7 +968,7 @@ export function TrackDetailsPage({
               <div className="track-lyrics-empty">
                 <UserIcon width={32} height={32} />
                 <strong>Listener Login Required</strong>
-                <span>Log in with a Listener account to write, sync, and save your own personal lyrics.</span>
+                <span>Login with a Listener account to write, sync, and save your own personal lyrics.</span>
                 <button
                   type="button"
                   className="button button-primary"
@@ -1070,14 +1070,47 @@ export function TrackDetailsPage({
             </dl>
           </section>
           <section className="track-author-card">
-            {track.creator?.avatarUrl ? <img src={track.creator.avatarUrl} alt="" /> : null}
-            <span className="track-section-icon">
-              <UserIcon width={18} height={18} />
-            </span>
-            <small>CREATOR</small>
-            <h3>{track.creator?.displayName ?? "Unknown Creator"}</h3>
-            <p>Explore more music and albums from this creator.</p>
-            <button onClick={() => goToCreatorProfile(creatorId)}>View profile</button>
+            <div className="track-author-banner">
+              <span className="track-author-badge" title="Creator profile">
+                <UserIcon width={16} height={16} />
+              </span>
+            </div>
+            <div className="track-author-content">
+              <div className="track-author-avatar-wrap">
+                {track.creator?.avatarUrl ? (
+                  <img
+                    src={track.creator.avatarUrl}
+                    alt={track.creator.displayName ?? "Creator avatar"}
+                    className="track-author-avatar"
+                  />
+                ) : (
+                  <div className="track-author-avatar track-author-avatar--fallback">
+                    {track.creator?.displayName ? (
+                      <span className="track-author-initials">
+                        {track.creator.displayName
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0].toUpperCase())
+                          .join("")}
+                      </span>
+                    ) : (
+                      <UserIcon width={32} height={32} />
+                    )}
+                  </div>
+                )}
+              </div>
+              <span className="track-author-kicker">CREATOR</span>
+              <h3 className="track-author-name">{track.creator?.displayName ?? "Unknown Creator"}</h3>
+              <p className="track-author-desc">Explore more music and albums from this creator.</p>
+              <button
+                type="button"
+                className="track-author-btn"
+                onClick={() => goToCreatorProfile(creatorId)}
+              >
+                View profile
+              </button>
+            </div>
           </section>
           {/* More from this Creator */}
           <section className="track-context-card track-more-tracks-card">
@@ -1218,7 +1251,7 @@ export function TrackDetailsPage({
                     <h2 id="auth-dialog-title">Listener login required</h2>
                   </div>
                 </div>
-                <p>Log in with a Listener account to save favorites and manage playlists.</p>
+                <p>Login with a Listener account to save favorites and manage playlists.</p>
                 <div className="track-dialog-actions">
                   <button className="button button-secondary" onClick={() => setAuthPromptOpen(false)}>
                     Not now

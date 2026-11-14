@@ -64,7 +64,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const toggleFavorite = useCallback(
     async (trackId: number) => {
       if (user?.role !== "LISTENER") {
-        throw new Error("Log in with a Listener account to manage favorites.");
+        throw new Error("Login with a Listener account to manage favorites.");
       }
 
       if (favoriteIds.includes(trackId)) {

@@ -764,7 +764,7 @@ export function LyricsDrawer({
                   Listener Login Required
                 </strong>
                 <span style={{ fontSize: 13, maxWidth: 300, lineHeight: 1.5 }}>
-                  Log in to create, time-sync, and save your own private lyrics for this song.
+                  Login to create, time-sync, and save your own private lyrics for this song.
                 </span>
                 <button
                   type="button"

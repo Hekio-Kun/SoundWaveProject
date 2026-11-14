@@ -473,7 +473,7 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
       <div className="createmytrack upload-track-page">
         <section className="upload-track-access-card">
           <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
-          <h1>{isAuthenticated ? "Listener access required" : "Log in to upload music"}</h1>
+          <h1>{isAuthenticated ? "Listener access required" : "Login to upload music"}</h1>
           <p>{isAuthenticated
             ? "Track uploads are available to listener accounts. Staff and administrators can use their dashboards."
             : "Your account is required to save drafts and submit tracks for review."}</p>

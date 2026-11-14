@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { catalogApi } from "../../api/catalog";
-import { albums, featuredCreators, genres, heroCovers, tracks } from "../../data";
+import { albums, featuredCreators, genres, heroCovers } from "../../data";
 import { ArrowIcon, CheckIcon, HeadphonesIcon, MoreIcon, PauseIcon, PlayIcon, UploadIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
 import { navigateTo } from "../../utils/navigation";
@@ -93,7 +93,7 @@ export function LandingPage({ currentTrack, playing, onPlay, isAuthenticated }: 
       .catch(() => {});
   }, []);
 
-  const approvedTracks = liveTracks.length > 0 ? liveTracks : tracks.filter((track) => track.publicationStatus === "APPROVED");
+  const approvedTracks = liveTracks;
 
   return (
     <main className="page-main">

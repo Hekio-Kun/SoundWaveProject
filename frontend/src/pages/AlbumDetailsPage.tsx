@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { albums as mockAlbums, tracks as mockTracks } from "../data";
 import { DiscIcon, HeadphonesIcon, PauseIcon, PlayIcon } from "../icons";
 import type { LandingTrack, PublicAlbumDetails } from "../types";
 
@@ -45,23 +44,17 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
     };
   }, [albumId]);
 
-  // Fallback to mock data if API call returns null
-  const fallbackAlbum = mockAlbums.find((a) => a.id === albumId) ?? mockAlbums[0];
-  const fallbackTracks = mockTracks.filter((t) => t.album?.id === fallbackAlbum?.id && t.publicationStatus === "APPROVED");
-
-  const title = albumData?.title ?? fallbackAlbum?.title ?? "Album";
-  const coverUrl = albumData?.coverUrl ?? fallbackAlbum?.coverUrl;
-  const description = albumData?.description ?? fallbackAlbum?.description;
-  const creatorName = albumData?.creator?.displayName ?? fallbackAlbum?.creatorName ?? "Creator";
+  const title = albumData?.title ?? "Album";
+  const coverUrl = albumData?.coverUrl;
+  const description = albumData?.description;
+  const creatorName = albumData?.creator?.displayName ?? "Creator";
   const releaseYear = albumData?.releaseDate
     ? new Date(albumData.releaseDate).getFullYear()
     : albumData?.createdAt
     ? new Date(albumData.createdAt).getFullYear()
-    : fallbackAlbum?.releaseYear ?? 2026;
+    : new Date().getFullYear();
 
-  const albumTracks: LandingTrack[] = albumData?.tracks && albumData.tracks.length > 0
-    ? albumData.tracks
-    : fallbackTracks;
+  const albumTracks: LandingTrack[] = albumData?.tracks || [];
 
   const totalDurationMs = albumTracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMin = Math.round(totalDurationMs / 60000);

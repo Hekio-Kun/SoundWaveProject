@@ -167,7 +167,7 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           type="button"
           className="ops-sidebar-logout-btn"
           onClick={onLogout}
-          title="Log out of SoundWave"
+          title="Logout of SoundWave"
         >
           <LogoutIcon width={15} height={15} />
           <span>Sign Out</span>
