@@ -132,7 +132,7 @@ export function FilteredCatalogPage({
         search: searchQuery.trim() || undefined,
         sort: sortBy,
         page: currentPage,
-        size: 20, // Standard page size fixed at 20 tracks per page
+        size: 18, // Standard page size fixed at 18 tracks per page
       })
       .then((res) => {
         if (!active) return;
