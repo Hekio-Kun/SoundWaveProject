@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMotionReveal } from "./useMotionReveal";
 import { getCurrentRoute, LOCATION_CHANGE_EVENT, navigateTo } from "../utils/navigation";
 
@@ -30,7 +30,7 @@ export function useRouter(): AppRouterState {
   }, []);
 
   // navigateTo() tự phát event "soundwave:navigate" (cancelable) để trang có thay đổi chưa lưu chặn lại
-  const navigate = (path: string) => navigateTo(path);
+  const navigate = useCallback((path: string) => navigateTo(path), []);
 
   const [pathname, queryString] = route.split("?");
   const queryParams = useMemo(() => new URLSearchParams(queryString || ""), [queryString]);
