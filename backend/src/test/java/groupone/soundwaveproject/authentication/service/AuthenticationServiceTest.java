@@ -359,7 +359,7 @@ class AuthenticationServiceTest {
 
         var response = service.verifyEmail(new EmailOtpRequest("pending@example.com", "654321"));
 
-        assertEquals("Email verified successfully. You can now log in.", response.message());
+        assertEquals("Email verified successfully. You can now login.", response.message());
         verify(token).markUsed(any());
         verify(user).verifyEmail(any());
         verify(authRateLimiterService).resetOtpAttempts("pending@example.com");
