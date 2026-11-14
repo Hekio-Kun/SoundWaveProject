@@ -334,7 +334,13 @@ export function LibraryPage({
                     className="row-thumbnail"
                     onClick={() => onPlayTrack(track, favoriteTracks, "Favorite tracks", "favorites")}
                   >
-                    <img src={track.coverUrl ?? undefined} alt="" />
+                    <img
+                      src={track.coverUrl || covers.dawn}
+                      alt=""
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                      }}
+                    />
                     <button
                       className="row-hover-play"
                       aria-label={`Play ${track.title}`}
@@ -572,7 +578,13 @@ export function LibraryPage({
                           className="row-thumbnail"
                           onClick={() => onPlayTrack(track, historyTracks, "Listening History", "history")}
                         >
-                          <img src={item.coverUrl ?? undefined} alt="" />
+                          <img
+                            src={item.coverUrl || covers.dawn}
+                            alt=""
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                            }}
+                          />
                           <button
                             className="row-hover-play"
                             aria-label={`Play ${item.title}`}

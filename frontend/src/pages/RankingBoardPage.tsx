@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { catalogApi } from "../api/catalog";
 import { useFavorites } from "../context/FavoritesContext";
+import { covers } from "../data";
 import {
   FlameIcon,
   HeartFillIcon,
@@ -609,8 +610,11 @@ export function RankingBoardPage({
                         }
                       >
                         <img
-                          src={track.coverUrl || "/placeholder-album.png"}
+                          src={track.coverUrl || covers.dawn}
                           alt={track.title}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                          }}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                         <button
