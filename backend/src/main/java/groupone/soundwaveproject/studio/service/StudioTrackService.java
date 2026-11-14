@@ -563,7 +563,7 @@ public class StudioTrackService {
 
     /**
      * Tra cứu chi tiết lý do từ chối kiểm duyệt bài hát theo trackId (UC-20: View Rejection Reason).
-     * Bước 6: uploader = validateAndGetUploader(currentUserEmail)
+     * Bước 6: uploader = getAuthenticatedUser(currentUserEmail)
      * Bước 7: optionalTrack = trackRepository.findByIdAndUploaderUserId(trackId, uploader.getId())
      * Bước 13 (Alt: Track not found / access denied): throw ResourceNotFoundException("Track not found or access denied.")
      * Bước 16 (Alt: Track exists and owned by listener): track = optionalTrack.get()
@@ -572,19 +572,12 @@ public class StudioTrackService {
      */
     @Transactional(readOnly = true)
     public RejectionDetailsResponse getRejectionDetails(Long id, String currentUserEmail) {
-        User uploader = validateAndGetUploader(currentUserEmail);
+        User uploader = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, uploader.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
         List<TrackSubmission> submissionsList = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(track.getId());
         return studioTrackMapper.toRejectionDetails(track, submissionsList);
-    }
-
-    /**
-     * Xác thực và lấy đối tượng người dùng sở hữu (uploader) theo email (Bước 6 trong Sequence Diagram).
-     */
-    private User validateAndGetUploader(String email) {
-        return getAuthenticatedUser(email);
     }
 
     @Transactional(readOnly = true)
