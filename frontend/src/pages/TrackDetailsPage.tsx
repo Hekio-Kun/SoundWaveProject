@@ -555,10 +555,9 @@ export function TrackDetailsPage({
           aria-hidden="true"
         />
         <div className="track-showcase-visual">
-          <button
-            className="track-cover-button"
-            onClick={() => onPlayTrack(track)}
-            aria-label={isPlayingThis ? `Pause ${track.title}` : `Play ${track.title}`}
+          <div
+            className={`track-cover-button ${isPlayingThis ? "is-playing" : ""}`}
+            style={{ cursor: "default" }}
           >
             <img
               src={track.coverUrl ?? covers.dawn}
@@ -567,8 +566,7 @@ export function TrackDetailsPage({
                 event.currentTarget.src = covers.dawn;
               }}
             />
-            <span>{isPlayingThis ? <PauseIcon width={28} height={28} /> : <PlayIcon width={28} height={28} />}</span>
-          </button>
+          </div>
         </div>
 
         <div className="track-showcase-content">
