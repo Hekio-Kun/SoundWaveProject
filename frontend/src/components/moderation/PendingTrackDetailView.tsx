@@ -447,13 +447,22 @@ export function PendingTrackDetailView({
         ? "Lyric update approved successfully."
         : "Track approved successfully.";
 
+      try {
+        sessionStorage.setItem(
+          "soundwave_flash_toast",
+          JSON.stringify({ message: finalMsg, type: "success" })
+        );
+      } catch {
+        // ignore
+      }
+
       showInternalToast(finalMsg, "success");
       onApproveSuccess?.(finalMsg);
 
       const nextPendingId = updated.albumNavigation?.nextPendingSubmissionId;
       if (nextPendingId && onNavigateToSubmission) {
         onNavigateToSubmission(nextPendingId);
-      } else if (updated.albumNavigation) {
+      } else {
         onBack();
       }
     } catch (err: unknown) {
@@ -490,13 +499,22 @@ export function PendingTrackDetailView({
         ? "Lyric update rejected successfully."
         : "Track rejected successfully.";
 
+      try {
+        sessionStorage.setItem(
+          "soundwave_flash_toast",
+          JSON.stringify({ message: finalMsg, type: "success" })
+        );
+      } catch {
+        // ignore
+      }
+
       showInternalToast(finalMsg, "success");
       onRejectSuccess?.(finalMsg);
 
       const nextPendingId = updated.albumNavigation?.nextPendingSubmissionId;
       if (nextPendingId && onNavigateToSubmission) {
         onNavigateToSubmission(nextPendingId);
-      } else if (updated.albumNavigation) {
+      } else {
         onBack();
       }
     } catch (err: unknown) {

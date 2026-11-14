@@ -625,7 +625,7 @@ export function AppTopBar({
                   }}
                 >
                   <LogoutIcon width={16} height={16} />
-                  <span>Log out</span>
+                  <span>Logout</span>
                 </button>
               </div>
             )}
@@ -636,7 +636,7 @@ export function AppTopBar({
               className="button button-ghost button-small"
               onClick={() => onNavigate("/login")}
             >
-              Log in
+              Login
             </button>
             <button
               className="button button-primary button-small"

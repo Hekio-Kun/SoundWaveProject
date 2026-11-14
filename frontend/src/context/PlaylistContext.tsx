@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { playlistApi } from "../api/playlists";
-import { demoPlaylists } from "../data";
 import { AddTrackToPlaylistModal } from "../components/modals/AddTrackToPlaylistModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { PlaylistFormModal } from "../components/modals/PlaylistFormModal";
@@ -48,7 +47,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   // tránh hiển thị coverUrl cũ sau khi ảnh đã bị đổi/xóa.
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
     localStorage.removeItem("soundwave_playlists");
-    return demoPlaylists;
+    return [];
   });
 
   const [toastNotice, setToastNotice] = useState("");
@@ -95,7 +94,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
 
   const openCreatePlaylist = useCallback(() => {
     if (!isAuthenticated) {
-      showToast("Please log in to create a playlist.", "warning");
+      showToast("Please login to create a playlist.", "warning");
       navigateTo("/login", { force: true });
       return;
     }
@@ -106,7 +105,7 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   const openEditPlaylist = useCallback(
     (pl: Playlist) => {
       if (!isAuthenticated) {
-        showToast("Please log in to edit the playlist.", "warning");
+        showToast("Please login to edit the playlist.", "warning");
         navigateTo("/login", { force: true });
         return;
       }

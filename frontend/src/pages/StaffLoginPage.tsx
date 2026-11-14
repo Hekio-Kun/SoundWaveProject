@@ -174,7 +174,7 @@ export function StaffLoginPage({ onLoginSuccess, onNavigate }: StaffLoginPagePro
                   onClick={requestLogout}
                 >
                   <LogoutIcon width={14} height={14} />
-                  <span>Log Out Current Account</span>
+                  <span>Logout Current Account</span>
                 </button>
                 <button
                   type="button"

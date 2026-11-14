@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { tracks } from "../data";
 import type { LandingTrack } from "../types";
 
 export interface PlayerContextType {
@@ -42,27 +41,15 @@ export interface PlayerContextType {
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const defaultTrack = useMemo(() => tracks.find((t) => t.id === 1) || tracks[0] || null, []);
   const audio = useMemo(() => {
-    const el = new Audio(defaultTrack?.audioUrl || "");
+    const el = new Audio("");
     el.preload = "metadata";
     return el;
-  }, [defaultTrack]);
+  }, []);
 
-  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(() => {
-    try {
-      const savedId = sessionStorage.getItem("soundwave_current_track_id");
-      if (savedId) {
-        const found = tracks.find((t) => t.id === Number(savedId));
-        if (found) return found;
-      }
-    } catch {
-      // ignore
-    }
-    return defaultTrack;
-  });
+  const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [queue, setQueue] = useState<LandingTrack[]>(tracks);
+  const [queue, setQueue] = useState<LandingTrack[]>([]);
   const [queueOpen, setQueueOpen] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
   const [lyricsFullScreen, setLyricsFullScreen] = useState(false);
@@ -70,6 +57,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [pendingTrack, setPendingTrack] = useState<LandingTrack | null>(null);
+
+  // Tự động tải danh sách bài hát thực tế mới nhất từ Backend API cho Player queue và track hiện tại
+  useEffect(() => {
+    let active = true;
+    catalogApi.getTracks({ size: 50, sort: "newest" })
+      .then((res) => {
+        if (!active || !res?.content || res.content.length === 0) return;
+        const apiTracks = res.content.filter(
+          (t) => !t.audioUrl?.includes("soundwave-demo.wav") && t.id < 900
+        );
+        if (apiTracks.length === 0) return;
+
+        setQueue((prevQueue) => (prevQueue.length === 0 ? apiTracks : prevQueue));
+
+        setCurrentTrack((prev) => {
+          if (!prev) {
+            try {
+              const savedId = sessionStorage.getItem("soundwave_current_track_id");
+              if (savedId) {
+                const matched = apiTracks.find((t) => t.id === Number(savedId));
+                if (matched) {
+                  if (audio && matched.audioUrl && (!audio.src || audio.src === window.location.href)) {
+                    audio.src = matched.audioUrl;
+                  }
+                  return matched;
+                } else {
+                  sessionStorage.removeItem("soundwave_current_track_id");
+                }
+              }
+            } catch {}
+
+            const firstReal = apiTracks[0];
+            if (audio && firstReal?.audioUrl && (!audio.src || audio.src === window.location.href)) {
+              audio.src = firstReal.audioUrl;
+            }
+            return firstReal || null;
+          }
+          return prev;
+        });
+      })
+      .catch((err) => {
+        console.warn("Could not load backend tracks for player queue:", err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [audio]);
 
   useEffect(() => {
     if (currentTrack) {
@@ -116,7 +151,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       );
       if (mergedTrack.audioUrl && (!audio.src || audio.src === window.location.href)) {
         audio.src = mergedTrack.audioUrl;
-        void audio.play().catch(() => {});
+        void audio.play().catch(() => { });
       }
     } catch (err) {
       console.warn("Could not sync live track stream info:", err);
@@ -303,12 +338,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!open) setLyricsFullScreen(false);
   }, []);
 
-const openLyricsFullscreen = useCallback((trackToPlay?: LandingTrack, source: "OFFICIAL" | "PERSONAL" = "OFFICIAL") => {
+  const openLyricsFullscreen = useCallback((trackToPlay?: LandingTrack, source: "OFFICIAL" | "PERSONAL" = "OFFICIAL") => {
     if (trackToPlay && (!currentTrack || currentTrack.id !== trackToPlay.id)) {
       playTrack(trackToPlay);
     } else if (!playing) {
       setAudioPlaying(true);
-      void audio.play().catch(() => {});
+      void audio.play().catch(() => { });
     }
     setQueueOpen(false);
     setLyricsSource(source);

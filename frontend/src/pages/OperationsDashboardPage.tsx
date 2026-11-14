@@ -481,9 +481,9 @@ export function DashboardAccessDenied({
       <span><ShieldIcon width={32} height={32} /></span>
       <small>403 · RESTRICTED AREA</small>
       <h1>Access denied</h1>
-      <p>This workspace is available only to accounts with the {requiredRole} role. Please log in with an authorized account.</p>
+      <p>This workspace is available only to accounts with the {requiredRole} role. Please login with an authorized account.</p>
       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1rem" }}>
-        <button className="button button-primary" onClick={() => onNavigate("/staff/login")}>Log In as Staff</button>
+        <button className="button button-primary" onClick={() => onNavigate("/staff/login")}>Login as Staff</button>
         <button className="button button-secondary" onClick={() => onNavigate("/")}>Back to Explore</button>
       </div>
     </div>

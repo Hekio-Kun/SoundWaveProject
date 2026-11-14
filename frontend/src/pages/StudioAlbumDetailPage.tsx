@@ -681,7 +681,7 @@ export function StudioAlbumDetailPage({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "36px 48px minmax(160px, 1.8fr) minmax(120px, 1fr) 110px 70px 140px",
+                gridTemplateColumns: "36px 48px minmax(160px, 1.8fr) minmax(110px, 1fr) 150px 70px 105px",
                 alignItems: "center",
                 gap: "14px",
                 padding: "10px 16px",
@@ -718,7 +718,7 @@ export function StudioAlbumDetailPage({
                   className={`table-track-row ${isCurrent ? "table-track-row--active" : ""}`}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "36px 48px minmax(160px, 1.8fr) minmax(120px, 1fr) 110px 70px 140px",
+                    gridTemplateColumns: "36px 48px minmax(160px, 1.8fr) minmax(110px, 1fr) 150px 70px 105px",
                     alignItems: "center",
                     gap: "14px",
                     padding: "10px 16px",
@@ -801,7 +801,7 @@ export function StudioAlbumDetailPage({
                   </div>
 
                   {/* Status Pill */}
-                  <div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
                     {(() => {
                       const isPublished = track.status === "PUBLISHED" || track.status === "APPROVED";
                       const isPending = track.status === "PENDING";
@@ -813,7 +813,7 @@ export function StudioAlbumDetailPage({
                           style={{
                             fontSize: "11px",
                             fontWeight: 700,
-                            padding: "3px 9px",
+                            padding: "3px 8px",
                             borderRadius: "6px",
                             background: isPublished
                               ? "#D1FADF"
@@ -836,16 +836,30 @@ export function StudioAlbumDetailPage({
                               : isRejected
                               ? "1px solid #FCA5A5"
                               : "1px solid #E4E7EC",
-                            textTransform: "uppercase",
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: "4px",
+                            gap: "5px",
+                            whiteSpace: "nowrap",
                             cursor: isRejected ? "pointer" : "default",
                           }}
                           title={isRejected ? "Click to view staff rejection feedback (AF02)" : undefined}
                         >
-                          {isPublished ? "PUBLISHED" : track.status}
-                          {isRejected && <span style={{ fontSize: "10px", textDecoration: "underline" }}>(Feedback)</span>}
+                          <span>{isPublished ? "PUBLISHED" : isPending ? "PENDING" : isRejected ? "REJECTED" : track.status}</span>
+                          {isRejected && (
+                            <span
+                              style={{
+                                fontSize: "9.5px",
+                                background: "#FCA5A5",
+                                color: "#7F1D1D",
+                                padding: "1px 5px",
+                                borderRadius: "4px",
+                                textTransform: "none",
+                                fontWeight: 700,
+                              }}
+                            >
+                              Feedback
+                            </span>
+                          )}
                         </span>
                       );
                     })()}

@@ -124,7 +124,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     throw new ApiError(
       response.status,
       errorBody.message || (response.status === 401
-        ? "Your session has expired. Please log in again."
+        ? "Your session has expired. Please login again."
         : `Request failed with status ${response.status}`),
       errorBody.code,
       errorBody.fieldErrors,
