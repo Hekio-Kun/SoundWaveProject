@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import { PlayerProvider, usePlayer } from "./context/PlayerContext";
@@ -168,6 +169,7 @@ export default function App() {
         <FavoritesProvider>
           <PlaylistProvider>
             <AppContent />
+            <Analytics />
           </PlaylistProvider>
         </FavoritesProvider>
       </PlayerProvider>
