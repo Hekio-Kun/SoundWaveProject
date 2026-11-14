@@ -10,7 +10,6 @@ import { MusicPlayer } from "./components/player/MusicPlayer";
 import { GuestLoginPrompt } from "./components/modals/GuestLoginPrompt";
 import { LogoutConfirmationDialog } from "./components/modals/LogoutConfirmationDialog";
 import { CenterNotificationPopup } from "./components/modals/CenterNotificationPopup";
-import { tracks } from "./data";
 
 function AppContent() {
   const {
@@ -51,8 +50,8 @@ function AppContent() {
   const { openCreatePlaylist, toastNotice, toastType, showToast } = usePlaylists();
   const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
 
-  const activeTrack = currentTrack || tracks[0];
-  const activeQueue = queue.length > 0 ? queue : tracks;
+  const activeTrack = currentTrack;
+  const activeQueue = queue;
 
   return (
     <div className={isMusicRoute ? "app-root app-root--has-player" : "app-root"}>
@@ -101,14 +100,16 @@ function AppContent() {
       )}
 
       {/* Global Music Player fixed at bottom - luôn luôn giữ được bật không được tắt */}
-      {isMusicRoute && activeTrack && (
+      {isMusicRoute && (
         <MusicPlayer
           track={activeTrack}
           queue={activeQueue}
           audio={audio}
           playing={playing}
           onPlayingChange={setAudioPlaying}
-          onTrackChange={playTrack}
+          onTrackChange={(track, autoplay) => {
+            if (track) playTrack(track, autoplay);
+          }}
           onGuestTrackEnded={handleGuestTrackEnded}
           isAuthenticated={isAuthenticated}
           onToggleQueue={toggleQueue}

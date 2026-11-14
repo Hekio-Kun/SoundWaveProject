@@ -43,7 +43,7 @@ import { SearchIcon } from "../icons";
 
 export function AppRouter(): React.ReactElement | null {
   const { user, authReady, isAuthenticated, handleLoginSuccess, handleProfileUpdated } = useAuth();
-  const { currentTrack, playing, playTrack, pause, audio } = usePlayer();
+  const { currentTrack, playing, playTrack, pause, audio, syncExploreQueue } = usePlayer();
   const { favoriteTracks, favoriteIds, toggleFavorite } = useFavorites();
   const {
     playlists,
@@ -168,6 +168,7 @@ export function AppRouter(): React.ReactElement | null {
         favoriteIds={favoriteIds}
         onToggleFavorite={toggleFavorite}
         onAddToPlaylist={openAddTrackModal}
+        syncExploreQueue={syncExploreQueue}
       />
     );
   }
@@ -684,6 +685,11 @@ export function AppRouter(): React.ReactElement | null {
       playing={playing}
       onPlayTrack={playTrack}
       onNavigate={navigate}
+      currentUser={user}
+      favoriteIds={favoriteIds}
+      onToggleFavorite={toggleFavorite}
+      onAddToPlaylist={openAddTrackModal}
+      syncExploreQueue={syncExploreQueue}
     />
   );
 }

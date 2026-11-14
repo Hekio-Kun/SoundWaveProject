@@ -7,7 +7,7 @@ import type { LandingTrack } from "../../types";
  */
 export type MusicPlayerProps = {
   /** The track currently loaded into the player */
-  track: LandingTrack;
+  track: LandingTrack | null;
   /** Active playback queue of tracks */
   queue: LandingTrack[];
   /** Underlying HTML audio element used for playback */
@@ -17,7 +17,7 @@ export type MusicPlayerProps = {
   /** Callback triggered when playback state toggles between play and pause */
   onPlayingChange: (playing: boolean) => void;
   /** Callback triggered when active track changes (e.g., skip, previous, auto-advance) */
-  onTrackChange: (track: LandingTrack, autoplay?: boolean) => void;
+  onTrackChange: (track: LandingTrack | null, autoplay?: boolean) => void;
   /** Callback invoked when a guest finishes playing a track to display registration prompt */
   onGuestTrackEnded: (next: LandingTrack) => void;
   /** Flag indicating whether current user is authenticated */
@@ -77,7 +77,7 @@ export function MusicPlayer({
   onNavigate,
 }: MusicPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(track.durationMs / 1000);
+  const [duration, setDuration] = useState(() => (track ? track.durationMs / 1000 : 0));
   const [volume, setVolume] = useState(() => (Number.isFinite(audio?.volume) ? audio.volume : 0.8));
   const [shuffle, setShuffle] = useState(() => {
     try {
@@ -131,7 +131,7 @@ export function MusicPlayer({
         // Tắt repeat khi bật shuffle để tránh xung đột hành vi
         setRepeat(false);
         // Tự động xáo trộn danh sách các bài sắp phát trong hàng đợi
-        if (onReorderQueue && queue.length > 1) {
+        if (onReorderQueue && queue.length > 1 && track) {
           originalQueueRef.current = [...queue];
           const curTrack = queue.find((t) => t.id === track.id) || track;
           const upcoming = queue.filter((t) => t.id !== track.id);
@@ -177,18 +177,18 @@ export function MusicPlayer({
     }
   };
 
-  const index = useMemo(() => queue.findIndex((item) => item.id === track.id), [queue, track.id]);
+  const index = useMemo(() => (track ? queue.findIndex((item) => item.id === track.id) : -1), [queue, track?.id]);
 
   /**
    * Resolves next track to play taking into account shuffle mode and queue boundaries.
    *
-   * @returns Next {@link LandingTrack} to play
+   * @returns Next {@link LandingTrack} to play, or null if empty
    */
-  const nextTrack = () => {
+  const nextTrack = (): LandingTrack | null => {
     if (!queue.length) return track;
     const curIdx = index >= 0 ? index : 0;
     // Nếu shuffle đang bật nhưng không có callback reorder thì fallback chọn random candidate
-    if (shuffle && !onReorderQueue && queue.length > 1) {
+    if (shuffle && !onReorderQueue && queue.length > 1 && track) {
       const candidates = queue.filter((item) => item.id !== track.id);
       if (candidates.length > 0) {
         return candidates[Math.floor(Math.random() * candidates.length)];
@@ -224,11 +224,12 @@ export function MusicPlayer({
       recordedRef.current = false;
       actualListenedSecondsRef.current = 0;
       lastPlayheadTimeRef.current = 0;
-      onTrackChange(track, true);
+      if (track) onTrackChange(track, true);
       return;
     }
     const next = nextTrack();
     onPlayingChange(false);
+    if (!next) return;
     if (isAuthenticated) onTrackChange(next, true);
     else onGuestTrackEnded(next);
   };
@@ -281,13 +282,13 @@ export function MusicPlayer({
       errorTimerRef.current = null;
     }
     setCurrentTime(0);
-    setDuration(track.durationMs / 1000);
+    setDuration(track ? track.durationMs / 1000 : 0);
     setAudioError(false);
     setErrorMessage("");
     recordedRef.current = false;
     actualListenedSecondsRef.current = 0;
     lastPlayheadTimeRef.current = null;
-  }, [track.id, track.durationMs]);
+  }, [track?.id, track?.durationMs]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -307,7 +308,7 @@ export function MusicPlayer({
 
     };
 
-    const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : track.durationMs / 1000);
+    const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : (track ? track.durationMs / 1000 : 0));
     const reportError = () => {
       // EX01 [30], EX02 [36]: Detect track inaccessible or player error
       setAudioError(true);
@@ -323,7 +324,8 @@ export function MusicPlayer({
         errorTimerRef.current = window.setTimeout(() => {
           setAudioError(false);
           setErrorMessage("");
-          onTrackChange(nextTrack(), true);
+          const next = nextTrack();
+          if (next) onTrackChange(next, true);
         }, 1500);
       } else {
         setErrorMessage("The audio could not be loaded. Please check your network connection.");
@@ -342,6 +344,42 @@ export function MusicPlayer({
       audio.removeEventListener("error", reportError);
     };
   });
+
+  if (!track) {
+    return (
+      <aside className="music-player music-player--loading" aria-label="Music player loading">
+        <div className="player-track">
+          <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 8 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 120 }}>
+            <div className="skeleton" style={{ width: 110, height: 14, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
+          </div>
+        </div>
+        <div className="player-center">
+          <div className="player-controls">
+            <button className="player-icon" disabled><ShuffleIcon /></button>
+            <button className="player-icon" disabled><PreviousIcon /></button>
+            <button className="player-play" disabled><PlayIcon /></button>
+            <button className="player-icon" disabled><NextIcon /></button>
+            <button className="player-icon" disabled><RepeatIcon /></button>
+          </div>
+          <div className="timeline">
+            <span>0:00</span>
+            <input type="range" min="0" max="100" value="0" disabled style={{ "--range-progress": "0%" } as CSSProperties} />
+            <span>0:00</span>
+          </div>
+        </div>
+        <div className="player-right">
+          <button className="player-icon" disabled><QueueIcon /></button>
+          <button className="player-icon" disabled><FileTextIcon /></button>
+          <div className="volume-control">
+            <button className="player-icon" disabled><VolumeIcon /></button>
+            <input type="range" min="0" max="1" step="0.01" value={volume} disabled />
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className={`music-player ${playing ? "music-player--playing" : ""}`} aria-label="Music player">

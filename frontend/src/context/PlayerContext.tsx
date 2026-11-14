@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { tracks } from "../data";
 import type { LandingTrack } from "../types";
 
 export interface PlayerContextType {
@@ -36,33 +35,79 @@ export interface PlayerContextType {
   closeGuestPrompt: () => void;
   handleRecordPlay: (trackId: number, listenedDurationMs: number, completed: boolean) => Promise<void>;
   reorderQueue: (newQueue: LandingTrack[]) => void;
+  syncExploreQueue: (tracks: LandingTrack[]) => void;
   pause: () => void;
 }
+
+const SOUNDWAVE_CACHED_TRACK_KEY = "soundwave_cached_explore_track";
+const SOUNDWAVE_CACHED_QUEUE_KEY = "soundwave_cached_explore_queue";
+
+const getCachedInitialTrack = (): LandingTrack | null => {
+  try {
+    const raw = localStorage.getItem(SOUNDWAVE_CACHED_TRACK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as LandingTrack;
+      if (
+        parsed &&
+        parsed.id &&
+        parsed.title !== "Nơi Này Có Anh" &&
+        parsed.slug !== "noi-nay-co-anh"
+      ) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+const getCachedInitialQueue = (): LandingTrack[] => {
+  try {
+    const raw = localStorage.getItem(SOUNDWAVE_CACHED_QUEUE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as LandingTrack[];
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        parsed[0]?.title !== "Nơi Này Có Anh" &&
+        parsed[0]?.slug !== "noi-nay-co-anh"
+      ) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+};
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const defaultTrack = useMemo(() => tracks.find((t) => t.id === 1) || tracks[0] || null, []);
+  const cachedTrack = useMemo(() => getCachedInitialTrack(), []);
+  const cachedQueue = useMemo(() => getCachedInitialQueue(), []);
+
   const audio = useMemo(() => {
-    const el = new Audio(defaultTrack?.audioUrl || "");
+    const el = new Audio(cachedTrack?.audioUrl || "");
     el.preload = "metadata";
     return el;
-  }, [defaultTrack]);
+  }, [cachedTrack]);
 
   const [currentTrack, setCurrentTrack] = useState<LandingTrack | null>(() => {
     try {
       const savedId = sessionStorage.getItem("soundwave_current_track_id");
-      if (savedId) {
-        const found = tracks.find((t) => t.id === Number(savedId));
+      if (savedId && Number(savedId) !== 1 && cachedQueue.length > 0) {
+        const found = cachedQueue.find((t) => Number(t.id) === Number(savedId));
         if (found) return found;
       }
     } catch {
       // ignore
     }
-    return defaultTrack;
+    return cachedTrack;
   });
   const [playing, setPlaying] = useState(false);
-  const [queue, setQueue] = useState<LandingTrack[]>(tracks);
+  const [queue, setQueue] = useState<LandingTrack[]>(cachedQueue);
   const [queueOpen, setQueueOpen] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
   const [lyricsFullScreen, setLyricsFullScreen] = useState(false);
@@ -223,8 +268,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       activeStreamTrackIdRef.current = track.id;
       setCurrentTrack(track);
+      try {
+        localStorage.setItem(SOUNDWAVE_CACHED_TRACK_KEY, JSON.stringify(track));
+      } catch {
+        // ignore
+      }
       if (contextQueue && contextQueue.length > 0) {
         setQueue(contextQueue);
+        try {
+          localStorage.setItem(SOUNDWAVE_CACHED_QUEUE_KEY, JSON.stringify(contextQueue));
+        } catch {
+          // ignore
+        }
       } else {
         setQueue((prev) => (prev.some((item) => Number(item.id) === Number(track.id)) ? prev : [track, ...prev]));
       }
@@ -335,6 +390,82 @@ const openLyricsFullscreen = useCallback((trackToPlay?: LandingTrack, source: "O
     setQueue(newQueue);
   }, []);
 
+  const syncExploreQueue = useCallback(
+    (exploreTracks: LandingTrack[]) => {
+      if (!exploreTracks || exploreTracks.length === 0) return;
+
+      // Ưu tiên "Where Have You Been" (bài hát nổi bật trên radar) ở đầu danh sách nếu có
+      const targetTrack = exploreTracks.find(
+        (t) => t.id === 24 || t.slug?.includes("where-have-you-been") || t.title.toLowerCase().includes("where have you been")
+      );
+      let ordered = exploreTracks;
+      if (targetTrack && exploreTracks[0]?.id !== targetTrack.id) {
+        ordered = [targetTrack, ...exploreTracks.filter((t) => t.id !== targetTrack.id)];
+      }
+
+      // 1. Lưu cache vào localStorage để lần sau khởi động ở 0ms mà không bị chớp giật
+      try {
+        localStorage.setItem(SOUNDWAVE_CACHED_QUEUE_KEY, JSON.stringify(ordered));
+      } catch {
+        // ignore
+      }
+
+      // 2. Cập nhật hàng chờ (Queue) bằng toàn bộ danh sách bài hát từ trang Explore gọi từ DB
+      setQueue((prevQueue) => {
+        const isDefaultOrOld =
+          prevQueue.length === 0 ||
+          prevQueue.some((t) => t.title === "Nơi Này Có Anh" || t.slug === "noi-nay-co-anh");
+        return isDefaultOrOld ? ordered : prevQueue;
+      });
+
+      // 3. Bài hát được đề xuất đầu tiên từ Explore DB ("Where Have You Been" - Hekio)
+      const savedId = sessionStorage.getItem("soundwave_current_track_id");
+      const savedTrack =
+        savedId && Number(savedId) !== 1
+          ? ordered.find((t) => String(t.id) === String(savedId))
+          : null;
+      const heroTrack = savedTrack || ordered[0];
+
+      if (heroTrack) {
+        try {
+          localStorage.setItem(SOUNDWAVE_CACHED_TRACK_KEY, JSON.stringify(heroTrack));
+        } catch {
+          // ignore
+        }
+
+        setCurrentTrack((prev) => {
+          if (!prev || prev.id === 1 || prev.title === "Nơi Này Có Anh" || prev.slug === "noi-nay-co-anh") {
+            if (heroTrack.audioUrl && audio.src !== heroTrack.audioUrl) {
+              audio.src = heroTrack.audioUrl;
+              audio.load();
+            }
+            return heroTrack;
+          }
+          return prev;
+        });
+      }
+    },
+    [audio]
+  );
+
+  // Tự động tải danh sách bài hát gợi ý từ Database khi khởi chạy ứng dụng
+  useEffect(() => {
+    let isMounted = true;
+    catalogApi
+      .getCuratedRecommendations(10)
+      .then((dbTracks) => {
+        if (!isMounted || !dbTracks || dbTracks.length === 0) return;
+        syncExploreQueue(dbTracks);
+      })
+      .catch((err) => {
+        console.warn("Could not load initial explore queue from database:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [syncExploreQueue]);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -361,6 +492,7 @@ const openLyricsFullscreen = useCallback((trackToPlay?: LandingTrack, source: "O
         removeFromQueue,
         clearQueue,
         reorderQueue,
+        syncExploreQueue,
         handleGuestTrackEnded,
         continueListening,
         closeGuestPrompt,

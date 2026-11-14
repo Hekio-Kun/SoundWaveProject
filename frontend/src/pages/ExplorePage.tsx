@@ -24,6 +24,7 @@ type Props = {
   favoriteIds?: number[];
   onToggleFavorite?: (trackId: number) => Promise<void>;
   onAddToPlaylist?: (trackId: number) => void;
+  syncExploreQueue?: (tracks: LandingTrack[]) => void;
 };
 
 const MOOD_CHIPS = [
@@ -39,6 +40,26 @@ const MOOD_CHIPS = [
 const FALLBACK_BEACH_COVER =
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80";
 
+const getInitialRecommendedTracks = (): LandingTrack[] => {
+  try {
+    const raw = localStorage.getItem("soundwave_cached_explore_queue");
+    if (raw) {
+      const parsed = JSON.parse(raw) as LandingTrack[];
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        parsed[0]?.title !== "Nơi Này Có Anh" &&
+        parsed[0]?.slug !== "noi-nay-co-anh"
+      ) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return fallbackTracks.slice(0, 10);
+};
+
 export function ExplorePage({
   currentTrack,
   playing,
@@ -48,13 +69,38 @@ export function ExplorePage({
   favoriteIds = [],
   onToggleFavorite,
   onAddToPlaylist,
+  syncExploreQueue,
 }: Props) {
-  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>(() => fallbackTracks.slice(0, 10));
-  const [tracksLoading, setTracksLoading] = useState(false);
+  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>(getInitialRecommendedTracks);
+  const [tracksLoading, setTracksLoading] = useState(() => {
+    try {
+      const raw = localStorage.getItem("soundwave_cached_explore_queue");
+      if (raw) {
+        const parsed = JSON.parse(raw) as LandingTrack[];
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.title !== "Nơi Này Có Anh" &&
+          parsed[0]?.slug !== "noi-nay-co-anh"
+        ) {
+          return false;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return true;
+  });
   const [tracksError, setTracksError] = useState("");
   const [selectedChip, setSelectedChip] = useState("all");
 
-  const heroTrack = recommendedTracks[0] ?? fallbackTracks[0] ?? null;
+  const heroTrack =
+    recommendedTracks.find(
+      (t) => t.id === 24 || t.slug?.includes("where-have-you-been") || t.title.toLowerCase().includes("where have you been")
+    ) ??
+    recommendedTracks[0] ??
+    fallbackTracks[0] ??
+    null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);
 
   // [FEATURE]: UC-06 View Recommended Song - Tải danh sách bài hát gợi ý theo sở thích và thể loại
@@ -64,21 +110,38 @@ export function ExplorePage({
       setTracksError("");
       const recommendedRes = await catalogApi.getCuratedRecommendations(10);
       if (recommendedRes && recommendedRes.length > 0) {
-        setRecommendedTracks(recommendedRes);
+        // Ưu tiên "Where Have You Been" (bài hát nổi bật trên radar) ở đầu danh sách nếu có
+        const targetTrack = recommendedRes.find(
+          (t) => t.id === 24 || t.slug?.includes("where-have-you-been") || t.title.toLowerCase().includes("where have you been")
+        );
+        let ordered = recommendedRes;
+        if (targetTrack && recommendedRes[0]?.id !== targetTrack.id) {
+          ordered = [targetTrack, ...recommendedRes.filter((t) => t.id !== targetTrack.id)];
+        }
+        setRecommendedTracks(ordered);
+        syncExploreQueue?.(ordered);
+        try {
+          localStorage.setItem("soundwave_cached_explore_queue", JSON.stringify(ordered));
+          localStorage.setItem("soundwave_cached_explore_track", JSON.stringify(ordered[0]));
+        } catch {
+          // ignore
+        }
       } else {
         setRecommendedTracks(fallbackTracks.slice(0, 10));
+        syncExploreQueue?.(fallbackTracks.slice(0, 10));
       }
     } catch (err: unknown) {
       console.warn("Using curated fallback tracks for explore feed:", err);
       if (fallbackTracks && fallbackTracks.length > 0) {
         setRecommendedTracks(fallbackTracks.slice(0, 10));
+        syncExploreQueue?.(fallbackTracks.slice(0, 10));
       } else {
         setTracksError("Unable to load recommendations at this time");
       }
     } finally {
       setTracksLoading(false);
     }
-  }, []);
+  }, [syncExploreQueue]);
 
   useEffect(() => {
     void loadExploreTracks();
@@ -91,7 +154,19 @@ export function ExplorePage({
     try {
       if (chipId === "all" || !genre) {
         const res = await catalogApi.getCuratedRecommendations(10);
-        setRecommendedTracks(res && res.length > 0 ? res : fallbackTracks.slice(0, 10));
+        if (res && res.length > 0) {
+          const targetTrack = res.find(
+            (t) => t.id === 24 || t.slug?.includes("where-have-you-been") || t.title.toLowerCase().includes("where have you been")
+          );
+          let ordered = res;
+          if (targetTrack && res[0]?.id !== targetTrack.id) {
+            ordered = [targetTrack, ...res.filter((t) => t.id !== targetTrack.id)];
+          }
+          setRecommendedTracks(ordered);
+          syncExploreQueue?.(ordered);
+        } else {
+          setRecommendedTracks(fallbackTracks.slice(0, 10));
+        }
       } else {
         const res = await catalogApi.getTracks({ genre, size: 10 });
         if (res?.content && res.content.length > 0) {
