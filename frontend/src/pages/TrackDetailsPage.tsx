@@ -642,19 +642,17 @@ export function TrackDetailsPage({
               <ShareIcon />
             </button>
 
-            {/* Direct Report Track Action Button (UC-22.1) - Chỉ hiển thị cho người dùng không phải tác giả của bài hát */}
-            {!isTrackCreator && (
-              <button
-                type="button"
-                className="track-round-action track-round-action--report"
-                disabled={submittingAction}
-                onClick={() => requestLibraryAccess(() => onNavigate(`/report/track/${track.id}`))}
-                title="Report Track"
-                aria-label="Report Track"
-              >
-                <FlagIcon width={18} height={18} />
-              </button>
-            )}
+            {/* Direct Report Track Action Button (UC-22.1) */}
+            <button
+              type="button"
+              className="track-round-action track-round-action--report"
+              disabled={submittingAction}
+              onClick={() => requestLibraryAccess(() => onNavigate(`/report/track/${track.id}`))}
+              title="Report Track"
+              aria-label="Report Track"
+            >
+              <FlagIcon width={18} height={18} />
+            </button>
           </div>
           {actionMessage ? (
             <p className="track-action-message is-success" role="status">
@@ -1110,6 +1108,16 @@ export function TrackDetailsPage({
               </button>
             </div>
           </section>
+          {/* UC-22.1: Report Track Action in Release Information Sidebar */}
+          <button
+            type="button"
+            className="track-report-button"
+            onClick={() => requestLibraryAccess(() => onNavigate(`/report/track/${track.id}`))}
+            title="Report this track for violation"
+          >
+            <FlagIcon width={16} height={16} />
+            <span>Report this track</span>
+          </button>
           {/* More from this Creator */}
           <section className="track-context-card track-more-tracks-card">
             <h4 style={{ margin: "0 0 10px", fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
