@@ -1346,7 +1346,7 @@ export function StaffLyricsManagementPage() {
                 </div>
 
                 {/* Search Box */}
-                <form className="staff-search-wrapper" onSubmit={handleModSearchSubmit} role="search">
+                <form className="staff-search-wrapper" onSubmit={handleModSearchSubmit} role="search" noValidate>
                   <div className="staff-search-input-box">
                     <button
                       type="submit"

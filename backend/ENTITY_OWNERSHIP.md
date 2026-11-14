@@ -1,15 +1,17 @@
 # SoundWave Entity Ownership
 
-Tài liệu này quy định module duy nhất sở hữu mỗi bảng/entity. Thành viên không được tạo entity thứ hai ánh xạ cùng một bảng.
+Tài liệu này quy định module duy nhất sở hữu mỗi bảng/entity theo chuẩn RDS PostgreSQL. Thành viên không được tạo entity thứ hai ánh xạ cùng một bảng.
 
 | Database table | Owning module | Entity |
 | --- | --- | --- |
-| `roles` | `authentication` | `Role` |
-| `app_users` | `authentication` | `AppUser` |
+| `staff_roles` | `authentication` | `StaffRole` |
+| `staffs` | `authentication` | `Staff` |
+| `users` | `authentication` | `UserAccount` |
 | `user_profiles` | `authentication` | `UserProfile` |
 | `email_verification_tokens` | `authentication` | `EmailVerificationToken` |
 | `password_reset_tokens` | `authentication` | `PasswordResetToken` |
 | `refresh_tokens` | `authentication` | `RefreshToken` |
+| `account_unlock_tokens` | `authentication` | `AccountUnlockToken` |
 | `genres` | `catalog` | `Genre` |
 | `albums` | `catalog` | `Album` |
 | `tracks` | `catalog` | `Track` |
@@ -18,6 +20,7 @@ Tài liệu này quy định module duy nhất sở hữu mỗi bảng/entity. T
 | `playlists` | `library` | `Playlist` |
 | `playlist_tracks` | `library` | `PlaylistTrack` |
 | `track_submissions` | `moderation` | `TrackSubmission` |
+| `album_submissions` | `moderation` | `AlbumSubmission` |
 | `content_reports` | `moderation` | `ContentReport` |
 | `official_lyrics` | `lyrics` | `OfficialLyric` |
 | `personal_lyrics` | `lyrics` | `PersonalLyric` |

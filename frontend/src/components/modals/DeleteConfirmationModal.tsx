@@ -45,6 +45,8 @@ export function DeleteConfirmationModal({
     <div className="modal-overlay" onClick={onCancel} style={{ zIndex: 1200 }}>
       <div
         className="modal-card"
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: "440px", width: "100%", padding: "24px" }}
       >

@@ -23,6 +23,7 @@ import {
   ZapIcon,
 } from "../../icons";
 import { CenterNotificationPopup, type CenterNotificationType } from "../modals/CenterNotificationPopup";
+import { DeleteConfirmationModal } from "../modals/DeleteConfirmationModal";
 
 export interface LyricLine {
   id: string;
@@ -137,6 +138,13 @@ export function LyricSyncTab({
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: CenterNotificationType; message: string } | null>(null);
+  const [confirmModalState, setConfirmModalState] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: "danger" | "primary";
+    onConfirm: () => void;
+  } | null>(null);
 
   // Timing & Nudge Rules state
   const [nudgeStep, setNudgeStep] = useState<0.1 | 0.2 | 0.5>(0.2);
@@ -586,25 +594,8 @@ export function LyricSyncTab({
   };
 
   // Save & Apply Actions
-  const handleApply = () => {
-    let currentLines = lines;
-    if (currentLines.length === 0 && rawText.trim()) {
-      currentLines = parseLyricsToLines(rawText);
-      setLines(currentLines);
-    }
-
-    if (currentLines.length === 0) {
-      setFeedbackNotice({ type: "error", message: "Please enter or paste your lyrics text before applying." });
-      return;
-    }
-
-    if (orderConflictsCount > 0) {
-      if (window.confirm(`There are ${orderConflictsCount} line(s) with timestamps out of chronological order. Would you like to auto-sort them by time before applying?`)) {
-        handleAutoSortLines();
-      }
-    }
-
-    const lrcContent = compileLinesToLrc(currentLines);
+  const finalizeApplyLyrics = (targetLines: LyricLine[]) => {
+    const lrcContent = compileLinesToLrc(targetLines);
     if (!lrcContent.trim()) {
       setFeedbackNotice({ type: "error", message: "Please enter lyric lines before applying." });
       return;
@@ -620,8 +611,42 @@ export function LyricSyncTab({
     onApplyLyrics(lrcContent, virtualFile);
     setFeedbackNotice({
       type: "success",
-      message: `Successfully applied ${currentLines.length} lyric lines to the track!`,
+      message: `Successfully applied ${targetLines.length} lyric lines to the track!`,
     });
+  };
+
+  const handleApply = () => {
+    let currentLines = lines;
+    if (currentLines.length === 0 && rawText.trim()) {
+      currentLines = parseLyricsToLines(rawText);
+      setLines(currentLines);
+    }
+
+    if (currentLines.length === 0) {
+      setFeedbackNotice({ type: "error", message: "Please enter or paste your lyrics text before applying." });
+      return;
+    }
+
+    if (orderConflictsCount > 0) {
+      setConfirmModalState({
+        title: "Auto-sort out-of-order timestamps?",
+        message: `There are ${orderConflictsCount} line(s) with timestamps out of chronological order. Would you like to auto-sort them by time before applying?`,
+        confirmLabel: "Auto-sort & Apply",
+        variant: "primary",
+        onConfirm: () => {
+          pushHistory(currentLines);
+          const stamped = currentLines.filter((l) => l.timeSec !== null).sort((a, b) => a.timeSec! - b.timeSec!);
+          const unstamped = currentLines.filter((l) => l.timeSec === null);
+          const sortedLines = [...stamped, ...unstamped];
+          setLines(sortedLines);
+          setConfirmModalState(null);
+          finalizeApplyLyrics(sortedLines);
+        },
+      });
+      return;
+    }
+
+    finalizeApplyLyrics(currentLines);
   };
 
   const handleDownloadLrc = () => {
@@ -793,6 +818,19 @@ export function LyricSyncTab({
           type={feedbackNotice.type}
           message={feedbackNotice.message}
           onClose={() => setFeedbackNotice(null)}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModalState && (
+        <DeleteConfirmationModal
+          open={Boolean(confirmModalState)}
+          title={confirmModalState.title}
+          message={confirmModalState.message}
+          confirmLabel={confirmModalState.confirmLabel}
+          variant={confirmModalState.variant}
+          onConfirm={confirmModalState.onConfirm}
+          onCancel={() => setConfirmModalState(null)}
         />
       )}
 
@@ -1145,9 +1183,16 @@ export function LyricSyncTab({
                     type="button"
                     className="button button-secondary button-small"
                     onClick={() => {
-                      if (window.confirm("Are you sure you want to re-paste lyrics from scratch?")) {
-                        setLines([]);
-                      }
+                      setConfirmModalState({
+                        title: "Re-paste lyrics from scratch?",
+                        message: "Are you sure you want to clear the current line list and re-paste lyrics from scratch?",
+                        confirmLabel: "Re-paste",
+                        variant: "danger",
+                        onConfirm: () => {
+                          setLines([]);
+                          setConfirmModalState(null);
+                        },
+                      });
                     }}
                     style={{ fontSize: "11px" }}
                   >
@@ -1842,11 +1887,18 @@ export function LyricSyncTab({
               type="button"
               className="button button-secondary button-small"
               onClick={() => {
-                if (window.confirm("Are you sure you want to clear all lyrics?")) {
-                  setLines([]);
-                  onClearLyrics();
-                  setFeedbackNotice({ type: "success", message: "All lyrics have been cleared." });
-                }
+                setConfirmModalState({
+                  title: "Clear all lyrics?",
+                  message: "Are you sure you want to clear all lyrics? This action will remove all lines and timestamps.",
+                  confirmLabel: "Clear all",
+                  variant: "danger",
+                  onConfirm: () => {
+                    setLines([]);
+                    onClearLyrics();
+                    setFeedbackNotice({ type: "success", message: "All lyrics have been cleared." });
+                    setConfirmModalState(null);
+                  },
+                });
               }}
               style={{ fontSize: "12px", color: "#DC2626" }}
             >

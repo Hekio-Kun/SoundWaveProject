@@ -99,7 +99,7 @@ export function AuthExperience({
   };
 
   const trackTitle = activeTrack?.title || "Explore SoundWave";
-  const artistName = (activeTrack as { artist?: string })?.artist || activeTrack?.creator?.displayName || "Independent Artist";
+  const artistName = (activeTrack as { artist?: string })?.artist || activeTrack?.creator?.displayName || "Independent Creator";
   const genreName = activeTrack?.genreName || (activeTrack as { genre?: string })?.genre || activeTrack?.album?.title || "Indie";
 
   return (
