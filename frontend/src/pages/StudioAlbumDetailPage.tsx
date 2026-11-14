@@ -134,6 +134,9 @@ export function StudioAlbumDetailPage({
       setLoading(true);
       setLoadError(null);
       const data = await albumApi.getAlbumById(albumId);
+      if (data && data.tracks) {
+        data.tracks = data.tracks.filter((t) => t.status !== "TAKEN_DOWN");
+      }
       setAlbum(data);
     } catch (err: unknown) {
       setLoadError(err instanceof Error ? err.message : "Failed to load album details.");
@@ -241,14 +244,17 @@ export function StudioAlbumDetailPage({
     if (!onPlayTrack || !album) return;
     const artist = currentUser?.displayName || "Creator";
     const landing = studioTrackToLandingTrack(track, artist);
-    const landingList = (album.tracks || []).map((t) => studioTrackToLandingTrack(t, artist));
+    const validTracks = (album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN");
+    const landingList = validTracks.map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landing, landingList, `Album • ${album.title}`, `album-${album.id}`);
   };
 
   const handlePlayAll = () => {
     if (!onPlayTrack || !album || !album.tracks || album.tracks.length === 0) return;
     const artist = currentUser?.displayName || "Creator";
-    const landingList = album.tracks.map((t) => studioTrackToLandingTrack(t, artist));
+    const validTracks = album.tracks.filter((t) => t.status !== "TAKEN_DOWN");
+    if (validTracks.length === 0) return;
+    const landingList = validTracks.map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landingList[0], landingList, `Album • ${album.title}`, `album-${album.id}`);
   };
 
@@ -318,7 +324,7 @@ export function StudioAlbumDetailPage({
   const isPending = status === "PENDING";
   const isRejected = status === "REJECTED";
   const canSubmit = status === "DRAFT" || status === "REJECTED";
-  const albumTracks = album.tracks || [];
+  const albumTracks = (album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN");
   const totalDurationMs = albumTracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMinutes = Math.round(totalDurationMs / 60000);
 

@@ -312,6 +312,10 @@ public class StudioTrackService {
             track.setAudioPublicId(null);
             track.setCoverUrl(null);
             track.setCoverPublicId(null);
+            if (album != null) {
+                track.setAlbum(null);
+                track.setTrackNumber(null);
+            }
             trackRepository.save(track);
         } else {
             // [FEATURE]: HARD DELETE (POST-2 & Step 7) cho bài hát DRAFT hoặc REJECTED

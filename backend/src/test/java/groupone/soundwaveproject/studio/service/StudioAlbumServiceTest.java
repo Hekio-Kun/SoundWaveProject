@@ -288,6 +288,29 @@ class StudioAlbumServiceTest {
     }
 
     @Test
+    @DisplayName("UC-21.2: Xem chi tiết album tự động loại bỏ bài hát đã bị gỡ (TAKEN_DOWN)")
+    void getAlbumById_ExcludesTakenDownTracks() {
+        Track takenDownTrack = Track.builder()
+                .id(501L)
+                .uploaderUserId(10L)
+                .title("Violating Song")
+                .genre(mockTrack.getGenre())
+                .publicationStatus(TrackPublicationStatus.TAKEN_DOWN)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
+        when(albumRepository.findByIdAndCreatedByUserId(100L, 10L)).thenReturn(Optional.of(mockAlbum));
+        when(trackRepository.findByAlbum_IdOrderByTrackNumberAsc(100L)).thenReturn(List.of(mockTrack, takenDownTrack));
+
+        StudioAlbumResponse response = studioAlbumService.getAlbumById(100L, mockUser.getEmail());
+
+        assertThat(response).isNotNull();
+        assertThat(response.getTracks()).hasSize(1);
+        assertThat(response.getTracks().get(0).title()).isEqualTo("Sandy Shore");
+        assertThat(response.getTrackCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("UC-21.2 EX01: Xem album không tồn tại hoặc không thuộc sở hữu ném lỗi 404")
     void getAlbumById_NotFound_ThrowsException() {
         when(userRepository.findByEmailIgnoreCase(mockUser.getEmail())).thenReturn(Optional.of(mockUser));
