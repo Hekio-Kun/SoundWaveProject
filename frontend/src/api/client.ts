@@ -1,10 +1,24 @@
 export const getApiBaseUrl = (): string => {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  let base = import.meta.env.VITE_API_BASE_URL;
+  if (base) {
+    base = base.trim().replace(/\/+$/, "");
+    if (!base.endsWith("/api/v1")) {
+      base = `${base}/api/v1`;
+    }
+    return base;
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname || "localhost";
-    return `http://${host}:8080/api/v1`;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return `http://${host}:8080/api/v1`;
+    }
+    // Remote production deployment (e.g. Vercel)
+    console.warn(
+      "[SoundWave] VITE_API_BASE_URL environment variable is missing. " +
+      "Please set VITE_API_BASE_URL in your hosting platform (Vercel) to point to your backend."
+    );
+    const protocol = window.location.protocol;
+    return `${protocol}//${host}/api/v1`;
   }
   return "http://localhost:8080/api/v1";
 };
