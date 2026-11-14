@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi, type RejectionDetails } from "../api/track";
+import { covers } from "../data";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
@@ -745,8 +746,11 @@ export function StudioAlbumDetailPage({
                     onClick={() => handlePlayTrack(track)}
                   >
                     <img
-                      src={track.coverUrl || album.coverUrl || "/pics/album.png"}
+                      src={track.coverUrl || album.coverUrl || covers.dawn}
                       alt=""
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                      }}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                     {onPlayTrack && (

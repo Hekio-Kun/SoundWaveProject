@@ -853,8 +853,11 @@ export function PlaylistDetailsPage({
             <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid #e4e7ec" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0 }}>
                 <img
-                  src={selectedDetailTrack.coverUrl || "/pics/album.png"}
+                  src={selectedDetailTrack.coverUrl || covers.dawn}
                   alt={selectedDetailTrack.title}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                  }}
                   style={{
                     width: "56px",
                     height: "56px",

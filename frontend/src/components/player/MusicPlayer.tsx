@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FileTextIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
+import { covers } from "../../data";
 
 /**
  * Props for the persistent {@link MusicPlayer} component.
@@ -347,8 +348,11 @@ export function MusicPlayer({
     <aside className={`music-player ${playing ? "music-player--playing" : ""}`} aria-label="Music player">
       <div className="player-track">
         <img
-          src={track.coverUrl ?? undefined}
+          src={track.coverUrl || covers.dawn}
           alt={`${track.title} cover`}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = covers.dawn;
+          }}
           style={{ cursor: onNavigate ? "pointer" : "default" }}
           onClick={() => onNavigate?.(`/track/${track.id}`)}
         />
@@ -460,7 +464,13 @@ export function MusicPlayer({
           <div className="queue-list">
             {queue.map((item) => (
               <button key={item.id} className={item.id === track.id ? "queue-item queue-item--active" : "queue-item"} onClick={() => onTrackChange(item, true)}>
-                <img src={item.coverUrl ?? undefined} alt="" />
+                <img
+                  src={item.coverUrl || covers.dawn}
+                  alt=""
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                  }}
+                />
                 <span><b>{item.title}</b><small>{item.creator.displayName}</small></span>
                 <small>{formatTime(item.durationMs / 1000)}</small>
               </button>
