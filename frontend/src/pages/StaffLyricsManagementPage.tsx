@@ -22,35 +22,8 @@ import {
   VolumeIcon,
 } from "../icons";
 import { downloadLrcFile } from "../utils/lyricsDownload";
-
-function formatDurationSeconds(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return "--:--";
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.floor(seconds % 60);
-  return `${minutes}:${remaining.toString().padStart(2, "0")}`;
-}
-
-function formatDurationMs(ms?: number | null): string {
-  if (!ms || ms <= 0) return "--:--";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    return new Date(isoString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
-}
+import { formatDuration as formatDurationMs, formatDurationSeconds } from "../utils/timeUtils";
+import { formatDate } from "../utils/dateUtils";
 
 function formatRelativeTime(isoString?: string | null): string {
   if (!isoString) return "--";

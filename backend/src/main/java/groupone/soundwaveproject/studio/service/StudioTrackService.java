@@ -15,6 +15,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
@@ -49,12 +50,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -119,9 +118,6 @@ public class StudioTrackService {
         this.notificationService = notificationService;
         this.lyricService = lyricService;
     }
-
-    private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
-    private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getMyTracks(String currentUserEmail, String statusFilter) {
@@ -638,16 +634,9 @@ public class StudioTrackService {
     }
 
     private String generateUniqueSlug(String input) {
-        String baseSlug = toSlug(input);
+        String baseSlug = SearchNormalizeUtil.toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "track";
         String slug = baseSlug + "-" + System.currentTimeMillis();
         return slug.length() > 220 ? slug.substring(0, 220) : slug;
-    }
-
-    private String toSlug(String input) {
-        String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
-        String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
-        String slug = NONLATIN.matcher(normalized).replaceAll("");
-        return slug.toLowerCase(Locale.ENGLISH);
     }
 }

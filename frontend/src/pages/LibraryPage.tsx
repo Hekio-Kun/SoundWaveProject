@@ -18,6 +18,7 @@ import { historyApi } from "../api/history";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { formatDate, formatDateTime } from "../utils/dateUtils";
+import { formatDuration } from "../utils/timeUtils";
 
 export function historyItemToTrack(item: ListeningHistoryItem): LandingTrack {
   return {
@@ -50,12 +51,6 @@ type Props = {
   onDeletePlaylist: (playlistId: number) => void;
   initialTab?: "favorites" | "playlists" | "history";
   allTracks?: LandingTrack[];
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 function parseIsoDate(dateStr: string): Date {

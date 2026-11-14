@@ -12,6 +12,7 @@ import {
 } from "../../icons";
 import { DeleteConfirmationModal } from "./DeleteConfirmationModal";
 import type { LandingTrack, Playlist } from "../../types";
+import { formatDuration } from "../../utils/timeUtils";
 
 type Props = {
   open: boolean;
@@ -21,12 +22,6 @@ type Props = {
   onRemoveTrack: (playlistId: number, trackId: number) => Promise<void>;
   onReorderTracks: (playlistId: number, trackId: number, direction: "up" | "down") => Promise<void>;
   onOpenAddTrackModal: () => void;
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 export function ManagePlaylistTracksModal({

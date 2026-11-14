@@ -22,36 +22,9 @@ import {
 } from "../../icons";
 import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
-
-function formatDuration(ms?: number | null): string {
-  if (!ms || ms <= 0) return "0:00";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
-
-function formatSeconds(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
+import { formatDuration, formatDurationSeconds } from "../../utils/timeUtils";
+import { formatDate } from "../../utils/dateUtils";
+import { setFlashToast } from "../../utils/toastUtils";
 
 // Parse timestamp [mm:ss.xx] or [mm:ss] into seconds
 function parseTimestampToSeconds(line: string): number | null {
@@ -447,14 +420,7 @@ export function PendingTrackDetailView({
         ? "Lyric update approved successfully."
         : "Track approved successfully.";
 
-      try {
-        sessionStorage.setItem(
-          "soundwave_flash_toast",
-          JSON.stringify({ message: finalMsg, type: "success" })
-        );
-      } catch {
-        // ignore
-      }
+      setFlashToast(finalMsg, "success");
 
       showInternalToast(finalMsg, "success");
       onApproveSuccess?.(finalMsg);
@@ -499,14 +465,7 @@ export function PendingTrackDetailView({
         ? "Lyric update rejected successfully."
         : "Track rejected successfully.";
 
-      try {
-        sessionStorage.setItem(
-          "soundwave_flash_toast",
-          JSON.stringify({ message: finalMsg, type: "success" })
-        );
-      } catch {
-        // ignore
-      }
+      setFlashToast(finalMsg, "success");
 
       showInternalToast(finalMsg, "success");
       onRejectSuccess?.(finalMsg);
@@ -741,9 +700,9 @@ export function PendingTrackDetailView({
                   {/* Timeline Seekbar with full accessibility attributes */}
                   <div className="staff-player-seek-wrap">
                     <div className="staff-player-times">
-                      <span className="staff-time-current">{formatSeconds(currentTime)}</span>
+                      <span className="staff-time-current">{formatDurationSeconds(currentTime)}</span>
                       <span className="staff-time-total">
-                        {formatSeconds(
+                        {formatDurationSeconds(
                           duration || (detail.track.durationMs ? detail.track.durationMs / 1000 : 0)
                         )}
                       </span>
@@ -759,7 +718,7 @@ export function PendingTrackDetailView({
                       aria-valuemin={0}
                       aria-valuemax={maxSeekTime}
                       aria-valuenow={currentTime}
-                      aria-valuetext={`${formatSeconds(currentTime)} of ${formatSeconds(maxSeekTime)}`}
+                      aria-valuetext={`${formatDurationSeconds(currentTime)} of ${formatDurationSeconds(maxSeekTime)}`}
                     />
                   </div>
 

@@ -4,6 +4,7 @@ import { ClockIcon, HeadphonesIcon, MailIcon, PauseIcon, PlayIcon, UserIcon } fr
 import type { LandingTrack } from "../types";
 import { catalogApi } from "../api/catalog";
 import { profileApi, type ProfileDetails } from "../api/profile";
+import { formatDuration } from "../utils/timeUtils";
 
 type Props = {
   creatorId: number;
@@ -22,12 +23,6 @@ const formatDate = (value: string | null | undefined) =>
 
 const formatPlays = (value: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
-};
 
 export function CreatorProfilePage({ creatorId, currentTrack, playing, onPlayTrack, onNavigate }: Props) {
   const [profile, setProfile] = useState<ProfileDetails | null>(null);

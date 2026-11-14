@@ -12,6 +12,7 @@ import groupone.soundwaveproject.catalog.dto.response.TrackResponse;
 import groupone.soundwaveproject.catalog.entity.Track;
 import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
@@ -31,11 +32,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Service xử lý nghiệp vụ Quản lý Playlist cá nhân (UC-15: Manage My Playlist - CRUD).
@@ -51,9 +50,6 @@ public class PlaylistService {
     private final UserRepository userRepository;
     private final UserAccountPublicService userAccountPublicService;
     private final CloudMediaService cloudMediaService;
-
-    private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
-    private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
     /**
      * Lấy danh sách toàn bộ Playlist thuộc quyền sở hữu của người dùng hiện tại (Sequence: View).
@@ -475,7 +471,7 @@ public class PlaylistService {
     }
 
     private String generateUniqueSlug(String title) {
-        String baseSlug = toSlug(title);
+        String baseSlug = SearchNormalizeUtil.toSlug(title);
         if (baseSlug.isBlank()) baseSlug = "playlist";
         String candidate = baseSlug;
         int counter = 1;
@@ -484,14 +480,5 @@ public class PlaylistService {
             counter++;
         }
         return candidate;
-    }
-
-    private static String toSlug(String input) {
-        if (input == null) return "";
-        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
-        String noAccents = Pattern.compile("\\p{InCombiningDiacriticalMarks}+").matcher(normalized).replaceAll("");
-        String slug = WHITESPACE.matcher(noAccents).replaceAll("-");
-        slug = NONLATIN.matcher(slug).replaceAll("");
-        return slug.toLowerCase(Locale.ENGLISH).replaceAll("-+", "-").replaceAll("^-|-$", "");
     }
 }

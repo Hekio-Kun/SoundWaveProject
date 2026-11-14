@@ -25,6 +25,8 @@ import {
   UploadIcon,
 } from "../icons";
 import type { CurrentUser, LandingTrack, StudioAlbum, StudioTrack } from "../types";
+import { formatDuration } from "../utils/timeUtils";
+import { setFlashToast } from "../utils/toastUtils";
 
 type Props = {
   albumId: number;
@@ -39,14 +41,6 @@ type Props = {
     contextKey?: string
   ) => void;
 };
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 function studioTrackToLandingTrack(st: StudioTrack, creatorName: string): LandingTrack {
   return {
@@ -118,10 +112,7 @@ export function StudioAlbumDetailPage({
 
   const handleAlbumSubmittedSuccess = () => {
     setSubmitReviewModalOpen(false);
-    sessionStorage.setItem(
-      "soundwave_flash_toast",
-      JSON.stringify({ message: "Album submitted successfully for Staff review.", type: "success" })
-    );
+    setFlashToast("Album submitted successfully for Staff review.", "success");
     onNavigate("/album");
   };
 
@@ -159,13 +150,7 @@ export function StudioAlbumDetailPage({
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
       // Step 1.11.2.22: displaySuccessToast("Album and all constituent tracks have been permanently deleted") and navigate to MyAlbums()
-      sessionStorage.setItem(
-        "soundwave_flash_toast",
-        JSON.stringify({
-          message: "Album and all constituent tracks have been permanently deleted",
-          type: "success",
-        })
-      );
+      setFlashToast("Album and all constituent tracks have been permanently deleted", "success");
       onNavigate("/album");
     } catch (err: unknown) {
       // Step 1.11.1.4: displayErrorMessage("Album not found or access denied") and dismissModal()

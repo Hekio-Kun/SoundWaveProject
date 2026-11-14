@@ -27,6 +27,8 @@ import {
   validateAudioFile,
   validateLyricsFile,
 } from "../utils/trackUpload";
+import { formatDuration } from "../utils/timeUtils";
+import { setFlashToast } from "../utils/toastUtils";
 
 type Props = {
   isAuthenticated: boolean;
@@ -48,14 +50,6 @@ type TrackItem = {
 type FormErrors = Record<string, string>;
 
 const MAX_ALBUM_TRACKS = 7;
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 function cleanFilenameToTitle(filename: string): string {
   const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
@@ -447,10 +441,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       await albumApi.createAlbum(payload, coverFile ?? undefined, audioFiles);
 
       // Sequence 1.2.2.16: displaySuccessToast("Album draft saved successfully") and redirect to /album
-      sessionStorage.setItem(
-        "soundwave_flash_toast",
-        JSON.stringify({ message: "Album draft saved successfully.", type: "success" })
-      );
+      setFlashToast("Album draft saved successfully.", "success");
       onNavigate("/album");
     } catch (err: unknown) {
       if (err instanceof AlbumApiError) {

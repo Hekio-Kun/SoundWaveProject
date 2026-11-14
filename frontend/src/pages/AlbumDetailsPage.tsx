@@ -3,6 +3,7 @@ import { catalogApi } from "../api/catalog";
 import { covers } from "../data";
 import { ClockIcon, DiscIcon, EyeIcon, HeadphonesIcon, PauseIcon, PlayIcon } from "../icons";
 import type { LandingTrack, PublicAlbumDetails } from "../types";
+import { formatDuration } from "../utils/timeUtils";
 
 type Props = {
   albumId: number;
@@ -10,12 +11,6 @@ type Props = {
   playing: boolean;
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string, contextKey?: string) => void;
   onNavigate: (route: string) => void;
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, onNavigate }: Props) {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { searchApi, type SearchCategoryType } from "../api/search";
+import { formatDuration } from "../utils/timeUtils";
 import type {
   CurrentUser,
   CreatorSearchResult,
@@ -23,14 +24,6 @@ import {
 
 const DEFAULT_COVER_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300' width='300' height='300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230284C7'/%3E%3Cstop offset='100%25' stop-color='%230369A1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23bg)' rx='12'/%3E%3Ccircle cx='150' cy='150' r='54' fill='none' stroke='rgba(255,255,255,0.2)' stroke-width='4'/%3E%3Cpath d='M140 120v40a16 16 0 1 0 10 14.8V132l24-6v24a16 16 0 1 0 10 14.8V114l-44 6z' fill='%23ffffff'/%3E%3C/svg%3E";
-
-const formatDuration = (ms?: number) => {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-};
 
 type Props = {
   initialQuery?: string;

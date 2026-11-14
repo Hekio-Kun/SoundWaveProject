@@ -5,10 +5,7 @@ import { CenterNotificationPopup } from "../components/modals/CenterNotification
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { GenreFormModal } from "../components/modals/GenreFormModal";
 import { AlertIcon, CloseIcon, DiscIcon, EditIcon, PlusIcon, RefreshIcon, SearchIcon } from "../icons";
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
+import { formatDate } from "../utils/dateUtils";
 
 export function AdminGenreManagementPage() {
   const [genrePage, setGenrePage] = useState<AdminGenrePage | null>(null);

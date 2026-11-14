@@ -12,6 +12,7 @@ import {
   UserIcon,
 } from "../../icons";
 import type { StaffModerationActivityResponse, StaffSummaryItem } from "../../types";
+import { formatDate } from "../../utils/dateUtils";
 
 type Props = {
   open: boolean;
@@ -21,21 +22,6 @@ type Props = {
   error?: string;
   onClose: () => void;
 };
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
-}
 
 export function StaffActivityModal({
   open,
