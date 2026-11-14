@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { FileTextIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
 import { covers } from "../../data";
+import { formatDurationSeconds as formatTime } from "../../utils/timeUtils";
 
 /**
  * Props for the persistent {@link MusicPlayer} component.
@@ -31,26 +32,12 @@ export type MusicPlayerProps = {
   onToggleLyrics?: () => void;
   /** Controlled open state of the lyrics drawer */
   isLyricsOpen?: boolean;
-  /** Callback to record playback count when valid listening threshold is met (BR.13) */
-  onRecordPlay?: (trackId: number, listenedDurationMs: number, completed: boolean) => void;
   /** Human-readable playback context description (e.g., "Playing from Top Charts") */
   playbackContext?: string | null;
   /** Optional callback to reorder active queue when shuffle mode is toggled */
   onReorderQueue?: (newQueue: LandingTrack[]) => void;
   /** Optional callback to navigate to a target route */
   onNavigate?: (route: string) => void;
-};
-
-/**
- * Formats a duration in seconds into `mm:ss` representation.
- *
- * @param seconds - Duration in seconds
- * @returns Formatted time string, or "0:00" if invalid
- */
-const formatTime = (seconds: number) => {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
 };
 
 /**
@@ -72,7 +59,6 @@ export function MusicPlayer({
   isQueueOpen,
   onToggleLyrics,
   isLyricsOpen,
-  onRecordPlay,
   playbackContext,
   onReorderQueue,
   onNavigate,
@@ -101,7 +87,6 @@ export function MusicPlayer({
   const [audioError, setAudioError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const recordedRef = useRef(false);
   const lastPlayheadTimeRef = useRef<number | null>(null);
   const actualListenedSecondsRef = useRef(0);
   const errorTimerRef = useRef<number | null>(null);
@@ -216,13 +201,11 @@ export function MusicPlayer({
   }, [audio, volume]);
 
   /**
-   * Handles natural track completion: records listening event if actual listening threshold met,
-   * respects repeat mode, or advances to the next track.
+   * Handles natural track completion: respects repeat mode, or advances to the next track.
    */
   const handleEnded = () => {
     if (repeat) {
       audio.currentTime = 0;
-      recordedRef.current = false;
       actualListenedSecondsRef.current = 0;
       lastPlayheadTimeRef.current = 0;
       onTrackChange(track, true);
@@ -233,6 +216,9 @@ export function MusicPlayer({
     if (isAuthenticated) onTrackChange(next, true);
     else onGuestTrackEnded(next);
   };
+
+  const handleEndedRef = useRef(handleEnded);
+  handleEndedRef.current = handleEnded;
 
   /**
    * Handles previous button navigation adhering to sequence rule AF02:
@@ -285,10 +271,34 @@ export function MusicPlayer({
     setDuration(track.durationMs / 1000);
     setAudioError(false);
     setErrorMessage("");
-    recordedRef.current = false;
     actualListenedSecondsRef.current = 0;
     lastPlayheadTimeRef.current = null;
   }, [track.id, track.durationMs]);
+
+  const reportError = () => {
+    // EX01 [30], EX02 [36]: Detect track inaccessible or player error
+    setAudioError(true);
+    // EX01 [31], EX02 [37]: Stop current track and restore last stable state
+    onPlayingChange(false);
+    audio.currentTime = 0;
+    setCurrentTime(0);
+
+    // EX01 [32-35]: Advance to next eligible track if queue has other tracks
+    if (queue.length > 1) {
+      setErrorMessage("Track unavailable. Skipping to next track in queue...");
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = window.setTimeout(() => {
+        setAudioError(false);
+        setErrorMessage("");
+        onTrackChange(nextTrack(), true);
+      }, 1500);
+    } else {
+      setErrorMessage("The audio could not be loaded. Please check your network connection.");
+    }
+  };
+
+  const reportErrorRef = useRef(reportError);
+  reportErrorRef.current = reportError;
 
   useEffect(() => {
     const updateTime = () => {
@@ -298,51 +308,38 @@ export function MusicPlayer({
       // Accumulate actual listened duration during continuous forward playback
       if (lastPlayheadTimeRef.current !== null) {
         const delta = cur - lastPlayheadTimeRef.current;
-        // Normal HTML5 audio timeupdate occurs every ~250ms.
-        // A delta between 0 and 1.5 seconds indicates continuous listening (not seeking/skipping).
         if (delta > 0 && delta < 1.5) {
           actualListenedSecondsRef.current += delta;
         }
       }
       lastPlayheadTimeRef.current = cur;
-
     };
 
-    const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : track.durationMs / 1000);
-    const reportError = () => {
-      // EX01 [30], EX02 [36]: Detect track inaccessible or player error
-      setAudioError(true);
-      // EX01 [31], EX02 [37]: Stop current track and restore last stable state
-      onPlayingChange(false);
-      audio.currentTime = 0;
-      setCurrentTime(0);
+    const updateDuration = () => {
+      setDuration(Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : track.durationMs / 1000);
+    };
 
-      // EX01 [32-35]: Advance to next eligible track if queue has other tracks
-      if (queue.length > 1) {
-        setErrorMessage("Track unavailable. Skipping to next track in queue...");
-        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-        errorTimerRef.current = window.setTimeout(() => {
-          setAudioError(false);
-          setErrorMessage("");
-          onTrackChange(nextTrack(), true);
-        }, 1500);
-      } else {
-        setErrorMessage("The audio could not be loaded. Please check your network connection.");
-      }
+    const onAudioEnded = () => {
+      handleEndedRef.current();
+    };
+
+    const onAudioError = () => {
+      reportErrorRef.current();
     };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", reportError);
+    audio.addEventListener("ended", onAudioEnded);
+    audio.addEventListener("error", onAudioError);
     if (audio.readyState >= 1) updateDuration();
+
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", reportError);
+      audio.removeEventListener("ended", onAudioEnded);
+      audio.removeEventListener("error", onAudioError);
     };
-  });
+  }, [audio, track.durationMs]);
 
   return (
     <aside className={`music-player ${playing ? "music-player--playing" : ""}`} aria-label="Music player">

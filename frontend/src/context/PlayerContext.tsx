@@ -33,7 +33,6 @@ export interface PlayerContextType {
   handleGuestTrackEnded: (next: LandingTrack) => void;
   continueListening: () => void;
   closeGuestPrompt: () => void;
-  handleRecordPlay: (trackId: number, listenedDurationMs: number, completed: boolean) => Promise<void>;
   reorderQueue: (newQueue: LandingTrack[]) => void;
   pause: () => void;
 }
@@ -172,7 +171,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setPlaying(false);
     };
     const handleEnded = () => {
-      setPlaying(false);
+      if (audio.paused || audio.ended) {
+        setPlaying(false);
+      }
     };
 
     audio.addEventListener("play", handlePlay);
@@ -191,7 +192,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("playing", handlePlay);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
-      audio.pause();
     };
   }, [audio, syncTrackPlay]);
 
@@ -301,23 +301,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setGuestPromptOpen(false);
   }, []);
 
-  const handleRecordPlay = useCallback(
-    async (trackId: number, listenedDurationMs: number, completed: boolean) => {
-      try {
-        const res = await catalogApi.recordPlay(trackId, listenedDurationMs, completed);
-        setCurrentTrack((prev) =>
-          prev && prev.id === trackId ? { ...prev, playCount: res.playCount } : prev
-        );
-        setQueue((prevQueue) =>
-          prevQueue.map((item) => (item.id === trackId ? { ...item, playCount: res.playCount } : item))
-        );
-      } catch (err) {
-        console.warn("Failed to record play count:", err);
-      }
-    },
-    []
-  );
-
   const toggleQueue = useCallback(() => {
     setQueueOpen((prev) => {
       if (!prev) setLyricsOpen(false);
@@ -399,7 +382,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         handleGuestTrackEnded,
         continueListening,
         closeGuestPrompt,
-        handleRecordPlay,
         pause,
       }}
     >
