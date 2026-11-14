@@ -24,18 +24,6 @@ type Props = {
   onAddToPlaylist?: (trackId: number) => void;
 };
 
-const DEFAULT_GENRE_CHIPS = [
-  { id: "all", label: "All", genre: "" },
-  { id: "pop", label: "Pop", genre: "pop" },
-  { id: "ballad", label: "Ballad", genre: "ballad" },
-  { id: "rap-hip-hop", label: "Rap / Hip-hop", genre: "rap-hip-hop" },
-  { id: "rnb", label: "R&B", genre: "rnb" },
-  { id: "acoustic", label: "Acoustic", genre: "acoustic" },
-  { id: "edm", label: "EDM", genre: "edm" },
-  { id: "indie", label: "Indie", genre: "indie" },
-  { id: "lofi", label: "Lofi", genre: "lofi" },
-];
-
 const FALLBACK_BEACH_COVER =
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80";
 
@@ -52,32 +40,6 @@ export function ExplorePage({
   const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState("");
-  const [selectedChip, setSelectedChip] = useState("all");
-  const [genreChips, setGenreChips] = useState(DEFAULT_GENRE_CHIPS);
-
-  useEffect(() => {
-    let isMounted = true;
-    void catalogApi
-      .getGenres()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setGenreChips([
-            { id: "all", label: "All", genre: "" },
-            ...data.map((g) => ({
-              id: g.slug || String(g.id),
-              label: g.name,
-              genre: g.slug,
-            })),
-          ]);
-        }
-      })
-      .catch(() => {
-        // Fallback to DEFAULT_GENRE_CHIPS
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const heroTrack = recommendedTracks[0] ?? null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);
@@ -118,30 +80,6 @@ export function ExplorePage({
   useEffect(() => {
     void loadExploreTracks();
   }, [loadExploreTracks]);
-
-  const handleSelectChip = async (chipId: string, genre: string) => {
-    setSelectedChip(chipId);
-    setTracksLoading(true);
-    setTracksError("");
-    try {
-      if (chipId === "all" || !genre) {
-        const res = await catalogApi.getCuratedRecommendations(10);
-        if (res && res.length > 0) {
-          setRecommendedTracks(res);
-        } else {
-          const catalogRes = await catalogApi.getTracks({ size: 10, sort: "trending" });
-          setRecommendedTracks(catalogRes?.content || []);
-        }
-      } else {
-        const res = await catalogApi.getTracks({ genre, size: 10 });
-        setRecommendedTracks(res?.content || []);
-      }
-    } catch {
-      setRecommendedTracks([]);
-    } finally {
-      setTracksLoading(false);
-    }
-  };
 
   const renderTrackState = (emptyMessage: string) => (
     <div className={`explore-track-state ${tracksError ? "is-error" : ""}`} role={tracksError ? "alert" : "status"}>
@@ -264,26 +202,7 @@ export function ExplorePage({
         </div>
       </section>
 
-      {/* 3. Genre Chips Bar */}
-      <div className="explore-chips-bar">
-        <div className="explore-chips-list">
-          {genreChips.map((chip) => {
-            const isActive = selectedChip === chip.id;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                className={`explore-chip ${isActive ? "is-active" : ""}`}
-                onClick={() => void handleSelectChip(chip.id, chip.genre)}
-              >
-                {chip.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 4. Section: Recommended for You */}
+      {/* 3. Section: Recommended for You */}
       <section className="sw-section" id="recommended">
         <div className="explore-section-header">
           <div>
