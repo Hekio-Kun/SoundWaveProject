@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { covers, tracks } from "../data";
+import { covers } from "../data";
 import { playlistApi } from "../api/playlists";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
@@ -158,7 +158,7 @@ export function PlaylistDetailsPage({
     if (playlist.tracks && playlist.tracks.length > 0) {
       return playlist.tracks;
     }
-    const sourceTracks = allTracks && allTracks.length > 0 ? allTracks : tracks;
+    const sourceTracks = allTracks && allTracks.length > 0 ? allTracks : [];
     return (playlist.trackIds || [])
       .map((id) => sourceTracks.find((t) => t.id === id))
       .filter((t): t is LandingTrack => Boolean(t));
@@ -166,7 +166,7 @@ export function PlaylistDetailsPage({
 
   const handleRemoveTrack = async (plId: number, trId: number) => {
     if (!currentUser) {
-      showToast("Please log in to remove tracks from the playlist.", "warning");
+      showToast("Please login to remove tracks from the playlist.", "warning");
       onNavigate("/login");
       return;
     }
@@ -192,7 +192,7 @@ export function PlaylistDetailsPage({
 
   const handleReorderTracks = async (plId: number, trId: number, direction: "up" | "down") => {
     if (!currentUser) {
-      showToast("Please log in to reorder tracks in the playlist.", "warning");
+      showToast("Please login to reorder tracks in the playlist.", "warning");
       onNavigate("/login");
       return;
     }
@@ -400,7 +400,7 @@ export function PlaylistDetailsPage({
                   className="button button-ghost"
                   onClick={() => {
                     if (!currentUser) {
-                      showToast("Please log in to edit the playlist.", "warning");
+                      showToast("Please login to edit the playlist.", "warning");
                       onNavigate("/login");
                       return;
                     }
@@ -424,7 +424,7 @@ export function PlaylistDetailsPage({
                   className="button button-ghost"
                   onClick={() => {
                     if (!currentUser) {
-                      showToast("Please log in to delete the playlist.", "warning");
+                      showToast("Please login to delete the playlist.", "warning");
                       onNavigate("/login");
                       return;
                     }

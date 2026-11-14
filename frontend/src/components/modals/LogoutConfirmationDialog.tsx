@@ -41,7 +41,7 @@ export function LogoutConfirmationDialog({ open, submitting, onCancel, onConfirm
       >
         <div className="logout-dialog-icon"><AlertIcon width={25} height={25} /></div>
         <p className="eyebrow">ACCOUNT SESSION</p>
-        <h2 id="logout-dialog-title">Log out of SoundWave?</h2>
+        <h2 id="logout-dialog-title">Logout of SoundWave?</h2>
         <p id="logout-dialog-description">
           You will need to enter your email and password again to access your personal library.
         </p>
@@ -50,7 +50,7 @@ export function LogoutConfirmationDialog({ open, submitting, onCancel, onConfirm
             Cancel
           </button>
           <button className="button logout-dialog-confirm" type="button" onClick={onConfirm} disabled={submitting}>
-            {submitting ? "Logging out…" : "Log out"}
+            {submitting ? "Logging out…" : "Logout"}
           </button>
         </div>
       </section>

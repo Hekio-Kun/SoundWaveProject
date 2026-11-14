@@ -11,7 +11,6 @@ import { MusicPlayer } from "./components/player/MusicPlayer";
 import { GuestLoginPrompt } from "./components/modals/GuestLoginPrompt";
 import { LogoutConfirmationDialog } from "./components/modals/LogoutConfirmationDialog";
 import { CenterNotificationPopup } from "./components/modals/CenterNotificationPopup";
-import { tracks } from "./data";
 
 function AppContent() {
   const {
@@ -52,8 +51,8 @@ function AppContent() {
   const { openCreatePlaylist, toastNotice, toastType, showToast } = usePlaylists();
   const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
 
-  const activeTrack = currentTrack || tracks[0];
-  const activeQueue = queue.length > 0 ? queue : tracks;
+  const activeTrack = currentTrack || queue[0] || null;
+  const activeQueue = queue;
 
   return (
     <div className={isMusicRoute ? "app-root app-root--has-player" : "app-root"}>

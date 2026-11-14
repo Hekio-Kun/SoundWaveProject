@@ -244,8 +244,10 @@ html { scroll-behavior: smooth; }
 }
 
 .track-creator-chip,
+.track-author-avatar,
 .track-author-card > img { transition: transform var(--sw-motion-base) var(--sw-ease-emphasized), box-shadow var(--sw-motion-base) ease; }
 .track-creator-chip:hover { transform: translate3d(3px, 0, 0); }
+.track-author-card:hover .track-author-avatar,
 .track-author-card:hover > img { transform: translate3d(0, -3px, 0) scale(1.035); }
 
 /* Player luôn hiện nhưng chỉ pulse khi thực sự đang phát. */

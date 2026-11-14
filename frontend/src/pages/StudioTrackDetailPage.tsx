@@ -529,18 +529,9 @@ export function StudioTrackDetailPage({
             </div>
           </div>
 
-          {/* Right: Status Badge & Action CRUD Buttons */}
+          {/* Right: Action CRUD Buttons */}
           {track ? (
             <div className="studio-top-nav-single-right">
-              {/* Status Badge */}
-              <span
-                className={`staff-status-chip ${statusClass}`}
-                style={{ padding: "4px 10px", fontSize: "12.5px" }}
-              >
-                <i />
-                <span>{statusLabel}</span>
-              </span>
-
               {/* View Rejection button (UC-20) */}
               {isRejected && (
                 <button

@@ -477,7 +477,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       <div className="upload-track-page">
         <section className="upload-track-access-card">
           <span className="upload-track-access-card__icon"><UploadIcon width={28} height={28} /></span>
-          <h1>{isAuthenticated ? "Creator access required" : "Log in to create an album"}</h1>
+          <h1>{isAuthenticated ? "Creator access required" : "Login to create an album"}</h1>
           <p>
             {isAuthenticated
               ? "Album creation is available for active creator accounts. Please return to studio or contact support."

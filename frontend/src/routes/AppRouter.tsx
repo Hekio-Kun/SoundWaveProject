@@ -5,7 +5,6 @@ import { usePlayer } from "../context/PlayerContext";
 import { usePlaylists } from "../context/PlaylistContext";
 import { useRouter } from "../hooks/useRouter";
 import { navigateTo } from "../utils/navigation";
-import { initialStudioTracks } from "../data";
 
 import { AlbumDetailsPage } from "../pages/AlbumDetailsPage";
 import { AlbumsPage } from "../pages/AlbumsPage";
@@ -348,7 +347,7 @@ export function AppRouter(): React.ReactElement | null {
     ) : (
       <div className="state-page">
         <span className="state-icon">!</span>
-        <h1>Log in to manage your profile</h1>
+        <h1>Login to manage your profile</h1>
         <p>Your profile settings are available after authentication.</p>
         <button className="button button-primary" onClick={() => navigate("/login")}>
           Go to login
@@ -447,7 +446,7 @@ export function AppRouter(): React.ReactElement | null {
       return (
         <div className="state-page" style={{ padding: "80px 20px", textAlign: "center" }}>
           <span className="state-icon">!</span>
-          <h1>Log in to view reports history</h1>
+          <h1>Login to view reports history</h1>
           <p>You need to be logged in to inspect your submitted reports.</p>
           <button className="button button-primary" onClick={() => navigate("/login")}>
             Go to login
@@ -465,7 +464,7 @@ export function AppRouter(): React.ReactElement | null {
       return (
         <div className="state-page" style={{ padding: "80px 20px", textAlign: "center" }}>
           <span className="state-icon">!</span>
-          <h1>Log in to report a track</h1>
+          <h1>Login to report a track</h1>
           <p>You need to be logged in with a listener account to submit a content report.</p>
           <button className="button button-primary" onClick={() => navigate("/login")}>
             Go to login
@@ -608,13 +607,13 @@ export function AppRouter(): React.ReactElement | null {
   // [FEATURE]: Trang danh sách bài hát của Creator - My Tracks (/track hoặc /tracks)
   if (pathname === "/track" || pathname === "/tracks" || pathname === "/studio") {
     if (!authReady || !isAuthenticated) return null;
-    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="TRACKS" currentUser={user} />;
+    return <StudioPage tracks={[]} onNavigate={navigate} initialTab="TRACKS" currentUser={user} />;
   }
 
   // [FEATURE]: Trang danh sách album của Creator - My Albums (/album)
   if (pathname === "/album" || pathname === "/studio/albums") {
     if (!authReady || !isAuthenticated) return null;
-    return <StudioPage tracks={initialStudioTracks} onNavigate={navigate} initialTab="ALBUMS" currentUser={user} />;
+    return <StudioPage tracks={[]} onNavigate={navigate} initialTab="ALBUMS" currentUser={user} />;
   }
 
 
