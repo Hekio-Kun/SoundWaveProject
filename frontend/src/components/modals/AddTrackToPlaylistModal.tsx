@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useModalScrollLock } from "../../hooks/useModalScrollLock";
-import { tracks as staticTracks } from "../../data";
 import { catalogApi } from "../../api/catalog";
 import { CloseIcon, PlusIcon, SearchIcon, CheckIcon, AlertIcon } from "../../icons";
 import type { LandingTrack } from "../../types";

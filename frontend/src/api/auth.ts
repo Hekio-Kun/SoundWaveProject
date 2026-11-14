@@ -64,7 +64,7 @@ export const authApi = {
     if (!session) {
       throw new AuthApiError({
         code: "INVALID_REFRESH_TOKEN",
-        message: "Your session has expired. Please log in again.",
+        message: "Your session has expired. Please login again.",
       }, 401);
     }
     return session;
