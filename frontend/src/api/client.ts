@@ -1,6 +1,11 @@
 export const getApiBaseUrl = (): string => {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  let base = import.meta.env.VITE_API_BASE_URL;
+  if (base) {
+    base = base.trim().replace(/\/+$/, "");
+    if (!base.endsWith("/api/v1")) {
+      base = `${base}/api/v1`;
+    }
+    return base;
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname || "localhost";
