@@ -21,10 +21,10 @@ Nguyên tắc chung:
 Trước khi xây màn hình mới, xem các file sau:
 
 - `src/styles.css`: token, component style và responsive hiện tại.
-- `src/components/LandingPage.tsx`: chuẩn về bố cục public page.
-- `src/components/SoundWaveHeader.tsx`: header và điều hướng public.
-- `src/components/MusicPlayer.tsx`: player dùng chung toàn hệ thống.
-- `src/components/SoundWaveFooter.tsx`: footer public.
+- `src/pages/ExplorePage.tsx`: chuẩn về bố cục public page.
+- `src/components/layout/SoundWaveHeader.tsx`: header và điều hướng public.
+- `src/components/player/MusicPlayer.tsx`: player dùng chung toàn hệ thống.
+- `src/components/layout/SoundWaveFooter.tsx`: footer public.
 - `src/types.ts`: model dữ liệu frontend.
 - `src/data.ts`: dữ liệu demo và cách đặt tên.
 
@@ -235,7 +235,7 @@ Quy tắc bắt buộc cho toàn bộ thông báo trạng thái tức thời (nh
 
 ### Public/User pages
 
-- Giữ nền sáng `#F7F8FA`.
+- Giữ nền sáng `#F6EFE3` (Warm Sand).
 - Dùng container tối đa 1280px.
 - Track Details, Album Details và User/Creator Profile là ba màn hình riêng.
 - Các màn hình khám phá sử dụng cùng Track Card, Album Card và Creator Card với landing page.
@@ -299,7 +299,7 @@ Không dùng spinner toàn màn hình cho danh sách dài nếu skeleton phù h�
 - Chỉ hiển thị track có `publicationStatus === "APPROVED"` trên public pages.
 - Frontend có thể ẩn action theo role nhưng backend vẫn phải kiểm tra quyền.
 - Không đưa logic role phức tạp trực tiếp vào component trình bày.
-- Hash route hiện tại là tạm thời; khi thêm React Router, route phải giữ cấu trúc ý nghĩa như `/tracks/:id`, `/albums/:id`, `/creators/:id`.
+- Ứng dụng sử dụng History API routing (`/path` qua `src/utils/navigation.ts` và `src/hooks/useRouter.ts`), tuyệt đối không dùng hash URL (`#/path`) mới; URL có cấu trúc ý nghĩa như `/tracks/:id`, `/albums/:id`, `/creators/:id`.
 
 ## 10. Cấu trúc code
 
@@ -378,7 +378,7 @@ Một màn hình chỉ được xem là hoàn thành khi:
 - Không tạo dark theme khi chưa có yêu cầu.
 - Không tạo actor hoặc giao diện “Đăng ký làm nghệ sĩ”.
 - Không gọi User đăng nhạc là Artist trong nghiệp vụ.
-- Không thêm lyric đồng bộ thời gian khi scope hiện tại chỉ dùng lyric dạng text.
+- Hỗ trợ hiển thị và biên tập lời bài hát đồng bộ thời gian chuẩn LRC (`[mm:ss.xx]`) và plain text qua `OfficialLyric`, `PersonalLyric` và `LyricSyncTab`; tuân thủ quy tắc One-Time Official Lyrics Rule đối với Creator.
 - Không thêm AI recommendation và gọi nội dung là cá nhân hóa khi chưa có backend hỗ trợ.
 - Không thêm animation nặng hoặc autoplay video/audio.
 - Không thay đổi player thành component riêng cho từng page.

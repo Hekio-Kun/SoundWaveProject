@@ -3,7 +3,7 @@
 ## 1. Phạm vi áp dụng
 
 - File này áp dụng cho toàn bộ mã nguồn trong thư mục `backend/`.
-- Công nghệ chính: Java 21, Spring Boot, Spring MVC, Spring Data JPA, SQL Server và Lombok.
+- Công nghệ chính: Java 21, Spring Boot, Spring MVC, Spring Data JPA, PostgreSQL và Lombok.
 - Backend được tổ chức theo modular monolith: chia theo module nghiệp vụ trước, sau đó chia layer bên trong từng module.
 - Ưu tiên code dễ đọc, ngắn gọn, dễ kiểm thử và đúng trách nhiệm. Không rút gọn đến mức làm mất ý nghĩa nghiệp vụ.
 - Không tự ý thay đổi yêu cầu nghiệp vụ khi RDS chưa rõ; ghi chú điểm chưa rõ và xác nhận trước khi triển khai.
@@ -236,14 +236,14 @@ public TrackResponse createTrack(CreateTrackRequest request, Long userId) {
 - Trường tạo/cập nhật nên được quản lý nhất quán bằng JPA Auditing hoặc cơ chế chung.
 - Xóa mềm phải được xử lý nhất quán với trường `deleted_at` nếu entity có hỗ trợ.
 - Index, unique constraint và foreign key phải được định nghĩa ở database, không chỉ kiểm tra bằng code.
-- Khi chạy local có thể dùng `trustServerCertificate=true`; production phải dùng chứng chỉ tin cậy và không bỏ qua xác thực certificate.
+- Kết nối tới cloud PostgreSQL (Neon/RDS) bắt buộc bật `sslmode=require`.
 
 Các biến môi trường cần thiết:
 
 ```text
-DB_URL=jdbc:sqlserver://localhost:1433;databaseName=soundwave;encrypt=true;trustServerCertificate=true
-DB_USERNAME=sa
-DB_PASSWORD=<mật khẩu SQL Server>
+DB_URL=jdbc:postgresql://<host>:5432/soundwave?sslmode=require
+DB_USERNAME=<username PostgreSQL>
+DB_PASSWORD=<mật khẩu PostgreSQL>
 JPA_DDL_AUTO=validate
 ```
 

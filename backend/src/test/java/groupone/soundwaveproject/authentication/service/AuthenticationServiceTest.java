@@ -339,4 +339,115 @@ class AuthenticationServiceTest {
         verify(user).unlock();
         verify(authRateLimiterService).resetLoginAttempts("user@example.com");
     }
+
+    @Test
+    void verifyEmailActivatesPendingUserAndResetsOtpAttempts() {
+        User user = mock(User.class);
+        groupone.soundwaveproject.authentication.entity.EmailVerificationToken token =
+                mock(groupone.soundwaveproject.authentication.entity.EmailVerificationToken.class);
+        when(user.getId()).thenReturn(15L);
+        when(user.getEmail()).thenReturn("pending@example.com");
+        when(user.getEmailVerifiedAt()).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("pending@example.com")).thenReturn(Optional.of(user));
+        when(authRateLimiterService.isOtpBlocked("pending@example.com")).thenReturn(false);
+        when(verificationTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(15L))
+                .thenReturn(Optional.of(token));
+        when(token.getTokenHash()).thenReturn("otp-hash");
+        when(token.isUsed()).thenReturn(false);
+        when(token.isExpired(any())).thenReturn(false);
+        when(passwordEncoder.matches("654321", "otp-hash")).thenReturn(true);
+
+        var response = service.verifyEmail(new EmailOtpRequest("pending@example.com", "654321"));
+
+        assertEquals("Email verified successfully. You can now log in.", response.message());
+        verify(token).markUsed(any());
+        verify(user).verifyEmail(any());
+        verify(authRateLimiterService).resetOtpAttempts("pending@example.com");
+    }
+
+    @Test
+    void verifyEmailRejectsExpiredOrInvalidOtp() {
+        User user = mock(User.class);
+        groupone.soundwaveproject.authentication.entity.EmailVerificationToken token =
+                mock(groupone.soundwaveproject.authentication.entity.EmailVerificationToken.class);
+        when(user.getId()).thenReturn(15L);
+        when(user.getEmail()).thenReturn("pending@example.com");
+        when(user.getEmailVerifiedAt()).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("pending@example.com")).thenReturn(Optional.of(user));
+        when(authRateLimiterService.isOtpBlocked("pending@example.com")).thenReturn(false);
+        when(verificationTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(15L))
+                .thenReturn(Optional.of(token));
+        when(token.isUsed()).thenReturn(false);
+        when(token.isExpired(any())).thenReturn(true);
+
+        assertThrows(groupone.soundwaveproject.authentication.exception.InvalidOtpException.class,
+                () -> service.verifyEmail(new EmailOtpRequest("pending@example.com", "000000")));
+        verify(user, never()).verifyEmail(any());
+    }
+
+    @Test
+    void resendVerificationOtpSendsNewCodeForPendingUser() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(15L);
+        when(user.getEmail()).thenReturn("pending@example.com");
+        when(user.getStatus()).thenReturn(UserStatus.PENDING);
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getEmailVerifiedAt()).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("pending@example.com")).thenReturn(Optional.of(user));
+        when(verificationTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(15L))
+                .thenReturn(Optional.empty());
+        when(profileRepository.findByUserId(15L)).thenReturn(Optional.empty());
+        when(otpGenerator.generate()).thenReturn("998877");
+        when(passwordEncoder.encode("998877")).thenReturn("new-otp-hash");
+
+        var response = service.resendVerificationOtp(new EmailRequest("pending@example.com"));
+
+        assertEquals("A new verification OTP has been sent.", response.message());
+        verify(verificationTokenRepository).save(any());
+        verify(mailService).sendVerificationOtp("pending@example.com", "SoundWave user", "998877", 10L);
+    }
+
+    @Test
+    void loginRejectsListenerAttemptingStaffPortal() {
+        when(staffRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.empty());
+
+        groupone.soundwaveproject.authentication.exception.AccountUnavailableException ex =
+                assertThrows(groupone.soundwaveproject.authentication.exception.AccountUnavailableException.class,
+                        () -> service.login(new LoginRequest("listener@example.com", "Password@123", false, "STAFF")));
+
+        assertEquals("LISTENER_ACCOUNT_NOT_ALLOWED", ex.getCode());
+    }
+
+    @Test
+    void loginRejectsStaffAttemptingListenerPortal() {
+        groupone.soundwaveproject.authentication.entity.Staff staff =
+                mock(groupone.soundwaveproject.authentication.entity.Staff.class);
+        when(staffRepository.findByEmailIgnoreCase("staff@soundwave.com")).thenReturn(Optional.of(staff));
+
+        assertThrows(groupone.soundwaveproject.authentication.exception.InvalidCredentialsException.class,
+                () -> service.login(new LoginRequest("staff@soundwave.com", "Staff@123456", false, "LISTENER")));
+    }
+
+    @Test
+    void forgotPasswordCreatesResetTokenAndSendsOtpWithoutLeakingUnknownEmail() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(20L);
+        when(user.getEmail()).thenReturn("active@example.com");
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getDeletedAt()).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("active@example.com")).thenReturn(Optional.of(user));
+        when(resetTokenRepository.findFirstByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(20L))
+                .thenReturn(Optional.empty());
+        when(otpGenerator.generate()).thenReturn("445566");
+        when(passwordEncoder.encode("445566")).thenReturn("reset-hash");
+
+        var resKnown = service.forgotPassword(new EmailRequest("active@example.com"));
+        verify(resetTokenRepository).save(any());
+        verify(mailService).sendPasswordResetOtp("active@example.com", "445566", 10L);
+
+        when(userRepository.findByEmailIgnoreCase("unknown@example.com")).thenReturn(Optional.empty());
+        var resUnknown = service.forgotPassword(new EmailRequest("unknown@example.com"));
+
+        assertEquals(resKnown.message(), resUnknown.message());
+    }
 }

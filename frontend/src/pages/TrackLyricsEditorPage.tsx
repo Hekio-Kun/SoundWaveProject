@@ -198,7 +198,7 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
               <div className="lyric-studio-meta">
                 <h1 className="lyric-studio-title">{track.title}</h1>
                 <span className="lyric-studio-subtitle">
-                  {track.creator?.displayName || "Independent Artist"} · {track.genreName || "Music"}
+                  {track.creator?.displayName || "Independent Creator"} · {track.genreName || "Music"}
                 </span>
               </div>
             </div>

@@ -21,10 +21,10 @@ Nguyên tắc chung:
 Trước khi xây màn hình mới, xem các file sau:
 
 - `src/styles.css`: token, component style và responsive hiện tại.
-- `src/components/LandingPage.tsx`: chuẩn về bố cục public page.
-- `src/components/SoundWaveHeader.tsx`: header và điều hướng public.
-- `src/components/MusicPlayer.tsx`: player dùng chung toàn hệ thống.
-- `src/components/SoundWaveFooter.tsx`: footer public.
+- `src/pages/ExplorePage.tsx`: chuẩn về bố cục public page.
+- `src/components/layout/SoundWaveHeader.tsx`: header và điều hướng public.
+- `src/components/player/MusicPlayer.tsx`: player dùng chung toàn hệ thống.
+- `src/components/layout/SoundWaveFooter.tsx`: footer public.
 - `src/types.ts`: model dữ liệu frontend.
 - `src/data.ts`: dữ liệu demo và cách đặt tên.
 
@@ -213,11 +213,29 @@ Bấm tên bài mở Track Details. Bấm creator mở User/Creator Profile. Kh�
 - Khi Guest nghe hết bài, mở `GuestLoginPrompt`; chọn tiếp tục thì phát bài kế tiếp.
 - Lời nhắc Guest không được lưu vào bảng `notifications`.
 
+### 4.9 Thông báo nổi hệ thống (Toast / Popup Notifications)
+
+Quy tắc bắt buộc cho toàn bộ thông báo trạng thái tức thời (như Đăng xuất thành công, Tạo/Sửa Playlist thành công, Thao tác lưu...):
+
+- **Vị trí hiển thị**: Luôn nổi ở **phía trên - chính giữa màn hình (Top-Center)**: `top: 24px; left: 50%; transform: translate3d(-50%, 0, 0); z-index: 9999`.
+- **Kiểu dáng nhỏ gọn (Floating Pill)**: Thiết kế dạng viên thuốc bo tròn nhỏ gọn (`border-radius: 9999px; max-width: min(92vw, 420px)`), thanh thoát, không che khuất tầm nhìn.
+- **Không dùng backdrop overlay**: Tuyệt đối không phủ lớp nền tối/mờ (backdrop) làm gián đoạn hoặc khóa thao tác trang web đối với các thông báo trạng thái ngắn hạn.
+- **Không cần nút xác nhận lại**: Bỏ hoàn toàn nút xác nhận ("Got it", "OK"). Thông báo phải tự động trượt lên và biến mất sau **3 giây** (`durationMs: 3000ms`), hoặc cho phép người dùng click trực tiếp vào viên thuốc / icon `×` để đóng ngay.
+- **Nội dung súc tích**: Chỉ hiển thị trực tiếp một câu thông điệp ngắn gọn (ví dụ: *"You have logged out successfully."*), tuyệt đối không thêm tiêu đề dài dòng, đoạn giải thích hay hướng dẫn phụ rườm rà.
+- **Màu sắc & Nhận diện SoundWave**:
+  - Nền viên thuốc: Gradient trắng - cát ấm (`#FFFFFF` ➔ `#FDFAF4`).
+  - Viền: Cát ấm nhẹ tự nhiên (`1.5px solid rgba(212, 163, 115, 0.45)`).
+  - Icon badge: Hình tròn nhỏ 28px mang sắc **Xanh biển Ocean Blue** (`linear-gradient(135deg, #0EA5E9, #0284C7)`), chứa vector icon SVG màu trắng (`CheckIcon` hoặc `AlertIcon`) kèm hiệu ứng sóng nước nhẹ lan tỏa (wave ripple).
+  - Chữ: Đá sẫm dễ đọc (`#1E293B`, `font-weight: 700`, `font-size: 13.5px`).
+  - Thanh đếm ngược: Đường viền siêu mỏng 2.5px mang dải màu Ocean Blue dưới đáy viên thuốc đếm ngược thời gian hiển thị.
+- **Hiệu ứng động (Animation)**: Thả nhẹ từ trên xuống có độ nảy tự nhiên (`sw-top-toast-enter`, `cubic-bezier(0.16, 1, 0.3, 1)`), biến mất bằng cách trượt lên trên (`sw-top-toast-exit`).
+- **Thành phần dùng chung**: Tái sử dụng component `CenterNotificationPopup` (trong `src/components/modals/CenterNotificationPopup.tsx`).
+
 ## 5. Bố cục theo nhóm màn hình
 
 ### Public/User pages
 
-- Giữ nền sáng `#F7F8FA`.
+- Giữ nền sáng `#F6EFE3` (Warm Sand).
 - Dùng container tối đa 1280px.
 - Track Details, Album Details và User/Creator Profile là ba màn hình riêng.
 - Các màn hình khám phá sử dụng cùng Track Card, Album Card và Creator Card với landing page.
@@ -281,7 +299,7 @@ Không dùng spinner toàn màn hình cho danh sách dài nếu skeleton phù h�
 - Chỉ hiển thị track có `publicationStatus === "APPROVED"` trên public pages.
 - Frontend có thể ẩn action theo role nhưng backend vẫn phải kiểm tra quyền.
 - Không đưa logic role phức tạp trực tiếp vào component trình bày.
-- Hash route hiện tại là tạm thời; khi thêm React Router, route phải giữ cấu trúc ý nghĩa như `/tracks/:id`, `/albums/:id`, `/creators/:id`.
+- Ứng dụng sử dụng History API routing (`/path` qua `src/utils/navigation.ts` và `src/hooks/useRouter.ts`), tuyệt đối không dùng hash URL (`#/path`) mới; URL có cấu trúc ý nghĩa như `/tracks/:id`, `/albums/:id`, `/creators/:id`.
 
 ## 10. Cấu trúc code
 
@@ -360,7 +378,7 @@ Một màn hình chỉ được xem là hoàn thành khi:
 - Không tạo dark theme khi chưa có yêu cầu.
 - Không tạo actor hoặc giao diện “Đăng ký làm nghệ sĩ”.
 - Không gọi User đăng nhạc là Artist trong nghiệp vụ.
-- Không thêm lyric đồng bộ thời gian khi scope hiện tại chỉ dùng lyric dạng text.
+- Hỗ trợ hiển thị và biên tập lời bài hát đồng bộ thời gian chuẩn LRC (`[mm:ss.xx]`) và plain text qua `OfficialLyric`, `PersonalLyric` và `LyricSyncTab`; tuân thủ quy tắc One-Time Official Lyrics Rule đối với Creator.
 - Không thêm AI recommendation và gọi nội dung là cá nhân hóa khi chưa có backend hỗ trợ.
 - Không thêm animation nặng hoặc autoplay video/audio.
 - Không thay đổi player thành component riêng cho từng page.

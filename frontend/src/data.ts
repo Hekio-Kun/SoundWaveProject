@@ -48,7 +48,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 1,
     title: "Nơi Này Có Anh",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/v1791565403/soundwave/tracks/covers/project-cover-noi-nay-co-anh.webp",
+    coverUrl: covers.blue,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565402/soundwave/tracks/audio/project-track-noi-nay-co-anh.mp3",
     durationMs: 278269,
     playCount: 892300,
@@ -64,7 +64,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 2,
     title: "Baby",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-baby-mck.webp",
+    coverUrl: covers.gold,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565312/soundwave/tracks/audio/project-track-baby-mck.mp3",
     durationMs: 173740,
     playCount: 285420,
@@ -80,7 +80,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 3,
     title: "Exit Sign",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-exit-sign-hieuthuhai.webp",
+    coverUrl: covers.warm,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565333/soundwave/tracks/audio/project-track-exit-sign-hieuthuhai.mp3",
     durationMs: 201718,
     playCount: 421890,
@@ -96,7 +96,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 4,
     title: "Giữa Đại Lộ Đông Tây",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-giua-dai-lo-dong-tay.webp",
+    coverUrl: covers.rose,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565353/soundwave/tracks/audio/project-track-giua-dai-lo-dong-tay.mp3",
     durationMs: 226691,
     playCount: 356700,
@@ -112,7 +112,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 5,
     title: "Tìm Em",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-tim-em-hngle-bao-anh.webp",
+    coverUrl: covers.dawn,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565382/soundwave/tracks/audio/project-track-tim-em-hngle-bao-anh.mp3",
     durationMs: 272170,
     playCount: 198400,
@@ -128,7 +128,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 6,
     title: "Haru (晴る)",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-haru-yorushika.webp",
+    coverUrl: covers.green,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565495/soundwave/tracks/audio/project-track-haru-yorushika.mp3",
     durationMs: 276715,
     playCount: 312500,
@@ -144,7 +144,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 7,
     title: "A Cruel Angel's Thesis (残酷な天使のテーゼ)",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-a-cruel-angels-thesis.webp",
+    coverUrl: covers.night,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565521/soundwave/tracks/audio/project-track-a-cruel-angels-thesis.mp3",
     durationMs: 243905,
     playCount: 523100,
@@ -160,7 +160,7 @@ export const projectTracks: LandingTrack[] = [
   {
     id: 8,
     title: "Yoru ni Kakeru (夜に駆ける)",
-    coverUrl: "https://res.cloudinary.com/dq0jm9tlt/image/upload/soundwave/tracks/covers/project-cover-yoru-ni-kakeru.webp",
+    coverUrl: covers.city,
     audioUrl: "https://res.cloudinary.com/dq0jm9tlt/video/upload/v1791565419/soundwave/tracks/audio/project-track-yoru-ni-kakeru.mp3",
     durationMs: 275043,
     playCount: 689400,
