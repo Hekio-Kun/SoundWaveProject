@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog";
-import { SortDropdown, type SortOption } from "../components/common/SortDropdown";
 import {
   ClockIcon,
   CloseIcon,
@@ -20,47 +19,11 @@ type Props = {
   onNavigate: (route: string) => void;
 };
 
-const ALBUM_SORT_OPTIONS: SortOption<"newest" | "trending" | "title">[] = [
-  {
-    value: "newest",
-    label: "Newest",
-    hint: "Recently published albums",
-    icon: <ClockIcon width={15} height={15} />,
-    badgeBg: "#EFF6FF",
-    badgeColor: "#2563EB",
-  },
-  {
-    value: "trending",
-    label: "Most tracks",
-    hint: "Albums with most constituent tracks",
-    icon: <TrendingUpIcon width={15} height={15} />,
-    badgeBg: "#FFF1F2",
-    badgeColor: "#E11D48",
-  },
-  {
-    value: "title",
-    label: "Title (A-Z)",
-    hint: "Alphabetical from A to Z",
-    icon: (
-      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="m3 8 4-4 4 4" />
-        <path d="M7 4v16" />
-        <path d="M15 5h5l-5 5h5" />
-        <path d="M15 19v-3a2 2 0 0 1 4 0v3" />
-        <path d="M15 17h4" />
-      </svg>
-    ),
-    badgeBg: "#F0FDF4",
-    badgeColor: "#16A34A",
-  },
-];
-
 export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: Props) {
   const [albums, setAlbums] = useState<PublicAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"newest" | "trending" | "title">("newest");
   const [playingAlbumId, setPlayingAlbumId] = useState<number | null>(null);
 
   // Debounce search input
@@ -76,7 +39,6 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
     try {
       const response = await catalogApi.getAlbums({
         search: debouncedSearch || undefined,
-        sort: sortBy === "trending" ? "tracks" : sortBy,
         page: 0,
         size: 50,
       });
@@ -87,7 +49,7 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, sortBy]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     void loadAlbums();
@@ -127,7 +89,6 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
   const handleClearFilters = () => {
     setSearch("");
     setDebouncedSearch("");
-    setSortBy("newest");
   };
 
   return (
@@ -142,70 +103,7 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
         </div>
       </div>
 
-      {/* 2. Filter Toolbar (matching Browse Catalog toolbar style) */}
-      <div
-        className="sw-catalog-toolbar"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "14px",
-          marginBottom: "24px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", flex: 1 }}>
-          {/* Custom Modern Sort Dropdown */}
-          <SortDropdown
-            value={sortBy}
-            onChange={(newSort) => setSortBy(newSort)}
-            options={ALBUM_SORT_OPTIONS}
-            showLabel={true}
-          />
-
-          {/* Clear filters Button */}
-          {(debouncedSearch || sortBy !== "newest") && (
-            <button
-              type="button"
-              className="button button-ghost"
-              onClick={handleClearFilters}
-              style={{
-                height: "38px",
-                padding: "0 14px",
-                fontSize: "12px",
-                fontWeight: 700,
-                borderRadius: "10px",
-                border: "1px solid #FCA5A5",
-                background: "#FEF2F2",
-                color: "#DC2626",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-
-        {/* Result summary chip (matching Browse Catalog chip) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span
-            style={{
-              padding: "6px 14px",
-              borderRadius: "999px",
-              background: "var(--sw-sand-chip, #f5ead8)",
-              color: "var(--sw-sand-deep, #8c5828)",
-              border: "1px solid var(--sw-sand-border, #e6d5b8)",
-              fontSize: "12px",
-              fontWeight: 700,
-            }}
-          >
-            Result count: <b>{albums.length}</b> albums
-          </span>
-        </div>
-      </div>
-
-      {/* 3. Albums Content Area */}
+      {/* 2. Albums Content Area */}
       {loading ? (
         <div
           style={{

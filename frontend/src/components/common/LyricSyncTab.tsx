@@ -23,6 +23,7 @@ import {
   ZapIcon,
 } from "../../icons";
 import { CenterNotificationPopup, type CenterNotificationType } from "../modals/CenterNotificationPopup";
+import { DeleteConfirmationModal } from "../modals/DeleteConfirmationModal";
 
 export interface LyricLine {
   id: string;
@@ -142,6 +143,11 @@ export function LyricSyncTab({
   const [nudgeStep, setNudgeStep] = useState<0.1 | 0.2 | 0.5>(0.2);
   const [nudgeMode, setNudgeMode] = useState<"single" | "ripple">("single");
   const [history, setHistory] = useState<LyricLine[][]>([]);
+
+  // Custom Confirmation Modals state (replacing browser native dialogs)
+  const [repasteConfirmOpen, setRepasteConfirmOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [sortPromptOpen, setSortPromptOpen] = useState(false);
 
   // Auto-scroll refs
   const lineListRef = useRef<HTMLDivElement | null>(null);
@@ -586,25 +592,8 @@ export function LyricSyncTab({
   };
 
   // Save & Apply Actions
-  const handleApply = () => {
-    let currentLines = lines;
-    if (currentLines.length === 0 && rawText.trim()) {
-      currentLines = parseLyricsToLines(rawText);
-      setLines(currentLines);
-    }
-
-    if (currentLines.length === 0) {
-      setFeedbackNotice({ type: "error", message: "Please enter or paste your lyrics text before applying." });
-      return;
-    }
-
-    if (orderConflictsCount > 0) {
-      if (window.confirm(`There are ${orderConflictsCount} line(s) with timestamps out of chronological order. Would you like to auto-sort them by time before applying?`)) {
-        handleAutoSortLines();
-      }
-    }
-
-    const lrcContent = compileLinesToLrc(currentLines);
+  const executeApply = (targetLines: LyricLine[]) => {
+    const lrcContent = compileLinesToLrc(targetLines);
     if (!lrcContent.trim()) {
       setFeedbackNotice({ type: "error", message: "Please enter lyric lines before applying." });
       return;
@@ -620,8 +609,28 @@ export function LyricSyncTab({
     onApplyLyrics(lrcContent, virtualFile);
     setFeedbackNotice({
       type: "success",
-      message: `Successfully applied ${currentLines.length} lyric lines to the track!`,
+      message: `Successfully applied ${targetLines.length} lyric lines to the track!`,
     });
+  };
+
+  const handleApply = () => {
+    let currentLines = lines;
+    if (currentLines.length === 0 && rawText.trim()) {
+      currentLines = parseLyricsToLines(rawText);
+      setLines(currentLines);
+    }
+
+    if (currentLines.length === 0) {
+      setFeedbackNotice({ type: "error", message: "Please enter or paste your lyrics text before applying." });
+      return;
+    }
+
+    if (orderConflictsCount > 0) {
+      setSortPromptOpen(true);
+      return;
+    }
+
+    executeApply(currentLines);
   };
 
   const handleDownloadLrc = () => {
@@ -1144,11 +1153,7 @@ export function LyricSyncTab({
                   <button
                     type="button"
                     className="button button-secondary button-small"
-                    onClick={() => {
-                      if (window.confirm("Are you sure you want to re-paste lyrics from scratch?")) {
-                        setLines([]);
-                      }
-                    }}
+                    onClick={() => setRepasteConfirmOpen(true)}
                     style={{ fontSize: "11px" }}
                   >
                     <RefreshIcon width={12} height={12} /> Re-paste
@@ -1841,13 +1846,7 @@ export function LyricSyncTab({
             <button
               type="button"
               className="button button-secondary button-small"
-              onClick={() => {
-                if (window.confirm("Are you sure you want to clear all lyrics?")) {
-                  setLines([]);
-                  onClearLyrics();
-                  setFeedbackNotice({ type: "success", message: "All lyrics have been cleared." });
-                }
-              }}
+              onClick={() => setClearConfirmOpen(true)}
               style={{ fontSize: "12px", color: "#DC2626" }}
             >
               <TrashIcon width={13} height={13} /> Clear all
@@ -1866,6 +1865,59 @@ export function LyricSyncTab({
           <span>Apply to track</span>
         </button>
       </div>
+
+      {/* Custom Confirmation Modals (Replacing browser "google says" native dialogs) */}
+      <DeleteConfirmationModal
+        open={repasteConfirmOpen}
+        title="Re-paste Lyrics"
+        message="Are you sure you want to re-paste lyrics from scratch? Current timestamps and synced lines will be cleared."
+        confirmLabel="Re-paste"
+        variant="danger"
+        onConfirm={() => {
+          setLines([]);
+          setRepasteConfirmOpen(false);
+        }}
+        onCancel={() => setRepasteConfirmOpen(false)}
+      />
+
+      <DeleteConfirmationModal
+        open={clearConfirmOpen}
+        title="Clear All Lyrics"
+        message="Are you sure you want to clear all lyrics? All timing stamps and synced lines will be removed. This action cannot be undone."
+        confirmLabel="Clear all"
+        variant="danger"
+        onConfirm={() => {
+          setLines([]);
+          onClearLyrics?.();
+          setClearConfirmOpen(false);
+          setFeedbackNotice({ type: "success", message: "All lyrics have been cleared." });
+        }}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
+
+      <DeleteConfirmationModal
+        open={sortPromptOpen}
+        title="Auto-Sort Timestamps"
+        message={`There are ${orderConflictsCount} line(s) with timestamps out of chronological order. Would you like to auto-sort them by time before applying?`}
+        confirmLabel="Auto-sort & Apply"
+        variant="primary"
+        icon={<ClockIcon width={22} height={22} />}
+        onConfirm={() => {
+          handleAutoSortLines();
+          setSortPromptOpen(false);
+          const sorted = [...lines].sort((a, b) => {
+            if (a.timeSec === null && b.timeSec === null) return 0;
+            if (a.timeSec === null) return 1;
+            if (b.timeSec === null) return -1;
+            return a.timeSec - b.timeSec;
+          });
+          executeApply(sorted);
+        }}
+        onCancel={() => {
+          setSortPromptOpen(false);
+          executeApply(lines);
+        }}
+      />
     </div>
   );
 }

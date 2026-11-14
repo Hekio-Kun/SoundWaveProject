@@ -87,7 +87,7 @@ export function ResetPasswordPage({ email, onNavigate }: { email: string; onNavi
   return (
     <AuthExperience mode="recovery" eyebrow="ACCOUNT SECURITY" title="Create a new password" description={`Enter the OTP sent to ${email || "your email"} and choose a secure password.`} onNavigate={onNavigate}>
       {submitted ? (
-        <div className="auth-v2-success"><span><CheckIcon width={28} height={28} /></span><h2>Password updated</h2><p>You can now log in with your new password.</p><button className="button button-primary button-large" onClick={() => onNavigate("/login")}>Login</button></div>
+        <div className="auth-v2-success"><span><CheckIcon width={28} height={28} /></span><h2>Password updated</h2><p>You can now login with your new password.</p><button className="button button-primary button-large" onClick={() => onNavigate("/login")}>Login</button></div>
       ) : (
         <form className="auth-v2-form" onSubmit={handleSubmit} noValidate>
           {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Review the New Password and Confirm Password fields." /> : null}

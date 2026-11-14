@@ -78,13 +78,18 @@ export function StudioPage({
   const artistName = currentUser?.displayName || currentUser?.username || "You";
 
   // Server state
-  const [trackList, setTrackList] = useState<StudioTrack[]>(fallbackTracks);
-  const [stats, setStats] = useState({
-    total: fallbackTracks.length,
-    draft: fallbackTracks.filter((t) => t.status === "DRAFT").length,
-    pending: fallbackTracks.filter((t) => t.status === "PENDING").length,
-    approved: fallbackTracks.filter((t) => t.status === "APPROVED").length,
-    rejected: fallbackTracks.filter((t) => t.status === "REJECTED").length,
+  const [trackList, setTrackList] = useState<StudioTrack[]>(() =>
+    (fallbackTracks || []).filter((t: StudioTrack) => !t.audioUrl?.includes("soundwave-demo.wav") && t.id < 100)
+  );
+  const [stats, setStats] = useState(() => {
+    const list = (fallbackTracks || []).filter((t: StudioTrack) => !t.audioUrl?.includes("soundwave-demo.wav") && t.id < 100);
+    return {
+      total: list.length,
+      draft: list.filter((t: StudioTrack) => t.status === "DRAFT").length,
+      pending: list.filter((t: StudioTrack) => t.status === "PENDING").length,
+      approved: list.filter((t: StudioTrack) => t.status === "APPROVED").length,
+      rejected: list.filter((t: StudioTrack) => t.status === "REJECTED").length,
+    };
   });
   const [genres, setGenres] = useState<GenreOption[]>([]);
   const [albums, setAlbums] = useState<AlbumOption[]>([]);

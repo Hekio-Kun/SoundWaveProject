@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { covers, featuredCreators, tracks } from "../data";
+import { covers, featuredCreators } from "../data";
 import { ClockIcon, HeadphonesIcon, MailIcon, PauseIcon, PlayIcon, UserIcon } from "../icons";
 import type { LandingTrack } from "../types";
 import { catalogApi } from "../api/catalog";
@@ -16,8 +16,8 @@ type Props = {
 const formatDate = (value: string | null | undefined) =>
   value
     ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
-        new Date(`${value}T00:00:00`)
-      )
+      new Date(`${value}T00:00:00`)
+    )
     : "Not provided";
 
 const formatPlays = (value: number) =>
@@ -48,7 +48,7 @@ export function CreatorProfilePage({ creatorId, currentTrack, playing, onPlayTra
         if (stored) {
           cachedCreator = JSON.parse(stored);
         }
-      } catch {}
+      } catch { }
 
       // 2. Also check currentTrack
       if (!cachedCreator && currentTrack?.creator?.userId === creatorId) {
@@ -74,7 +74,7 @@ export function CreatorProfilePage({ creatorId, currentTrack, playing, onPlayTra
           }
         }
       } catch {
-        tracksList = tracks.filter((t) => t.creator.userId === creatorId && t.publicationStatus === "APPROVED");
+        tracksList = [];
       }
 
       // 5. Try fetching from profileApi

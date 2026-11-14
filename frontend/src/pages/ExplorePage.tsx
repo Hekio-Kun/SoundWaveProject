@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { catalogApi } from "../api/catalog";
 import { TrackCard } from "../components/common/MusicCards";
-import { tracks as fallbackTracks } from "../data";
 import {
   ArrowIcon,
   ArrowUpRightIcon,
@@ -9,7 +8,6 @@ import {
   PauseIcon,
   PlayIcon,
   RefreshIcon,
-  SlidersIcon,
   SparklesIcon,
   WaveformIcon,
 } from "../icons";
@@ -26,14 +24,16 @@ type Props = {
   onAddToPlaylist?: (trackId: number) => void;
 };
 
-const MOOD_CHIPS = [
+const DEFAULT_GENRE_CHIPS = [
   { id: "all", label: "All", genre: "" },
-  { id: "vpop", label: "V-Pop", genre: "pop" },
-  { id: "acoustic", label: "Acoustic Chill", genre: "acoustic" },
-  { id: "indie", label: "Indie Vietnam", genre: "indie" },
-  { id: "lofi", label: "Lofi Sunset", genre: "lofi" },
-  { id: "workout", label: "Workout", genre: "edm" },
-  { id: "focus", label: "Deep Focus", genre: "classical" },
+  { id: "pop", label: "Pop", genre: "pop" },
+  { id: "ballad", label: "Ballad", genre: "ballad" },
+  { id: "rap-hip-hop", label: "Rap / Hip-hop", genre: "rap-hip-hop" },
+  { id: "rnb", label: "R&B", genre: "rnb" },
+  { id: "acoustic", label: "Acoustic", genre: "acoustic" },
+  { id: "edm", label: "EDM", genre: "edm" },
+  { id: "indie", label: "Indie", genre: "indie" },
+  { id: "lofi", label: "Lofi", genre: "lofi" },
 ];
 
 const FALLBACK_BEACH_COVER =
@@ -49,12 +49,37 @@ export function ExplorePage({
   onToggleFavorite,
   onAddToPlaylist,
 }: Props) {
-  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>(() => fallbackTracks.slice(0, 10));
+  const [recommendedTracks, setRecommendedTracks] = useState<LandingTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState("");
   const [selectedChip, setSelectedChip] = useState("all");
+  const [genreChips, setGenreChips] = useState(DEFAULT_GENRE_CHIPS);
 
-  const heroTrack = recommendedTracks[0] ?? fallbackTracks[0] ?? null;
+  useEffect(() => {
+    let isMounted = true;
+    void catalogApi
+      .getGenres()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setGenreChips([
+            { id: "all", label: "All", genre: "" },
+            ...data.map((g) => ({
+              id: g.slug || String(g.id),
+              label: g.name,
+              genre: g.slug,
+            })),
+          ]);
+        }
+      })
+      .catch(() => {
+        // Fallback to DEFAULT_GENRE_CHIPS
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const heroTrack = recommendedTracks[0] ?? null;
   const heroPlaying = Boolean(heroTrack && currentTrack?.id === heroTrack.id && playing);
 
   // [FEATURE]: UC-06 View Recommended Song - Tải danh sách bài hát gợi ý theo sở thích và thể loại
@@ -66,13 +91,23 @@ export function ExplorePage({
       if (recommendedRes && recommendedRes.length > 0) {
         setRecommendedTracks(recommendedRes);
       } else {
-        setRecommendedTracks(fallbackTracks.slice(0, 10));
+        const catalogRes = await catalogApi.getTracks({ size: 10, sort: "trending" });
+        if (catalogRes?.content && catalogRes.content.length > 0) {
+          setRecommendedTracks(catalogRes.content);
+        } else {
+          setRecommendedTracks([]);
+        }
       }
     } catch (err: unknown) {
-      console.warn("Using curated fallback tracks for explore feed:", err);
-      if (fallbackTracks && fallbackTracks.length > 0) {
-        setRecommendedTracks(fallbackTracks.slice(0, 10));
-      } else {
+      console.warn("Curated recommendations unavailable, fetching published tracks:", err);
+      try {
+        const catalogRes = await catalogApi.getTracks({ size: 10, sort: "trending" });
+        if (catalogRes?.content && catalogRes.content.length > 0) {
+          setRecommendedTracks(catalogRes.content);
+        } else {
+          setRecommendedTracks([]);
+        }
+      } catch {
         setTracksError("Unable to load recommendations at this time");
       }
     } finally {
@@ -91,19 +126,18 @@ export function ExplorePage({
     try {
       if (chipId === "all" || !genre) {
         const res = await catalogApi.getCuratedRecommendations(10);
-        setRecommendedTracks(res && res.length > 0 ? res : fallbackTracks.slice(0, 10));
+        if (res && res.length > 0) {
+          setRecommendedTracks(res);
+        } else {
+          const catalogRes = await catalogApi.getTracks({ size: 10, sort: "trending" });
+          setRecommendedTracks(catalogRes?.content || []);
+        }
       } else {
         const res = await catalogApi.getTracks({ genre, size: 10 });
-        if (res?.content && res.content.length > 0) {
-          setRecommendedTracks(res.content);
-        } else {
-          const filtered = fallbackTracks.filter((t) => t.genreSlug?.toLowerCase() === genre.toLowerCase());
-          setRecommendedTracks(filtered.length > 0 ? filtered : fallbackTracks.slice(0, 10));
-        }
+        setRecommendedTracks(res?.content || []);
       }
     } catch {
-      const filtered = genre ? fallbackTracks.filter((t) => t.genreSlug?.toLowerCase() === genre.toLowerCase()) : fallbackTracks;
-      setRecommendedTracks(filtered.length > 0 ? filtered : fallbackTracks.slice(0, 10));
+      setRecommendedTracks([]);
     } finally {
       setTracksLoading(false);
     }
@@ -230,10 +264,10 @@ export function ExplorePage({
         </div>
       </section>
 
-      {/* 3. Mood Chips Bar */}
+      {/* 3. Genre Chips Bar */}
       <div className="explore-chips-bar">
         <div className="explore-chips-list">
-          {MOOD_CHIPS.map((chip) => {
+          {genreChips.map((chip) => {
             const isActive = selectedChip === chip.id;
             return (
               <button
@@ -247,16 +281,6 @@ export function ExplorePage({
             );
           })}
         </div>
-
-        <button
-          type="button"
-          className="explore-chips-filter-btn"
-          title="Browse All Genres"
-          aria-label="Browse All Genres"
-          onClick={() => onNavigate("/genres")}
-        >
-          <SlidersIcon width={16} height={16} />
-        </button>
       </div>
 
       {/* 4. Section: Recommended for You */}

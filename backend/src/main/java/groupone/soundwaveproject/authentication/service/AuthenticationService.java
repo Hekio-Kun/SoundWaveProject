@@ -147,7 +147,7 @@ public class AuthenticationService {
         user.verifyEmail(now);
         authRateLimiterService.resetOtpAttempts(user.getEmail());
         log.info("Email verified successfully for user ID: {} ({})", user.getId(), user.getEmail());
-        return new MessageResponse("Email verified successfully. You can now log in.");
+        return new MessageResponse("Email verified successfully. You can now login.");
     }
 
     /**
@@ -322,7 +322,7 @@ public class AuthenticationService {
         authRateLimiterService.resetLoginAttempts(user.getEmail());
         authRateLimiterService.resetOtpAttempts(user.getEmail());
         log.info("Account successfully unlocked via OTP for user ID: {} ({})", user.getId(), user.getEmail());
-        return new MessageResponse("Your account has been successfully unlocked. You can now log in.");
+        return new MessageResponse("Your account has been successfully unlocked. You can now login.");
     }
 
     /**
@@ -374,7 +374,7 @@ public class AuthenticationService {
         authRateLimiterService.resetLoginAttempts(user.getEmail());
         authRateLimiterService.resetOtpAttempts(user.getEmail());
         log.info("Password reset successfully for user ID: {} ({}). All active sessions revoked.", user.getId(), user.getEmail());
-        return new MessageResponse("Password updated successfully. Please log in again.");
+        return new MessageResponse("Password updated successfully. Please login again.");
     }
 
     /**

@@ -76,7 +76,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
     try {
       const session = await authApi.login(email.trim(), password, rememberMe, "LISTENER");
 
-      // Strict role enforcement: Staff and Admin accounts must not log in through the Listener portal
+      // Strict role enforcement: Staff and Admin accounts must not login through the Listener portal
       if (session.user.role === "ADMIN" || session.user.role === "STAFF" || session.user.role === "MODERATOR") {
         try {
           await authApi.logout();
@@ -170,7 +170,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
   const isWarningRemainingAttempts = apiError.includes("remaining before");
 
   return (
-    <AuthExperience mode="login" eyebrow="WELCOME BACK" title="Continue with SoundWave" description="Log in to open your personal library and continue listening where you left off." onNavigate={onNavigate}>
+    <AuthExperience mode="login" eyebrow="WELCOME BACK" title="Continue with SoundWave" description="Login to open your personal library and continue listening where you left off." onNavigate={onNavigate}>
       <form onSubmit={handleSubmit} className="auth-v2-form" noValidate>
         {Object.values(errors).some(Boolean) ? <AuthErrorNotice message="Please review the fields marked below." /> : null}
         {apiError ? (
@@ -182,7 +182,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
                 ? "Account temporarily locked"
                 : isWarningRemainingAttempts
                 ? "Incorrect password warning"
-                : "Unable to log in"
+                : "Unable to login"
             }
             message={apiError}
             action={
@@ -231,7 +231,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }: AuthProps) {
                     document.getElementById("login-password")?.focus();
                   }}
                 >
-                  Log in now
+                  Login now
                 </button>
                 <span>·</span>
                 <button
