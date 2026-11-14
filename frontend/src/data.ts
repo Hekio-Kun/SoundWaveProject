@@ -2,30 +2,26 @@ import type { FeaturedAlbum, FeaturedCreator, Genre, LandingTrack } from "./type
 
 const svgData = (svg: string) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 
-const cover = (from: string, to: string, accent: string, label: string, variant = 1) =>
+const cover = (from: string, to: string, accent: string, variant = 1) =>
   svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
     <rect width="600" height="600" rx="32" fill="url(#g)"/>
     ${variant % 3 === 0
-      ? `<circle cx="300" cy="278" r="178" fill="none" stroke="${accent}" stroke-width="52" opacity=".72"/><circle cx="300" cy="278" r="58" fill="${accent}" opacity=".9"/>`
+      ? `<circle cx="300" cy="300" r="178" fill="none" stroke="${accent}" stroke-width="52" opacity=".72"/><circle cx="300" cy="300" r="58" fill="${accent}" opacity=".9"/>`
       : variant % 3 === 1
         ? `<path d="M-30 380C100 210 170 530 315 315S520 120 660 268" fill="none" stroke="${accent}" stroke-width="80" stroke-linecap="round" opacity=".8"/>`
         : `<g fill="${accent}" opacity=".82"><rect x="105" y="185" width="68" height="230" rx="34"/><rect x="205" y="105" width="68" height="390" rx="34"/><rect x="305" y="150" width="68" height="300" rx="34"/><rect x="405" y="225" width="68" height="150" rx="34"/></g>`}
-    <text x="42" y="535" fill="white" font-family="Arial,sans-serif" font-weight="700" font-size="38">${label}</text>
   </svg>`);
 
-const avatar = (background: string, foreground: string, initials: string) =>
-  svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" rx="100" fill="${background}"/><circle cx="100" cy="75" r="38" fill="${foreground}" opacity=".92"/><path d="M36 190c4-46 27-72 64-72s60 26 64 72" fill="${foreground}" opacity=".92"/><text x="100" y="108" text-anchor="middle" fill="white" font-family="Arial" font-weight="800" font-size="24">${initials}</text></svg>`);
-
 export const covers = {
-  dawn: cover("#0e7490", "#d4a373", "#67e8f9", "SỚM MAI", 1),
-  city: cover("#111827", "#be185d", "#f9a8d4", "THÀNH PHỐ", 2),
-  blue: cover("#0369a1", "#312e81", "#bae6fd", "BIỂN XANH", 3),
-  warm: cover("#c2410c", "#7c2d12", "#fed7aa", "MÙA HẠ", 1),
-  night: cover("#1e1b4b", "#4c1d95", "#c4b5fd", "ĐÊM TRÔI", 2),
-  green: cover("#065f46", "#134e4a", "#99f6e4", "BÌNH YÊN", 3),
-  rose: cover("#9f1239", "#581c87", "#fda4af", "CHẠM", 1),
-  gold: cover("#92400e", "#b45309", "#fde68a", "GỌI NẮNG", 2),
+  dawn: cover("#0e7490", "#d4a373", "#67e8f9", 1),
+  city: cover("#111827", "#be185d", "#f9a8d4", 2),
+  blue: cover("#0369a1", "#312e81", "#bae6fd", 3),
+  warm: cover("#c2410c", "#7c2d12", "#fed7aa", 1),
+  night: cover("#1e1b4b", "#4c1d95", "#c4b5fd", 2),
+  green: cover("#065f46", "#134e4a", "#99f6e4", 3),
+  rose: cover("#9f1239", "#581c87", "#fda4af", 1),
+  gold: cover("#92400e", "#b45309", "#fde68a", 2),
 };
 
 const creators: Record<string, { userId: number; displayName: string; avatarUrl: string }> = {};
@@ -54,12 +50,3 @@ export const heroCovers = [covers.dawn, covers.city, covers.blue];
 export const demoPlaylists: import("./types").Playlist[] = [];
 
 export const initialStudioTracks: import("./types").StudioTrack[] = [];
-
-export const demoUser: import("./types").CurrentUser = {
-  id: 1,
-  email: "lean@soundwave.vn",
-  displayName: "Lê An",
-  avatarUrl: avatar("#cffafe", "#0891b2", "LA"),
-  role: "LISTENER",
-  bio: "Creating mellow lofi and acoustic pop melodies.",
-};
