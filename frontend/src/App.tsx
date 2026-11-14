@@ -41,7 +41,6 @@ function AppContent() {
     lyricsOpen,
     setLyricsOpen,
     toggleLyrics,
-    handleRecordPlay,
     removeFromQueue,
     clearQueue,
     reorderQueue,
@@ -114,7 +113,6 @@ function AppContent() {
           isQueueOpen={queueOpen}
           onToggleLyrics={toggleLyrics}
           isLyricsOpen={lyricsOpen}
-          onRecordPlay={handleRecordPlay}
           onReorderQueue={reorderQueue}
           onNavigate={navigate}
         />

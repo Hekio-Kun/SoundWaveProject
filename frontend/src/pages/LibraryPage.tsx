@@ -19,23 +19,9 @@ import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmation
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 import { formatDate, formatDateTime } from "../utils/dateUtils";
 import { formatDuration } from "../utils/timeUtils";
+import { historyItemToTrack } from "../utils/trackMappers";
 
-export function historyItemToTrack(item: ListeningHistoryItem): LandingTrack {
-  return {
-    id: item.trackId,
-    title: item.title,
-    slug: item.slug,
-    coverUrl: item.coverUrl,
-    audioUrl: item.audioUrl || "",
-    durationMs: item.durationMs,
-    playCount: 0,
-    creator: {
-      userId: 0,
-      displayName: item.artistName || "Unknown Creator",
-      avatarUrl: null,
-    },
-  };
-}
+export { historyItemToTrack };
 
 type Props = {
   currentTrack: LandingTrack | null;

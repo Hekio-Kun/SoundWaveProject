@@ -1,15 +1,15 @@
 /**
- * Utility functions for formatting time and durations across SoundWave.
+ * Định dạng thời lượng đồng nhất toàn bộ dự án SoundWave.
  */
 
 /**
- * Formats duration in milliseconds into mm:ss format.
+ * Định dạng thời lượng từ mili-giây sang mm:ss (dùng cho Track duration, Album duration).
  *
- * @param ms Duration in milliseconds
- * @returns Formatted duration string, e.g. "3:45"
+ * @param ms - Thời lượng tính bằng mili-giây
+ * @returns Chuỗi định dạng "mm:ss", hoặc "0:00" nếu không hợp lệ
  */
 export function formatDuration(ms?: number | null): string {
-  if (!ms || ms <= 0) return "0:00";
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return "0:00";
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -17,15 +17,19 @@ export function formatDuration(ms?: number | null): string {
 }
 
 /**
- * Formats duration in seconds into mm:ss format.
+ * Định dạng thời lượng từ giây sang mm:ss (dùng cho Audio player currentTime, duration).
  *
- * @param seconds Duration in seconds
- * @returns Formatted duration string, e.g. "3:45"
+ * @param seconds - Thời lượng tính bằng giây
+ * @returns Chuỗi định dạng "mm:ss", hoặc "0:00" nếu không hợp lệ
  */
 export function formatDurationSeconds(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return "0:00";
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) return "0:00";
   const minutes = Math.floor(seconds / 60);
-  const sec = Math.floor(seconds % 60);
-  return `${minutes}:${sec.toString().padStart(2, "0")}`;
+  const remaining = Math.floor(seconds % 60);
+  return `${minutes}:${remaining.toString().padStart(2, "0")}`;
 }
 
+/**
+ * Bí danh cho formatDurationSeconds.
+ */
+export const formatTime = formatDurationSeconds;
