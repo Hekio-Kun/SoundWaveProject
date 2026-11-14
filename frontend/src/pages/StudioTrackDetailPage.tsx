@@ -41,29 +41,9 @@ import {
   validateCoverFile,
   validateLyricsFile,
 } from "../utils/trackUpload";
-
-function formatDuration(ms?: number | null): string {
-  if (!ms || ms <= 0) return "0:00";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
+import { formatDuration } from "../utils/timeUtils";
+import { formatDate } from "../utils/dateUtils";
+import { consumeFlashToast, setFlashToast } from "../utils/toastUtils";
 
 function formatSeconds(totalSeconds: number): string {
   if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
@@ -220,17 +200,9 @@ export function StudioTrackDetailPage({
   }, [trackId]);
 
   useEffect(() => {
-    try {
-      const flash = sessionStorage.getItem("soundwave_flash_toast");
-      if (flash) {
-        sessionStorage.removeItem("soundwave_flash_toast");
-        const parsed = JSON.parse(flash);
-        if (parsed?.message) {
-          setActionSuccess(parsed.message);
-        }
-      }
-    } catch {
-      // ignore
+    const flash = consumeFlashToast();
+    if (flash?.message) {
+      setActionSuccess(flash.message);
     }
   }, []);
 
@@ -384,14 +356,11 @@ export function StudioTrackDetailPage({
       setDeleteConfirmOpen(false);
       // [FEATURE]: UC-19: Delete An Owned Track (POST-5)
       // Lưu flash message vào sessionStorage để hiển thị khi điều hướng về danh sách bài hát
-      sessionStorage.setItem(
-        "soundwave_flash_toast",
-        JSON.stringify({
-          message: isPublished
-            ? "Track taken down and removed from your active library successfully."
-            : "Track deleted successfully.",
-          type: "success",
-        })
+      setFlashToast(
+        isPublished
+          ? "Track taken down and removed from your active library successfully."
+          : "Track deleted successfully.",
+        "success"
       );
       onNavigate("/track");
     } catch (err: unknown) {

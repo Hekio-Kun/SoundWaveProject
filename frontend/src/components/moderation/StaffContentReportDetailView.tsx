@@ -21,6 +21,8 @@ import type { StaffContentReportResponse } from "../../types";
 import { TakeDownConfirmationModal } from "../modals/TakeDownConfirmationModal";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
+import { formatDurationSeconds as formatSeconds } from "../../utils/timeUtils";
+import { formatDate } from "../../utils/dateUtils";
 
 type Props = {
   reportId: number;
@@ -29,29 +31,6 @@ type Props = {
   onRefreshQueue: () => void;
   onNotify?: (message: string, type?: "success" | "info" | "warning" | "error") => void;
 };
-
-function formatSeconds(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
 
 export function StaffContentReportDetailView({
   reportId,

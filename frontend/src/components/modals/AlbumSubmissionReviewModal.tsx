@@ -12,6 +12,7 @@ import {
   UploadIcon,
 } from "../../icons";
 import type { StudioAlbum, StudioTrack } from "../../types";
+import { formatDuration } from "../../utils/timeUtils";
 
 type Props = {
   open: boolean;
@@ -21,14 +22,6 @@ type Props = {
 };
 
 const MAX_ALBUM_TRACKS = 7;
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: Props) {
   useModalScrollLock(open);

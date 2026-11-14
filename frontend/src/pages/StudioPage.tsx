@@ -10,8 +10,6 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { albumApi } from "../api/album";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
-import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/common/MediaUploadField";
@@ -38,6 +36,8 @@ import {
 import type { CurrentUser, LandingTrack, StudioAlbum, StudioTrack } from "../types";
 import { usePlayer } from "../context/PlayerContext";
 import { covers } from "../data";
+import { formatDuration } from "../utils/timeUtils";
+import { consumeFlashToast } from "../utils/toastUtils";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -45,14 +45,6 @@ import {
   validateCoverFile,
   validateLyricsFile,
 } from "../utils/trackUpload";
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 function studioTrackToLanding(track: StudioTrack, currentUser?: CurrentUser | null): LandingTrack {
   return {
@@ -157,9 +149,6 @@ export function StudioPage({
   >("ALL");
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
   const [loadingAlbums, setLoadingAlbums] = useState(false);
-  const [albumModalOpen, setAlbumModalOpen] = useState(false);
-  const [editingAlbum, setEditingAlbum] = useState<StudioAlbum | null>(null);
-  const [detailAlbum, setDetailAlbum] = useState<StudioAlbum | null>(null);
   const [deleteConfirmAlbum, setDeleteConfirmAlbum] = useState<StudioAlbum | null>(null);
   const [deletingAlbum, setDeletingAlbum] = useState(false);
   const [submittingAlbum, setSubmittingAlbum] = useState<StudioAlbum | null>(null);
@@ -284,17 +273,9 @@ export function StudioPage({
   }, [filterStatus]);
 
   useEffect(() => {
-    try {
-      const flash = sessionStorage.getItem("soundwave_flash_toast");
-      if (flash) {
-        sessionStorage.removeItem("soundwave_flash_toast");
-        const parsed = JSON.parse(flash);
-        if (parsed?.message) {
-          setActionSuccess(parsed.message);
-        }
-      }
-    } catch {
-      // ignore
+    const flash = consumeFlashToast();
+    if (flash?.message) {
+      setActionSuccess(flash.message);
     }
   }, []);
 
@@ -1207,29 +1188,6 @@ export function StudioPage({
         </div>,
         document.body
       )}
-
-      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.5 Update An Album) */}
-      <AlbumFormModal
-        open={albumModalOpen}
-        onClose={() => setAlbumModalOpen(false)}
-        album={editingAlbum}
-        onSaved={async () => {
-          setAlbumModalOpen(false);
-          await Promise.all([loadAlbums(), loadStudioData()]);
-          setActionSuccess(editingAlbum ? "Album updated successfully." : "Album created successfully.");
-        }}
-      />
-
-      {/* Album Detail Modal (UC-21.2) */}
-      <AlbumDetailModal
-        open={Boolean(detailAlbum)}
-        onClose={() => setDetailAlbum(null)}
-        album={detailAlbum}
-        onDelete={(alb) => {
-          setDetailAlbum(null);
-          setDeleteConfirmAlbum(alb);
-        }}
-      />
 
       {/* Album Delete Confirmation Modal (UC-21.6 Delete An Album) */}
       <DeleteConfirmationModal

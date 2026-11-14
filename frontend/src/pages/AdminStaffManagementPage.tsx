@@ -27,19 +27,7 @@ import type {
   StaffModerationActivityResponse,
   StaffSummaryItem,
 } from "../types";
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "Never";
-  try {
-    return new Date(value).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return value;
-  }
-}
+import { formatDate } from "../utils/dateUtils";
 
 function getInitials(name: string): string {
   if (!name) return "ST";

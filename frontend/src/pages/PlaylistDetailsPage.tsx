@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { formatDuration } from "../utils/timeUtils";
 import { covers } from "../data";
 import { playlistApi } from "../api/playlists";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
@@ -42,12 +43,6 @@ type Props = {
   allTracks?: LandingTrack[];
   audio?: HTMLAudioElement;
   onPlayingChange?: (playing: boolean) => void;
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 export function PlaylistDetailsPage({

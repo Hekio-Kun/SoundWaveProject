@@ -11,6 +11,7 @@ import {
   TrophyIcon,
 } from "../icons";
 import type { Genre, LandingTrack } from "../types";
+import { formatDuration } from "../utils/timeUtils";
 
 type Props = {
   currentTrack: LandingTrack | null;
@@ -18,13 +19,6 @@ type Props = {
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string, contextKey?: string) => void;
   onNavigate: (route: string) => void;
   initialGenre?: string;
-};
-
-const formatDuration = (ms: number): string => {
-  if (!ms || ms <= 0) return "0:00";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const formatPlayCount = (count?: number): string => {
