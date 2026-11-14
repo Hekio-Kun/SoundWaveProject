@@ -229,6 +229,11 @@ public class StaffContentReportService {
                     );
                 }
             }
+
+            // Gỡ bỏ hoàn toàn liên kết của bài hát khỏi album theo đúng quy chuẩn nghiệp vụ
+            track.setAlbum(null);
+            track.setTrackNumber(null);
+            trackRepository.save(track);
         }
 
         // Update submission status if associated submission exists

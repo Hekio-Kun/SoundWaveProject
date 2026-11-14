@@ -154,7 +154,10 @@ public class StudioAlbumService {
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
-        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+                .stream()
+                .filter(t -> t.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
+                .toList();
         return studioAlbumMapper.toStudioAlbumResponse(album, tracks.size(), tracks);
     }
 
@@ -603,7 +606,10 @@ public class StudioAlbumService {
         }
 
         // Sequence 1.2.2.10 - 1.2.2.13: findByAlbumId
-        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+                .stream()
+                .filter(t -> t.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
+                .toList();
 
         // RDS EX01 & BR-18: Album contains zero associated tracks
         if (tracks.isEmpty()) {
@@ -662,6 +668,7 @@ public class StudioAlbumService {
         List<Track> allUserTracks = trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(user.getId());
 
         return allUserTracks.stream()
+                .filter(track -> track.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
                 .filter(track -> track.getAlbum() == null || (currentAlbumId != null && track.getAlbum().getId().equals(currentAlbumId)))
                 .map(track -> studioTrackMapper.toStudioTrackResponse(track, track.getGenre(), track.getAlbum(), null))
                 .toList();
