@@ -1133,11 +1133,18 @@ export function StudioPage({
         isOpen={Boolean(rejectionModalTrack)}
         details={rejectionModalTrack}
         onClose={() => setRejectionModalTrack(null)}
+        onDeleteTrack={(trackId) => {
+          const targetTrack = trackList.find((t) => t.id === trackId);
+          setRejectionModalTrack(null);
+          if (targetTrack) {
+            setDeleteConfirmTrack(targetTrack);
+          }
+        }}
         onEditTrack={(trackId) => {
           const targetTrack = trackList.find((t) => t.id === trackId);
           setRejectionModalTrack(null);
           if (targetTrack) {
-            onNavigate(`/studio/tracks/${targetTrack.id}/edit`);
+            setDeleteConfirmTrack(targetTrack);
           }
         }}
       />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AlertIcon, CheckIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../icons";
+import { AlertIcon, CheckIcon, EyeIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../icons";
 import { staffReportsApi } from "../api/staffReports";
 import { ApiError } from "../api/client";
 import type { StaffContentReportResponse } from "../types";
@@ -138,12 +138,14 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
       return (
         <span
           style={{
-            padding: "3px 8px",
+            padding: "4px 10px",
             borderRadius: "6px",
             fontSize: "0.78rem",
-            fontWeight: 600,
+            fontWeight: 700,
             backgroundColor: "#FEF3C7",
             color: "#92400E",
+            whiteSpace: "nowrap",
+            display: "inline-block",
           }}
         >
           Pending
@@ -154,12 +156,14 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
       return (
         <span
           style={{
-            padding: "3px 8px",
+            padding: "4px 10px",
             borderRadius: "6px",
             fontSize: "0.78rem",
-            fontWeight: 600,
+            fontWeight: 700,
             backgroundColor: "#DEF7EC",
             color: "#03543F",
+            whiteSpace: "nowrap",
+            display: "inline-block",
           }}
         >
           Resolved
@@ -170,19 +174,21 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
       return (
         <span
           style={{
-            padding: "3px 8px",
+            padding: "4px 10px",
             borderRadius: "6px",
             fontSize: "0.78rem",
-            fontWeight: 600,
+            fontWeight: 700,
             backgroundColor: "#F3F4F6",
             color: "#4B5563",
+            whiteSpace: "nowrap",
+            display: "inline-block",
           }}
         >
           Dismissed
         </span>
       );
     }
-    return <span>{status}</span>;
+    return <span style={{ whiteSpace: "nowrap" }}>{status}</span>;
   };
 
   return (
@@ -277,12 +283,12 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
             <table className="ops-table">
               <thead>
                 <tr>
-                  <th style={{ width: "32%" }}>Track Title</th>
-                  <th style={{ width: "24%" }}>Violation Reason</th>
-                  <th style={{ width: "16%" }}>Reporter / Count</th>
-                  <th style={{ width: "14%" }}>Submission Date</th>
-                  <th style={{ width: "8%" }}>Status</th>
-                  <th style={{ width: "6%", textAlign: "right" }}>Actions</th>
+                  <th style={{ width: "30%", minWidth: "180px" }}>Track Title</th>
+                  <th style={{ width: "24%", minWidth: "160px" }}>Violation Reason</th>
+                  <th style={{ width: "16%", minWidth: "140px" }}>Reporter / Count</th>
+                  <th style={{ width: "14%", minWidth: "140px" }}>Submission Date</th>
+                  <th style={{ width: "10%", minWidth: "90px", textAlign: "center", whiteSpace: "nowrap" }}>Status</th>
+                  <th style={{ width: "6%", minWidth: "60px", textAlign: "center", whiteSpace: "nowrap" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -437,19 +443,31 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                       </td>
 
                       {/* Status */}
-                      <td>
+                      <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                         {getStatusBadge(report.status)}
                       </td>
 
-                      {/* Action Controls - Always Review Report */}
-                      <td style={{ textAlign: "right" }}>
+                      {/* Action Controls - Eye icon button */}
+                      <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                         <button
                           type="button"
-                          className={`button button-small ${isPending ? "button-primary" : "button-secondary"}`}
+                          className={`icon-button ${isPending ? "button-primary" : "button-secondary"}`}
                           onClick={() => setSelectedReportId(report.id)}
-                          style={{ whiteSpace: "nowrap" }}
+                          title="Review Report"
+                          aria-label={`Review report for ${report.trackTitle}`}
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "10px",
+                            display: "inline-grid",
+                            placeItems: "center",
+                            cursor: "pointer",
+                            padding: 0,
+                            margin: "0 auto",
+                            border: isPending ? "none" : "1px solid var(--ops-border, #E2E8F0)",
+                          }}
                         >
-                          Review Report
+                          <EyeIcon width={16} height={16} />
                         </button>
                       </td>
                     </tr>

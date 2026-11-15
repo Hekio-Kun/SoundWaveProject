@@ -555,8 +555,8 @@ export function PlaylistDetailsPage({
               style={{
                 display: "grid",
                 gridTemplateColumns: isOwner
-                  ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
-                  : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
+                  ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 200px"
+                  : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 90px",
                 alignItems: "center",
                 gap: "14px",
                 padding: "10px 16px",
@@ -591,8 +591,8 @@ export function PlaylistDetailsPage({
                   style={{
                     display: "grid",
                     gridTemplateColumns: isOwner
-                      ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
-                      : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
+                      ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 200px"
+                      : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 90px",
                     alignItems: "center",
                     gap: "14px",
                     padding: "10px 16px",
@@ -731,10 +731,12 @@ export function PlaylistDetailsPage({
                         gap: "4px",
                         color: "var(--sw-primary, #0284c7)",
                         fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
                       }}
                     >
                       <EyeIcon width={13} height={13} />
-                      <span>Detail</span>
+                      <span style={{ whiteSpace: "nowrap" }}>Detail</span>
                     </button>
 
                     {isOwner ? (
