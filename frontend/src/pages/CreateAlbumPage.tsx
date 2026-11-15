@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { albumApi, AlbumApiError } from "../api/album";
 import { catalogApi } from "../api/catalog";
+import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { LyricSyncTab } from "../components/common/LyricSyncTab";
 import { MediaUploadField } from "../components/common/MediaUploadField";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
@@ -94,6 +96,39 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pageToast, setPageToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
+
+  const [unsavedModalOpen, setUnsavedModalOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+
+  const isSavedOrBypassedRef = useRef(false);
+
+  useEffect(() => {
+    isSavedOrBypassedRef.current = false;
+  }, [
+    title,
+    description,
+    coverFile,
+    tracks,
+    currentAudioFile,
+    currentTitle,
+    currentDescription,
+    currentLyrics,
+    currentLyricsFile,
+  ]);
+
+  useModalScrollLock(unsavedModalOpen);
+
+  useEffect(() => {
+    if (!unsavedModalOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) {
+        setPendingNavigation(null);
+        setUnsavedModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [unsavedModalOpen, submitting]);
 
   // Load genres for track assignment
   useEffect(() => {
@@ -369,14 +404,14 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
   };
 
   // Submission process (Save Draft - Sequence UC-21.1)
-  const processSubmitAlbum = async () => {
+  const processSubmitAlbum = async (destinationRoute?: string): Promise<boolean> => {
     // 1.1: validateAlbumAndTracks()
     let finalTracks = [...tracks];
     if (editingTrackIndex === null && currentAudioFile && currentTitle.trim()) {
       if (finalTracks.length >= MAX_ALBUM_TRACKS) {
         setSubmitError(`An album cannot contain more than ${MAX_ALBUM_TRACKS} tracks.`);
         window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
+        return false;
       }
       const genreIdVal = Number(currentGenreId || genres[0]?.id || 1);
       const autoTrack: TrackItem = {
@@ -411,7 +446,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
       setFormErrors(errors);
       setSubmitError("Please complete all required fields.");
       window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+      return false;
     }
 
     setSubmitting(true);
@@ -442,8 +477,22 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
 
       // Sequence 1.2.2.16: displaySuccessToast("Album draft saved successfully") and redirect to /album
       setFlashToast("Album draft saved successfully.", "success");
-      onNavigate("/album");
+      isSavedOrBypassedRef.current = true;
+      resetAlbumForm();
+      if (destinationRoute === "BACK") {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          onNavigate("/album");
+        }
+      } else if (destinationRoute) {
+        onNavigate(destinationRoute);
+      } else {
+        onNavigate("/album");
+      }
+      return true;
     } catch (err: unknown) {
+      isSavedOrBypassedRef.current = false;
       if (err instanceof AlbumApiError) {
         setSubmitError(err.message);
         if (err.fieldErrors) {
@@ -455,8 +504,160 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
         setSubmitError("Failed to create album. Please verify your connection and try again.");
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const resetAlbumForm = () => {
+    setTitle("");
+    setDescription("");
+    setCoverFile(null);
+    setCoverPreview(null);
+    if (coverInputRef.current) coverInputRef.current.value = "";
+    setTracks([]);
+    resetTrackForm();
+    setFormErrors({});
+    setTrackFormErrors({});
+    setSubmitError("");
+    setUnsavedModalOpen(false);
+    setPendingNavigation(null);
+    setStep(1);
+  };
+
+  const hasUnsavedChanges = () => {
+    if (isSavedOrBypassedRef.current) return false;
+    return Boolean(
+      title.trim() !== "" ||
+      description.trim() !== "" ||
+      coverFile !== null ||
+      tracks.length > 0 ||
+      currentAudioFile !== null ||
+      currentTitle.trim() !== "" ||
+      currentDescription.trim() !== "" ||
+      currentLyrics.trim() !== "" ||
+      currentLyricsFile !== null
+    );
+  };
+
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
+
+  const handleBack = () => {
+    if (hasUnsavedChanges()) {
+      setPendingNavigation("BACK");
+      setUnsavedModalOpen(true);
+    } else {
+      isSavedOrBypassedRef.current = true;
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        onNavigate("/studio");
+      }
+    }
+  };
+
+  const handleBackRef = useRef(handleBack);
+  handleBackRef.current = handleBack;
+
+  const handleCancel = () => {
+    if (hasUnsavedChanges()) {
+      setPendingNavigation("BACK");
+      setUnsavedModalOpen(true);
+    } else {
+      isSavedOrBypassedRef.current = true;
+      resetAlbumForm();
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        onNavigate("/studio");
+      }
+    }
+  };
+
+  useEffect(() => {
+    // 1. Intercept header back button
+    const handleSoundWaveBack = (e: Event) => {
+      e.preventDefault();
+      handleBackRef.current();
+    };
+
+    // 2. Intercept router navigation (Sidebar, TopBar, etc.)
+    const handleSoundWaveNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ to: string }>;
+      const destination = customEvent.detail?.to;
+
+      // Ignore if navigating to the same album creation route
+      if (destination === "/album/create") return;
+
+      if (hasUnsavedChangesRef.current()) {
+        customEvent.preventDefault();
+        setPendingNavigation(destination || null);
+        setUnsavedModalOpen(true);
+      }
+    };
+
+    // 3. Intercept direct anchor link clicks (e.g. playback player track/creator links)
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (!href || !href.startsWith("/") || href.startsWith("//")) return;
+
+      const destination = href;
+      if (destination === "/album/create") return;
+
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingNavigation(destination);
+        setUnsavedModalOpen(true);
+      }
+    };
+
+    // 4. Intercept window refresh or close
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("soundwave:back", handleSoundWaveBack);
+    window.addEventListener("soundwave:navigate", handleSoundWaveNavigate);
+    window.addEventListener("click", handleGlobalClick, true);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("soundwave:back", handleSoundWaveBack);
+      window.removeEventListener("soundwave:navigate", handleSoundWaveNavigate);
+      window.removeEventListener("click", handleGlobalClick, true);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  const handleSaveAndExit = async () => {
+    const dest = pendingNavigation ?? undefined;
+    const hasPendingTrack = editingTrackIndex === null && currentAudioFile && currentTitle.trim();
+    const willHaveTracks = tracks.length > 0 || Boolean(hasPendingTrack);
+
+    if (!title.trim() || !willHaveTracks) {
+      setPageToast({
+        type: "warning",
+        message: "To save as a draft, please enter an album title and at least one track, or select \"Don't Save\" to exit.",
+      });
+      setUnsavedModalOpen(false);
+      return;
+    }
+
+    const success = await processSubmitAlbum(dest);
+    if (success) {
+      setUnsavedModalOpen(false);
+      setPendingNavigation(null);
+    } else {
+      setUnsavedModalOpen(false);
     }
   };
 
@@ -753,7 +954,7 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
               <button
                 type="button"
                 className="button button-ghost"
-                onClick={() => onNavigate("/studio")}
+                onClick={handleCancel}
               >
                 Cancel
               </button>
@@ -1251,15 +1452,24 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
               gap: "16px",
             }}
           >
-            <button
-              type="button"
-              className="button button-ghost"
-              onClick={() => setStep(1)}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-            >
-              <ChevronLeftIcon width={16} height={16} />
-              <span>Back to Album Info</span>
-            </button>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setStep(1)}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                <ChevronLeftIcon width={16} height={16} />
+                <span>Back to Album Info</span>
+              </button>
+            </div>
 
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
               <button
@@ -1277,6 +1487,99 @@ export function CreateAlbumPage({ isAuthenticated, canCreate, onNavigate }: Prop
             </div>
           </div>
         </div>
+      )}
+
+      {/* Unsaved changes confirmation dialog */}
+      {unsavedModalOpen && createPortal(
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!submitting) {
+              setPendingNavigation(null);
+              setUnsavedModalOpen(false);
+            }
+          }}
+        >
+          <div
+            className="modal-card modal-card--narrow"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsaved-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 id="unsaved-modal-title">Unsaved changes</h3>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => {
+                  setPendingNavigation(null);
+                  setUnsavedModalOpen(false);
+                }}
+                disabled={submitting}
+                aria-label="Close dialog"
+              >
+                <CloseIcon width={18} height={18} />
+              </button>
+            </div>
+            <p style={{ margin: "14px 0 20px", color: "var(--sw-text-secondary, #57534E)", lineHeight: 1.5 }}>
+              You have unsaved changes in your album draft. What would you like to do before leaving?
+            </p>
+            <div className="modal-actions" style={{ display: "flex", gap: "10px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => {
+                  setPendingNavigation(null);
+                  setUnsavedModalOpen(false);
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={submitting}
+                onClick={() => {
+                  const target = pendingNavigation;
+                  isSavedOrBypassedRef.current = true;
+                  setUnsavedModalOpen(false);
+                  resetAlbumForm();
+                  setPendingNavigation(null);
+                  if (target) {
+                    if (target === "BACK") {
+                      if (window.history.length > 1) {
+                        window.history.back();
+                      } else {
+                        onNavigate("/studio");
+                      }
+                    } else {
+                      onNavigate(target);
+                    }
+                  } else {
+                    if (window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      onNavigate("/studio");
+                    }
+                  }
+                }}
+              >
+                Don't Save
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={submitting}
+                onClick={() => void handleSaveAndExit()}
+              >
+                {submitting ? "Saving..." : "Save Draft"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Center Toast Notification Popup */}
