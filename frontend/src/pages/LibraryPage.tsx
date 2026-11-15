@@ -320,15 +320,15 @@ export function LibraryPage({
             </button>
           </div>
         ) : (
-          <div className="library-tracks-table">
-            <div className="library-tracks-header">
-              <span style={{ textAlign: "center" }}>#</span>
-              <span />
-              <span>Track & Creator</span>
-              <span>Album</span>
-              <span style={{ textAlign: "right" }}>Duration</span>
-              <span style={{ textAlign: "right", paddingRight: "6px" }}>Favorite</span>
-            </div>
+            <div className="library-tracks-table">
+              <div className="library-tracks-header">
+                <span style={{ textAlign: "center" }}>#</span>
+                <span />
+                <span>Track & Creator</span>
+                <span>Album</span>
+                <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>Duration</span>
+                <span style={{ textAlign: "center", whiteSpace: "nowrap" }}>Favorite</span>
+              </div>
             {favoriteTracks.map((track, idx) => {
               const isCurrent = currentTrack?.id === track.id;
               const isPlayingThis = isCurrent && playing;
@@ -722,8 +722,8 @@ export function LibraryPage({
                     <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <ClockIcon width={12} height={12} /> Played Time
                     </span>
-                    <span style={{ textAlign: "right" }}>Duration</span>
-                    <span style={{ textAlign: "right", paddingRight: "6px" }}>Remove</span>
+                    <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>Duration</span>
+                    <span style={{ textAlign: "center", whiteSpace: "nowrap" }}>Remove</span>
                   </div>
 
                   {group.items.map((item, idx) => {

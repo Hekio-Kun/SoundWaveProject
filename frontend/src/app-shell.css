@@ -1682,7 +1682,7 @@
 
 .library-tracks-header {
   display: grid;
-  grid-template-columns: 36px 44px minmax(180px, 2fr) minmax(120px, 1.2fr) 60px 80px;
+  grid-template-columns: 36px 44px minmax(180px, 2fr) minmax(120px, 1.2fr) 80px 70px;
   align-items: center;
   gap: 12px;
   padding: 10px 18px;
@@ -1697,7 +1697,7 @@
 
 .table-track-row {
   display: grid;
-  grid-template-columns: 36px 44px minmax(180px, 2fr) minmax(120px, 1.2fr) 60px 80px;
+  grid-template-columns: 36px 44px minmax(180px, 2fr) minmax(120px, 1.2fr) 80px 70px;
   align-items: center;
   gap: 12px;
   padding: 10px 18px;
@@ -1808,11 +1808,15 @@
 .row-duration {
   font-size: 12px;
   color: #98a2b3;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .row-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 
