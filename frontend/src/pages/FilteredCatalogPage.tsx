@@ -57,6 +57,13 @@ export function FilteredCatalogPage({
   const [totalPages, setTotalPages] = useState<number>(() => initialCachedTracks?.totalPages ?? 0);
   const [totalElements, setTotalElements] = useState<number>(() => initialCachedTracks?.totalElements ?? 0);
 
+  const tracksRef = useRef<LandingTrack[]>(tracks);
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  const reqIdRef = useRef(0);
+
   // Exception notices (EX01 & EX03)
   const [genreNotice, setGenreNotice] = useState<string | null>(null);
   const [pageNotice, setPageNotice] = useState<string | null>(null);
@@ -139,14 +146,12 @@ export function FilteredCatalogPage({
 
   // Phase 2 & 3: Query matching published tracks whenever genre, sort, search, or page changes
   const fetchTracks = useCallback(() => {
-    let active = true;
+    const reqId = ++reqIdRef.current;
+
     // Only show full loading state if we do not already have tracks on screen
-    setTracks((prev) => {
-      if (prev.length === 0) {
-        setTracksLoading(true);
-      }
-      return prev;
-    });
+    if (tracksRef.current.length === 0) {
+      setTracksLoading(true);
+    }
     setTracksError(null);
 
     catalogApi
@@ -158,7 +163,7 @@ export function FilteredCatalogPage({
         size: 18, // Standard page size fixed at 18 tracks per page
       })
       .then((res) => {
-        if (!active) return;
+        if (reqId !== reqIdRef.current) return;
         const totalP = res?.totalPages ?? 0;
         const totalE = res?.totalElements ?? 0;
         const fetchedTracks = res?.content ?? [];
@@ -183,24 +188,24 @@ export function FilteredCatalogPage({
         setTotalElements(totalE);
       })
       .catch((err: unknown) => {
-        if (!active) return;
+        if (reqId !== reqIdRef.current) return;
         setTracks([]);
         setTotalPages(0);
         setTotalElements(0);
         setTracksError(err instanceof Error ? err.message : "Failed to load public catalog.");
       })
       .finally(() => {
-        if (active) setTracksLoading(false);
+        if (reqId === reqIdRef.current) {
+          setTracksLoading(false);
+        }
       });
-
-    return () => {
-      active = false;
-    };
   }, [selectedGenre, sortBy, searchQuery, currentPage]);
 
   useEffect(() => {
-    const cleanup = fetchTracks();
-    return cleanup;
+    fetchTracks();
+    return () => {
+      reqIdRef.current++;
+    };
   }, [fetchTracks]);
 
   const activeGenreObj = useMemo(
