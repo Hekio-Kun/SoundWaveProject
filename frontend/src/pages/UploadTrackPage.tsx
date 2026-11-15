@@ -376,10 +376,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   handleBackRef.current = handleBack;
 
   useEffect(() => {
-    // 1. Intercept header back button
+    // 1. Intercept header back button & browser back button
     const handleSoundWaveBack = (e: Event) => {
-      e.preventDefault();
-      handleBackRef.current();
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        handleBackRef.current();
+      }
     };
 
     // 2. Intercept router navigation (Sidebar, TopBar, etc.)
