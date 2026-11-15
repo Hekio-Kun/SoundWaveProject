@@ -3,6 +3,7 @@ import { covers } from "../data";
 import {
   AlertIcon,
   ClockIcon,
+  DiscIcon,
   EditIcon,
   HeadphonesIcon,
   HeartIcon,
@@ -14,6 +15,7 @@ import {
   TrashIcon,
 } from "../icons";
 import type { LandingTrack, ListeningHistoryItem, Playlist } from "../types";
+import { playlistApi } from "../api/playlists";
 import { historyApi } from "../api/history";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
@@ -100,6 +102,33 @@ export function LibraryPage({
     message: "",
     type: "success",
   });
+
+  const [playingPlaylistId, setPlayingPlaylistId] = useState<number | null>(null);
+
+  const handlePlayPlaylist = async (playlist: Playlist, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playingPlaylistId === playlist.id && playing) {
+      return;
+    }
+    setPlayingPlaylistId(playlist.id);
+
+    try {
+      let tracks = playlist.tracks;
+      if (!tracks || tracks.length === 0) {
+        const details = await playlistApi.getPlaylistById(playlist.id);
+        tracks = details.tracks || [];
+      }
+      if (tracks && tracks.length > 0) {
+        if (onPlayAll) {
+          onPlayAll(tracks, `Playlist • ${playlist.title}`, `playlist-${playlist.id}`);
+        } else {
+          onPlayTrack(tracks[0], tracks, `Playlist • ${playlist.title}`, `playlist-${playlist.id}`);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not play playlist tracks:", err);
+    }
+  };
 
   const loadHistory = async (page = 0) => {
     setHistoryLoading(true);
@@ -385,102 +414,256 @@ export function LibraryPage({
             </button>
           </div>
         ) : (
-          <div className="playlists-grid">
-            {playlists.map((pl) => (
-              <div key={pl.id} className="playlist-card">
-                <div className="playlist-art" onClick={() => onNavigate(`/playlist/${pl.id}`)}>
-                  <img
-                    src={pl.coverUrl || covers.dawn}
-                    alt={pl.title}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = covers.dawn;
+          <div
+            className="playlists-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+              gap: "22px",
+            }}
+          >
+            {playlists.map((pl) => {
+              const trackCount = pl.trackIds ? pl.trackIds.length : (pl.trackCount ?? 0);
+              const playlistYear = pl.createdAt
+                ? new Date(pl.createdAt).getFullYear()
+                : new Date().getFullYear();
+              const isPlaying = playingPlaylistId === pl.id && playing;
+
+              return (
+                <article
+                  key={pl.id}
+                  className="sw-album-card playlist-card"
+                  onClick={() => onNavigate(`/playlist/${pl.id}`)}
+                  style={{
+                    background: "#ffffff",
+                    borderRadius: "14px",
+                    padding: "14px",
+                    border: "1px solid var(--sw-border)",
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    display: "flex",
+                    flexDirection: "column",
+                    cursor: "pointer",
+                    position: "relative",
+                    gap: "0px",
+                  }}
+                >
+                  {/* Cover art with play overlay & track count badge */}
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      aspectRatio: "1/1",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                      background: "linear-gradient(135deg, #0284c7 0%, #d4a373 100%)",
+                      marginBottom: "12px",
                     }}
-                  />
-                  <span className="playlist-hover-play">
-                    <PlayIcon width={20} height={20} />
-                  </span>
-                </div>
-                <div className="playlist-info" onClick={() => onNavigate(`/playlist/${pl.id}`)} style={{ cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                    <h3 className="playlist-title" style={{ margin: 0 }}>{pl.title}</h3>
+                  >
+                    {pl.coverUrl ? (
+                      <img
+                        src={pl.coverUrl}
+                        alt={pl.title}
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#ffffff",
+                        }}
+                      >
+                        <DiscIcon width={48} height={48} />
+                      </div>
+                    )}
+
+                    {/* Track count badge (Top-Left of cover, matching Album card) */}
                     <span
                       style={{
-                        fontSize: "9px",
-                        fontWeight: 800,
-                        padding: "2px 6px",
+                        position: "absolute",
+                        left: "8px",
+                        top: "8px",
+                        padding: "3px 8px",
                         borderRadius: "6px",
-                        background: "#F3F4F6",
-                        color: "#6B7280",
-                        border: "1px solid #E5E7EB",
+                        background: "rgba(15, 23, 42, 0.65)",
+                        color: "#ffffff",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        backdropFilter: "blur(4px)",
+                        zIndex: 2,
                       }}
                     >
-                      Private
+                      {trackCount} {trackCount === 1 ? "track" : "tracks"}
                     </span>
-                  </div>
-                  <p className="playlist-meta">
-                    {pl.trackIds ? pl.trackIds.length : pl.trackCount} tracks
-                  </p>
-                  {pl.description && <p className="playlist-desc">{pl.description}</p>}
-                </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <button
-                    className="icon-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNavigate(`/playlist/${pl.id}`);
-                    }}
-                    title="Manage Playlist Tracks"
+                    {/* Top-Right Action Buttons: Manage tracks, Edit, Delete */}
+                    <div
+                      className="playlist-card-actions"
+                      style={{
+                        position: "absolute",
+                        top: "8px",
+                        right: "8px",
+                        display: "flex",
+                        gap: "4px",
+                        zIndex: 3,
+                        background: "rgba(15, 23, 42, 0.65)",
+                        backdropFilter: "blur(4px)",
+                        padding: "3px 6px",
+                        borderRadius: "16px",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onNavigate(`/playlist/${pl.id}`)}
+                        title="Manage playlist tracks"
+                        aria-label="Manage tracks"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: "2px",
+                          cursor: "pointer",
+                          color: "#FFFFFF",
+                          display: "grid",
+                          placeItems: "center",
+                          transition: "transform 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.2)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      >
+                        <QueueIcon width={14} height={14} />
+                      </button>
+
+                      {onEditPlaylist && (
+                        <button
+                          type="button"
+                          onClick={() => onEditPlaylist(pl)}
+                          title="Edit playlist details"
+                          aria-label="Edit playlist"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: "2px",
+                            cursor: "pointer",
+                            color: "#FFFFFF",
+                            display: "grid",
+                            placeItems: "center",
+                            transition: "transform 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.2)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                        >
+                          <EditIcon width={13} height={13} />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => onDeletePlaylist(pl.id)}
+                        title="Delete playlist"
+                        aria-label="Delete playlist"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: "2px",
+                          cursor: "pointer",
+                          color: "#FCA5A5",
+                          display: "grid",
+                          placeItems: "center",
+                          transition: "transform 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.2)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      >
+                        <TrashIcon width={13} height={13} />
+                      </button>
+                    </div>
+
+                    {/* Circular Blue Play Button (Bottom-Right of cover, matching Album card) */}
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={(e) => handlePlayPlaylist(pl, e)}
+                      aria-label={`Play playlist ${pl.title}`}
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        bottom: "10px",
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                        boxShadow: "0 6px 16px rgba(2, 132, 199, 0.4)",
+                        transform: isPlaying ? "scale(1)" : "scale(0.95)",
+                        opacity: isPlaying ? 1 : 0.95,
+                        border: "none",
+                        cursor: "pointer",
+                        zIndex: 2,
+                      }}
+                      title={isPlaying ? "Playing playlist" : "Play entire playlist"}
+                    >
+                      {isPlaying ? <PauseIcon width={17} height={17} /> : <PlayIcon width={17} height={17} />}
+                    </button>
+                  </div>
+
+                  {/* Playlist metadata: Title */}
+                  <h3
                     style={{
-                      width: "32px",
-                      height: "32px",
-                      borderRadius: "8px",
-                      border: "1px solid #A7F3D0",
-                      background: "#ECFDF5",
-                      color: "#065F46",
-                      cursor: "pointer",
-                      display: "grid",
-                      placeItems: "center",
+                      fontSize: "14.5px",
+                      fontWeight: 700,
+                      margin: "0 0 4px 0",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--sw-text-primary, #0f172a)",
+                    }}
+                    title={pl.title}
+                  >
+                    {pl.title}
+                  </h3>
+
+                  {/* Subtitle: Creator · Year (matching Album card) */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginTop: "auto",
+                      paddingTop: "6px",
+                      fontSize: "12.5px",
+                      color: "var(--sw-muted)",
                     }}
                   >
-                    <QueueIcon width={15} height={15} />
-                  </button>
-                  {onEditPlaylist && (
-                    <button
-                      className="icon-button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditPlaylist(pl);
-                      }}
-                      title="Edit details"
+                    <span
                       style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--sw-border)",
-                        background: "#fff",
-                        color: "var(--sw-text)",
-                        cursor: "pointer",
-                        display: "grid",
-                        placeItems: "center",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontWeight: 500,
                       }}
                     >
-                      <EditIcon width={14} height={14} />
-                    </button>
-                  )}
-                  <button
-                    className="playlist-delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeletePlaylist(pl.id);
-                    }}
-                    title="Delete playlist"
-                  >
-                    <TrashIcon width={14} height={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+                      {pl.ownerName || pl.creatorName || "anh tuan"}
+                    </span>
+                    <span>· {playlistYear}</span>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )
       ) : (

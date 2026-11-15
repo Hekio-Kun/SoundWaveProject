@@ -375,7 +375,7 @@ export function StudioAlbumDetailPage({
         className="playlist-header-banner"
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          gridTemplateColumns: "220px minmax(0, 1fr)",
           gap: "28px",
           padding: "28px",
           background: "#ffffff",
@@ -383,6 +383,7 @@ export function StudioAlbumDetailPage({
           borderRadius: "20px",
           boxShadow: "0 8px 30px rgba(16, 24, 40, 0.04)",
           marginBottom: "32px",
+          overflow: "hidden",
         }}
       >
         {/* Cover Art */}
@@ -395,6 +396,7 @@ export function StudioAlbumDetailPage({
             overflow: "hidden",
             boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
             backgroundColor: "var(--color-sand-light, #FAF7F2)",
+            flexShrink: 0,
           }}
         >
           {album.coverUrl ? (
@@ -419,7 +421,7 @@ export function StudioAlbumDetailPage({
         </div>
 
         {/* Album Meta Info & Action Toolbar */}
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0, maxWidth: "100%" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <span className="eyebrow" style={{ color: "var(--color-ocean-primary, #0284C7)" }}>
@@ -466,6 +468,8 @@ export function StudioAlbumDetailPage({
                 color: "var(--color-ocean-dark, #0F172A)",
                 letterSpacing: "-0.04em",
                 margin: "0 0 10px 0",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {album.title}
@@ -473,12 +477,22 @@ export function StudioAlbumDetailPage({
 
             {album.description && (
               <p
+                className="sw-description"
                 style={{
                   fontSize: "14px",
                   color: "var(--sw-muted, #64748B)",
                   margin: "0 0 12px 0",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
+                title={album.description}
               >
                 {album.description}
               </p>
