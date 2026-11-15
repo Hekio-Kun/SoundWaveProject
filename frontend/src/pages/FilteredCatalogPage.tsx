@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { catalogApi } from "../api/catalog";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { catalogApi, getCachedGenres, getCachedTracks } from "../api/catalog";
 import { TrackCard } from "../components/common/MusicCards";
 import { SortDropdown, type SortOptionValue } from "../components/common/SortDropdown";
 import { HeadphonesIcon, SearchIcon } from "../icons";
@@ -26,21 +26,43 @@ export function FilteredCatalogPage({
   initialSearch,
   initialPage = 0,
 }: Props) {
+  const onNavigateRef = useRef(onNavigate);
+  useEffect(() => {
+    onNavigateRef.current = onNavigate;
+  }, [onNavigate]);
+
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre ?? "all");
   const [sortBy, setSortBy] = useState<SortOptionValue>(initialSort ?? "newest");
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch ?? "");
   const [searchInput, setSearchInput] = useState<string>(initialSearch ?? "");
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
-  const [totalPages, setTotalPages] = useState<number>(0);
-  const [totalElements, setTotalElements] = useState<number>(0);
 
-  const [genresList, setGenresList] = useState<Genre[]>([]);
-  const [genresLoading, setGenresLoading] = useState(true);
+  // Check cache for initial state so returning to this page renders instantly without loading spinner
+  const cachedGenres = getCachedGenres();
+  const [genresList, setGenresList] = useState<Genre[]>(() => cachedGenres ?? []);
+  const [genresLoading, setGenresLoading] = useState(() => !cachedGenres);
   const [genresError, setGenresError] = useState(false);
 
-  const [tracks, setTracks] = useState<LandingTrack[]>([]);
-  const [tracksLoading, setTracksLoading] = useState(true);
+  const initialCachedTracks = getCachedTracks({
+    genre: initialGenre !== "all" ? initialGenre : undefined,
+    search: initialSearch?.trim() || undefined,
+    sort: initialSort ?? "newest",
+    page: initialPage,
+    size: 18,
+  });
+
+  const [tracks, setTracks] = useState<LandingTrack[]>(() => initialCachedTracks?.content ?? []);
+  const [tracksLoading, setTracksLoading] = useState(() => !initialCachedTracks);
   const [tracksError, setTracksError] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState<number>(() => initialCachedTracks?.totalPages ?? 0);
+  const [totalElements, setTotalElements] = useState<number>(() => initialCachedTracks?.totalElements ?? 0);
+
+  const tracksRef = useRef<LandingTrack[]>(tracks);
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  const reqIdRef = useRef(0);
 
   // Exception notices (EX01 & EX03)
   const [genreNotice, setGenreNotice] = useState<string | null>(null);
@@ -69,7 +91,9 @@ export function FilteredCatalogPage({
   // Phase 1: Load available genres from backend and validate selected genre (EX01)
   useEffect(() => {
     let active = true;
-    setGenresLoading(true);
+    if (!getCachedGenres()) {
+      setGenresLoading(true);
+    }
     setGenresError(false);
 
     catalogApi
@@ -98,7 +122,7 @@ export function FilteredCatalogPage({
               if (searchQuery.trim()) params.set("search", searchQuery.trim());
               if (currentPage > 0) params.set("page", String(currentPage + 1));
               const qs = params.toString();
-              onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+              onNavigateRef.current(`/browse${qs ? `?${qs}` : ""}`);
             }
           }
         } else {
@@ -122,8 +146,12 @@ export function FilteredCatalogPage({
 
   // Phase 2 & 3: Query matching published tracks whenever genre, sort, search, or page changes
   const fetchTracks = useCallback(() => {
-    let active = true;
-    setTracksLoading(true);
+    const reqId = ++reqIdRef.current;
+
+    // Only show full loading state if we do not already have tracks on screen
+    if (tracksRef.current.length === 0) {
+      setTracksLoading(true);
+    }
     setTracksError(null);
 
     catalogApi
@@ -132,10 +160,10 @@ export function FilteredCatalogPage({
         search: searchQuery.trim() || undefined,
         sort: sortBy,
         page: currentPage,
-        size: 20, // Standard page size fixed at 20 tracks per page
+        size: 18, // Standard page size fixed at 18 tracks per page
       })
       .then((res) => {
-        if (!active) return;
+        if (reqId !== reqIdRef.current) return;
         const totalP = res?.totalPages ?? 0;
         const totalE = res?.totalElements ?? 0;
         const fetchedTracks = res?.content ?? [];
@@ -151,7 +179,7 @@ export function FilteredCatalogPage({
           if (sortBy && sortBy !== "newest") params.set("sort", sortBy);
           if (searchQuery.trim()) params.set("search", searchQuery.trim());
           const qs = params.toString();
-          onNavigate(`/browse${qs ? `?${qs}` : ""}`);
+          onNavigateRef.current(`/browse${qs ? `?${qs}` : ""}`);
           return;
         }
 
@@ -160,24 +188,24 @@ export function FilteredCatalogPage({
         setTotalElements(totalE);
       })
       .catch((err: unknown) => {
-        if (!active) return;
+        if (reqId !== reqIdRef.current) return;
         setTracks([]);
         setTotalPages(0);
         setTotalElements(0);
         setTracksError(err instanceof Error ? err.message : "Failed to load public catalog.");
       })
       .finally(() => {
-        if (active) setTracksLoading(false);
+        if (reqId === reqIdRef.current) {
+          setTracksLoading(false);
+        }
       });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedGenre, sortBy, searchQuery, currentPage, onNavigate]);
+  }, [selectedGenre, sortBy, searchQuery, currentPage]);
 
   useEffect(() => {
-    const cleanup = fetchTracks();
-    return cleanup;
+    fetchTracks();
+    return () => {
+      reqIdRef.current++;
+    };
   }, [fetchTracks]);
 
   const activeGenreObj = useMemo(

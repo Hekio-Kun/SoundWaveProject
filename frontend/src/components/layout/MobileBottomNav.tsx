@@ -1,21 +1,23 @@
 import { CompassIcon, DashboardIcon, FilterIcon, LibraryIcon, UploadIcon } from "../../icons";
 import type { CurrentUser } from "../../types";
+import type { NavigateOptions } from "../../utils/navigation";
 
 type Props = {
   activeRoute: string;
-  onNavigate: (route: string) => void;
+  onNavigate: (route: string, options?: NavigateOptions) => void;
   isAuthenticated: boolean;
   userRole?: CurrentUser["role"];
 };
 
 export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, userRole }: Props) {
   const isCurrent = (route: string) => activeRoute === route || (route !== "/" && activeRoute.startsWith(route));
+  const handleNavClick = (route: string) => onNavigate(route, { reloadIfSame: true });
 
   return (
     <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
       <button
         className={`mobile-nav-item ${activeRoute === "/" || activeRoute === "/home" || isCurrent("/explore") ? "mobile-nav-item--active" : ""}`}
-        onClick={() => onNavigate("/")}
+        onClick={() => handleNavClick("/")}
       >
         <CompassIcon width={20} height={20} />
         <span>Explore</span>
@@ -23,7 +25,7 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
 
       <button
         className={`mobile-nav-item ${activeRoute.startsWith("/browse") || activeRoute.includes("genre") ? "mobile-nav-item--active" : ""}`}
-        onClick={() => onNavigate("/browse")}
+        onClick={() => handleNavClick("/browse")}
       >
         <FilterIcon width={20} height={20} />
         <span>Browse</span>
@@ -31,7 +33,7 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
 
       <button
         className={`mobile-nav-item ${isCurrent("/favorites") || isCurrent("/playlists") || activeRoute === "/library" ? "mobile-nav-item--active" : ""}`}
-        onClick={() => onNavigate("/favorites")}
+        onClick={() => handleNavClick("/favorites")}
       >
         <LibraryIcon width={20} height={20} />
         <span>Library</span>
@@ -40,7 +42,7 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
       {userRole === "ADMIN" || userRole === "STAFF" || userRole === "MODERATOR" ? (
         <button
           className={`mobile-nav-item ${isCurrent(userRole === "ADMIN" ? "/admin" : "/staff") ? "mobile-nav-item--active" : ""}`}
-          onClick={() => onNavigate(userRole === "ADMIN" ? "/admin/dashboard" : "/staff/dashboard")}
+          onClick={() => handleNavClick(userRole === "ADMIN" ? "/admin/dashboard" : "/staff/dashboard")}
         >
           <DashboardIcon width={20} height={20} />
           <span>Dashboard</span>
@@ -48,7 +50,7 @@ export function MobileBottomNav({ activeRoute, onNavigate, isAuthenticated, user
       ) : isAuthenticated ? (
         <button
           className={`mobile-nav-item ${isCurrent("/track") || isCurrent("/tracks") || isCurrent("/studio/tracks") || isCurrent("/studio") ? "mobile-nav-item--active" : ""}`}
-          onClick={() => onNavigate("/studio/tracks")}
+          onClick={() => handleNavClick("/studio/tracks")}
         >
           <UploadIcon width={20} height={20} />
           <span>Create</span>

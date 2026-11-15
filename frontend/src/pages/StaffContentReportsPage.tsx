@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AlertIcon, CheckIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../icons";
+import { AlertIcon, EyeIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../icons";
 import { staffReportsApi } from "../api/staffReports";
 import { ApiError } from "../api/client";
 import type { StaffContentReportResponse } from "../types";
+import { covers } from "../data";
 import { StaffContentReportDetailView } from "../components/moderation/StaffContentReportDetailView";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { formatDate } from "../utils/dateUtils";
 
 type Props = {
   onNavigate: (route: string) => void;
@@ -115,80 +117,25 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
     );
   }
 
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return "-";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const upper = status.toUpperCase();
     if (upper === "PENDING") {
-      return (
-        <span
-          style={{
-            padding: "3px 8px",
-            borderRadius: "6px",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            backgroundColor: "#FEF3C7",
-            color: "#92400E",
-          }}
-        >
-          Pending
-        </span>
-      );
+      return <span className="staff-report-status-badge is-pending">Pending</span>;
     }
     if (upper === "RESOLVED") {
-      return (
-        <span
-          style={{
-            padding: "3px 8px",
-            borderRadius: "6px",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            backgroundColor: "#DEF7EC",
-            color: "#03543F",
-          }}
-        >
-          Resolved
-        </span>
-      );
+      return <span className="staff-report-status-badge is-resolved">Resolved</span>;
     }
     if (upper === "DISMISSED") {
-      return (
-        <span
-          style={{
-            padding: "3px 8px",
-            borderRadius: "6px",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            backgroundColor: "#F3F4F6",
-            color: "#4B5563",
-          }}
-        >
-          Dismissed
-        </span>
-      );
+      return <span className="staff-report-status-badge is-dismissed">Dismissed</span>;
     }
-    return <span>{status}</span>;
+    return <span className="staff-report-status-badge">{status}</span>;
   };
 
   return (
     <div className="ops-dashboard ops-dashboard--staff">
       {/* Header Banner */}
-      <header className="staff-hero-banner" style={{ marginBottom: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: "16px" }}>
+      <header className="staff-hero-banner staff-reports-hero-banner">
+        <div className="staff-reports-hero-row">
           <div className="staff-hero-copy">
             <div className="staff-hero-title-row">
               <span className="staff-hero-title-icon" aria-hidden="true">
@@ -204,10 +151,9 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
           <div>
             <button
               type="button"
-              className="button button-secondary"
+              className="button button-secondary staff-reports-refresh-btn"
               onClick={fetchReports}
               disabled={loading}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
               <RefreshIcon width={15} height={15} />
               <span>Refresh</span>
@@ -256,7 +202,7 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
       )}
 
       {/* Main Table or Loading/Empty State */}
-      <section className="ops-panel" style={{ padding: "0", overflow: "hidden" }}>
+      <section className="ops-panel staff-reports-panel">
         {loading ? (
           <div style={{ padding: "48px 24px", textAlign: "center", color: "#8D877F" }}>
             <p>Loading reported tracks queue...</p>
@@ -272,16 +218,24 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
             </p>
           </div>
         ) : (
-          <div className="ops-table-wrap" style={{ margin: 0 }}>
-            <table className="ops-table">
+          <div className="ops-table-wrap staff-reports-table-wrap">
+            <table className="ops-table staff-reports-table">
+              <colgroup>
+                <col className="staff-reports-col-track" />
+                <col className="staff-reports-col-reason" />
+                <col className="staff-reports-col-reporter" />
+                <col className="staff-reports-col-date" />
+                <col className="staff-reports-col-status" />
+                <col className="staff-reports-col-actions" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: "32%" }}>Track Title</th>
-                  <th style={{ width: "24%" }}>Violation Reason</th>
-                  <th style={{ width: "16%" }}>Reporter / Count</th>
-                  <th style={{ width: "14%" }}>Submission Date</th>
-                  <th style={{ width: "8%" }}>Status</th>
-                  <th style={{ width: "6%", textAlign: "right" }}>Actions</th>
+                  <th>Track Title</th>
+                  <th>Violation Reason</th>
+                  <th>Reporter / Count</th>
+                  <th>Submission Date</th>
+                  <th className="staff-reports-th-center">Status</th>
+                  <th className="staff-reports-th-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,57 +245,26 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                   return (
                     <tr key={report.id}>
                       {/* Track Title */}
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          {report.coverUrl ? (
-                            <img
-                              src={report.coverUrl}
-                              alt={report.trackTitle}
-                              style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: "42px",
-                                height: "42px",
-                                borderRadius: "8px",
-                                background: "#D4A373",
-                                color: "#FFFFFF",
-                                display: "grid",
-                                placeItems: "center",
-                                fontSize: "0.85rem",
-                                fontWeight: 700,
-                                flexShrink: 0,
-                              }}
-                            >
-                              ♪
-                            </div>
-                          )}
-                          <div style={{ minWidth: 0 }}>
+                      <td data-cell="track" data-label="Track Title">
+                        <div className="staff-reports-track-cell">
+                          <img
+                            src={report.coverUrl || covers.dawn}
+                            alt={report.trackTitle}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                            }}
+                            className="staff-reports-track-cover"
+                          />
+                          <div className="staff-reports-track-meta">
                             <button
                               type="button"
                               onClick={() => setSelectedReportId(report.id)}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                padding: 0,
-                                font: "inherit",
-                                fontWeight: 700,
-                                color: "#1C1917",
-                                fontSize: "0.94rem",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                maxWidth: "260px",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                display: "block",
-                              }}
-                              title="Inspect content report details"
+                              className="staff-reports-track-btn"
+                              title={`Inspect content report details: ${report.trackTitle}`}
                             >
                               {report.trackTitle}
                             </button>
-                            <small style={{ color: "#57534E", fontSize: "0.82rem" }}>
+                            <small className="staff-reports-track-artist" title={report.artistName}>
                               {report.artistName}
                             </small>
                           </div>
@@ -349,50 +272,19 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                       </td>
 
                       {/* Violation Reason */}
-                      <td>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            fontSize: "0.84rem",
-                            fontWeight: 600,
-                            color: "#BE123C",
-                            backgroundColor: "#FFF1F2",
-                            padding: "6px 14px",
-                            borderRadius: "20px",
-                            border: "1px solid #FECDD3",
-                            whiteSpace: "nowrap",
-                            boxShadow: "0 1px 2px rgba(190, 18, 60, 0.04)",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: "6px",
-                              height: "6px",
-                              borderRadius: "50%",
-                              backgroundColor: "#E11D48",
-                              flexShrink: 0,
-                            }}
-                          />
+                      <td data-cell="reason" data-label="Violation Reason">
+                        <span className="staff-reports-reason-pill">
+                          <span className="staff-reports-reason-dot" />
                           <span>{report.reason}</span>
                         </span>
                       </td>
 
                       {/* Reporter / Count Column */}
-                      <td>
+                      <td data-cell="reporter" data-label="Reporter / Count">
                         {isCopyrightReport(report) ? (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <div className="staff-reports-reporter-wrap">
                             <span
-                              style={{
-                                fontWeight: 600,
-                                color: "#0C4A6E",
-                                fontSize: "0.86rem",
-                                maxWidth: "160px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
+                              className="staff-reports-reporter-handle"
                               title={`@${report.reporterUsername || report.reporterName || "user"}`}
                             >
                               @{report.reporterUsername || report.reporterName || "user"}
@@ -400,63 +292,42 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                             {report.evidenceUrl && (
                               <span
                                 title="Copyright evidence document attached"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "#0284C7",
-                                  backgroundColor: "#E0F2FE",
-                                  border: "1px solid #BAE6FD",
-                                  padding: "3px 6px",
-                                  borderRadius: "6px",
-                                  flexShrink: 0,
-                                }}
+                                className="staff-reports-evidence-clip"
                               >
                                 <PaperclipIcon width={13} height={13} />
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              fontSize: "0.8rem",
-                              fontWeight: 700,
-                              color: count > 1 ? "#0369A1" : "#57534E",
-                              backgroundColor: count > 1 ? "#E0F2FE" : "#F6EFE3",
-                              border: count > 1 ? "1px solid #BAE6FD" : "1px solid #E8DCCB",
-                              padding: "4px 10px",
-                              borderRadius: "12px",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                          <span className={`staff-reports-count-pill ${count > 1 ? "is-multi" : ""}`}>
                             {count} {count > 1 ? "reports" : "report"}
                           </span>
                         )}
                       </td>
 
                       {/* Submission Date */}
-                      <td>
-                        <span style={{ fontSize: "0.84rem", color: "#57534E", whiteSpace: "nowrap" }}>
-                          {formatDate(report.createdAt)}
+                      <td data-cell="date" data-label="Submission Date">
+                        <span className="staff-reports-date-text">
+                          {formatDate(report.createdAt, "-")}
                         </span>
                       </td>
 
                       {/* Status */}
-                      <td>
+                      <td data-cell="status" data-label="Status" className="staff-reports-td-center">
                         {getStatusBadge(report.status)}
                       </td>
 
-                      {/* Action Controls - Always Review Report */}
-                      <td style={{ textAlign: "right" }}>
+                      {/* Action Controls - Eye icon button */}
+                      <td data-cell="actions" data-label="Actions" className="staff-reports-td-center">
                         <button
                           type="button"
-                          className={`button button-small ${isPending ? "button-primary" : "button-secondary"}`}
+                          className={`icon-button staff-reports-action-btn ${isPending ? "button-primary" : "button-secondary"}`}
                           onClick={() => setSelectedReportId(report.id)}
-                          style={{ whiteSpace: "nowrap" }}
+                          title="Review Report"
+                          aria-label={`Review report for ${report.trackTitle}`}
                         >
-                          Review Report
+                          <EyeIcon width={16} height={16} />
+                          <span className="staff-reports-action-label">Review Report</span>
                         </button>
                       </td>
                     </tr>

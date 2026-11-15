@@ -15,8 +15,11 @@ import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ResourceNotFoundException;
 import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
 import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
+import groupone.soundwaveproject.media.dto.response.DownloadedMediaResponse;
+import groupone.soundwaveproject.media.service.CloudMediaService;
 import groupone.soundwaveproject.moderation.dto.request.ResolveContentReportRequest;
 import groupone.soundwaveproject.moderation.dto.request.TakeDownTrackRequest;
+import groupone.soundwaveproject.moderation.dto.response.EvidenceDownloadResponse;
 import groupone.soundwaveproject.moderation.dto.response.StaffContentReportResponse;
 import groupone.soundwaveproject.moderation.entity.ContentReport;
 import groupone.soundwaveproject.moderation.entity.ReportCategory;
@@ -48,6 +51,7 @@ public class StaffContentReportService {
     private final NotificationService notificationService;
     private final OfficialLyricRepository officialLyricRepository;
     private final AlbumRepository albumRepository;
+    private final CloudMediaService cloudMediaService;
 
     @Transactional(readOnly = true)
     public List<StaffContentReportResponse> getReportsQueue() {
@@ -101,6 +105,30 @@ public class StaffContentReportService {
         }
 
         return mapGroupToResponse(group);
+    }
+
+    /**
+     * Tải xuống tệp tài liệu chứng minh bản quyền đính kèm của báo cáo từ Cloud Storage.
+     */
+    @Transactional(readOnly = true)
+    public EvidenceDownloadResponse downloadEvidence(Long reportId) {
+        ContentReport report = contentReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("REPORT_NOT_FOUND", "Content report not found with id: " + reportId));
+
+        if (report.getEvidenceUrl() == null || report.getEvidenceUrl().isBlank()) {
+            throw new ResourceNotFoundException("EVIDENCE_NOT_FOUND", "No proof document is attached to this report.");
+        }
+
+        DownloadedMediaResponse media = cloudMediaService.downloadReportEvidence(
+                report.getEvidenceUrl(),
+                report.getEvidencePublicId()
+        );
+
+        String extension = media.extension() != null && !media.extension().isBlank()
+                ? "." + media.extension()
+                : "";
+        String fileName = "copyright-proof-report-" + report.getId() + extension;
+        return new EvidenceDownloadResponse(media.bytes(), media.contentType(), fileName);
     }
 
     @Transactional
@@ -229,6 +257,11 @@ public class StaffContentReportService {
                     );
                 }
             }
+
+            // Gỡ bỏ hoàn toàn liên kết của bài hát khỏi album theo đúng quy chuẩn nghiệp vụ
+            track.setAlbum(null);
+            track.setTrackNumber(null);
+            trackRepository.save(track);
         }
 
         // Update submission status if associated submission exists

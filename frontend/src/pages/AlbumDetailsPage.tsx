@@ -3,6 +3,7 @@ import { catalogApi } from "../api/catalog";
 import { covers } from "../data";
 import { ClockIcon, DiscIcon, EyeIcon, HeadphonesIcon, PauseIcon, PlayIcon } from "../icons";
 import type { LandingTrack, PublicAlbumDetails } from "../types";
+import { formatDuration } from "../utils/timeUtils";
 
 type Props = {
   albumId: number;
@@ -10,12 +11,6 @@ type Props = {
   playing: boolean;
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string, contextKey?: string) => void;
   onNavigate: (route: string) => void;
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, onNavigate }: Props) {
@@ -99,7 +94,7 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
         className="playlist-header-banner"
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          gridTemplateColumns: "220px minmax(0, 1fr)",
           gap: "28px",
           padding: "28px",
           background: "#fff",
@@ -107,6 +102,7 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
           borderRadius: "20px",
           boxShadow: "0 8px 30px rgba(16, 24, 40, 0.04)",
           marginBottom: "32px",
+          overflow: "hidden",
         }}
       >
         <div
@@ -130,7 +126,7 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0, maxWidth: "100%" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <span className="eyebrow" style={{ color: "var(--sw-primary, #0284c7)", fontWeight: 800, fontSize: "11px", letterSpacing: "0.08em" }}>
@@ -162,6 +158,8 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
                 color: "var(--sw-text, #0f172a)",
                 letterSpacing: "-0.04em",
                 margin: "0 0 10px 0",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {title}
@@ -169,12 +167,22 @@ export function AlbumDetailsPage({ albumId, currentTrack, playing, onPlayTrack, 
 
             {description && (
               <p
+                className="sw-description"
                 style={{
                   fontSize: "14px",
                   color: "var(--sw-muted, #64748b)",
                   margin: "0 0 12px 0",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
+                title={description}
               >
                 {description}
               </p>

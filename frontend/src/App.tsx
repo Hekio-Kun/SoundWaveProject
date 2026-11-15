@@ -42,14 +42,13 @@ function AppContent() {
     lyricsOpen,
     setLyricsOpen,
     toggleLyrics,
-    handleRecordPlay,
     removeFromQueue,
     clearQueue,
     reorderQueue,
   } = usePlayer();
 
   const { openCreatePlaylist, toastNotice, toastType, showToast } = usePlaylists();
-  const { pathname, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
+  const { pathname, reloadKey, navigate, isAuthRoute, isDashboardRoute, isMusicRoute, isExploreRoute } = useRouter();
 
   const activeTrack = currentTrack || queue[0] || null;
   const activeQueue = queue;
@@ -57,23 +56,25 @@ function AppContent() {
   return (
     <div className={isMusicRoute ? "app-root app-root--has-player" : "app-root"}>
       {isAuthRoute ? (
-        <div key={pathname} className="app-route-stage app-route-stage--auth">
+        <div key={`${pathname}-${reloadKey}`} className="app-route-stage app-route-stage--auth">
           <AppRouter />
         </div>
       ) : isDashboardRoute ? (
         <DashboardLayout
           activeRoute={pathname}
+          reloadKey={reloadKey}
           user={user}
           onNavigate={navigate}
           onLogout={requestLogout}
         >
-          <div key={pathname} className="app-route-stage app-route-stage--dashboard">
+          <div key={`${pathname}-${reloadKey}`} className="app-route-stage app-route-stage--dashboard">
             <AppRouter />
           </div>
         </DashboardLayout>
       ) : (
         <MusicAppShell
           activeRoute={pathname}
+          reloadKey={reloadKey}
           onNavigate={navigate}
           user={user}
           isAuthenticated={isAuthenticated}
@@ -94,7 +95,7 @@ function AppContent() {
           hasPlayer
           showFooter={isExploreRoute}
         >
-          <div key={pathname} className="app-route-stage app-route-stage--music">
+          <div key={`${pathname}-${reloadKey}`} className="app-route-stage app-route-stage--music">
             <AppRouter />
           </div>
         </MusicAppShell>
@@ -115,7 +116,6 @@ function AppContent() {
           isQueueOpen={queueOpen}
           onToggleLyrics={toggleLyrics}
           isLyricsOpen={lyricsOpen}
-          onRecordPlay={handleRecordPlay}
           onReorderQueue={reorderQueue}
           onNavigate={navigate}
         />

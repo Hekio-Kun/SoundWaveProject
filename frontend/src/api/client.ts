@@ -118,34 +118,35 @@ function createRequest(options: ApiFetchOptions, token: string | null): RequestI
   };
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new ApiError(
-      response.status,
-      errorBody.message || (response.status === 401
-        ? "Your session has expired. Please login again."
-        : `Request failed with status ${response.status}`),
-      errorBody.code,
-      errorBody.fieldErrors,
-    );
-  }
-  if (response.status === 204) return undefined as T;
-  const text = await response.text();
-  if (!text || text.trim() === "") return undefined as T;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return text as unknown as T;
-  }
+function isNetworkTypeError(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    (error.message.includes("fetch") ||
+      error.message.includes("network") ||
+      error.message.includes("Failed"))
+  );
 }
 
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+async function throwIfErrorResponse(response: Response): Promise<void> {
+  if (response.ok) return;
+  const errorBody = await response.json().catch(() => ({}));
+  throw new ApiError(
+    response.status,
+    errorBody.message ||
+      (response.status === 401
+        ? "Your session has expired. Please login again."
+        : `Request failed with status ${response.status}`),
+    errorBody.code,
+    errorBody.fieldErrors
+  );
+}
+
+async function fetchWithAuth(path: string, options: ApiFetchOptions = {}): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, getAuthToken()));
   } catch (error: unknown) {
-    if (error instanceof TypeError && (error.message.includes("fetch") || error.message.includes("network") || error.message.includes("Failed"))) {
+    if (isNetworkTypeError(error)) {
       throw new ApiError(
         0,
         "Không thể kết nối đến máy chủ backend (Port 8080) hoặc kết nối bị ngắt quãng. Vui lòng đảm bảo Spring Boot backend đang chạy và file không vượt quá dung lượng cho phép.",
@@ -161,7 +162,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       try {
         response = await fetch(`${API_BASE_URL}${path}`, createRequest(options, session.accessToken));
       } catch (retryError: unknown) {
-        if (retryError instanceof TypeError && (retryError.message.includes("fetch") || retryError.message.includes("network") || retryError.message.includes("Failed"))) {
+        if (isNetworkTypeError(retryError)) {
           throw new ApiError(
             0,
             "Không thể kết nối đến máy chủ backend (Port 8080).",
@@ -173,5 +174,30 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     }
   }
 
-  return parseResponse<T>(response);
+  await throwIfErrorResponse(response);
+  return response;
+}
+
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const response = await fetchWithAuth(path, options);
+  if (response.status === 204) return undefined as T;
+  const text = await response.text();
+  if (!text || text.trim() === "") return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
+}
+
+export async function apiFetchBlob(
+  path: string,
+  options: ApiFetchOptions = {}
+): Promise<{ blob: Blob; contentDisposition: string | null }> {
+  const response = await fetchWithAuth(path, options);
+  const blob = await response.blob();
+  return {
+    blob,
+    contentDisposition: response.headers.get("Content-Disposition"),
+  };
 }

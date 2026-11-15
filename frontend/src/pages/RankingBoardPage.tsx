@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { catalogApi } from "../api/catalog";
+import { catalogApi, getCachedGenres, getCachedRanking } from "../api/catalog";
 import { useFavorites } from "../context/FavoritesContext";
+import { covers } from "../data";
 import {
   FlameIcon,
   HeartFillIcon,
@@ -10,6 +11,7 @@ import {
   TrophyIcon,
 } from "../icons";
 import type { Genre, LandingTrack } from "../types";
+import { formatDuration } from "../utils/timeUtils";
 
 type Props = {
   currentTrack: LandingTrack | null;
@@ -17,13 +19,6 @@ type Props = {
   onPlayTrack: (track: LandingTrack, contextQueue?: LandingTrack[], contextTitle?: string, contextKey?: string) => void;
   onNavigate: (route: string) => void;
   initialGenre?: string;
-};
-
-const formatDuration = (ms: number): string => {
-  if (!ms || ms <= 0) return "0:00";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const formatPlayCount = (count?: number): string => {
@@ -42,10 +37,13 @@ export function RankingBoardPage({
   const { favoriteIds, toggleFavorite } = useFavorites();
 
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre ?? "all");
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [rankingTracks, setRankingTracks] = useState<LandingTrack[]>([]);
+  const cachedGenres = getCachedGenres();
+  const [genres, setGenres] = useState<Genre[]>(() => cachedGenres ?? []);
+
+  const cachedRanking = getCachedRanking({ genre: initialGenre ?? "all", limit: 50 });
+  const [rankingTracks, setRankingTracks] = useState<LandingTrack[]>(() => cachedRanking ?? []);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => !cachedRanking);
   const [error, setError] = useState<string | null>(null);
 
   // Load genres for AF01
@@ -75,7 +73,12 @@ export function RankingBoardPage({
 
   // Fetch ranking tracks (Normal Flow & AF01)
   const fetchRanking = useCallback(async () => {
-    setLoading(true);
+    setRankingTracks((prev) => {
+      if (prev.length === 0) {
+        setLoading(true);
+      }
+      return prev;
+    });
     setError(null);
 
     try {
@@ -609,8 +612,11 @@ export function RankingBoardPage({
                         }
                       >
                         <img
-                          src={track.coverUrl || "/placeholder-album.png"}
+                          src={track.coverUrl || covers.dawn}
                           alt={track.title}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                          }}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                         <button

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { catalogApi } from "../api/catalog";
 import { reportsApi, type ReportCategoryType } from "../api/reports";
+import { covers } from "../data";
 import type { CurrentUser, LandingTrack } from "../types";
 import {
   AlertIcon,
@@ -258,10 +259,10 @@ export function ReportTrackPage({ trackId, currentUser, onNavigate }: Props) {
         ) : track ? (
           <>
             <img
-              src={track.coverUrl || "/pics/album.png"}
+              src={track.coverUrl || covers.dawn}
               alt={track.title}
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = "/pics/album.png";
+                (e.currentTarget as HTMLImageElement).src = covers.dawn;
               }}
               style={{
                 width: "48px",

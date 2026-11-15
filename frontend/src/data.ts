@@ -1,4 +1,4 @@
-import type { FeaturedAlbum, FeaturedCreator, Genre, LandingTrack } from "./types";
+import type { FeaturedCreator, Genre } from "./types";
 
 const svgData = (svg: string) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 
@@ -24,12 +24,6 @@ export const covers = {
   gold: cover("#92400e", "#b45309", "#fde68a", 2),
 };
 
-const creators: Record<string, { userId: number; displayName: string; avatarUrl: string }> = {};
-
-export const projectTracks: LandingTrack[] = [];
-export const demoTracks: LandingTrack[] = [];
-export const tracks: LandingTrack[] = [];
-
 export const genres: Genre[] = [
   { id: 1, name: "Pop", slug: "pop", color: "#ecfeff", accent: "#0891b2", description: "Bright, catchy, and popular melodies." },
   { id: 2, name: "Ballad", slug: "ballad", color: "#fdf6ed", accent: "#b4691e", description: "Gentle, heartfelt songs rich in emotion." },
@@ -41,12 +35,4 @@ export const genres: Genre[] = [
   { id: 8, name: "Lofi", slug: "lofi", color: "#fbf5ea", accent: "#8c5828", description: "Relaxing sounds for studying and working." },
 ];
 
-export const albums: FeaturedAlbum[] = [];
-
 export const featuredCreators: FeaturedCreator[] = [];
-
-export const heroCovers = [covers.dawn, covers.city, covers.blue];
-
-export const demoPlaylists: import("./types").Playlist[] = [];
-
-export const initialStudioTracks: import("./types").StudioTrack[] = [];

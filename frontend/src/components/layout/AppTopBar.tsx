@@ -586,7 +586,7 @@ export function AppTopBar({
                     ) : (
                       <DashboardIcon width={16} height={16} />
                     )}
-                    <span>{user.role === "ADMIN" ? "Admin dashboard" : "Staff dashboard"}</span>
+                    <span>{user.role === "ADMIN" ? "System Statistics" : "Staff dashboard"}</span>
                   </button>
                 )}
 

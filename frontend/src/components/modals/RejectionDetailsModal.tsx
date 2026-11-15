@@ -7,7 +7,6 @@ import {
   AlertIcon,
   CloseIcon,
   ClockIcon,
-  EditIcon,
   CheckIcon,
 } from "../../icons";
 
@@ -21,10 +20,10 @@ export type RejectionDetailsModalProps = {
   isOpen: boolean;
   /** Callback khi người dùng nhấn đóng modal */
   onClose: () => void;
-  /** Callback khi người dùng nhấn "Chỉnh sửa bài hát" để sửa và nộp lại duyệt (UC-19, BR-24) */
   /** Callback điều hướng tới trang chi tiết bài hát (tuỳ chọn) */
   onViewTrackDetail?: (trackId: number) => void;
   onEditTrack?: (trackId?: any) => void;
+  onDeleteTrack?: (trackId?: any) => void;
 };
 
 /**
@@ -34,7 +33,7 @@ export type RejectionDetailsModalProps = {
  * - Normal Flow: Hiển thị lý do từ chối (Categorized reason), ghi chú từ kiểm duyệt viên (Reviewer note), thời gian duyệt.
  * - Alternative Flow AF01: Mở rộng xem lịch sử phản hồi kiểm duyệt của các lần nộp trước (Submission history timeline).
  * - Exception EX01: Fallback hiển thị thông báo kiểm duyệt cộng đồng tiêu chuẩn nếu lý do trống.
- * - Business Rule BR-24: Cung cấp nút hành động "Chỉnh sửa bài hát" để cập nhật audio/metadata và nộp lại.
+ * - Cung cấp nút xóa bài hát bị từ chối khỏi hệ thống.
  */
 export function RejectionDetailsModal({
   details,
@@ -42,6 +41,7 @@ export function RejectionDetailsModal({
   onClose,
   onViewTrackDetail,
   onEditTrack,
+  onDeleteTrack,
 }: RejectionDetailsModalProps) {
   // Khoá scroll chuột khi mở modal
   useModalScrollLock(isOpen);
@@ -416,30 +416,6 @@ export function RejectionDetailsModal({
           >
             Close
           </button>
-
-          {onEditTrack && (
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => {
-                onClose();
-                onEditTrack(details.trackId);
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#0284c7",
-                color: "#ffffff",
-                padding: "8px 18px",
-                borderRadius: "10px",
-                fontWeight: 600,
-              }}
-            >
-              <EditIcon width={15} height={15} />
-              <span>Edit Track</span>
-            </button>
-          )}
         </div>
       </div>
     </div>,

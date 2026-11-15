@@ -4,9 +4,9 @@ import {
   CheckIcon,
   ClockIcon,
   DiscIcon,
+  DownloadIcon,
   FileTextIcon,
   FlagIcon,
-  PaperclipIcon,
   PauseIcon,
   PlayIcon,
   ShieldIcon,
@@ -21,6 +21,9 @@ import type { StaffContentReportResponse } from "../../types";
 import { TakeDownConfirmationModal } from "../modals/TakeDownConfirmationModal";
 import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
+import { formatDurationSeconds as formatSeconds } from "../../utils/timeUtils";
+import { formatDate } from "../../utils/dateUtils";
+import { covers } from "../../data";
 
 type Props = {
   reportId: number;
@@ -29,29 +32,6 @@ type Props = {
   onRefreshQueue: () => void;
   onNotify?: (message: string, type?: "success" | "info" | "warning" | "error") => void;
 };
-
-function formatSeconds(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
 
 export function StaffContentReportDetailView({
   reportId,
@@ -83,8 +63,9 @@ export function StaffContentReportDetailView({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Take Down Modal state
+  // Take Down Modal & Proof Download state
   const [isTakedownModalOpen, setIsTakedownModalOpen] = useState<boolean>(false);
+  const [downloadingEvidence, setDownloadingEvidence] = useState<boolean>(false);
 
   const isCopyright = useMemo(() => {
     if (!report) return false;
@@ -443,6 +424,40 @@ export function StaffContentReportDetailView({
     onRefreshQueue();
   };
 
+  const handleDownloadEvidence = async () => {
+    if (!report?.evidenceUrl || downloadingEvidence) return;
+    setDownloadingEvidence(true);
+    try {
+      const { blob, fileName } = await staffReportsApi.downloadEvidence(report.id);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setToastNotification({
+        open: true,
+        type: "success",
+        message: "Proof document downloaded.",
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Unable to download proof document from cloud storage.";
+      setToastNotification({
+        open: true,
+        type: "error",
+        message,
+      });
+    } finally {
+      setDownloadingEvidence(false);
+    }
+  };
+
   const isPending = report?.status?.toUpperCase() === "PENDING";
   const isPublished = report?.trackPublicationStatus === "PUBLISHED";
   const maxSeekTime = duration || 1;
@@ -529,6 +544,9 @@ export function StaffContentReportDetailView({
                   src={report.coverUrl}
                   alt={report.trackTitle}
                   className="staff-hero-artwork"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                  }}
                 />
               ) : (
                 <div
@@ -903,17 +921,19 @@ export function StaffContentReportDetailView({
                       </div>
                     </div>
 
-                    {/* Proof Document Open / Download Button */}
+                    {/* Proof Document Download Button */}
                     {report.evidenceUrl ? (
-                      <a
-                        href={report.evidenceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => void handleDownloadEvidence()}
+                        disabled={downloadingEvidence}
+                        aria-label="Download copyright proof document"
+                        title="Download proof document to your computer"
                         className="button button-small"
                         style={{
                           backgroundColor: "#0284C7",
                           color: "#FFFFFF",
-                          textDecoration: "none",
+                          border: "none",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
@@ -921,11 +941,13 @@ export function StaffContentReportDetailView({
                           padding: "8px 16px",
                           borderRadius: "8px",
                           whiteSpace: "nowrap",
+                          cursor: downloadingEvidence ? "wait" : "pointer",
+                          opacity: downloadingEvidence ? 0.78 : 1,
                         }}
                       >
-                        <PaperclipIcon width={14} height={14} />
-                        <span>View Proof Document ↗</span>
-                      </a>
+                        <DownloadIcon width={14} height={14} />
+                        <span>{downloadingEvidence ? "Downloading..." : "Download Proof Document"}</span>
+                      </button>
                     ) : (
                       <span
                         style={{

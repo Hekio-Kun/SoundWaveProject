@@ -548,9 +548,10 @@ body { overflow-x: hidden; }
 
 .sw-section { scroll-margin-top: 92px; }
 .sw-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 21px; }
-.sw-section-heading h2 { margin: 0; color: var(--sw-text); font-size: clamp(21px, 2vw, 27px); letter-spacing: -.035em; }
-.sw-section-heading p { margin: 7px 0 0; color: var(--sw-muted); font-size: 12px; }
-.sw-section-heading > button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 0; border: 0; background: transparent; color: var(--sw-primary-dark); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.sw-section-heading > div:first-child { min-width: 0; flex: 1; }
+.sw-section-heading h2 { margin: 0; color: var(--sw-text); font-size: clamp(21px, 2vw, 27px); letter-spacing: -.035em; word-break: break-word; overflow-wrap: anywhere; }
+.sw-section-heading p { margin: 7px 0 0; color: var(--sw-muted); font-size: 12px; word-break: break-word; overflow-wrap: anywhere; }
+.sw-section-heading > button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 0; border: 0; background: transparent; color: var(--sw-primary-dark); font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .sw-section-heading > button:hover svg { transform: translateX(3px); }
 
 .sw-track-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(13px, 1.5vw, 20px); }
@@ -651,10 +652,10 @@ body { overflow-x: hidden; }
 .track-cover-button { position: relative; width: 100%; aspect-ratio: 1; display: block; overflow: hidden; padding: 0; border: 8px solid rgba(255, 255, 255, .94); border-radius: 24px; background: #fff; box-shadow: 0 28px 55px rgba(16, 24, 40, .21); }
 .track-cover-button img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s; }
 .track-cover-button:hover img { transform: scale(1.02); }
-.track-showcase-content { position: relative; z-index: 1; max-width: 760px; }
+.track-showcase-content { position: relative; z-index: 1; max-width: 760px; min-width: 0; }
 .track-labels { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; }.track-labels > span { display: inline-flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 7px; background: rgba(255, 255, 255, .75); color: var(--sw-primary-dark); font-size: 8px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }.track-labels .is-approved { background: #ecfdf3; color: #027a48; }
-.track-showcase h1 { margin: 0; color: var(--sw-text); font-size: clamp(40px, 4.7vw, 68px); line-height: 1.06; letter-spacing: -.065em; }
-.track-intro { max-width: 680px; margin: 17px 0 20px; color: var(--sw-muted); font-size: 13px; line-height: 1.72; }
+.track-showcase h1 { margin: 0; color: var(--sw-text); font-size: clamp(40px, 4.7vw, 68px); line-height: 1.06; letter-spacing: -.065em; word-break: break-word; overflow-wrap: anywhere; }
+.track-intro { max-width: 680px; margin: 17px 0 20px; color: var(--sw-muted); font-size: 13px; line-height: 1.72; word-break: break-word; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
 .track-creator-chip { width: fit-content; display: flex; align-items: center; gap: 10px; padding: 6px 13px 6px 6px; border: 1px solid rgba(228, 231, 236, .85); border-radius: 999px; background: rgba(255, 255, 255, .75); color: var(--sw-text); text-align: left; box-shadow: 0 5px 16px rgba(16, 24, 40, .04); }.track-creator-chip img { width: 38px; height: 38px; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover; object-position: center; flex-shrink: 0; }.track-creator-chip > span { display: flex; flex-direction: column; gap: 1px; }.track-creator-chip small { color: #98a2b3; font-size: 7.5px; }.track-creator-chip strong { font-size: 10.5px; }
 .track-stat-row { display: flex; align-items: center; gap: 17px; margin: 23px 0; }.track-stat-row > span { min-width: 0; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 6px; }.track-stat-row svg { grid-row: 1 / 3; color: var(--sw-primary); }.track-stat-row b { overflow: hidden; max-width: 210px; color: var(--sw-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.track-stat-row small { color: #98a2b3; font-size: 8px; }.track-stat-row > i { width: 1px; height: 26px; background: #d0d5dd; }
 .track-primary-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }.track-round-action { width: 50px; height: 50px; display: grid; place-items: center; border: 1px solid #d0d5dd; border-radius: 50%; background: rgba(255, 255, 255, .86); color: #475467; cursor: pointer; transition: all 0.2s ease; }.track-round-action:hover { border-color: #a5f3fc; color: var(--sw-primary); box-shadow: 0 8px 18px rgba(16, 24, 40, .08); }.track-round-action.is-favorite { border-color: #fecdd3; background: #fff1f2; color: #e11d48; }.track-round-action--report { color: #dc2626; }.track-round-action--report:hover { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; box-shadow: 0 8px 18px rgba(220, 38, 38, 0.12); }
@@ -2177,80 +2178,7 @@ body { overflow-x: hidden; }
   background: #0369a1;
 }
 
-/* 3. Mood Chips Bar */
-.explore-chips-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 4px;
-}
-
-.explore-chips-list {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 4px 0;
-}
-
-.explore-chips-list::-webkit-scrollbar {
-  display: none;
-}
-
-.explore-chip {
-  height: 38px;
-  padding: 0 20px;
-  border-radius: 9999px;
-  background: #ffffff;
-  color: #334155;
-  border: 1px solid #e2e8f0;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-}
-
-.explore-chip:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-}
-
-.explore-chip.is-active {
-  background: #0284c7;
-  color: #ffffff;
-  border-color: #0284c7;
-  font-weight: 600;
-  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.22);
-}
-
-.explore-chips-filter-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #475467;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-
-.explore-chips-filter-btn:hover {
-  border-color: #cbd5e1;
-  color: #0284c7;
-  background: #f8fafc;
-}
-
-/* 4. Section Header */
+/* 3. Section Header */
 .explore-section-header {
   display: flex;
   align-items: flex-end;

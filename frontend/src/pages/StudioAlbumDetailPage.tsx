@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { albumApi } from "../api/album";
 import { studioApi, type RejectionDetails } from "../api/track";
+import { covers } from "../data";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { ManageAlbumTracksModal } from "../components/modals/ManageAlbumTracksModal";
@@ -24,6 +25,8 @@ import {
   UploadIcon,
 } from "../icons";
 import type { CurrentUser, LandingTrack, StudioAlbum, StudioTrack } from "../types";
+import { formatDuration } from "../utils/timeUtils";
+import { setFlashToast } from "../utils/toastUtils";
 
 type Props = {
   albumId: number;
@@ -38,14 +41,6 @@ type Props = {
     contextKey?: string
   ) => void;
 };
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 function studioTrackToLandingTrack(st: StudioTrack, creatorName: string): LandingTrack {
   return {
@@ -117,10 +112,7 @@ export function StudioAlbumDetailPage({
 
   const handleAlbumSubmittedSuccess = () => {
     setSubmitReviewModalOpen(false);
-    sessionStorage.setItem(
-      "soundwave_flash_toast",
-      JSON.stringify({ message: "Album submitted successfully for Staff review.", type: "success" })
-    );
+    setFlashToast("Album submitted successfully for Staff review.", "success");
     onNavigate("/album");
   };
 
@@ -133,6 +125,9 @@ export function StudioAlbumDetailPage({
       setLoading(true);
       setLoadError(null);
       const data = await albumApi.getAlbumById(albumId);
+      if (data && data.tracks) {
+        data.tracks = data.tracks.filter((t) => t.status !== "TAKEN_DOWN");
+      }
       setAlbum(data);
     } catch (err: unknown) {
       setLoadError(err instanceof Error ? err.message : "Failed to load album details.");
@@ -155,13 +150,7 @@ export function StudioAlbumDetailPage({
       await albumApi.deleteAlbum(album.id);
       setDeleteConfirmOpen(false);
       // Step 1.11.2.22: displaySuccessToast("Album and all constituent tracks have been permanently deleted") and navigate to MyAlbums()
-      sessionStorage.setItem(
-        "soundwave_flash_toast",
-        JSON.stringify({
-          message: "Album and all constituent tracks have been permanently deleted",
-          type: "success",
-        })
-      );
+      setFlashToast("Album and all constituent tracks have been permanently deleted", "success");
       onNavigate("/album");
     } catch (err: unknown) {
       // Step 1.11.1.4: displayErrorMessage("Album not found or access denied") and dismissModal()
@@ -240,14 +229,17 @@ export function StudioAlbumDetailPage({
     if (!onPlayTrack || !album) return;
     const artist = currentUser?.displayName || "Creator";
     const landing = studioTrackToLandingTrack(track, artist);
-    const landingList = (album.tracks || []).map((t) => studioTrackToLandingTrack(t, artist));
+    const validTracks = (album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN");
+    const landingList = validTracks.map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landing, landingList, `Album • ${album.title}`, `album-${album.id}`);
   };
 
   const handlePlayAll = () => {
     if (!onPlayTrack || !album || !album.tracks || album.tracks.length === 0) return;
     const artist = currentUser?.displayName || "Creator";
-    const landingList = album.tracks.map((t) => studioTrackToLandingTrack(t, artist));
+    const validTracks = album.tracks.filter((t) => t.status !== "TAKEN_DOWN");
+    if (validTracks.length === 0) return;
+    const landingList = validTracks.map((t) => studioTrackToLandingTrack(t, artist));
     onPlayTrack(landingList[0], landingList, `Album • ${album.title}`, `album-${album.id}`);
   };
 
@@ -317,7 +309,7 @@ export function StudioAlbumDetailPage({
   const isPending = status === "PENDING";
   const isRejected = status === "REJECTED";
   const canSubmit = status === "DRAFT" || status === "REJECTED";
-  const albumTracks = album.tracks || [];
+  const albumTracks = (album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN");
   const totalDurationMs = albumTracks.reduce((acc, t) => acc + (t.durationMs || 0), 0);
   const totalMinutes = Math.round(totalDurationMs / 60000);
 
@@ -383,7 +375,7 @@ export function StudioAlbumDetailPage({
         className="playlist-header-banner"
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          gridTemplateColumns: "220px minmax(0, 1fr)",
           gap: "28px",
           padding: "28px",
           background: "#ffffff",
@@ -391,6 +383,7 @@ export function StudioAlbumDetailPage({
           borderRadius: "20px",
           boxShadow: "0 8px 30px rgba(16, 24, 40, 0.04)",
           marginBottom: "32px",
+          overflow: "hidden",
         }}
       >
         {/* Cover Art */}
@@ -403,6 +396,7 @@ export function StudioAlbumDetailPage({
             overflow: "hidden",
             boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
             backgroundColor: "var(--color-sand-light, #FAF7F2)",
+            flexShrink: 0,
           }}
         >
           {album.coverUrl ? (
@@ -427,7 +421,7 @@ export function StudioAlbumDetailPage({
         </div>
 
         {/* Album Meta Info & Action Toolbar */}
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0, maxWidth: "100%" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <span className="eyebrow" style={{ color: "var(--color-ocean-primary, #0284C7)" }}>
@@ -474,6 +468,8 @@ export function StudioAlbumDetailPage({
                 color: "var(--color-ocean-dark, #0F172A)",
                 letterSpacing: "-0.04em",
                 margin: "0 0 10px 0",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {album.title}
@@ -481,12 +477,22 @@ export function StudioAlbumDetailPage({
 
             {album.description && (
               <p
+                className="sw-description"
                 style={{
                   fontSize: "14px",
                   color: "var(--sw-muted, #64748B)",
                   margin: "0 0 12px 0",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
+                title={album.description}
               >
                 {album.description}
               </p>
@@ -745,8 +751,11 @@ export function StudioAlbumDetailPage({
                     onClick={() => handlePlayTrack(track)}
                   >
                     <img
-                      src={track.coverUrl || album.coverUrl || "/pics/album.png"}
+                      src={track.coverUrl || album.coverUrl || covers.dawn}
                       alt=""
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                      }}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                     {onPlayTrack && (

@@ -22,35 +22,8 @@ import {
   VolumeIcon,
 } from "../icons";
 import { downloadLrcFile } from "../utils/lyricsDownload";
-
-function formatDurationSeconds(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return "--:--";
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.floor(seconds % 60);
-  return `${minutes}:${remaining.toString().padStart(2, "0")}`;
-}
-
-function formatDurationMs(ms?: number | null): string {
-  if (!ms || ms <= 0) return "--:--";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    return new Date(isoString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
-}
+import { formatDuration as formatDurationMs, formatDurationSeconds } from "../utils/timeUtils";
+import { formatDate } from "../utils/dateUtils";
 
 function formatRelativeTime(isoString?: string | null): string {
   if (!isoString) return "--";
@@ -286,11 +259,6 @@ function LyricInspectionModal({
   };
 
   // Pre-parse proposed lyrics with useMemo to eliminate repetitive Regex executions during audio playback
-  const currentLines = useMemo(() => {
-    if (!inspectingDetail?.track.lyrics) return [];
-    return inspectingDetail.track.lyrics.split(/\r?\n/);
-  }, [inspectingDetail?.track.lyrics]);
-
   const parsedProposedLines = useMemo<ParsedProposedLine[]>(() => {
     if (!inspectingDetail?.proposedLyrics) return [];
     return inspectingDetail.proposedLyrics.split(/\r?\n/).map((line, idx) => {
@@ -399,7 +367,7 @@ function LyricInspectionModal({
           background: "#FFFFFF",
           borderRadius: "16px",
           width: "100%",
-          maxWidth: "1080px",
+          maxWidth: "860px",
           maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
@@ -469,6 +437,7 @@ function LyricInspectionModal({
             type="button"
             onClick={onClose}
             disabled={submittingDecision}
+            aria-label="Close modal"
             style={{
               background: "none",
               border: "none",
@@ -533,6 +502,7 @@ function LyricInspectionModal({
                     <button
                       type="button"
                       onClick={togglePlayAudio}
+                      aria-label={audioPlaying ? "Pause audio" : "Play audio to audition lyrics"}
                       style={{
                         width: 40,
                         height: 40,
@@ -585,6 +555,7 @@ function LyricInspectionModal({
                       <button
                         type="button"
                         onClick={toggleMute}
+                        aria-label={isMuted ? "Unmute audio" : "Mute audio"}
                         style={{
                           background: "none",
                           border: "none",
@@ -645,251 +616,160 @@ function LyricInspectionModal({
                 />
               </div>
 
-              {/* Side-by-Side Diff Container */}
+              {/* Proposed Official Lyrics Panel (single-panel view since updates only apply to tracks without official lyrics) */}
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                  minHeight: "340px",
+                  background: "#FFFFFF",
+                  border: "1px solid #BAE6FD",
+                  borderRadius: "12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  boxShadow: "0 2px 4px rgba(2, 132, 199, 0.04)",
+                  minHeight: "300px",
                 }}
               >
-                {/* Left: Current Official Lyric */}
                 <div
                   style={{
-                    background: "#F8FAFC",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: "12px",
+                    padding: "10px 16px",
+                    background: "#F0F9FF",
+                    borderBottom: "1px solid #BAE6FD",
                     display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "8px 12px",
                   }}
                 >
-                  <div
-                    style={{
-                      padding: "10px 16px",
-                      background: "#F1F5F9",
-                      borderBottom: "1px solid #E2E8F0",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#475569" }}>
-                      CURRENT OFFICIAL LYRICS
+                  <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#0369A1", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0284C7" }} />
+                    PROPOSED OFFICIAL LYRICS
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
+                      {parsedProposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
                     </span>
-                    <span style={{ fontSize: "11px", color: "#64748B" }}>
-                      {currentLines.length > 0 ? `${currentLines.length} lines` : "No lyrics"}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyProposed}
+                      style={{
+                        background: "rgba(255, 255, 255, 0.8)",
+                        border: "1px solid #BAE6FD",
+                        borderRadius: 6,
+                        padding: "3px 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#0369A1",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      title="Copy proposed lyrics to clipboard"
+                    >
+                      <CopyIcon width={12} height={12} />
+                      <span>{copiedProposal ? "Copied!" : "Copy"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadProposed}
+                      style={{
+                        background: "rgba(255, 255, 255, 0.8)",
+                        border: "1px solid #BAE6FD",
+                        borderRadius: 6,
+                        padding: "3px 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#0369A1",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      title="Download proposed lyrics as .lrc file"
+                    >
+                      <DownloadIcon width={12} height={12} />
+                      <span>.LRC</span>
+                    </button>
                   </div>
+                </div>
 
-                  <div
-                    style={{
-                      padding: "14px 16px",
-                      overflowY: "auto",
-                      flex: 1,
-                      maxHeight: "360px",
-                      fontFamily: "monospace",
-                      fontSize: "12.5px",
-                      lineHeight: "1.7",
-                    }}
-                  >
-                    {currentLines.length > 0 ? (
-                      currentLines.map((line, idx) => (
+                <div
+                  onScroll={handleProposedScroll}
+                  style={{
+                    padding: "14px 16px",
+                    overflowY: "auto",
+                    flex: 1,
+                    maxHeight: "380px",
+                    fontFamily: "monospace",
+                    fontSize: "12.5px",
+                    lineHeight: "1.7",
+                  }}
+                >
+                  {parsedProposedLines.length > 0 ? (
+                    parsedProposedLines.map((item, idx) => {
+                      const isActive = idx === activeLineIndex;
+
+                      return (
                         <div
-                          key={idx}
+                          key={item.lineNumber}
+                          ref={isActive ? activeLineRef : null}
                           style={{
                             display: "flex",
-                            gap: 12,
-                            color: line.trim() ? "#334155" : "transparent",
+                            gap: 10,
+                            alignItems: "baseline",
+                            background: isActive ? "rgba(2, 132, 199, 0.14)" : "transparent",
+                            borderLeft: isActive ? "3px solid #0284C7" : "3px solid transparent",
+                            borderRadius: 4,
+                            padding: "2px 6px",
+                            transition: "all 0.15s ease",
                           }}
                         >
                           <span
                             style={{
-                              width: 28,
+                              width: 24,
+                              flexShrink: 0,
                               color: "#94A3B8",
                               userSelect: "none",
                               textAlign: "right",
                               fontSize: 11,
                             }}
                           >
-                            {idx + 1}
+                            {item.lineNumber}
                           </span>
-                          <span>{line || "\u00A0"}</span>
+
+                          {item.tsMatch && item.tsSeconds !== null ? (
+                            <div style={{ display: "flex", gap: 8, alignItems: "baseline", minWidth: 0, flex: 1 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
+                                style={{
+                                  background: "rgba(2, 132, 199, 0.12)",
+                                  border: "1px solid rgba(2, 132, 199, 0.25)",
+                                  color: "#0369A1",
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                  flexShrink: 0,
+                                }}
+                                title={`Jump audio to ${formatDurationSeconds(item.tsSeconds)}`}
+                              >
+                                {item.tsMatch}
+                              </button>
+                              <span style={{ color: "#0F172A", wordBreak: "break-word" }}>{item.text}</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: "#0F172A", wordBreak: "break-word" }}>{item.raw || "\u00A0"}</span>
+                          )}
                         </div>
-                      ))
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          height: "100%",
-                          color: "#94A3B8",
-                          gap: 6,
-                          padding: 24,
-                          textAlign: "center",
-                        }}
-                      >
-                        <FileTextIcon width={32} height={32} />
-                        <strong style={{ fontSize: 13, color: "#64748B" }}>No Official Lyrics Published</strong>
-                        <span style={{ fontSize: 12 }}>This track currently has no official synchronized lyrics.</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right: Proposed Lyrics */}
-                <div
-                  style={{
-                    background: "#FFFFFF",
-                    border: "1px solid #BAE6FD",
-                    borderRadius: "12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                    boxShadow: "0 2px 4px rgba(2, 132, 199, 0.04)",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "10px 16px",
-                      background: "#F0F9FF",
-                      borderBottom: "1px solid #BAE6FD",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#0369A1", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0284C7" }} />
-                      PROPOSED LYRICS (NEW)
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: "11px", color: "#0284C7", fontWeight: 600 }}>
-                        {parsedProposedLines.length} lines • {inspectingDetail.proposedLyrics?.split(/\s+/).filter(Boolean).length || 0} words
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyProposed}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.8)",
-                          border: "1px solid #BAE6FD",
-                          borderRadius: 6,
-                          padding: "3px 8px",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#0369A1",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                        title="Copy proposed lyrics to clipboard"
-                      >
-                        <CopyIcon width={12} height={12} />
-                        <span>{copiedProposal ? "Copied!" : "Copy"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDownloadProposed}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.8)",
-                          border: "1px solid #BAE6FD",
-                          borderRadius: 6,
-                          padding: "3px 8px",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#0369A1",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                        title="Download proposed lyrics as .lrc file"
-                      >
-                        <DownloadIcon width={12} height={12} />
-                        <span>.LRC</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    onScroll={handleProposedScroll}
-                    style={{
-                      padding: "14px 16px",
-                      overflowY: "auto",
-                      flex: 1,
-                      maxHeight: "360px",
-                      fontFamily: "monospace",
-                      fontSize: "12.5px",
-                      lineHeight: "1.7",
-                    }}
-                  >
-                    {parsedProposedLines.length > 0 ? (
-                      parsedProposedLines.map((item, idx) => {
-                        const isActive = idx === activeLineIndex;
-
-                        return (
-                          <div
-                            key={item.lineNumber}
-                            ref={isActive ? activeLineRef : null}
-                            style={{
-                              display: "flex",
-                              gap: 10,
-                              alignItems: "baseline",
-                              background: isActive ? "rgba(2, 132, 199, 0.14)" : "transparent",
-                              borderLeft: isActive ? "3px solid #0284C7" : "3px solid transparent",
-                              borderRadius: 4,
-                              padding: "2px 6px",
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 24,
-                                color: "#94A3B8",
-                                userSelect: "none",
-                                textAlign: "right",
-                                fontSize: 11,
-                              }}
-                            >
-                              {item.lineNumber}
-                            </span>
-
-                            {item.tsMatch && item.tsSeconds !== null ? (
-                              <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleJumpToTimestamp(item.tsSeconds!)}
-                                  style={{
-                                    background: "rgba(2, 132, 199, 0.12)",
-                                    border: "1px solid rgba(2, 132, 199, 0.25)",
-                                    color: "#0369A1",
-                                    padding: "1px 6px",
-                                    borderRadius: 4,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                  }}
-                                  title={`Jump audio to ${formatDurationSeconds(item.tsSeconds)}`}
-                                >
-                                  {item.tsMatch}
-                                </button>
-                                <span style={{ color: "#0F172A" }}>{item.text}</span>
-                              </div>
-                            ) : (
-                              <span style={{ color: "#0F172A" }}>{item.raw || "\u00A0"}</span>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ color: "#94A3B8", padding: 16 }}>No proposed lyric content found.</div>
-                    )}
-                  </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ color: "#94A3B8", padding: 16 }}>No proposed lyric content found.</div>
+                  )}
                 </div>
               </div>
 
@@ -1082,6 +962,8 @@ function LyricInspectionModal({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
             background: "#FAFAFA",
           }}
         >

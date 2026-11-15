@@ -15,6 +15,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
 import groupone.soundwaveproject.exception.ConflictOperationException;
 import groupone.soundwaveproject.exception.ForbiddenOperationException;
@@ -49,12 +50,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -119,9 +118,6 @@ public class StudioTrackService {
         this.notificationService = notificationService;
         this.lyricService = lyricService;
     }
-
-    private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
-    private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
     @Transactional(readOnly = true)
     public List<StudioTrackResponse> getMyTracks(String currentUserEmail, String statusFilter) {
@@ -312,6 +308,10 @@ public class StudioTrackService {
             track.setAudioPublicId(null);
             track.setCoverUrl(null);
             track.setCoverPublicId(null);
+            if (album != null) {
+                track.setAlbum(null);
+                track.setTrackNumber(null);
+            }
             trackRepository.save(track);
         } else {
             // [FEATURE]: HARD DELETE (POST-2 & Step 7) cho bài hát DRAFT hoặc REJECTED
@@ -563,7 +563,7 @@ public class StudioTrackService {
 
     /**
      * Tra cứu chi tiết lý do từ chối kiểm duyệt bài hát theo trackId (UC-20: View Rejection Reason).
-     * Bước 6: uploader = validateAndGetUploader(currentUserEmail)
+     * Bước 6: uploader = getAuthenticatedUser(currentUserEmail)
      * Bước 7: optionalTrack = trackRepository.findByIdAndUploaderUserId(trackId, uploader.getId())
      * Bước 13 (Alt: Track not found / access denied): throw ResourceNotFoundException("Track not found or access denied.")
      * Bước 16 (Alt: Track exists and owned by listener): track = optionalTrack.get()
@@ -572,19 +572,12 @@ public class StudioTrackService {
      */
     @Transactional(readOnly = true)
     public RejectionDetailsResponse getRejectionDetails(Long id, String currentUserEmail) {
-        User uploader = validateAndGetUploader(currentUserEmail);
+        User uploader = getAuthenticatedUser(currentUserEmail);
         Track track = trackRepository.findByIdAndUploaderUserId(id, uploader.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Track not found or access denied."));
 
         List<TrackSubmission> submissionsList = trackSubmissionRepository.findByTrackIdOrderBySubmittedAtDesc(track.getId());
         return studioTrackMapper.toRejectionDetails(track, submissionsList);
-    }
-
-    /**
-     * Xác thực và lấy đối tượng người dùng sở hữu (uploader) theo email (Bước 6 trong Sequence Diagram).
-     */
-    private User validateAndGetUploader(String email) {
-        return getAuthenticatedUser(email);
     }
 
     @Transactional(readOnly = true)
@@ -634,16 +627,9 @@ public class StudioTrackService {
     }
 
     private String generateUniqueSlug(String input) {
-        String baseSlug = toSlug(input);
+        String baseSlug = SearchNormalizeUtil.toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "track";
         String slug = baseSlug + "-" + System.currentTimeMillis();
         return slug.length() > 220 ? slug.substring(0, 220) : slug;
-    }
-
-    private String toSlug(String input) {
-        String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
-        String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
-        String slug = NONLATIN.matcher(normalized).replaceAll("");
-        return slug.toLowerCase(Locale.ENGLISH);
     }
 }

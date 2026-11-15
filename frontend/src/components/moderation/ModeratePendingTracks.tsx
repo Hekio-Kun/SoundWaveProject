@@ -21,29 +21,9 @@ import {
   SearchIcon,
   UserIcon,
 } from "../../icons";
-
-function formatDuration(ms?: number | null): string {
-  if (!ms || ms <= 0) return "--:--";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
+import { formatDuration } from "../../utils/timeUtils";
+import { formatDate } from "../../utils/dateUtils";
+import { consumeFlashToast } from "../../utils/toastUtils";
 
 function formatRelativeTime(isoString?: string | null): string {
   if (!isoString) return "--";
@@ -96,17 +76,9 @@ export function ModeratePendingTracks({
 
   // Flash toast handler from sessionStorage across route changes
   useEffect(() => {
-    try {
-      const flash = sessionStorage.getItem("soundwave_flash_toast");
-      if (flash) {
-        sessionStorage.removeItem("soundwave_flash_toast");
-        const parsed = JSON.parse(flash);
-        if (parsed?.message) {
-          showToast(parsed.message, parsed.type || "success");
-        }
-      }
-    } catch {
-      // ignore
+    const flash = consumeFlashToast();
+    if (flash?.message) {
+      showToast(flash.message, flash.type === "error" ? "error" : "success");
     }
   }, [selectedSubmissionId]);
 

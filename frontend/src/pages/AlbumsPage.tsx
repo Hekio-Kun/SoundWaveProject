@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { catalogApi } from "../api/catalog";
+import { catalogApi, getCachedAlbums } from "../api/catalog";
 import {
   ClockIcon,
   CloseIcon,
@@ -20,8 +20,9 @@ type Props = {
 };
 
 export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: Props) {
-  const [albums, setAlbums] = useState<PublicAlbum[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialCached = getCachedAlbums({ page: 0, size: 50 });
+  const [albums, setAlbums] = useState<PublicAlbum[]>(() => initialCached?.content ?? []);
+  const [loading, setLoading] = useState(() => !initialCached);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [playingAlbumId, setPlayingAlbumId] = useState<number | null>(null);
@@ -35,7 +36,12 @@ export function AlbumsPage({ currentTrack, playing, onPlayTrack, onNavigate }: P
   }, [search]);
 
   const loadAlbums = useCallback(async () => {
-    setLoading(true);
+    setAlbums((prev) => {
+      if (prev.length === 0) {
+        setLoading(true);
+      }
+      return prev;
+    });
     try {
       const response = await catalogApi.getAlbums({
         search: debouncedSearch || undefined,

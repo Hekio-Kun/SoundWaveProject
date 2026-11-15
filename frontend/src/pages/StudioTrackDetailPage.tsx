@@ -41,29 +41,9 @@ import {
   validateCoverFile,
   validateLyricsFile,
 } from "../utils/trackUpload";
-
-function formatDuration(ms?: number | null): string {
-  if (!ms || ms <= 0) return "0:00";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function formatDate(isoString?: string | null): string {
-  if (!isoString) return "--";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
+import { formatDuration } from "../utils/timeUtils";
+import { formatDate } from "../utils/dateUtils";
+import { consumeFlashToast, setFlashToast } from "../utils/toastUtils";
 
 function formatSeconds(totalSeconds: number): string {
   if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
@@ -200,6 +180,14 @@ export function StudioTrackDetailPage({
       const data = await studioApi.getTrackById(trackId);
       if (active) {
         setTrack(data);
+        if (data.status === "REJECTED" || data.status === "TAKEN_DOWN") {
+          try {
+            const details = await studioApi.getRejectionDetails(data.id);
+            setRejectionModalDetails(details);
+          } catch (e) {
+            console.warn("Could not load rejection details:", e);
+          }
+        }
         setLoading(false);
       }
     } catch (err: unknown) {
@@ -220,17 +208,9 @@ export function StudioTrackDetailPage({
   }, [trackId]);
 
   useEffect(() => {
-    try {
-      const flash = sessionStorage.getItem("soundwave_flash_toast");
-      if (flash) {
-        sessionStorage.removeItem("soundwave_flash_toast");
-        const parsed = JSON.parse(flash);
-        if (parsed?.message) {
-          setActionSuccess(parsed.message);
-        }
-      }
-    } catch {
-      // ignore
+    const flash = consumeFlashToast();
+    if (flash?.message) {
+      setActionSuccess(flash.message);
     }
   }, []);
 
@@ -384,14 +364,11 @@ export function StudioTrackDetailPage({
       setDeleteConfirmOpen(false);
       // [FEATURE]: UC-19: Delete An Owned Track (POST-5)
       // Lưu flash message vào sessionStorage để hiển thị khi điều hướng về danh sách bài hát
-      sessionStorage.setItem(
-        "soundwave_flash_toast",
-        JSON.stringify({
-          message: isPublished
-            ? "Track taken down and removed from your active library successfully."
-            : "Track deleted successfully.",
-          type: "success",
-        })
+      setFlashToast(
+        isPublished
+          ? "Track taken down and removed from your active library successfully."
+          : "Track deleted successfully.",
+        "success"
       );
       onNavigate("/track");
     } catch (err: unknown) {
@@ -532,26 +509,7 @@ export function StudioTrackDetailPage({
           {/* Right: Action CRUD Buttons */}
           {track ? (
             <div className="studio-top-nav-single-right">
-              {/* View Rejection button (UC-20) */}
-              {isRejected && (
-                <button
-                  type="button"
-                  className="studio-crud-btn"
-                  onClick={handleOpenRejectionModal}
-                  title="View staff rejection reason & feedback"
-                  style={{
-                    backgroundColor: "#fee4e2",
-                    color: "#b42318",
-                    borderColor: "#fecdca",
-                  }}
-                >
-                  <AlertIcon width={13} height={13} />
-                  <span>Rejection feedback</span>
-                </button>
-              )}
-
-
-              {/* 2. Delete button - only allowed for DRAFT, REJECTED, PUBLISHED */}
+              {/* Delete button - allowed for DRAFT, REJECTED, PUBLISHED */}
               {canDelete && (
                 <button
                   type="button"
@@ -567,8 +525,8 @@ export function StudioTrackDetailPage({
                 </button>
               )}
 
-              {/* 3. Status-specific action button */}
-              {(isDraft || isRejected) && (
+              {/* Submit for review - only for draft */}
+              {isDraft && (
                 <button
                   type="button"
                   className="studio-crud-btn studio-crud-btn-primary"
@@ -579,7 +537,7 @@ export function StudioTrackDetailPage({
                   }}
                 >
                   <UploadIcon width={13} height={13} />
-                  <span>{isRejected ? "Resubmit for review" : "Submit for review"}</span>
+                  <span>Submit for review</span>
                 </button>
               )}
 
@@ -592,7 +550,6 @@ export function StudioTrackDetailPage({
                   <span>Withdraw submission</span>
                 </button>
               )}
-
 
               {isApproved && (
                 <button
@@ -646,6 +603,57 @@ export function StudioTrackDetailPage({
                 </span>
               </div>
             </div>
+
+            {/* Staff Rejection Reason Banner when Rejected */}
+            {isRejected && (
+              <div
+                style={{
+                  background: "#FFF1F2",
+                  border: "1px solid #FECDD3",
+                  borderRadius: "14px",
+                  padding: "16px 20px",
+                  marginBottom: "20px",
+                  boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    color: "#9F1239",
+                    fontWeight: 700,
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <AlertIcon width={16} height={16} />
+                  <span>Staff Rejection Reason:</span>
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#881337",
+                    fontSize: "14.5px",
+                    lineHeight: 1.6,
+                    fontWeight: 500,
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {rejectionModalDetails?.rejectionReason ||
+                    track.latestRejectionReason ||
+                    "Audio file corrupted or encoding does not meet platform standards."}
+                </p>
+                {rejectionModalDetails?.reviewerNote && (
+                  <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px dashed #FECDD3", fontSize: "13px", color: "#9F1239" }}>
+                    <b>Reviewer Note:</b> {rejectionModalDetails.reviewerNote}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Hero Card & Integrated Stream Player */}
             <div className="staff-inspector-hero-card staff-detail-hero-card">
@@ -1097,11 +1105,13 @@ export function StudioTrackDetailPage({
         isOpen={rejectionModalOpen}
         details={rejectionModalDetails}
         onClose={() => setRejectionModalOpen(false)}
+        onDeleteTrack={() => {
+          setRejectionModalOpen(false);
+          setDeleteConfirmOpen(true);
+        }}
         onEditTrack={() => {
           setRejectionModalOpen(false);
-          if (track) {
-            onNavigate(`/studio/tracks/${track.id}/edit`);
-          }
+          setDeleteConfirmOpen(true);
         }}
       />
 

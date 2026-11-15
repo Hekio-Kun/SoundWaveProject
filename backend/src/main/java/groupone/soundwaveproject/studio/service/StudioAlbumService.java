@@ -13,6 +13,7 @@ import groupone.soundwaveproject.catalog.entity.TrackPublicationStatus;
 import groupone.soundwaveproject.catalog.repository.AlbumRepository;
 import groupone.soundwaveproject.catalog.repository.GenreRepository;
 import groupone.soundwaveproject.catalog.repository.TrackRepository;
+import groupone.soundwaveproject.catalog.util.SearchNormalizeUtil;
 import groupone.soundwaveproject.lyrics.entity.OfficialLyric;
 import groupone.soundwaveproject.lyrics.repository.OfficialLyricRepository;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
@@ -40,11 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Service xử lý nghiệp vụ quản lý Album của nghệ sĩ/Listener (UC-21.1 đến UC-21.4).
@@ -115,8 +114,6 @@ public class StudioAlbumService {
         this.lyricService = lyricService;
     }
 
-    private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
-    private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
     /**
      * Lấy danh sách toàn bộ Album do người dùng hiện tại tạo ra (UC-21.4 View Albums).
@@ -154,7 +151,10 @@ public class StudioAlbumService {
         Album album = albumRepository.findByIdAndCreatedByUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Album not found or access denied."));
 
-        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+                .stream()
+                .filter(t -> t.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
+                .toList();
         return studioAlbumMapper.toStudioAlbumResponse(album, tracks.size(), tracks);
     }
 
@@ -542,18 +542,7 @@ public class StudioAlbumService {
             }
 
             // Đảm bảo bài hát được thanh lọc hoàn toàn khỏi CSDL (bảo toàn ràng buộc khóa ngoại khi xóa Album)
-            try {
-                playlistTrackRepository.deleteByTrack_Id(track.getId());
-                listeningHistoryRepository.deleteByTrackId(track.getId());
-                trackSubmissionRepository.deleteByTrackId(track.getId());
-                cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
-                if (track.getCoverPublicId() != null && !track.getCoverPublicId().equals(album.getCoverPublicId())) {
-                    cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
-                }
-                trackRepository.delete(track);
-            } catch (Exception ex) {
-                log.warn("Error deleting constituent track record ID {}: {}", track.getId(), ex.getMessage());
-            }
+            purgeTrackPhysical(track, album.getCoverPublicId());
         }
 
         // opt [cover_public_id != null] (Step 1.11.2.10 - 1.11.2.15)
@@ -603,7 +592,10 @@ public class StudioAlbumService {
         }
 
         // Sequence 1.2.2.10 - 1.2.2.13: findByAlbumId
-        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId());
+        List<Track> tracks = trackRepository.findByAlbum_IdOrderByTrackNumberAsc(album.getId())
+                .stream()
+                .filter(t -> t.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
+                .toList();
 
         // RDS EX01 & BR-18: Album contains zero associated tracks
         if (tracks.isEmpty()) {
@@ -662,6 +654,7 @@ public class StudioAlbumService {
         List<Track> allUserTracks = trackRepository.findByUploaderUserIdOrderByCreatedAtDesc(user.getId());
 
         return allUserTracks.stream()
+                .filter(track -> track.getPublicationStatus() != TrackPublicationStatus.TAKEN_DOWN)
                 .filter(track -> track.getAlbum() == null || (currentAlbumId != null && track.getAlbum().getId().equals(currentAlbumId)))
                 .map(track -> studioTrackMapper.toStudioTrackResponse(track, track.getGenre(), track.getAlbum(), null))
                 .toList();
@@ -715,38 +708,11 @@ public class StudioAlbumService {
 
         for (Track t : currentAlbumTracks) {
             if (!newTrackIdSet.contains(t.getId())) {
-                try {
-                    playlistTrackRepository.deleteByTrack_Id(t.getId());
-                    listeningHistoryRepository.deleteByTrackId(t.getId());
-                    trackSubmissionRepository.deleteByTrackId(t.getId());
-                    cloudMediaService.deleteTrackAudioQuietly(t.getAudioPublicId());
-                    if (t.getCoverPublicId() != null && !t.getCoverPublicId().equals(album.getCoverPublicId())) {
-                        cloudMediaService.deleteImageQuietly(t.getCoverPublicId());
-                    }
-                    trackRepository.delete(t);
-                } catch (Exception ex) {
-                    log.warn("Error cleaning up removed track ID {}: {}", t.getId(), ex.getMessage());
-                    trackRepository.delete(t);
-                }
+                purgeTrackPhysical(t, album.getCoverPublicId());
             }
         }
 
-        List<Track> resultTracks = new ArrayList<>();
-        int order = 1;
-        for (Long trackId : distinctTrackIds) {
-            Track track = trackRepository.findByIdAndUploaderUserId(trackId, currentUserId)
-                    .orElseThrow(() -> new BadRequestOperationException("Track ID " + trackId + " not found or does not belong to you."));
-
-            if (track.getAlbum() != null && !track.getAlbum().getId().equals(album.getId())) {
-                throw new BadRequestOperationException("Track '" + track.getTitle() + "' already belongs to another album ('" + track.getAlbum().getTitle() + "').");
-            }
-
-            track.setAlbum(album);
-            track.setTrackNumber(order++);
-            resultTracks.add(trackRepository.save(track));
-        }
-
-        return resultTracks;
+        return assignTracksToAlbum(album, distinctTrackIds, currentUserId);
     }
 
     private void recalculateAndSaveAlbumStatus(Album album) {
@@ -799,24 +765,33 @@ public class StudioAlbumService {
         return user;
     }
 
+    private void purgeTrackPhysical(Track track, String albumCoverPublicId) {
+        try {
+            playlistTrackRepository.deleteByTrack_Id(track.getId());
+            listeningHistoryRepository.deleteByTrackId(track.getId());
+            trackSubmissionRepository.deleteByTrackId(track.getId());
+            cloudMediaService.deleteTrackAudioQuietly(track.getAudioPublicId());
+            if (track.getCoverPublicId() != null && !track.getCoverPublicId().equals(albumCoverPublicId)) {
+                cloudMediaService.deleteImageQuietly(track.getCoverPublicId());
+            }
+            trackRepository.delete(track);
+        } catch (Exception ex) {
+            log.warn("Error purging constituent track record ID {}: {}", track.getId(), ex.getMessage());
+            trackRepository.delete(track);
+        }
+    }
+
     private String generateUniqueSlug(String input) {
-        String baseSlug = toSlug(input);
+        String baseSlug = SearchNormalizeUtil.toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "album";
         String candidate = baseSlug + "-" + System.currentTimeMillis();
         return candidate.length() > 220 ? candidate.substring(0, 220) : candidate;
     }
 
     private String generateUniqueTrackSlug(String input) {
-        String baseSlug = toSlug(input);
+        String baseSlug = SearchNormalizeUtil.toSlug(input);
         if (baseSlug.isBlank()) baseSlug = "track";
         String candidate = baseSlug + "-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 6);
         return candidate.length() > 220 ? candidate.substring(0, 220) : candidate;
-    }
-
-    private String toSlug(String input) {
-        String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
-        String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
-        String slug = NONLATIN.matcher(normalized).replaceAll("");
-        return slug.toLowerCase(Locale.ENGLISH);
     }
 }

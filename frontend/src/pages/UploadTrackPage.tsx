@@ -19,6 +19,7 @@ import {
 } from "../icons";
 import { LyricSyncTab } from "../components/common/LyricSyncTab";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
+import { setFlashToast } from "../utils/toastUtils";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -254,20 +255,14 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
 
       if (submitForReview && targetTrackId) {
         await studioApi.submitForReview(targetTrackId, note);
-        sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
-          message: "Track submitted for review successfully!",
-          type: "success",
-        }));
+        setFlashToast("Track submitted for review successfully!", "success");
         isSavedOrBypassedRef.current = true;
         resetForm();
         onNavigate(`/track/submission/${targetTrackId}`);
         return true;
       }
 
-      sessionStorage.setItem("soundwave_flash_toast", JSON.stringify({
-        message: "Draft saved successfully!",
-        type: "success",
-      }));
+      setFlashToast("Draft saved successfully!", "success");
 
       isSavedOrBypassedRef.current = true;
       resetForm();
@@ -381,10 +376,12 @@ export function CreateMyTrack({ isAuthenticated, canUpload, onNavigate, editTrac
   handleBackRef.current = handleBack;
 
   useEffect(() => {
-    // 1. Intercept header back button
+    // 1. Intercept header back button & browser back button
     const handleSoundWaveBack = (e: Event) => {
-      e.preventDefault();
-      handleBackRef.current();
+      if (hasUnsavedChangesRef.current()) {
+        e.preventDefault();
+        handleBackRef.current();
+      }
     };
 
     // 2. Intercept router navigation (Sidebar, TopBar, etc.)

@@ -12,6 +12,7 @@ import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmation
 import { covers } from "../data";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import { downloadLrcFile } from "../utils/lyricsDownload";
+import { formatDuration } from "../utils/timeUtils";
 import {
   AlertIcon,
   CheckIcon,
@@ -55,12 +56,6 @@ type Props = {
 
 const formatPlays = (value: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
-
-const formatDuration = (ms: number) => {
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-};
 
 const formatReleaseDate = (value?: string) => {
   if (!value) return "Not specified";

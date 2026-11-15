@@ -12,6 +12,7 @@ import {
   UploadIcon,
 } from "../../icons";
 import type { StudioAlbum, StudioTrack } from "../../types";
+import { formatDuration } from "../../utils/timeUtils";
 
 type Props = {
   open: boolean;
@@ -21,14 +22,6 @@ type Props = {
 };
 
 const MAX_ALBUM_TRACKS = 7;
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: Props) {
   useModalScrollLock(open);
@@ -334,7 +327,24 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
                   {current.title}
                 </h3>
 
-                <p style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", margin: "0 0 10px", lineHeight: "1.5", wordBreak: "break-word", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--sw-text-secondary, #64748B)",
+                    margin: "0 0 10px",
+                    lineHeight: "1.5",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                    whiteSpace: "pre-wrap",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: "100%",
+                  }}
+                  title={current.description || undefined}
+                >
                   {current.description || "No description provided."}
                 </p>
 

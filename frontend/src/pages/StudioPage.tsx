@@ -10,8 +10,6 @@ import {
   type RejectionDetails,
 } from "../api/track";
 import { albumApi } from "../api/album";
-import { AlbumFormModal } from "../components/modals/AlbumFormModal";
-import { AlbumDetailModal } from "../components/modals/AlbumDetailModal";
 import { AlbumSubmissionReviewModal } from "../components/modals/AlbumSubmissionReviewModal";
 import { DeleteConfirmationModal } from "../components/modals/DeleteConfirmationModal";
 import { MediaUploadField } from "../components/common/MediaUploadField";
@@ -35,7 +33,11 @@ import {
   TrashIcon,
   UploadIcon,
 } from "../icons";
-import type { CurrentUser, StudioAlbum, StudioTrack } from "../types";
+import type { CurrentUser, LandingTrack, StudioAlbum, StudioTrack } from "../types";
+import { usePlayer } from "../context/PlayerContext";
+import { covers } from "../data";
+import { formatDuration } from "../utils/timeUtils";
+import { consumeFlashToast } from "../utils/toastUtils";
 import {
   readAudioDuration,
   readLyricsFile,
@@ -44,12 +46,33 @@ import {
   validateLyricsFile,
 } from "../utils/trackUpload";
 
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+function studioTrackToLanding(track: StudioTrack, currentUser?: CurrentUser | null): LandingTrack {
+  return {
+    id: track.id,
+    title: track.title,
+    coverUrl: track.coverUrl || covers.dawn,
+    audioUrl: track.audioUrl || "",
+    durationMs: track.durationMs || 0,
+    playCount: 0,
+    slug: track.slug,
+    publicationStatus: track.status,
+    genreSlug: track.genreSlug,
+    genreName: track.genreName,
+    description: track.description,
+    createdAt: track.createdAt,
+    lyrics: track.lyrics,
+    creator: {
+      userId: currentUser?.id || 0,
+      displayName: currentUser?.displayName || currentUser?.username || "You",
+      avatarUrl: currentUser?.avatarUrl || null,
+    },
+    album: track.albumId
+      ? {
+          id: track.albumId,
+          title: track.albumTitle || "Album",
+        }
+      : undefined,
+  };
 }
 
 type Props = {
@@ -105,9 +128,7 @@ export function StudioPage({
   const [submitCopyrightAgreed, setSubmitCopyrightAgreed] = useState(false);
   const [withdrawConfirmTrack, setWithdrawConfirmTrack] = useState<StudioTrack | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [previewAudioUrl, setPreviewAudioUrl] = useState<string | null>(null);
-  const [previewAudioPlaying, setPreviewAudioPlaying] = useState(false);
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const player = usePlayer();
 
   const [isSaving, setIsSaving] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -128,9 +149,6 @@ export function StudioPage({
   >("ALL");
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
   const [loadingAlbums, setLoadingAlbums] = useState(false);
-  const [albumModalOpen, setAlbumModalOpen] = useState(false);
-  const [editingAlbum, setEditingAlbum] = useState<StudioAlbum | null>(null);
-  const [detailAlbum, setDetailAlbum] = useState<StudioAlbum | null>(null);
   const [deleteConfirmAlbum, setDeleteConfirmAlbum] = useState<StudioAlbum | null>(null);
   const [deletingAlbum, setDeletingAlbum] = useState(false);
   const [submittingAlbum, setSubmittingAlbum] = useState<StudioAlbum | null>(null);
@@ -213,7 +231,7 @@ export function StudioPage({
           title: t.title,
           slug: t.slug,
           description: t.description,
-          coverUrl: t.coverUrl ?? "/pics/album.png",
+          coverUrl: t.coverUrl || covers.dawn,
           audioUrl: t.audioUrl,
           durationMs: t.durationMs,
           genreId: t.genreId,
@@ -255,17 +273,9 @@ export function StudioPage({
   }, [filterStatus]);
 
   useEffect(() => {
-    try {
-      const flash = sessionStorage.getItem("soundwave_flash_toast");
-      if (flash) {
-        sessionStorage.removeItem("soundwave_flash_toast");
-        const parsed = JSON.parse(flash);
-        if (parsed?.message) {
-          setActionSuccess(parsed.message);
-        }
-      }
-    } catch {
-      // ignore
+    const flash = consumeFlashToast();
+    if (flash?.message) {
+      setActionSuccess(flash.message);
     }
   }, []);
 
@@ -341,36 +351,6 @@ export function StudioPage({
     }
   };
 
-  // Audio Preview Player
-  const handleToggleAudioPreview = (audioUrl?: string) => {
-    if (!audioUrl) return;
-    if (!previewAudioRef.current) return;
-    if (previewAudioUrl === audioUrl && previewAudioPlaying) {
-      previewAudioRef.current.pause();
-      setPreviewAudioPlaying(false);
-    } else {
-      if (playing) {
-        onPlayingChange?.(false);
-        if (audio) {
-          audio.pause();
-        }
-      }
-      previewAudioRef.current.src = audioUrl;
-      previewAudioRef.current.play().then(() => {
-        setPreviewAudioUrl(audioUrl);
-        setPreviewAudioPlaying(true);
-      }).catch(() => {
-        setPreviewAudioPlaying(false);
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (playing && previewAudioPlaying && previewAudioRef.current) {
-      previewAudioRef.current.pause();
-      setPreviewAudioPlaying(false);
-    }
-  }, [playing, previewAudioPlaying]);
 
   // View Rejection Reason (UC-20)
   // View Rejection Reason (UC-20 theo đúng Sequence Diagram & Đặc tả RDS)
@@ -405,6 +385,23 @@ export function StudioPage({
       (t.description && t.description.toLowerCase().includes(query))
     );
   });
+
+  const handleToggleTrackPlay = (t: StudioTrack) => {
+    if (!t.audioUrl) return;
+    const isThisTrackPlaying = Boolean(
+      player.currentTrack && Number(player.currentTrack.id) === Number(t.id) && player.playing
+    );
+    if (isThisTrackPlaying) {
+      player.setAudioPlaying(false);
+    } else if (player.currentTrack && Number(player.currentTrack.id) === Number(t.id)) {
+      player.setAudioPlaying(true);
+    } else {
+      const landing = studioTrackToLanding(t, currentUser);
+      const validTracks = filtered.filter((item) => item.audioUrl);
+      const queue = validTracks.map((item) => studioTrackToLanding(item, currentUser));
+      player.playTrack(landing, queue, "Content Studio", "studio-tracks");
+    }
+  };
 
   // Album Metrics & Filters (UC-21.4 View Albums - RDS AF01: Draft, Pending, Published, Rejected)
   const albumStats = {
@@ -480,10 +477,10 @@ export function StudioPage({
                     <td>
                       <div className="table-track-cell" style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                         <img
-                          src={album.coverUrl || "/pics/album.png"}
+                          src={album.coverUrl || covers.dawn}
                           alt={album.title}
                           onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = "/pics/album.png";
+                            (e.currentTarget as HTMLImageElement).src = covers.dawn;
                           }}
                           style={{
                             width: "44px",
@@ -733,13 +730,6 @@ export function StudioPage({
             </button>
           </div>
 
-      <audio
-        ref={previewAudioRef}
-        style={{ display: "none" }}
-        onEnded={() => setPreviewAudioPlaying(false)}
-        onError={() => setPreviewAudioPlaying(false)}
-      />
-
       {/* Tracks Table */}
       <div className="studio-table-container">
         {loading ? (
@@ -774,10 +764,10 @@ export function StudioPage({
                       <div className="table-track-cell" style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                         <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
                           <img
-                            src={t.coverUrl ?? "/pics/album.png"}
+                            src={t.coverUrl || covers.dawn}
                             alt={t.title}
                             onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = "/pics/album.png";
+                              (e.currentTarget as HTMLImageElement).src = covers.dawn;
                             }}
                             style={{
                               width: "100%",
@@ -789,35 +779,40 @@ export function StudioPage({
                               boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
                             }}
                           />
-                          {t.audioUrl && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleAudioPreview(t.audioUrl)}
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                background: previewAudioUrl === t.audioUrl && previewAudioPlaying ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)",
-                                border: "none",
-                                borderRadius: "10px",
-                                color: "#fff",
-                                cursor: "pointer",
-                                opacity: previewAudioUrl === t.audioUrl && previewAudioPlaying ? 1 : 0,
-                                transition: "opacity 0.18s ease",
-                              }}
-                              className="track-preview-hover-btn"
-                              title={previewAudioUrl === t.audioUrl && previewAudioPlaying ? "Pause audio preview" : "Play audio preview"}
-                              aria-label={previewAudioUrl === t.audioUrl && previewAudioPlaying ? `Pause ${t.title}` : `Play ${t.title}`}
-                            >
-                              {previewAudioUrl === t.audioUrl && previewAudioPlaying ? (
-                                <PauseIcon width={16} height={16} />
-                              ) : (
-                                <PlayIcon width={16} height={16} />
-                              )}
-                            </button>
-                          )}
+                          {t.audioUrl && (() => {
+                            const isPlayingThis = Boolean(
+                              player.currentTrack && Number(player.currentTrack.id) === Number(t.id) && player.playing
+                            );
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleTrackPlay(t)}
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: isPlayingThis ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)",
+                                  border: "none",
+                                  borderRadius: "10px",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                  opacity: isPlayingThis ? 1 : 0,
+                                  transition: "opacity 0.18s ease",
+                                }}
+                                className="track-preview-hover-btn"
+                                title={isPlayingThis ? "Pause" : "Play"}
+                                aria-label={isPlayingThis ? `Pause ${t.title}` : `Play ${t.title}`}
+                              >
+                                {isPlayingThis ? (
+                                  <PauseIcon width={16} height={16} />
+                                ) : (
+                                  <PlayIcon width={16} height={16} />
+                                )}
+                              </button>
+                            );
+                          })()}
                         </div>
 
                         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -1138,11 +1133,18 @@ export function StudioPage({
         isOpen={Boolean(rejectionModalTrack)}
         details={rejectionModalTrack}
         onClose={() => setRejectionModalTrack(null)}
+        onDeleteTrack={(trackId) => {
+          const targetTrack = trackList.find((t) => t.id === trackId);
+          setRejectionModalTrack(null);
+          if (targetTrack) {
+            setDeleteConfirmTrack(targetTrack);
+          }
+        }}
         onEditTrack={(trackId) => {
           const targetTrack = trackList.find((t) => t.id === trackId);
           setRejectionModalTrack(null);
           if (targetTrack) {
-            onNavigate(`/studio/tracks/${targetTrack.id}/edit`);
+            setDeleteConfirmTrack(targetTrack);
           }
         }}
       />
@@ -1193,29 +1195,6 @@ export function StudioPage({
         </div>,
         document.body
       )}
-
-      {/* Album Form Modal (Create / Edit - UC-21.1 & UC-21.5 Update An Album) */}
-      <AlbumFormModal
-        open={albumModalOpen}
-        onClose={() => setAlbumModalOpen(false)}
-        album={editingAlbum}
-        onSaved={async () => {
-          setAlbumModalOpen(false);
-          await Promise.all([loadAlbums(), loadStudioData()]);
-          setActionSuccess(editingAlbum ? "Album updated successfully." : "Album created successfully.");
-        }}
-      />
-
-      {/* Album Detail Modal (UC-21.2) */}
-      <AlbumDetailModal
-        open={Boolean(detailAlbum)}
-        onClose={() => setDetailAlbum(null)}
-        album={detailAlbum}
-        onDelete={(alb) => {
-          setDetailAlbum(null);
-          setDeleteConfirmAlbum(alb);
-        }}
-      />
 
       {/* Album Delete Confirmation Modal (UC-21.6 Delete An Album) */}
       <DeleteConfirmationModal

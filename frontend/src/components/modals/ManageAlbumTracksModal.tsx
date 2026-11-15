@@ -15,6 +15,7 @@ import {
   TrashIcon,
 } from "../../icons";
 import type { StudioAlbum, StudioTrack } from "../../types";
+import { formatDuration } from "../../utils/timeUtils";
 
 type Props = {
   open: boolean;
@@ -25,14 +26,6 @@ type Props = {
 };
 
 const MAX_ALBUM_TRACKS = 7;
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return "0:00";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
 
 export function ManageAlbumTracksModal({
   open,
@@ -46,7 +39,9 @@ export function ManageAlbumTracksModal({
   const [addSearchQuery, setAddSearchQuery] = useState("");
 
   // Tracks inside the album (ordered)
-  const [currentTracks, setCurrentTracks] = useState<StudioTrack[]>(album.tracks || []);
+  const [currentTracks, setCurrentTracks] = useState<StudioTrack[]>(
+    (album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN")
+  );
 
   // Available standalone tracks outside the album
   const [availableTracks, setAvailableTracks] = useState<StudioTrack[]>([]);
@@ -72,7 +67,7 @@ export function ManageAlbumTracksModal({
   // Sync current tracks when album updates
   useEffect(() => {
     if (open) {
-      setCurrentTracks(album.tracks || []);
+      setCurrentTracks((album.tracks || []).filter((t) => t.status !== "TAKEN_DOWN"));
       setErrorMessage(null);
       setSuccessMessage(null);
       setActiveTab(initialTab || "MANAGE");
@@ -86,9 +81,9 @@ export function ManageAlbumTracksModal({
     try {
       setLoadingAvailable(true);
       const data = await albumApi.getAvailableTracks(album.id);
-      // Filter out tracks already inside this album
+      // Filter out tracks already inside this album and taken down tracks
       const currentIds = new Set((album.tracks || []).map((t) => t.id));
-      setAvailableTracks(data.filter((t) => !currentIds.has(t.id)));
+      setAvailableTracks(data.filter((t) => !currentIds.has(t.id) && t.status !== "TAKEN_DOWN"));
     } catch (err: unknown) {
       console.error("Failed to load available tracks", err);
     } finally {

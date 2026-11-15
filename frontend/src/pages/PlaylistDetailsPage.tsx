@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { formatDuration } from "../utils/timeUtils";
 import { covers } from "../data";
 import { playlistApi } from "../api/playlists";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
@@ -42,12 +43,6 @@ type Props = {
   allTracks?: LandingTrack[];
   audio?: HTMLAudioElement;
   onPlayingChange?: (playing: boolean) => void;
-};
-
-const formatDuration = (ms: number) => {
-  const min = Math.floor(ms / 60000);
-  const sec = Math.floor((ms % 60000) / 1000);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 };
 
 export function PlaylistDetailsPage({
@@ -298,7 +293,7 @@ export function PlaylistDetailsPage({
         className="playlist-header-banner"
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          gridTemplateColumns: "220px minmax(0, 1fr)",
           gap: "28px",
           padding: "28px",
           background: "#fff",
@@ -306,9 +301,10 @@ export function PlaylistDetailsPage({
           borderRadius: "20px",
           boxShadow: "0 8px 30px rgba(16, 24, 40, 0.04)",
           marginBottom: "32px",
+          overflow: "hidden",
         }}
       >
-        <div style={{ position: "relative", width: "220px", height: "220px", borderRadius: "16px", overflow: "hidden" }}>
+        <div style={{ position: "relative", width: "220px", height: "220px", borderRadius: "16px", overflow: "hidden", flexShrink: 0 }}>
           <img
             src={playlist.coverUrl || covers.dawn}
             alt={playlist.title}
@@ -319,7 +315,7 @@ export function PlaylistDetailsPage({
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0, maxWidth: "100%" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <span className="eyebrow" style={{ color: "var(--sw-primary)" }}>PLAYLIST</span>
@@ -349,6 +345,8 @@ export function PlaylistDetailsPage({
                 color: "var(--sw-text)",
                 letterSpacing: "-0.04em",
                 margin: "0 0 10px 0",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {playlist.title}
@@ -356,12 +354,22 @@ export function PlaylistDetailsPage({
 
             {playlist.description && (
               <p
+                className="sw-description"
                 style={{
                   fontSize: "14px",
                   color: "var(--sw-muted)",
                   margin: "0 0 12px 0",
                   lineHeight: 1.6,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
+                title={playlist.description}
               >
                 {playlist.description}
               </p>
@@ -547,8 +555,8 @@ export function PlaylistDetailsPage({
               style={{
                 display: "grid",
                 gridTemplateColumns: isOwner
-                  ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
-                  : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
+                  ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 200px"
+                  : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 90px",
                 alignItems: "center",
                 gap: "14px",
                 padding: "10px 16px",
@@ -583,8 +591,8 @@ export function PlaylistDetailsPage({
                   style={{
                     display: "grid",
                     gridTemplateColumns: isOwner
-                      ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 170px"
-                      : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 85px",
+                      ? "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 200px"
+                      : "36px 48px minmax(180px, 1.5fr) minmax(120px, 1fr) 70px 90px",
                     alignItems: "center",
                     gap: "14px",
                     padding: "10px 16px",
@@ -723,10 +731,12 @@ export function PlaylistDetailsPage({
                         gap: "4px",
                         color: "var(--sw-primary, #0284c7)",
                         fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
                       }}
                     >
                       <EyeIcon width={13} height={13} />
-                      <span>Detail</span>
+                      <span style={{ whiteSpace: "nowrap" }}>Detail</span>
                     </button>
 
                     {isOwner ? (
@@ -853,8 +863,11 @@ export function PlaylistDetailsPage({
             <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid #e4e7ec" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0 }}>
                 <img
-                  src={selectedDetailTrack.coverUrl || "/pics/album.png"}
+                  src={selectedDetailTrack.coverUrl || covers.dawn}
                   alt={selectedDetailTrack.title}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                  }}
                   style={{
                     width: "56px",
                     height: "56px",
@@ -1071,7 +1084,7 @@ export function PlaylistDetailsPage({
                   <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--sw-text-secondary, #475569)", marginBottom: "4px" }}>
                     Description
                   </div>
-                  <div style={{ fontSize: "13px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap" }}>
+                  <div style={{ fontSize: "13px", color: "var(--sw-text, #1e293b)", background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere", maxHeight: "140px", overflowY: "auto" }}>
                     {selectedDetailTrack.description}
                   </div>
                 </div>
