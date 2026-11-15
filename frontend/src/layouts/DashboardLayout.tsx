@@ -115,11 +115,11 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           <>
             <button
               type="button"
-              className={activeRoute === "/admin" || activeRoute === "/admin/dashboard" ? "is-active" : ""}
-              onClick={() => handleNavClick("/admin/dashboard")}
+              className={activeRoute === "/admin" || activeRoute === "/admin/dashboard" || activeRoute === "/admin/statistics" ? "is-active" : ""}
+              onClick={() => handleNavClick("/admin/statistics")}
             >
               <ShieldIcon width={17} height={17} />
-              <span>System Dashboard</span>
+              <span>System Statistics</span>
             </button>
             <button
               type="button"
