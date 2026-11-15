@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMotionReveal } from "./useMotionReveal";
-import { getCurrentRoute, LOCATION_CHANGE_EVENT, navigateTo } from "../utils/navigation";
+import {
+  getCurrentRoute,
+  getRouteReloadKey,
+  LOCATION_CHANGE_EVENT,
+  navigateTo,
+  type NavigateOptions,
+} from "../utils/navigation";
 
 export interface AppRouterState {
   route: string;
   pathname: string;
   queryString: string;
   queryParams: URLSearchParams;
-  navigate: (path: string) => void;
+  reloadKey: number;
+  navigate: (path: string, options?: NavigateOptions) => void;
   isAuthRoute: boolean;
   isDashboardRoute: boolean;
   isMusicRoute: boolean;
@@ -16,6 +23,7 @@ export interface AppRouterState {
 
 export function useRouter(): AppRouterState {
   const [route, setRoute] = useState(() => getCurrentRoute());
+  const [reloadKey, setReloadKey] = useState(() => getRouteReloadKey());
 
   useEffect(() => {
     const handlePopState = () => {
@@ -27,9 +35,11 @@ export function useRouter(): AppRouterState {
         return;
       }
       setRoute(getCurrentRoute());
+      setReloadKey(getRouteReloadKey());
     };
     const handleLocationChange = () => {
       setRoute(getCurrentRoute());
+      setReloadKey(getRouteReloadKey());
     };
     window.addEventListener("popstate", handlePopState);
     window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange);
@@ -40,12 +50,12 @@ export function useRouter(): AppRouterState {
   }, [route]);
 
   // navigateTo() tự phát event "soundwave:navigate" (cancelable) để trang có thay đổi chưa lưu chặn lại
-  const navigate = useCallback((path: string) => navigateTo(path), []);
+  const navigate = useCallback((path: string, options?: NavigateOptions) => navigateTo(path, options), []);
 
   const [pathname, queryString] = route.split("?");
   const queryParams = useMemo(() => new URLSearchParams(queryString || ""), [queryString]);
 
-  useMotionReveal(pathname);
+  useMotionReveal(`${pathname}-${reloadKey}`);
 
   const isAuthRoute =
     pathname === "/login" ||
@@ -70,6 +80,7 @@ export function useRouter(): AppRouterState {
     pathname,
     queryString,
     queryParams,
+    reloadKey,
     navigate,
     isAuthRoute,
     isDashboardRoute,

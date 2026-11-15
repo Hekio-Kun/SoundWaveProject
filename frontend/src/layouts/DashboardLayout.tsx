@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useModalScrollLock } from "../hooks/useModalScrollLock";
 import {
   CloseIcon,
@@ -8,29 +8,31 @@ import {
   FlagIcon,
   LogoutIcon,
   MenuIcon,
-  MusicIcon,
   ShieldIcon,
   UserIcon,
   UsersIcon,
 } from "../icons";
 import { NotificationDropdown } from "../components/layout/NotificationDropdown";
 import type { CurrentUser } from "../types";
+import type { NavigateOptions } from "../utils/navigation";
 
 type Props = {
   children: ReactNode;
   activeRoute: string;
+  reloadKey?: number;
   user: CurrentUser | null;
-  onNavigate: (route: string) => void;
+  onNavigate: (route: string, options?: NavigateOptions) => void;
   onLogout: () => void;
 };
 
-export function DashboardLayout({ children, activeRoute, user, onNavigate, onLogout }: Props) {
+export function DashboardLayout({ children, activeRoute, reloadKey = 0, user, onNavigate, onLogout }: Props) {
   const isStaff = user?.role === "STAFF";
   const isAdmin = user?.role === "ADMIN";
   const roleLabel = isAdmin ? "Administrator" : "Staff";
 
   // Mobile Drawer State
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const contentRef = useRef<HTMLElement | null>(null);
 
   // Close drawer on escape key
   useEffect(() => {
@@ -42,13 +44,26 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileDrawerOpen]);
 
+  // Reset scroll position when navigating or reloading via sidebar
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [activeRoute, reloadKey]);
+
   // Lock scroll across all containers when mobile drawer is open
   useModalScrollLock(mobileDrawerOpen);
 
   const handleNavClick = (route: string) => {
     setMobileDrawerOpen(false);
-    onNavigate(route);
+    onNavigate(route, { reloadIfSame: true });
   };
+
+  const isReportedTracksActive =
+    activeRoute === "/staff/reports" || activeRoute === "/staff/content-reports";
+  const isPendingTracksActive =
+    activeRoute.startsWith("/staff") &&
+    activeRoute !== "/staff/lyrics" &&
+    !isReportedTracksActive;
 
   const renderSidebarContent = () => (
     <>
@@ -85,7 +100,7 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
           <>
             <button
               type="button"
-              className={activeRoute.startsWith("/staff") && activeRoute !== "/staff/lyrics" && activeRoute !== "/staff/reports" ? "is-active" : ""}
+              className={isPendingTracksActive ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/dashboard")}
               title="Pending track submissions"
             >
@@ -94,7 +109,7 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
             </button>
             <button
               type="button"
-              className={activeRoute === "/staff/reports" ? "is-active" : ""}
+              className={isReportedTracksActive ? "is-active" : ""}
               onClick={() => handleNavClick("/staff/reports")}
               title="Reported tracks"
             >
@@ -259,7 +274,7 @@ export function DashboardLayout({ children, activeRoute, user, onNavigate, onLog
         </header>
 
         {/* Scrollable Main View */}
-        <main className="ops-shell-content">{children}</main>
+        <main className="ops-shell-content" ref={contentRef}>{children}</main>
       </div>
     </div>
   );

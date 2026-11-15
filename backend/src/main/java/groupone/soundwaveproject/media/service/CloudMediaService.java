@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import groupone.soundwaveproject.config.CloudinaryProperties;
 import groupone.soundwaveproject.exception.BadRequestOperationException;
+import groupone.soundwaveproject.media.dto.response.DownloadedMediaResponse;
 import groupone.soundwaveproject.media.dto.response.StoredAudioResponse;
 import groupone.soundwaveproject.media.dto.response.StoredMediaResponse;
 import groupone.soundwaveproject.media.exception.CloudStorageUnavailableException;
@@ -16,8 +17,17 @@ import groupone.soundwaveproject.media.exception.InvalidTrackCoverException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,10 +39,17 @@ public class CloudMediaService {
     private static final long MAX_TRACK_AUDIO_SIZE = 30L * 1024 * 1024;
     private static final long MAX_TRACK_COVER_SIZE = 5L * 1024 * 1024;
     private static final long MAX_EVIDENCE_DOCUMENT_SIZE = 15L * 1024 * 1024;
+    private static final long MAX_EVIDENCE_DOWNLOAD_BYTES = 25L * 1024 * 1024;
+    private static final int MAX_CLOUD_REDIRECTS = 3;
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] OLE2_DOC_SIGNATURE = {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
 
     private final Cloudinary cloudinary;
     private final CloudinaryProperties properties;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
     /**
      * Kiểm tra và tải ảnh đại diện của người dùng lên Cloudinary.
@@ -112,6 +129,39 @@ public class CloudMediaService {
             log.error("Failed to read evidence document", e);
             throw new BadRequestOperationException("EVIDENCE_READ_ERROR", "Could not read uploaded evidence file.");
         }
+    }
+
+    /**
+     * Tải xuống tệp tài liệu chứng minh bản quyền từ Cloudinary kèm metadata định dạng.
+     */
+    public DownloadedMediaResponse downloadReportEvidence(String evidenceUrl, String evidencePublicId) {
+        if (evidenceUrl == null || evidenceUrl.isBlank()) {
+            throw new BadRequestOperationException("EVIDENCE_NOT_FOUND", "No proof document is attached to this report.");
+        }
+
+        URI initialUri = validateCloudinaryDownloadUri(evidenceUrl);
+        CloudHttpResponse response = fetchWithGuardedRedirects(initialUri);
+
+        // Dự phòng URL ký privateDownload nếu Cloudinary CDN chặn truy cập trực tiếp tệp PDF/ZIP
+        if ((response.statusCode() == 401 || response.statusCode() == 403)
+                && evidencePublicId != null && !evidencePublicId.isBlank() && properties.isConfigured()) {
+            String resourceType = resolveCloudinaryResourceType(evidenceUrl);
+            String urlExtension = extractExtensionFromPath(initialUri.getPath());
+            String signedUrl = buildSignedPrivateDownloadUrl(evidencePublicId, urlExtension, resourceType);
+            if (signedUrl != null) {
+                response = fetchWithGuardedRedirects(validateCloudinaryDownloadUri(signedUrl));
+            }
+        }
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300 || response.bytes().length == 0) {
+            log.warn("Không thể tải tệp bằng chứng từ Cloudinary, status={}", response.statusCode());
+            throw new CloudStorageUnavailableException(
+                    "Failed to download proof document from cloud storage. Please try again.");
+        }
+
+        String extension = resolveEvidenceExtension(initialUri.getPath(), response.contentType(), response.bytes());
+        String contentType = resolveEvidenceContentType(response.contentType(), extension);
+        return new DownloadedMediaResponse(response.bytes(), contentType, extension);
     }
 
     /**
@@ -308,5 +358,201 @@ public class CloudMediaService {
 
     private void ensureConfigured() {
         if (!properties.isConfigured()) throw new CloudStorageUnavailableException();
+    }
+
+    protected record CloudHttpResponse(int statusCode, String contentType, byte[] bytes) {}
+
+    protected CloudHttpResponse sendHttpGet(URI uri) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .GET()
+                .timeout(Duration.ofSeconds(30))
+                .build();
+        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        String contentType = response.headers().firstValue("Content-Type").orElse(null);
+        try (InputStream body = response.body()) {
+            if (response.statusCode() >= 300 && response.statusCode() < 400) {
+                String location = response.headers().firstValue("Location").orElse(null);
+                return new CloudHttpResponse(response.statusCode(), location, new byte[0]);
+            }
+            byte[] bytes = readBoundedBytes(body);
+            return new CloudHttpResponse(response.statusCode(), contentType, bytes);
+        }
+    }
+
+    protected String buildSignedPrivateDownloadUrl(String publicId, String format, String resourceType) {
+        try {
+            return cloudinary.privateDownload(
+                    publicId,
+                    format != null ? format : "",
+                    ObjectUtils.asMap(
+                            "resource_type", resourceType,
+                            "type", "upload",
+                            "attachment", true
+                    )
+            );
+        } catch (Exception exception) {
+            log.warn("Không thể tạo signed download URL cho Cloudinary publicId: {}", exception.getMessage());
+            return null;
+        }
+    }
+
+    // Chỉ theo dõi chuyển hướng nội bộ trên các host Cloudinary tin cậy để chống SSRF
+    private CloudHttpResponse fetchWithGuardedRedirects(URI startUri) {
+        URI currentUri = startUri;
+        try {
+            for (int hop = 0; hop <= MAX_CLOUD_REDIRECTS; hop++) {
+                CloudHttpResponse response = sendHttpGet(currentUri);
+                if (response.statusCode() >= 300 && response.statusCode() < 400) {
+                    String redirectLocation = response.contentType();
+                    if (redirectLocation == null || redirectLocation.isBlank() || hop == MAX_CLOUD_REDIRECTS) {
+                        throw new CloudStorageUnavailableException(
+                                "Failed to download proof document from cloud storage. Please try again.");
+                    }
+                    URI resolved = currentUri.resolve(redirectLocation);
+                    currentUri = validateCloudinaryDownloadUri(resolved.toString());
+                    continue;
+                }
+                return response;
+            }
+            throw new CloudStorageUnavailableException(
+                    "Failed to download proof document from cloud storage. Please try again.");
+        } catch (BadRequestOperationException | CloudStorageUnavailableException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new CloudStorageUnavailableException(
+                    "Proof document download was interrupted. Please try again.");
+        } catch (IOException | RuntimeException ex) {
+            log.warn("Lỗi kết nối khi tải tệp bằng chứng từ Cloudinary: {}", ex.getMessage());
+            throw new CloudStorageUnavailableException(
+                    "Failed to download proof document from cloud storage. Please try again.");
+        }
+    }
+
+    private URI validateCloudinaryDownloadUri(String rawUrl) {
+        URI uri;
+        try {
+            uri = URI.create(rawUrl.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestOperationException("INVALID_EVIDENCE_URL", "Evidence document URL is invalid.");
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (!"https".equalsIgnoreCase(scheme) || host == null || !isTrustedCloudinaryHost(host)) {
+            throw new BadRequestOperationException(
+                    "INVALID_EVIDENCE_URL",
+                    "Evidence document URL must point to a trusted cloud storage host.");
+        }
+        return uri;
+    }
+
+    private boolean isTrustedCloudinaryHost(String host) {
+        String normalized = host.toLowerCase(Locale.ROOT);
+        return normalized.equals("res.cloudinary.com")
+                || normalized.equals("api.cloudinary.com")
+                || normalized.endsWith(".cloudinary.com");
+    }
+
+    private byte[] readBoundedBytes(InputStream input) throws IOException {
+        if (input == null) return new byte[0];
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > MAX_EVIDENCE_DOWNLOAD_BYTES) {
+                throw new BadRequestOperationException(
+                        "EVIDENCE_TOO_LARGE",
+                        "Evidence document exceeds maximum supported download size.");
+            }
+            output.write(buffer, 0, read);
+        }
+        return output.toByteArray();
+    }
+
+    private String resolveCloudinaryResourceType(String evidenceUrl) {
+        if (evidenceUrl.contains("/raw/upload/")) return "raw";
+        if (evidenceUrl.contains("/video/upload/")) return "video";
+        return "image";
+    }
+
+    private String extractExtensionFromPath(String path) {
+        if (path == null || path.isBlank()) return "";
+        int lastSlash = path.lastIndexOf('/');
+        String fileSegment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        int dotIndex = fileSegment.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == fileSegment.length() - 1) return "";
+        String candidate = fileSegment.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+        return candidate.matches("[a-z0-9]{1,10}") ? candidate : "";
+    }
+
+    // Suy luận phần mở rộng tệp chuẩn theo thứ tự: URL -> magic bytes (tệp raw không đuôi) -> Content-Type
+    private String resolveEvidenceExtension(String path, String rawContentType, byte[] bytes) {
+        String fromUrl = extractExtensionFromPath(path);
+        if (!fromUrl.isEmpty()) return fromUrl;
+
+        if (isPdf(bytes)) return "pdf";
+        if (isPng(bytes)) return "png";
+        if (isJpeg(bytes)) return "jpg";
+        if (isWebp(bytes)) return "webp";
+        if (isOle2Doc(bytes)) return "doc";
+        if (isDocxZip(bytes)) return "docx";
+
+        String normalizedType = stripContentTypeParams(rawContentType);
+        return switch (normalizedType) {
+            case "application/pdf" -> "pdf";
+            case "image/png" -> "png";
+            case "image/jpeg" -> "jpg";
+            case "image/webp" -> "webp";
+            case "application/msword" -> "doc";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
+            default -> "";
+        };
+    }
+
+    private String resolveEvidenceContentType(String rawContentType, String extension) {
+        String normalized = stripContentTypeParams(rawContentType);
+        if (!normalized.isEmpty() && !"application/octet-stream".equals(normalized)) {
+            return normalized;
+        }
+        return switch (extension) {
+            case "pdf" -> "application/pdf";
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "webp" -> "image/webp";
+            case "doc" -> "application/msword";
+            case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            default -> "application/octet-stream";
+        };
+    }
+
+    private String stripContentTypeParams(String rawContentType) {
+        if (rawContentType == null || rawContentType.isBlank()) return "";
+        int semiIndex = rawContentType.indexOf(';');
+        String base = semiIndex >= 0 ? rawContentType.substring(0, semiIndex) : rawContentType;
+        return base.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isPdf(byte[] content) {
+        return content.length >= 5
+                && content[0] == '%' && content[1] == 'P' && content[2] == 'D' && content[3] == 'F' && content[4] == '-';
+    }
+
+    private boolean isOle2Doc(byte[] content) {
+        if (content.length < OLE2_DOC_SIGNATURE.length) return false;
+        for (int index = 0; index < OLE2_DOC_SIGNATURE.length; index++) {
+            if (content[index] != OLE2_DOC_SIGNATURE[index]) return false;
+        }
+        return true;
+    }
+
+    private boolean isDocxZip(byte[] content) {
+        if (content.length < 4
+                || content[0] != 'P' || content[1] != 'K' || content[2] != 0x03 || content[3] != 0x04) {
+            return false;
+        }
+        String preview = new String(content, 0, Math.min(content.length, 4096), StandardCharsets.ISO_8859_1);
+        return preview.contains("word/") || preview.contains("[Content_Types].xml");
     }
 }
