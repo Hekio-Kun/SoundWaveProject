@@ -114,6 +114,7 @@ public class StudioAlbumService {
         this.lyricService = lyricService;
     }
 
+
     /**
      * Lấy danh sách toàn bộ Album do người dùng hiện tại tạo ra (UC-21.4 View Albums).
      * Sequence Diagram Steps:
