@@ -27,10 +27,10 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
             <span className="nav-group-title">SYSTEM ADMINISTRATION</span>
             <button
               className={`nav-item ${isCurrent("/admin") ? "nav-item--active" : ""}`}
-              onClick={() => onNavigate("/admin/dashboard")}
+              onClick={() => onNavigate("/admin/statistics")}
             >
               <ShieldIcon />
-              <span>Administration overview</span>
+              <span>System Statistics</span>
               <small className="sidebar-badge">ADMIN</small>
             </button>
           </div>
