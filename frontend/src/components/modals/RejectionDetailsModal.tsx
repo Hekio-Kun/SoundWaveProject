@@ -7,9 +7,7 @@ import {
   AlertIcon,
   CloseIcon,
   ClockIcon,
-  EditIcon,
   CheckIcon,
-  TrashIcon,
 } from "../../icons";
 
 /**
@@ -418,35 +416,6 @@ export function RejectionDetailsModal({
           >
             Close
           </button>
-
-          {(onDeleteTrack || onEditTrack) && (
-            <button
-              type="button"
-              className="button button-danger"
-              onClick={() => {
-                onClose();
-                if (onDeleteTrack) {
-                  onDeleteTrack(details.trackId);
-                } else if (onEditTrack) {
-                  onEditTrack(details.trackId);
-                }
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#dc2626",
-                color: "#ffffff",
-                padding: "8px 18px",
-                borderRadius: "10px",
-                fontWeight: 600,
-                border: "none",
-              }}
-            >
-              <TrashIcon width={15} height={15} />
-              <span>Delete</span>
-            </button>
-          )}
         </div>
       </div>
     </div>,
