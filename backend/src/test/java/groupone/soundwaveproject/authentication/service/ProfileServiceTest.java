@@ -58,6 +58,26 @@ class ProfileServiceTest {
     }
 
     @Test
+    void getPublicProfileReturnsCreatorProfileByUserId() {
+        UserProfile profile = org.mockito.Mockito.mock(UserProfile.class);
+        ProfileResponse expected = response("creator");
+        when(profileRepository.findByUserId(42L)).thenReturn(Optional.of(profile));
+        when(profileMapper.toResponse(profile)).thenReturn(expected);
+
+        ProfileResponse result = service().getPublicProfile(42L);
+
+        assertSame(expected, result);
+    }
+
+    @Test
+    void getPublicProfileRejectsMissingUserId() {
+        when(profileRepository.findByUserId(999L)).thenReturn(Optional.empty());
+
+        assertThrows(ProfileNotFoundException.class,
+                () -> service().getPublicProfile(999L));
+    }
+
+    @Test
     void updateCurrentProfileNormalizesAndUpdatesAllowedFields() {
         UserProfile profile = org.mockito.Mockito.mock(UserProfile.class);
         UpdateProfileRequest request = new UpdateProfileRequest(

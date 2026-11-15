@@ -193,6 +193,9 @@ public class LyricService {
         log.info("Deleted personal lyric for userId={} trackId={} lyricType={}", user.getId(), trackId, type);
     }
 
+    /**
+     * Chuyển đổi thực thể OfficialLyric sang DTO LyricDetailResponse.
+     */
     public LyricDetailResponse mapOfficialToResponse(OfficialLyric lyric) {
         return new LyricDetailResponse(
                 lyric.getId(),
@@ -205,6 +208,9 @@ public class LyricService {
         );
     }
 
+    /**
+     * Chuyển đổi thực thể PersonalLyric sang DTO LyricDetailResponse.
+     */
     public LyricDetailResponse mapPersonalToResponse(PersonalLyric lyric) {
         return new LyricDetailResponse(
                 lyric.getId(),
@@ -217,6 +223,9 @@ public class LyricService {
         );
     }
 
+    /**
+     * Chuyển đổi thực thể PersonalLyric sang DTO CustomLyricResponse theo chuẩn UTC.
+     */
     public CustomLyricResponse mapToCustomResponse(PersonalLyric lyric) {
         LocalDateTime created = lyric.getCreatedAt() != null
                 ? LocalDateTime.ofInstant(lyric.getCreatedAt(), ZoneOffset.UTC)
@@ -274,6 +283,9 @@ public class LyricService {
         });
     }
 
+    /**
+     * Xuất bản lời bài hát chính thức cho bài hát theo trackId (alias phục vụ tương thích giữa các service).
+     */
     @Transactional
     public void publishOfficialLyricForTrack(Long trackId) {
         publishOfficialLyric(trackId);

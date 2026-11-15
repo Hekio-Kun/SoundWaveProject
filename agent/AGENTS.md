@@ -13,7 +13,7 @@ soundwave/
 │   ├── AGENTS_BACKEND.md   # Quy tắc chi tiết cho Backend
 │   ├── AGENTS_FRONTEND.md  # Quy tắc chi tiết cho Frontend
 │   └── *.md                # 68 chuyên viên AI chuyên sâu (architect, reviewer, security,...)
-├── backend/          # Java 21, Spring Boot, Spring Data JPA, SQL Server, Lombok
+├── backend/          # Java 21, Spring Boot, Spring Data JPA, PostgreSQL, Lombok
 ├── frontend/         # Vite, React, TypeScript, TailwindCSS / Custom CSS Tokens
 ├── .ecc/             # Bộ quy chuẩn Everything Claude Code (Rules, Workflows)
 └── AGENTS.md         # File này (Master Router)
@@ -21,18 +21,19 @@ soundwave/
 
 ---
 
-## 2. Quy tắc định tuyến tự động cho AI (Routing Rules)
+## 2. Quy tắc định tuyến tự động cho AI (Routing Rules) — LUÔN ÁP DỤNG
 
-Mỗi khi nhận yêu cầu từ lập trình viên, AI **bắt buộc** phải tuân theo định tuyến sau:
+AI Agent **BẮT BUỘC LUÔN LUÔN ĐỌC VÀ TUÂN THỦ** 2 tệp quy chuẩn nền tảng sau trong **MỌI lượt hội thoại**:
+- [agent/AGENTS_BACKEND.md](file:///c:/Users/lehai/IdeaProjects/SoundWaveProject/agent/AGENTS_BACKEND.md) (và `backend/AGENTS.md`): Áp dụng bắt buộc cho toàn bộ logic Backend (API, Database, Entity, Service, Auth, Repository).
+- [agent/AGENTS_FRONTEND.md](file:///c:/Users/lehai/IdeaProjects/SoundWaveProject/agent/AGENTS_FRONTEND.md) (và `frontend/AGENTS.md`): Áp dụng bắt buộc cho toàn bộ logic Frontend (Giao diện, Component, Page, Player, State, Theme Xanh biển `#0284C7` & Cát ấm `#D4A373`).
 
-1. **Nếu task chỉ liên quan Backend (API, Database, Entity, Service, Auth)**:
-   - Phải đọc và tuân thủ tuyệt đối [agent/AGENTS_BACKEND.md](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/AGENTS_BACKEND.md).
+Cụ thể:
+1. **Đối với Backend**:
    - Luồng bắt buộc: `Controller -> Service -> Repository -> Database`. Dùng DTO, không bao giờ để Controller gọi trực tiếp Repository.
    - Tuân thủ quy chuẩn Java & Spring Boot trong `.ecc/rules/java/`.
 
-2. **Nếu task chỉ liên quan Frontend (Giao diện, Component, Page, Player, State)**:
-   - Phải đọc và tuân thủ tuyệt đối [agent/AGENTS_FRONTEND.md](file:///C:/Users/lehai/IdeaProjects/soundwave/agent/AGENTS_FRONTEND.md).
-   - Chuẩn thiết kế: Light-first, tối giản, vibe biển & bờ cát tự nhiên, màu chủ đạo là **Xanh dương sáng** (`#0284C7` / `#0EA5E9`) kết hợp **Màu cát** (`#E6D5B8` / `#D4B996`), không dùng gradient quá mức, không duplicate Header/Footer/Player.
+2. **Đối với Frontend**:
+   - Chuẩn thiết kế: Light-first, tối giản, vibe biển & bờ cát tự nhiên, màu chủ đạo là **Xanh dương sáng** (`#0284C7` / `#0EA5E9`) kết hợp **Màu vàng cát** (`#D4A373` / `#F6EFE3` / `#E6D5B8`), không dùng gradient quá mức, không duplicate Header/Footer/Player.
    - Tuân thủ quy chuẩn React & TypeScript trong `.ecc/rules/react/`.
 
 3. **Nếu task Full-Stack (Tính năng mới đi từ Database -> API -> UI)**:
@@ -67,7 +68,7 @@ Khi được yêu cầu tạo tính năng mới (ví dụ: Tạo Playlist, Uploa
 ### Bước 3: Triển khai Frontend (`frontend/`)
 - Khai báo kiểu dữ liệu trong `src/types.ts` khớp với Response DTO của Backend.
 - Viết service/fetch API.
-- Tạo component/page tuân thủ Design Tokens trong `AGENTS_FRONTEND.md` (Xanh dương sáng `#0284C7` & Màu cát `#E6D5B8`, không duplicate Player/Header).
+- Tạo component/page tuân thủ Design Tokens trong `AGENTS_FRONTEND.md` (Xanh dương sáng `#0284C7` & Màu vàng cát `#D4A373` / `#F6EFE3`, không duplicate Player/Header).
 - Xử lý các trạng thái: Loading, Success, Error, Empty state.
 
 ### Bước 4: Kiểm tra & Review (Quality Gate)

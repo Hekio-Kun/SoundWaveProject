@@ -235,4 +235,89 @@ class LyricServiceTest {
         assertEquals("CUSTOM", response.lyricType());
         assertEquals("[00:10.00]Valid lyrics content", response.lyricContent());
     }
+
+    @Test
+    @DisplayName("savePersonalLyric - updates existing personal lyric record")
+    void savePersonalLyric_UpdatesExistingRecord() {
+        Track track = createTrack(1L, "Ocean Waves");
+        User user = createUser(5L, "listener@example.com");
+        PersonalLyric existing = PersonalLyric.builder()
+                .id(303L)
+                .user(user)
+                .track(track)
+                .lyricType("CUSTOM")
+                .lyricContent("[00:01.00]Old lyric")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(user));
+        when(personalLyricRepository.findByUserIdAndTrackIdAndLyricType(5L, 1L, "CUSTOM"))
+                .thenReturn(Optional.of(existing));
+        when(personalLyricRepository.save(any(PersonalLyric.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LyricDetailResponse updated = lyricService.savePersonalLyric(
+                "listener@example.com", 1L, new SavePersonalLyricRequest("CUSTOM", "[00:02.00]Updated lyric"));
+
+        assertEquals(303L, updated.id());
+        assertEquals("[00:02.00]Updated lyric", updated.lyricContent());
+        verify(personalLyricRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("savePersonalLyric - throws BadRequestOperationException when content is blank")
+    void savePersonalLyric_BlankContent_ThrowsBadRequest() {
+        Track track = createTrack(1L, "Ocean Waves");
+        User user = createUser(5L, "listener@example.com");
+        when(trackRepository.findById(1L)).thenReturn(Optional.of(track));
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(user));
+
+        assertThrows(BadRequestOperationException.class, () ->
+                lyricService.savePersonalLyric("listener@example.com", 1L, new SavePersonalLyricRequest("CUSTOM", "   "))
+        );
+    }
+
+    @Test
+    @DisplayName("getPersonalLyrics - returns user custom lyrics list for track")
+    void getPersonalLyrics_ReturnsListForAuthenticatedUser() {
+        Track track = createTrack(1L, "Ocean Waves");
+        User user = createUser(5L, "listener@example.com");
+        PersonalLyric personal = PersonalLyric.builder()
+                .id(404L)
+                .user(user)
+                .track(track)
+                .lyricType("TRANSLATION")
+                .lyricContent("[00:01.00]Translated line")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("listener@example.com")).thenReturn(Optional.of(user));
+        when(personalLyricRepository.findByUserIdAndTrackId(5L, 1L)).thenReturn(java.util.List.of(personal));
+
+        var list = lyricService.getPersonalLyrics(1L, "listener@example.com");
+
+        assertEquals(1, list.size());
+        assertEquals("TRANSLATION", list.get(0).lyricType());
+        assertEquals("[00:01.00]Translated line", list.get(0).lyricContent());
+    }
+
+    @Test
+    @DisplayName("publishOfficialLyric - transitions DRAFT official lyric to PUBLISHED")
+    void publishOfficialLyric_TransitionsDraftToPublished() {
+        Track track = createTrack(1L, "Ocean Waves");
+        OfficialLyric draft = OfficialLyric.builder()
+                .id(505L)
+                .track(track)
+                .lyricContent("[00:01.00]Draft official lyric")
+                .status("DRAFT")
+                .build();
+        when(officialLyricRepository.findByTrackId(1L)).thenReturn(Optional.of(draft));
+
+        lyricService.publishOfficialLyric(1L);
+
+        assertEquals("PUBLISHED", draft.getStatus());
+        verify(officialLyricRepository).save(draft);
+    }
 }

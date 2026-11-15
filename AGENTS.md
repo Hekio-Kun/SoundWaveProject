@@ -13,7 +13,7 @@ soundwave/
 │   ├── AGENTS_BACKEND.md   # Quy tắc chi tiết cho Backend
 │   ├── AGENTS_FRONTEND.md  # Quy tắc chi tiết cho Frontend
 │   └── *.md                # 68 chuyên viên AI chuyên sâu (architect, reviewer, security,...)
-├── backend/          # Java 21, Spring Boot, Spring Data JPA, SQL Server, Lombok
+├── backend/          # Java 21, Spring Boot, Spring Data JPA, PostgreSQL, Lombok
 ├── frontend/         # Vite, React, TypeScript, TailwindCSS / Custom CSS Tokens
 ├── .ecc/             # Bộ quy chuẩn Everything Claude Code (Rules, Workflows)
 └── AGENTS.md         # File này (Master Router)
