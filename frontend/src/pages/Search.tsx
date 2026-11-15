@@ -606,47 +606,64 @@ export function Search({
                     return (
                       <div
                         key={track.id}
+                        className="search-track-row"
                         style={{
                           display: "flex",
                           alignItems: "center",
                           boxSizing: "border-box",
-                    justifyContent: "space-between",
+                          justifyContent: "space-between",
                           padding: "8px 14px",
                           borderRadius: "10px",
                           background: isTrackActive ? "rgba(2, 132, 199, 0.08)" : "#FFFFFF",
-                          border: "1px solid var(--sw-border, #E2E8F0)",
+                          border: isTrackActive ? "1px solid #BAE6FD" : "1px solid var(--sw-border, #E2E8F0)",
                           transition: "all 0.15s ease",
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
-                          <button
+                          {/* Spotify-style thumbnail with centered play/pause overlay */}
+                          <div
+                            className="search-track-cover"
                             onClick={() => onPlayTrack(track)}
                             style={{
-                              width: "36px",
-                              height: "36px",
+                              position: "relative",
+                              width: "42px",
+                              height: "42px",
                               borderRadius: "8px",
-                              border: "none",
-                              background: "#0284C7",
-                              color: "#FFFFFF",
-                              display: "grid",
-                              placeItems: "center",
-                              cursor: "pointer",
+                              overflow: "hidden",
                               flexShrink: 0,
+                              cursor: "pointer",
                             }}
-                            aria-label={`Play ${track.title}`}
+                            title={isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
                           >
-                            {isTrackPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-                          </button>
-                          <img
-                            src={track.coverUrl || DEFAULT_COVER_FALLBACK}
-                            alt=""
-                            style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER_FALLBACK;
-                            }}
-                          />
+                            <img
+                              src={track.coverUrl || DEFAULT_COVER_FALLBACK}
+                              alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER_FALLBACK;
+                              }}
+                            />
+                            <div
+                              className="search-play-overlay"
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                background: isTrackPlaying ? "rgba(0, 0, 0, 0.55)" : "rgba(0, 0, 0, 0.45)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#FFFFFF",
+                                opacity: isTrackPlaying ? 1 : 0,
+                                transition: "opacity 0.15s ease",
+                              }}
+                            >
+                              {isTrackPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
+                            </div>
+                          </div>
+
                           <div style={{ minWidth: 0 }}>
                             <div
+                              onClick={() => onNavigate(`/track/${track.id}`)}
                               style={{
                                 fontSize: "14px",
                                 fontWeight: 600,
@@ -654,11 +671,22 @@ export function Search({
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
+                                cursor: "pointer",
                               }}
                             >
                               {track.title}
                             </div>
-                            <div style={{ fontSize: "12.5px", color: "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <div
+                              onClick={() => track.creator?.userId && onNavigate(`/creator/${track.creator.userId}`)}
+                              style={{
+                                fontSize: "12.5px",
+                                color: "#64748B",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                cursor: "pointer",
+                              }}
+                            >
                               {track.creator?.displayName || "Unknown Artist"}
                             </div>
                           </div>
@@ -907,45 +935,87 @@ export function Search({
                 return (
                   <div
                     key={track.id}
+                    className="search-track-row"
                     style={{
                       display: "flex",
                       alignItems: "center",
                       boxSizing: "border-box",
-                    justifyContent: "space-between",
+                      justifyContent: "space-between",
                       padding: "10px 16px",
                       borderRadius: "12px",
                       background: isTrackActive ? "rgba(2, 132, 199, 0.08)" : "#FFFFFF",
-                      border: "1px solid var(--sw-border, #E2E8F0)",
+                      border: isTrackActive ? "1px solid #BAE6FD" : "1px solid var(--sw-border, #E2E8F0)",
+                      transition: "all 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-                      <button
+                      {/* Spotify-style thumbnail with centered play/pause overlay */}
+                      <div
+                        className="search-track-cover"
                         onClick={() => onPlayTrack(track)}
                         style={{
-                          width: "38px",
-                          height: "38px",
-                          borderRadius: "50%",
-                          border: "none",
-                          background: "#0284C7",
-                          color: "#FFFFFF",
-                          display: "grid",
-                          placeItems: "center",
-                          cursor: "pointer",
+                          position: "relative",
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "8px",
+                          overflow: "hidden",
                           flexShrink: 0,
+                          cursor: "pointer",
                         }}
+                        title={isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
                       >
-                        {isTrackPlaying ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-                      </button>
-                      <img
-                        src={track.coverUrl || DEFAULT_COVER_FALLBACK}
-                        alt=""
-                        style={{ width: "44px", height: "44px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                      />
+                        <img
+                          src={track.coverUrl || DEFAULT_COVER_FALLBACK}
+                          alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER_FALLBACK;
+                          }}
+                        />
+                        <div
+                          className="search-play-overlay"
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            background: isTrackPlaying ? "rgba(0, 0, 0, 0.55)" : "rgba(0, 0, 0, 0.45)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#FFFFFF",
+                            opacity: isTrackPlaying ? 1 : 0,
+                            transition: "opacity 0.15s ease",
+                          }}
+                        >
+                          {isTrackPlaying ? <PauseIcon width={18} height={18} /> : <PlayIcon width={18} height={18} />}
+                        </div>
+                      </div>
+
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "14.5px", fontWeight: 600, color: isTrackActive ? "#0284C7" : "var(--sw-text-h)" }}>
+                        <div
+                          onClick={() => onNavigate(`/track/${track.id}`)}
+                          style={{
+                            fontSize: "14.5px",
+                            fontWeight: 600,
+                            color: isTrackActive ? "#0284C7" : "var(--sw-text-h)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            cursor: "pointer",
+                          }}
+                        >
                           {track.title}
                         </div>
-                        <div style={{ fontSize: "13px", color: "#64748B" }}>
+                        <div
+                          onClick={() => track.creator?.userId && onNavigate(`/creator/${track.creator.userId}`)}
+                          style={{
+                            fontSize: "13px",
+                            color: "#64748B",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            cursor: "pointer",
+                          }}
+                        >
                           {track.creator?.displayName || "Unknown Artist"} {track.album ? `• ${track.album.title}` : ""}
                         </div>
                       </div>
