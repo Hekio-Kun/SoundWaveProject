@@ -79,23 +79,18 @@ export function MusicPlayer({
       audio.volume = restored;
     }
   };
-  const [shuffle, setShuffle] = useState(() => {
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+
+  // Xóa bỏ key cũ trong sessionStorage nếu còn sót lại từ các phiên trước
+  useEffect(() => {
     try {
-      return sessionStorage.getItem("soundwave_player_shuffle") === "true";
+      sessionStorage.removeItem("soundwave_player_shuffle");
+      sessionStorage.removeItem("soundwave_player_repeat");
     } catch {
-      return false;
+      // ignore
     }
-  });
-  const [repeat, setRepeat] = useState(() => {
-    try {
-      // Prevent both shuffle and repeat being active simultaneously from stored session
-      const savedShuffle = sessionStorage.getItem("soundwave_player_shuffle") === "true";
-      const savedRepeat = sessionStorage.getItem("soundwave_player_repeat") === "true";
-      return savedRepeat && !savedShuffle;
-    } catch {
-      return false;
-    }
-  });
+  }, []);
   const [localQueueOpen, setLocalQueueOpen] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -104,24 +99,6 @@ export function MusicPlayer({
   const actualListenedSecondsRef = useRef(0);
   const errorTimerRef = useRef<number | null>(null);
   const originalQueueRef = useRef<LandingTrack[]>([]);
-
-  // NF03: Persist shuffle preference to sessionStorage
-  useEffect(() => {
-    try {
-      sessionStorage.setItem("soundwave_player_shuffle", String(shuffle));
-    } catch {
-      // ignore
-    }
-  }, [shuffle]);
-
-  // NF03: Persist repeat preference to sessionStorage
-  useEffect(() => {
-    try {
-      sessionStorage.setItem("soundwave_player_repeat", String(repeat));
-    } catch {
-      // ignore
-    }
-  }, [repeat]);
 
   const toggleShuffle = () => {
     setShuffle((prev) => {
