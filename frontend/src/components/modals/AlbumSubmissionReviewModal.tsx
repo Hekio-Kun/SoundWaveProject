@@ -327,7 +327,24 @@ export function AlbumSubmissionReviewModal({ open, onClose, album, onSuccess }: 
                   {current.title}
                 </h3>
 
-                <p style={{ fontSize: "13px", color: "var(--sw-text-secondary, #64748B)", margin: "0 0 10px", lineHeight: "1.5", wordBreak: "break-word", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--sw-text-secondary, #64748B)",
+                    margin: "0 0 10px",
+                    lineHeight: "1.5",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                    whiteSpace: "pre-wrap",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: "100%",
+                  }}
+                  title={current.description || undefined}
+                >
                   {current.description || "No description provided."}
                 </p>
 

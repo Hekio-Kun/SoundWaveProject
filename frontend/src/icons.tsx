@@ -13,6 +13,7 @@ export const PreviousIcon = (p: IconProps) => <svg {...base} {...p} fill="curren
 export const ShuffleIcon = (p: IconProps) => <svg {...base} {...p}><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>;
 export const RepeatIcon = (p: IconProps) => <svg {...base} {...p}><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>;
 export const VolumeIcon = (p: IconProps) => <svg {...base} {...p}><path d="M11 5 6 9H3v6h3l5 4V5ZM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg>;
+export const VolumeMuteIcon = (p: IconProps) => <svg {...base} {...p}><path d="M11 5 6 9H3v6h3l5 4V5ZM22 9l-6 6M16 9l6 6"/></svg>;
 export const QueueIcon = (p: IconProps) => <svg {...base} {...p}><path d="M4 6h12M4 11h12M4 16h8"/><path d="m17 15 4 3-4 3v-6Z"/></svg>;
 export const MoreIcon = (p: IconProps) => <svg {...base} {...p}><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg>;
 export const ArrowIcon = (p: IconProps) => <svg {...base} {...p}><path d="M5 12h14m-6-6 6 6-6 6"/></svg>;

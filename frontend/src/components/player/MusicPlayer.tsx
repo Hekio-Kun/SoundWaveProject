@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { FileTextIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon } from "../../icons";
+import { FileTextIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, ShuffleIcon, VolumeIcon, VolumeMuteIcon } from "../../icons";
 import type { LandingTrack } from "../../types";
 import { covers } from "../../data";
 import { formatDurationSeconds as formatTime } from "../../utils/timeUtils";
@@ -66,6 +66,19 @@ export function MusicPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(track.durationMs / 1000);
   const [volume, setVolume] = useState(() => (Number.isFinite(audio?.volume) ? audio.volume : 0.8));
+  const lastVolumeRef = useRef<number>(volume > 0 ? volume : 0.8);
+
+  const handleToggleMute = () => {
+    if (volume > 0) {
+      lastVolumeRef.current = volume;
+      setVolume(0);
+      audio.volume = 0;
+    } else {
+      const restored = lastVolumeRef.current > 0 ? lastVolumeRef.current : 0.8;
+      setVolume(restored);
+      audio.volume = restored;
+    }
+  };
   const [shuffle, setShuffle] = useState(() => {
     try {
       return sessionStorage.getItem("soundwave_player_shuffle") === "true";
@@ -432,7 +445,16 @@ export function MusicPlayer({
           <FileTextIcon width={17} height={17} />
         </button>
         <button className={`player-icon ${isQueueActive ? "player-icon--active" : ""}`} onClick={handleQueueClick} aria-label="Queue"><QueueIcon /></button>
-        <VolumeIcon />
+        <button
+          type="button"
+          className={`player-icon ${volume === 0 ? "player-icon--muted" : ""}`}
+          onClick={handleToggleMute}
+          aria-label={volume === 0 ? "Unmute audio" : "Mute audio"}
+          title={volume === 0 ? "Unmute audio (restore volume)" : "Mute audio"}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "grid", placeItems: "center" }}
+        >
+          {volume === 0 ? <VolumeMuteIcon width={18} height={18} /> : <VolumeIcon width={18} height={18} />}
+        </button>
         <input
           type="range"
           min="0"
@@ -443,6 +465,9 @@ export function MusicPlayer({
             const val = Number(event.target.value);
             setVolume(val);
             audio.volume = val;
+            if (val > 0) {
+              lastVolumeRef.current = val;
+            }
           }}
           aria-label="Volume"
           style={{ "--range-progress": `${volume * 100}%` } as CSSProperties}

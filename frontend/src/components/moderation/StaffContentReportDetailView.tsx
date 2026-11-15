@@ -23,6 +23,7 @@ import { CenterNotificationPopup } from "../modals/CenterNotificationPopup";
 import { parseLyricsToLines, formatTimeDisplay } from "../common/LyricSyncTab";
 import { formatDurationSeconds as formatSeconds } from "../../utils/timeUtils";
 import { formatDate } from "../../utils/dateUtils";
+import { covers } from "../../data";
 
 type Props = {
   reportId: number;
@@ -508,6 +509,9 @@ export function StaffContentReportDetailView({
                   src={report.coverUrl}
                   alt={report.trackTitle}
                   className="staff-hero-artwork"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                  }}
                 />
               ) : (
                 <div

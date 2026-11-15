@@ -3,6 +3,7 @@ import { AlertIcon, CheckIcon, FlagIcon, PaperclipIcon, RefreshIcon } from "../i
 import { staffReportsApi } from "../api/staffReports";
 import { ApiError } from "../api/client";
 import type { StaffContentReportResponse } from "../types";
+import { covers } from "../data";
 import { StaffContentReportDetailView } from "../components/moderation/StaffContentReportDetailView";
 import { CenterNotificationPopup } from "../components/modals/CenterNotificationPopup";
 
@@ -297,25 +298,17 @@ export function StaffContentReportsPage({ onNavigate }: Props) {
                             <img
                               src={report.coverUrl}
                               alt={report.trackTitle}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = covers.dawn;
+                              }}
                               style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
                             />
                           ) : (
-                            <div
-                              style={{
-                                width: "42px",
-                                height: "42px",
-                                borderRadius: "8px",
-                                background: "#D4A373",
-                                color: "#FFFFFF",
-                                display: "grid",
-                                placeItems: "center",
-                                fontSize: "0.85rem",
-                                fontWeight: 700,
-                                flexShrink: 0,
-                              }}
-                            >
-                              ♪
-                            </div>
+                            <img
+                              src={covers.dawn}
+                              alt={report.trackTitle}
+                              style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
+                            />
                           )}
                           <div style={{ minWidth: 0 }}>
                             <button
