@@ -1,22 +1,75 @@
 package groupone.soundwaveproject.authentication.service;
 
+import groupone.soundwaveproject.authentication.exception.EmailDeliveryUnavailableException;
+import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthenticationMailService {
-    private final JavaMailSender mailSender;
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(15);
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+    private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
-    @Value("${app.mail.from:magicinema.system@gmail.com}")
-    private String fromAddress;
+    private final JavaMailSender mailSender;
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
+
+    @Value("${app.mail.from:soundwave.song.website@gmail.com}")
+    private String fromAddress = "soundwave.song.website@gmail.com";
+
+    @Value("${app.mail.webhook-url:}")
+    private String webhookUrl = "";
+
+    @Value("${app.mail.webhook-secret:}")
+    private String webhookSecret = "";
+
+    @Value("${app.mail.brevo-api-key:}")
+    private String brevoApiKey = "";
+
+    @Value("${app.mail.resend-api-key:}")
+    private String resendApiKey = "";
+
+    @Autowired
+    public AuthenticationMailService(JavaMailSender mailSender) {
+        this(mailSender, createDefaultHttpClient());
+    }
+
+    AuthenticationMailService(JavaMailSender mailSender, HttpClient httpClient) {
+        this.mailSender = mailSender;
+        this.httpClient = httpClient;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    private static HttpClient createDefaultHttpClient() {
+        return HttpClient.newBuilder()
+                // Follow redirects required by Google Apps Script Web App POST (/exec -> 302)
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .connectTimeout(HTTP_CONNECT_TIMEOUT)
+                .build();
+    }
 
     /**
      * Gửi mã OTP dùng một lần để xác thực email đăng ký.
@@ -66,18 +119,9 @@ public class AuthenticationMailService {
     public boolean sendStaffCredentials(String recipient, String fullName, String temporaryPassword, String loginUrl) {
         log.info("Dispatching staff account credential email to: {}", recipient);
         try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-
-            helper.setFrom(fromAddress);
-            helper.setTo(recipient);
-            helper.setSubject("Welcome to SoundWave - Your Staff Account Credentials");
-
             String plainText = buildStaffCredentialsPlainText(fullName, recipient, temporaryPassword, loginUrl);
             String htmlContent = buildStaffCredentialsHtml(fullName, recipient, temporaryPassword, loginUrl);
-
-            helper.setText(plainText, htmlContent);
-            mailSender.send(mimeMessage);
+            dispatchEmail(recipient, "Welcome to SoundWave - Your Staff Account Credentials", plainText, htmlContent);
 
             log.info("Successfully dispatched staff credential email to: {}", recipient);
             return true;
@@ -166,11 +210,151 @@ public class AuthenticationMailService {
     }
 
     private void send(String recipient, String subject, String content) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromAddress);
-        message.setTo(recipient);
-        message.setSubject(subject);
-        message.setText(content);
-        mailSender.send(message);
+        try {
+            dispatchEmail(recipient, subject, content, null);
+        } catch (EmailDeliveryUnavailableException exception) {
+            throw exception;
+        } catch (MailException | MessagingException | IOException exception) {
+            log.error("Failed to send email to {} with subject '{}': {}", recipient, subject, exception.getMessage(), exception);
+            throw new EmailDeliveryUnavailableException();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while sending email to {}: {}", recipient, exception.getMessage());
+            throw new EmailDeliveryUnavailableException();
+        }
+    }
+
+    // Ưu tiên HTTPS API (cổng 443) cho môi trường cloud bị chặn SMTP như Render, fallback về SMTP khi chạy local.
+    private void dispatchEmail(String recipient, String subject, String plainText, String htmlContent)
+            throws MessagingException, IOException, InterruptedException {
+        if (hasText(webhookUrl)) {
+            sendViaWebhook(recipient, subject, plainText, htmlContent);
+            return;
+        }
+        if (hasText(brevoApiKey)) {
+            sendViaBrevoApi(recipient, subject, plainText, htmlContent);
+            return;
+        }
+        if (hasText(resendApiKey)) {
+            sendViaResendApi(recipient, subject, plainText, htmlContent);
+            return;
+        }
+        sendViaSmtp(recipient, subject, plainText, htmlContent);
+    }
+
+    private void sendViaSmtp(String recipient, String subject, String plainText, String htmlContent)
+            throws MessagingException {
+        if (!hasText(htmlContent)) {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromAddress);
+            message.setTo(recipient);
+            message.setSubject(subject);
+            message.setText(plainText);
+            mailSender.send(message);
+            return;
+        }
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+        helper.setFrom(fromAddress);
+        helper.setTo(recipient);
+        helper.setSubject(subject);
+        helper.setText(plainText, htmlContent);
+        mailSender.send(mimeMessage);
+    }
+
+    private void sendViaWebhook(String recipient, String subject, String plainText, String htmlContent)
+            throws IOException, InterruptedException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (hasText(webhookSecret)) {
+            payload.put("secret", webhookSecret.trim());
+        }
+        payload.put("to", recipient);
+        payload.put("subject", subject);
+        payload.put("text", plainText);
+        if (hasText(htmlContent)) {
+            payload.put("html", htmlContent);
+        }
+        String responseBody = postJson(webhookUrl.trim(), null, null, payload, "Mail Webhook");
+        validateWebhookJsonResponse(responseBody);
+    }
+
+    private void sendViaBrevoApi(String recipient, String subject, String plainText, String htmlContent)
+            throws IOException, InterruptedException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sender", Map.of("name", "SoundWave", "email", fromAddress));
+        payload.put("to", List.of(Map.of("email", recipient)));
+        payload.put("subject", subject);
+        payload.put("textContent", plainText);
+        if (hasText(htmlContent)) {
+            payload.put("htmlContent", htmlContent);
+        }
+        postJson(BREVO_API_URL, "api-key", brevoApiKey.trim(), payload, "Brevo API");
+    }
+
+    private void sendViaResendApi(String recipient, String subject, String plainText, String htmlContent)
+            throws IOException, InterruptedException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", "SoundWave <" + fromAddress + ">");
+        payload.put("to", List.of(recipient));
+        payload.put("subject", subject);
+        payload.put("text", plainText);
+        if (hasText(htmlContent)) {
+            payload.put("html", htmlContent);
+        }
+        postJson(RESEND_API_URL, "Authorization", "Bearer " + resendApiKey.trim(), payload, "Resend API");
+    }
+
+    private String postJson(
+            String endpointUrl,
+            String authHeaderName,
+            String authHeaderValue,
+            Map<String, Object> payload,
+            String providerName
+    ) throws IOException, InterruptedException {
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(payload);
+        } catch (JacksonException exception) {
+            log.error("Failed to serialize {} email payload: {}", providerName, exception.getMessage());
+            throw new EmailDeliveryUnavailableException();
+        }
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(endpointUrl))
+                .timeout(HTTP_REQUEST_TIMEOUT)
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody));
+
+        if (hasText(authHeaderName) && hasText(authHeaderValue)) {
+            builder.header(authHeaderName, authHeaderValue);
+        }
+
+        HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.error("{} returned HTTP {}: {}", providerName, response.statusCode(), response.body());
+            throw new EmailDeliveryUnavailableException();
+        }
+        return response.body();
+    }
+
+    private void validateWebhookJsonResponse(String responseBody) {
+        if (!hasText(responseBody) || !responseBody.trim().startsWith("{")) {
+            return;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            if (root.has("ok") && root.path("ok").isBoolean() && !root.path("ok").asBoolean(true)) {
+                String errorMessage = root.has("error") ? root.path("error").asString("") : "unknown error";
+                log.error("Mail Webhook reported failure: {}", errorMessage);
+                throw new EmailDeliveryUnavailableException();
+            }
+        } catch (JacksonException exception) {
+            log.warn("Unexpected non-JSON response from Mail Webhook: {}", exception.getMessage());
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

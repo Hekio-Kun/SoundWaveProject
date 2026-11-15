@@ -6,6 +6,7 @@ import groupone.soundwaveproject.authentication.exception.AccountBannedException
 import groupone.soundwaveproject.authentication.exception.AccountUnavailableException;
 import groupone.soundwaveproject.authentication.exception.AuthenticationException;
 import groupone.soundwaveproject.authentication.exception.EmailAlreadyExistsException;
+import groupone.soundwaveproject.authentication.exception.EmailDeliveryUnavailableException;
 import groupone.soundwaveproject.authentication.exception.EmailNotVerifiedException;
 import groupone.soundwaveproject.authentication.exception.InvalidCredentialsException;
 import groupone.soundwaveproject.authentication.exception.InvalidOtpException;
@@ -54,6 +55,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({AccountBannedException.class, EmailNotVerifiedException.class})
     public ResponseEntity<ApiErrorResponse> handleForbidden(AuthenticationException exception, HttpServletRequest request) {
         return build(HttpStatus.FORBIDDEN, exception.getCode(), exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(EmailDeliveryUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleEmailDeliveryUnavailable(
+            EmailDeliveryUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, exception.getCode(), exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(ProfileNotFoundException.class)
