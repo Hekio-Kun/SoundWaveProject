@@ -157,12 +157,18 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
   return (
     <div className="ops-dashboard ops-dashboard--admin">
       <DashboardHeading
-        eyebrow="ADMINISTRATION"
-        title="System Administration"
+        eyebrow="ADMINISTRATION · UC-29"
+        title="System Statistics"
         description="Review users, published content, playback trends, and platform health."
         icon={<ShieldIcon width={15} height={15} />}
       >
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+          {data?.generatedAt ? (
+            <span style={{ fontSize: "12px", color: "#64748B", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10B981" }} />
+              Snapshot: {new Date(data.generatedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
+          ) : null}
           <label className="ops-range-select">
             <span>Date range</span>
             <select
@@ -344,43 +350,44 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
                   <table className="ops-table">
                     <thead>
                       <tr>
-                        <th style={{ width: "36px" }}>#</th>
-                        <th>Track</th>
-                        <th>Genre</th>
-                        <th style={{ textAlign: "right" }}>Plays</th>
+                        <th style={{ width: "44px", textAlign: "center" }}>#</th>
+                        <th style={{ minWidth: "200px" }}>Track</th>
+                        <th style={{ width: "120px", whiteSpace: "nowrap" }}>Genre</th>
+                        <th style={{ width: "90px", textAlign: "right", whiteSpace: "nowrap" }}>Plays</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.topTracks.map((track, idx) => (
                         <tr key={track.id}>
-                          <td style={{ fontWeight: 800, color: "#8C5828" }}>{idx + 1}</td>
+                          <td style={{ fontWeight: 800, color: "#8C5828", textAlign: "center", fontSize: "14px" }}>{idx + 1}</td>
                           <td>
                             <div className="ops-user-cell">
                               {track.coverUrl ? (
                                 <img
                                   src={track.coverUrl}
                                   alt={track.title}
-                                  style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }}
+                                  style={{ width: "44px", height: "44px", borderRadius: "10px", objectFit: "cover", flexShrink: 0 }}
                                 />
                               ) : (
                                 <span
                                   style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    borderRadius: "8px",
+                                    width: "44px",
+                                    height: "44px",
+                                    borderRadius: "10px",
                                     background: "#E0F2FE",
                                     color: "#0284C7",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  <MusicIcon width={16} height={16} />
+                                  <MusicIcon width={18} height={18} />
                                 </span>
                               )}
-                              <div>
-                                <b>{track.title}</b>
-                                <small>{track.uploaderName}</small>
+                              <div style={{ minWidth: 0 }}>
+                                <b style={{ fontSize: "14px" }}>{track.title}</b>
+                                <small style={{ fontSize: "12px" }}>{track.uploaderName}</small>
                               </div>
                             </div>
                           </td>
@@ -389,7 +396,7 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
                               {track.genreName}
                             </span>
                           </td>
-                          <td style={{ textAlign: "right", fontWeight: 700, color: "#0284C7" }}>
+                          <td style={{ textAlign: "right", fontWeight: 800, fontSize: "15px", color: "#0284C7" }}>
                             {formatNumber(track.playCount)}
                           </td>
                         </tr>
@@ -416,10 +423,10 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
                   <table className="ops-table">
                     <thead>
                       <tr>
-                        <th>User</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Joined</th>
+                        <th style={{ minWidth: "160px" }}>User</th>
+                        <th style={{ width: "95px", whiteSpace: "nowrap" }}>Role</th>
+                        <th style={{ width: "105px", whiteSpace: "nowrap" }}>Status</th>
+                        <th style={{ width: "80px", textAlign: "right", whiteSpace: "nowrap" }}>Joined</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -431,27 +438,31 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
                                 <img
                                   src={account.avatarUrl}
                                   alt={account.displayName}
-                                  style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }}
+                                  style={{ width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
                                 />
                               ) : (
-                                <span>{account.initials}</span>
+                                <span style={{ width: "42px", height: "42px", borderRadius: "50%", flexShrink: 0, fontSize: "13px" }}>
+                                  {account.initials}
+                                </span>
                               )}
-                              <div>
-                                <b>{account.displayName}</b>
-                                <small>{account.email}</small>
+                              <div style={{ minWidth: 0 }}>
+                                <b style={{ fontSize: "14px" }}>{account.displayName}</b>
+                                <small style={{ fontSize: "12px" }}>{account.email}</small>
                               </div>
                             </div>
                           </td>
-                          <td>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             <span className="ops-role-chip">{account.role}</span>
                           </td>
-                          <td>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             <span className={`ops-status ${account.status === "Verified" ? "is-success" : "is-warning"}`}>
                               <i />
                               {account.status}
                             </span>
                           </td>
-                          <td>{formatTimeAgo(account.joinedAt)}</td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap", fontSize: "12.5px", color: "#64748B", fontWeight: 500 }}>
+                            {formatTimeAgo(account.joinedAt)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -465,6 +476,8 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
     </div>
   );
 }
+
+export const AdminStatisticsPage = AdminDashboardPage;
 
 export { StaffDashboardPage } from "./StaffDashboardPage";
 

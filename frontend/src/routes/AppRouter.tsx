@@ -642,7 +642,7 @@ export function AppRouter(): React.ReactElement | null {
     );
   }
 
-  if (pathname === "/admin" || pathname === "/admin/dashboard") {
+  if (pathname === "/admin" || pathname === "/admin/dashboard" || pathname === "/admin/statistics") {
     return user?.role === "ADMIN" ? (
       <AdminDashboardPage onNavigate={navigate} />
     ) : (

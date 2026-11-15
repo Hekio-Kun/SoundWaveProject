@@ -18,16 +18,26 @@ export function useRouter(): AppRouterState {
   const [route, setRoute] = useState(() => getCurrentRoute());
 
   useEffect(() => {
+    const handlePopState = () => {
+      const event = new CustomEvent("soundwave:back", { cancelable: true });
+      const notCancelled = window.dispatchEvent(event);
+      if (!notCancelled) {
+        // Navigation was intercepted by an unsaved changes guard
+        window.history.pushState(null, "", route);
+        return;
+      }
+      setRoute(getCurrentRoute());
+    };
     const handleLocationChange = () => {
       setRoute(getCurrentRoute());
     };
-    window.addEventListener("popstate", handleLocationChange);
+    window.addEventListener("popstate", handlePopState);
     window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange);
     return () => {
-      window.removeEventListener("popstate", handleLocationChange);
+      window.removeEventListener("popstate", handlePopState);
       window.removeEventListener(LOCATION_CHANGE_EVENT, handleLocationChange);
     };
-  }, []);
+  }, [route]);
 
   // navigateTo() tự phát event "soundwave:navigate" (cancelable) để trang có thay đổi chưa lưu chặn lại
   const navigate = useCallback((path: string) => navigateTo(path), []);
