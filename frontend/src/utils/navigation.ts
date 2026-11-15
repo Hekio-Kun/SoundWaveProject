@@ -5,6 +5,19 @@
 
 export const LOCATION_CHANGE_EVENT = "soundwave:locationchange";
 
+export type NavigateOptions = {
+  replace?: boolean;
+  force?: boolean;
+  reloadIfSame?: boolean;
+};
+
+let routeReloadKey = 0;
+
+/** Đếm số lần người dùng yêu cầu tải lại route hiện tại (ví dụ bấm lại vào mục đang chọn trên thanh điều hướng). */
+export function getRouteReloadKey(): number {
+  return routeReloadKey;
+}
+
 /** Route hiện tại dạng "/path?query" (không có dấu #). */
 export function getCurrentRoute(): string {
   const { pathname, search } = window.location;
@@ -25,10 +38,10 @@ export function notifyLocationChange(): void {
 }
 
 /**
- * Điều hướng không reload trang.
+ * Điều hướng không reload toàn trang.
  * Phát event "soundwave:navigate" (cancelable) để trang có thay đổi chưa lưu có thể chặn.
  */
-export function navigateTo(path: string, options: { replace?: boolean; force?: boolean } = {}): void {
+export function navigateTo(path: string, options: NavigateOptions = {}): void {
   const target = normalizePath(path);
 
   if (!options.force) {
@@ -39,7 +52,15 @@ export function navigateTo(path: string, options: { replace?: boolean; force?: b
     if (!window.dispatchEvent(event)) return;
   }
 
-  if (target === getCurrentRoute()) {
+  const currentRoute = getCurrentRoute();
+  const targetPathname = target.split("?")[0];
+  const currentPathname = currentRoute.split("?")[0];
+
+  if (options.reloadIfSame && targetPathname === currentPathname) {
+    routeReloadKey += 1;
+  }
+
+  if (target === currentRoute) {
     notifyLocationChange();
     return;
   }

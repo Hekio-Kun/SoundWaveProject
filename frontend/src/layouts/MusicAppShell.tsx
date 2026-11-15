@@ -6,6 +6,7 @@ import { LyricsDrawer } from "../components/player/LyricsDrawer";
 import { Sidebar } from "../components/layout/Sidebar";
 import { SoundWaveFooter } from "../components/layout/SoundWaveFooter";
 import type { CurrentUser, LandingTrack } from "../types";
+import type { NavigateOptions } from "../utils/navigation";
 
 /**
  * Props for the master {@link MusicAppShell} application layout wrapper.
@@ -16,7 +17,9 @@ export type MusicAppShellProps = {
   /** Currently active navigation route key */
   activeRoute: string;
   /** Navigation callback to switch between views */
-  onNavigate: (route: string) => void;
+  /** Counter incremented when re-clicking an active route to reload the view */
+  reloadKey?: number;
+  onNavigate: (route: string, options?: NavigateOptions) => void;
   /** Currently signed-in user object, or null for guests */
   user: CurrentUser | null;
   /** Whether the user is authenticated */
@@ -65,6 +68,7 @@ export type MusicAppShellProps = {
 export function MusicAppShell({
   children,
   activeRoute,
+  reloadKey = 0,
   onNavigate,
   user,
   isAuthenticated,
@@ -89,7 +93,7 @@ export function MusicAppShell({
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     document.getElementById("app-scroll-region")?.scrollTo({ top: 0, behavior: "auto" });
-  }, [activeRoute]);
+  }, [activeRoute, reloadKey]);
 
   return (
     <div className={`music-app-shell ${hasPlayer ? "music-app-shell--with-player" : ""} ${queueOpen ? "music-app-shell--queue-open" : ""}`}>

@@ -639,8 +639,10 @@ body.modal-open .app-scroll-region {
 }
 
 .ops-shell-content {
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   padding: 10px clamp(20px, 3vw, 44px) 56px;
 }
@@ -4426,4 +4428,417 @@ body.modal-open .app-scroll-region {
 
 .staff-lyric-ts-jump-btn:active {
   transform: translateY(0);
+}
+
+/* =========================================================================
+   STAFF REPORTED TRACKS QUEUE TABLE (NO HORIZONTAL OVERFLOW)
+   ========================================================================= */
+.staff-reports-hero-banner {
+  margin-bottom: 24px;
+}
+
+.staff-reports-hero-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.staff-reports-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-reports-panel {
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.staff-reports-table-wrap {
+  margin: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.staff-reports-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.staff-reports-col-track {
+  width: 27.5%;
+}
+
+.staff-reports-col-reason {
+  width: 20.5%;
+}
+
+.staff-reports-col-reporter {
+  width: 15.5%;
+}
+
+.staff-reports-col-date {
+  width: 14%;
+}
+
+.staff-reports-col-status {
+  width: 12.5%;
+}
+
+.staff-reports-col-actions {
+  width: 10%;
+}
+
+.staff-reports-table th,
+.staff-reports-table td {
+  padding: 12px 8px;
+}
+
+.staff-reports-table th:first-child,
+.staff-reports-table td:first-child {
+  padding-left: 16px;
+}
+
+.staff-reports-table th:last-child,
+.staff-reports-table td:last-child {
+  padding-left: 4px;
+  padding-right: 12px;
+}
+
+.staff-reports-table th {
+  white-space: normal;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
+.staff-reports-th-center,
+.staff-reports-td-center {
+  text-align: center;
+}
+
+.staff-reports-track-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.staff-reports-track-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.staff-reports-track-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.staff-reports-track-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: #1c1917;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  text-align: left;
+}
+
+.staff-reports-track-btn:hover {
+  color: var(--ops-brand-hover);
+}
+
+.staff-reports-track-artist {
+  display: block;
+  width: 100%;
+  color: #57534e;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staff-reports-reason-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #be123c;
+  background-color: #fff1f2;
+  padding: 5px 10px;
+  border-radius: 14px;
+  border: 1px solid #fecdd3;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(190, 18, 60, 0.04);
+}
+
+.staff-reports-reason-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #e11d48;
+  flex-shrink: 0;
+}
+
+.staff-reports-reporter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.staff-reports-reporter-handle {
+  font-weight: 600;
+  color: #0c4a6e;
+  font-size: 0.84rem;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-reports-evidence-clip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  background-color: #e0f2fe;
+  border: 1px solid #bae6fd;
+  padding: 3px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.staff-reports-count-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #57534e;
+  background-color: #f6efe3;
+  border: 1px solid #e8dccb;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.staff-reports-count-pill.is-multi {
+  color: #0369a1;
+  background-color: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+.staff-reports-date-text {
+  display: block;
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #57534e;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.staff-report-status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.staff-report-status-badge.is-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.staff-report-status-badge.is-resolved {
+  background-color: #def7ec;
+  color: #03543f;
+}
+
+.staff-report-status-badge.is-dismissed {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.staff-reports-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin: 0 auto;
+  border: 1px solid var(--ops-border, #e2e8f0);
+}
+
+.staff-reports-action-btn.button-primary {
+  border-color: transparent;
+}
+
+.staff-reports-action-label {
+  display: none;
+}
+
+@media (max-width: 1180px) and (min-width: 961px) {
+  .staff-reports-table th {
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+  }
+}
+
+@media (min-width: 1200px) {
+  .staff-reports-table th,
+  .staff-reports-table td {
+    padding: 13px 12px;
+  }
+
+  .staff-reports-table th:first-child,
+  .staff-reports-table td:first-child {
+    padding-left: 20px;
+  }
+
+  .staff-reports-table th:last-child,
+  .staff-reports-table td:last-child {
+    padding-right: 18px;
+  }
+
+  .staff-reports-track-cover {
+    width: 42px;
+    height: 42px;
+  }
+
+  .staff-reports-track-cell {
+    gap: 12px;
+  }
+
+  .staff-reports-reason-pill {
+    font-size: 0.84rem;
+    padding: 6px 12px;
+  }
+
+  .staff-report-status-badge {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+  }
+}
+
+@media (max-width: 960px) {
+  .staff-reports-table,
+  .staff-reports-table tbody,
+  .staff-reports-table tr,
+  .staff-reports-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .staff-reports-table colgroup,
+  .staff-reports-table thead {
+    display: none;
+  }
+
+  .staff-reports-table tr {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--ops-border-subtle);
+  }
+
+  .staff-reports-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .staff-reports-table td {
+    padding: 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .staff-reports-table td[data-cell="track"] {
+    padding: 0 0 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed var(--ops-border-subtle);
+  }
+
+  .staff-reports-table td[data-cell="track"] .staff-reports-track-btn,
+  .staff-reports-table td[data-cell="track"] .staff-reports-track-artist {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .staff-reports-table td[data-cell="reason"],
+  .staff-reports-table td[data-cell="reporter"],
+  .staff-reports-table td[data-cell="date"],
+  .staff-reports-table td[data-cell="status"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    text-align: right;
+  }
+
+  .staff-reports-table td[data-cell="reason"]::before,
+  .staff-reports-table td[data-cell="reporter"]::before,
+  .staff-reports-table td[data-cell="date"]::before,
+  .staff-reports-table td[data-cell="status"]::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ops-text-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .staff-reports-reporter-wrap {
+    justify-content: flex-end;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .staff-reports-table td[data-cell="actions"] {
+    padding: 10px 0 0;
+    margin-top: 8px;
+    border-top: 1px solid var(--ops-border-subtle);
+  }
+
+  .staff-reports-action-btn {
+    width: 100%;
+    height: 38px;
+    gap: 8px;
+    padding: 0 14px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .staff-reports-action-label {
+    display: inline;
+  }
 }

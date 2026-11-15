@@ -1,9 +1,10 @@
 import { ClockIcon, CompassIcon, DashboardIcon, DiscIcon, FilterIcon, FlagIcon, HeartIcon, LibraryIcon, PlusIcon, ShieldIcon, TrophyIcon, UploadIcon } from "../../icons";
 import type { CurrentUser } from "../../types";
+import type { NavigateOptions } from "../../utils/navigation";
 
 type Props = {
   activeRoute: string;
-  onNavigate: (route: string) => void;
+  onNavigate: (route: string, options?: NavigateOptions) => void;
   onCreatePlaylist: () => void;
   isAuthenticated: boolean;
   userRole?: CurrentUser["role"];
@@ -11,11 +12,12 @@ type Props = {
 
 export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthenticated, userRole }: Props) {
   const isCurrent = (route: string) => activeRoute === route || (route !== "/" && activeRoute.startsWith(route));
+  const handleNavClick = (route: string) => onNavigate(route, { reloadIfSame: true });
 
   return (
     <aside className="app-sidebar" aria-label="Main navigation">
       <div className="sidebar-brand">
-        <button className="brand" onClick={() => onNavigate("/")} aria-label="Go to SoundWave home">
+        <button className="brand" onClick={() => handleNavClick("/")} aria-label="Go to SoundWave home">
           <img className="brand-mark" src="/soundwave-logo.png" alt="SoundWave logo" />
           <span>SoundWave</span>
         </button>
@@ -27,7 +29,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
             <span className="nav-group-title">SYSTEM ADMINISTRATION</span>
             <button
               className={`nav-item ${isCurrent("/admin") ? "nav-item--active" : ""}`}
-              onClick={() => onNavigate("/admin/statistics")}
+              onClick={() => handleNavClick("/admin/statistics")}
             >
               <ShieldIcon />
               <span>System Statistics</span>
@@ -39,7 +41,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
             <span className="nav-group-title">STAFF WORKSPACE</span>
             <button
               className={`nav-item ${isCurrent("/staff") ? "nav-item--active" : ""}`}
-              onClick={() => onNavigate("/staff/dashboard")}
+              onClick={() => handleNavClick("/staff/dashboard")}
             >
               <DashboardIcon />
               <span>Moderation dashboard</span>
@@ -52,28 +54,28 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           <span className="nav-group-title">DISCOVER</span>
           <button
             className={`nav-item ${activeRoute === "/" || activeRoute === "/home" || (activeRoute.startsWith("/explore") && !activeRoute.includes("genre")) ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/")}
+            onClick={() => handleNavClick("/")}
           >
             <CompassIcon />
             <span>Explore</span>
           </button>
           <button
             className={`nav-item ${isCurrent("/ranking") || isCurrent("/charts") ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/ranking")}
+            onClick={() => handleNavClick("/ranking")}
           >
             <TrophyIcon width={18} height={18} />
             <span>Top Charts</span>
           </button>
           <button
             className={`nav-item ${activeRoute.startsWith("/browse") || activeRoute.includes("genre") ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/browse")}
+            onClick={() => handleNavClick("/browse")}
           >
             <FilterIcon width={18} height={18} />
             <span>Browse Catalog</span>
           </button>
           <button
             className={`nav-item ${isCurrent("/albums") && !activeRoute.includes("create") ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/albums")}
+            onClick={() => handleNavClick("/albums")}
           >
             <DiscIcon width={18} height={18} />
             <span>Albums</span>
@@ -84,7 +86,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           <span className="nav-group-title">YOUR LIBRARY</span>
           <button
             className={`nav-item ${isCurrent("/favorites") ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/favorites")}
+            onClick={() => handleNavClick("/favorites")}
           >
             <HeartIcon />
             <span>Favorite tracks</span>
@@ -92,7 +94,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
           {/* [FEATURE]: Đồng bộ active highlight khi xem Playlists hoặc chi tiết Playlist */}
           <button
             className={`nav-item ${activeRoute === "/playlists" || activeRoute.startsWith("/playlist") ? "nav-item--active" : ""}`}
-            onClick={() => onNavigate("/playlists")}
+            onClick={() => handleNavClick("/playlists")}
           >
             <LibraryIcon />
             <span>Playlists</span>
@@ -101,14 +103,14 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
             <>
               <button
                 className={`nav-item ${isCurrent("/history") ? "nav-item--active" : ""}`}
-                onClick={() => onNavigate("/history")}
+                onClick={() => handleNavClick("/history")}
               >
                 <ClockIcon />
                 <span>Listening history</span>
               </button>
               <button
                 className={`nav-item ${isCurrent("/reports") || isCurrent("/reports-history") ? "nav-item--active" : ""}`}
-                onClick={() => onNavigate("/reports")}
+                onClick={() => handleNavClick("/reports")}
               >
                 <FlagIcon width={18} height={18} />
                 <span>Reports history</span>
@@ -135,7 +137,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
                   ? "nav-item--active"
                   : ""
               }`}
-              onClick={() => onNavigate("/track")}
+              onClick={() => handleNavClick("/track")}
             >
               <UploadIcon width={18} height={18} />
               <span>My Tracks</span>
@@ -151,7 +153,7 @@ export function Sidebar({ activeRoute, onNavigate, onCreatePlaylist, isAuthentic
                   ? "nav-item--active"
                   : ""
               }`}
-              onClick={() => onNavigate("/album")}
+              onClick={() => handleNavClick("/album")}
             >
               <DiscIcon width={18} height={18} />
               <span>My Albums</span>
