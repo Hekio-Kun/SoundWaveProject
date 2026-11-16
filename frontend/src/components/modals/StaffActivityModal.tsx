@@ -97,7 +97,7 @@ export function StaffActivityModal({
               }}
             >
               <ActivityIcon width={13} height={13} />
-              STAFF MODERATION AUDIT (UC-27.4)
+              STAFF MODERATION AUDIT
             </span>
             <h2
               id="staff-activity-modal-title"

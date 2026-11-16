@@ -506,7 +506,7 @@ export function ReportsHistoryPage({ onNavigate }: Props) {
                               type="button"
                               className="button button-ghost button-small"
                               onClick={() => setEditingReport(item)}
-                              title="Change Reason and resubmit report (UC-22.3)"
+                              title="Change reason and resubmit report"
                               style={{
                                 fontSize: "11.5px",
                                 padding: "3px 8px",
