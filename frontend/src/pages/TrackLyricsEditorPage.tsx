@@ -33,7 +33,6 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
   const [pendingSubmission, setPendingSubmission] = useState<PendingLyricSubmission | null>(null);
 
   const [mode, setMode] = useState<"official" | "personal">(initialMode);
-  const [personalType, setPersonalType] = useState<"CUSTOM" | "TRANSLATION">("CUSTOM");
   const [submitterNote, setSubmitterNote] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -125,8 +124,8 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
           onNavigate(`/track/${track.id}`);
         }, 1400);
       } else {
-        await lyricsApi.savePersonalLyric(track.id, lrcContent.trim(), personalType);
-        setToastNotice(`${personalType === "TRANSLATION" ? "Translation" : "Personal lyrics"} saved to your library!`);
+        await lyricsApi.savePersonalLyric(track.id, lrcContent.trim(), "CUSTOM");
+        setToastNotice("Personal lyrics saved to your library!");
         setToastType("success");
         setTimeout(() => {
           onNavigate(`/track/${track.id}?tab=personal`);
@@ -235,7 +234,7 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
         </header>
 
         {/* Informative Scope Banners */}
-        {mode === "official" ? (
+        {mode === "official" && (
           hasOfficialLyrics ? (
             <div className="lyric-studio-banner" style={{ borderLeftColor: "#0284C7", background: "rgba(2, 132, 199, 0.08)" }} role="alert">
               <CheckCircleIcon width={20} height={20} style={{ color: "#0284C7", flexShrink: 0 }} />
@@ -278,36 +277,11 @@ export function TrackLyricsEditorPage({ trackId, initialMode = "official", onNav
               </div>
             </div>
           )
-        ) : (
-          <div className="lyric-studio-banner is-personal">
-            <FileTextIcon width={20} height={20} style={{ color: "#A855F7", flexShrink: 0 }} />
-            <div style={{ flex: 1, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-              <span>
-                <strong>Personal Lyrics Studio:</strong> Create custom lyrics or translations private to your account.
-              </span>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button
-                  type="button"
-                  className={`button button-small ${personalType === "CUSTOM" ? "button-primary" : "button-secondary"}`}
-                  onClick={() => setPersonalType("CUSTOM")}
-                >
-                  🎵 Custom Lyrics
-                </button>
-                <button
-                  type="button"
-                  className={`button button-small ${personalType === "TRANSLATION" ? "button-primary" : "button-secondary"}`}
-                  onClick={() => setPersonalType("TRANSLATION")}
-                >
-                  🌐 Translation
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* The Exact LyricSyncTab from Upload Track Page */}
         <LyricSyncTab
-          key={`${mode}-${personalType}`}
+          key={mode}
           audioUrl={track.audioUrl}
           initialLyrics={initialLyrics}
           trackTitle={track.title}
