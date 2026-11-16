@@ -157,7 +157,7 @@ export function AdminDashboardPage({ onNavigate: _onNavigate }: DashboardProps) 
   return (
     <div className="ops-dashboard ops-dashboard--admin">
       <DashboardHeading
-        eyebrow="ADMINISTRATION · UC-29"
+        eyebrow="ADMINISTRATION"
         title="System Statistics"
         description="Review users, published content, playback trends, and platform health."
         icon={<ShieldIcon width={15} height={15} />}
