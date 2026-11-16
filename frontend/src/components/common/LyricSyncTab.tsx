@@ -607,10 +607,6 @@ export function LyricSyncTab({
     });
 
     onApplyLyrics(lrcContent, virtualFile);
-    setFeedbackNotice({
-      type: "success",
-      message: `Successfully applied ${targetLines.length} lyric lines to the track!`,
-    });
   };
 
   const handleApply = () => {
@@ -1888,9 +1884,12 @@ export function LyricSyncTab({
         variant="danger"
         onConfirm={() => {
           setLines([]);
+          setRawText("");
+          setActiveLineIndex(0);
+          setHistory([]);
+          setDictationInput("");
           onClearLyrics?.();
           setClearConfirmOpen(false);
-          setFeedbackNotice({ type: "success", message: "All lyrics have been cleared." });
         }}
         onCancel={() => setClearConfirmOpen(false)}
       />

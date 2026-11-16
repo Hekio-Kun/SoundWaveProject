@@ -211,11 +211,12 @@ export function LyricsDrawer({
 
   const handleCreateCustom = () => {
     if (!currentTrack?.id) return;
+    if (isFullScreen) setIsFullScreen(false);
+    onClose();
     if (onCreateCustomLyrics) {
       onCreateCustomLyrics(currentTrack.id);
     } else if (onNavigate) {
-      onClose();
-      onNavigate(`/tracks/${currentTrack.id}`);
+      onNavigate(`/track/${currentTrack.id}/lyrics/edit?mode=personal`);
     }
   };
 
@@ -575,6 +576,8 @@ export function LyricsDrawer({
           onScroll={handleScroll}
           className="queue-drawer-body"
           style={{
+            position: "relative",
+            zIndex: 1,
             flex: 1,
             overflowY: "auto",
             padding: isFullScreen ? "40px 15% 90px" : "24px 20px 80px",
@@ -771,6 +774,7 @@ export function LyricsDrawer({
                   className="button button-primary"
                   style={{ marginTop: 14 }}
                   onClick={() => {
+                    if (isFullScreen) setIsFullScreen(false);
                     onClose();
                     onNavigate?.("/login");
                   }}
